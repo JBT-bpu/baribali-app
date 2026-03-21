@@ -1,0 +1,118 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Global Styles */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html,
+body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background-color: #000;
+    color: #fff;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* Glow Pulse Animation */
+@keyframes glowPulse {
+
+    0%,
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+
+    50% {
+        opacity: 0.8;
+        transform: scale(1.02);
+    }
+}
+
+.glow-overlay.animate {
+    animation: glowPulse 2s ease-in-out infinite;
+}
+
+/* Parallax Border Animations */
+@keyframes driftInward {
+
+    0%,
+    100% {
+        transform: translate(0, 0);
+    }
+
+    50% {
+        transform: translate(10px, 10px);
+    }
+}
+
+@keyframes scatterOutward {
+    0% {
+        transform: translate(0, 0) scale(1);
+        opacity: 0.85;
+    }
+
+    100% {
+        transform: translate(100px, 100px) scale(0.5);
+        opacity: 0;
+    }
+}
+
+@keyframes ambientFloat {
+
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-5px);
+    }
+}
+
+@keyframes accelerateToCard {
+    0% {
+        transform: scale(1);
+    }
+
+    100% {
+        transform: scale(1.2);
+    }
+}
+
+/* RTL Support */
+[dir='rtl'] {
+    direction: rtl;
+}
+
+/* Mobile viewport */
+@media (max-width: 768px) {
+    body {
+        font-size: 16px;
+    }
+}
+
+/* Prevent text selection on touch */
+* {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+/* Allow text selection for inputs */
+input,
+textarea {
+    -webkit-user-select: text;
+    user-select: text;
+}

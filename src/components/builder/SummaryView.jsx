@@ -1,0 +1,618 @@
+'use client';
+import { useMemo, useState, useEffect } from "react";
+
+// ─── Pickup slot generator ─────────────────────────────────────
+function generatePickupSlots() {
+    const now = new Date();
+    const day = now.getDay(); // 0=Sun 5=Fri 6=Sat
+    const h = now.getHours();
+    const m = now.getMinutes();
+
+    if (day === 6) return null; // Saturday — closed
+    if (day === 5 && h >= 16) return null; // Friday eve (Shabbat) — closed
+
+    const isPeak = (h === 11 && m >= 45) || h === 12 || h === 13 || (h === 14 && m <= 30);
+    const lead = isPeak ? 25 : 15;
+
+    const firstMin = Math.ceil((h * 60 + m + lead) / 5) * 5;
+    const slots = [];
+    for (let i = 0; i < 12; i++) {
+        const totalMins = firstMin + i * 5;
+        const sh = Math.floor(totalMins / 60);
+        const sm = totalMins % 60;
+        if (sh >= 21) break;
+        if (day === 5 && sh >= 16) break;
+        const label = `${String(sh).padStart(2, '0')}:${String(sm).padStart(2, '0')}`;
+        const isPeak = (sh === 11 && sm >= 45) || sh === 12 || sh === 13 || (sh === 14 && sm <= 30);
+        slots.push({ id: label, label, isPeak });
+    }
+    return slots.length ? slots : null;
+}
+import { STEPS, NUTRI, BASE } from "../../data/salad-data.js"; // NUTRI used in bowl calorie total
+const bgImage = "/builder-assets/BG/bg-gradient-base-mobile.png";
+const headerImage = "/builder-assets/header-brand.png";
+import MagicBackground from "./background/MagicBackground.jsx";
+import MixingAnimation from "./ui/MixingAnimation.jsx";
+
+export default function SummaryView({ sels, total, all, comboBadges, notes, setNotes, onBack, onEdit, onNewOrder, base = BASE, sizeLabel = null }) {
+    const [showMixing, setShowMixing] = useState(false);
+    const [ordered, setOrdered] = useState(false);
+    const [notesError, setNotesError] = useState("");
+    const [notesOpen, setNotesOpen] = useState(false);
+    const [highlightedStep, setHighlightedStep] = useState(null);
+    const [pickupTime, setPickupTime] = useState(() => generatePickupSlots()?.[0]?.id ?? null);
+    const [realOrderNum, setRealOrderNum] = useState(null);
+    const [realOrderId, setRealOrderId] = useState(null);
+
+    const highlightStep = (item) => {
+        const step = STEPS.find(s => (sels[s.id] || []).some(i => i.id === item.id));
+        if (!step) return;
+        setHighlightedStep(step.id);
+        setTimeout(() => setHighlightedStep(null), 900);
+    };
+    const MAX_NOTES_LENGTH = 200;
+    const extras = all.filter(i => i.price > 0);
+    const grouped = STEPS.map(s => ({ s, items: sels[s.id] || [] })).filter(g => g.items.length > 0);
+
+    const handleNotesChange = (e) => {
+        const value = e.target.value;
+        if (value.length <= MAX_NOTES_LENGTH) {
+            setNotes(value);
+            setNotesError("");
+        } else {
+            setNotesError(`מקסימום ${MAX_NOTES_LENGTH} תווים`);
+        }
+    };
+
+    const layers = useMemo(() => {
+        const greens = all.filter(i => (i.tags || []).some(t => ["base", "green"].includes(t) && !["herb"].includes(t)));
+        const vegs = all.filter(i => (i.tags || []).some(t => ["fresh", "red", "orange", "yellow", "purple", "warm"].includes(t)));
+        const tops = all.filter(i => (i.tags || []).some(t => ["crunch", "herb", "fat", "sweet"].includes(t)));
+        const prots = all.filter(i => (i.tags || []).includes("protein"));
+        const rest = all.filter(i => !greens.includes(i) && !vegs.includes(i) && !tops.includes(i) && !prots.includes(i));
+        return { greens, vegs, prots, tops, rest };
+    }, [all]);
+
+    if (ordered) return <OrderedScreen total={total} all={all} pickupTime={pickupTime} notes={notes} orderNum={realOrderNum} orderId={realOrderId} onNewOrder={onNewOrder || onBack} />;
+
+    return (
+        <div style={S.root}>
+            <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+            <div style={S.bg} /><div style={S.bgRay} />
+            <MagicBackground />
+
+            {showMixing && (
+                <MixingAnimation
+                    all={all}
+                    total={total}
+                    onComplete={() => {
+                        setShowMixing(false);
+                        setOrdered(true);
+                    }}
+                />
+            )}
+
+            <div style={S.main}>
+                <div style={S.header}>
+                    <img src={headerImage} alt="" aria-hidden="true" style={{ width: "100%", display: "block", height: "72px", objectFit: "cover", objectPosition: "center top", flexShrink: 0 }} />
+                    <div style={S.headerTop}>
+                        <button style={S.backBtn} onClick={onBack}>←</button>
+                        <div style={{ flex: 1, display: "flex", alignItems: "center", gap: "5px" }}>
+                            <span style={{ fontSize: "17px" }}>📋</span>
+                            <span style={{ fontSize: "16px", fontWeight: 800, color: "#e8f5e9" }}>הסלט שלכם</span>
+                        </div>
+                        <div style={S.pricePill}>
+                            <span style={S.priceS}>₪</span>
+                            <span style={S.priceV}>{total}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div style={S.content}>
+                    {/* Layered bowl — hero */}
+                    <div style={S.sumBowlWrap}>
+                        <div style={S.sumBowlGlow} />
+                        <div style={S.sumBowl}>
+                            <div style={S.bowlLayer}>{[...layers.tops, ...layers.prots].map((it, i) => <span key={it.id} onClick={() => highlightStep(it)} style={{ fontSize: "20px", cursor: "pointer", animation: `popBounce 0.3s ease ${i * 35 + 250}ms both`, filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.35))" }}>{it.icon}</span>)}</div>
+                            <div style={S.bowlLayer}>{layers.vegs.map((it, i) => <span key={it.id} onClick={() => highlightStep(it)} style={{ fontSize: "23px", cursor: "pointer", animation: `popBounce 0.3s ease ${i * 35 + 120}ms both`, filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.25))" }}>{it.icon}</span>)}</div>
+                            <div style={S.bowlLayer}>{[...layers.greens, ...layers.rest].map((it, i) => <span key={it.id} onClick={() => highlightStep(it)} style={{ fontSize: "26px", cursor: "pointer", animation: `popBounce 0.3s ease ${i * 35}ms both`, filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.2))" }}>{it.icon}</span>)}</div>
+                        </div>
+                        <NutriRing all={all} />
+                        <div style={S.sumBowlMeta}>
+                            <span>{all.length} מרכיבים</span>
+                            {(() => { const total = all.reduce((s, i) => s + ((NUTRI[i.id]?.kcal) || 0), 0); return total > 0 ? <><span style={{ color: "rgba(200,168,78,0.4)" }}>·</span><span>~{total} קק״ל</span></> : null; })()}
+                        </div>
+                    </div>
+
+                    {comboBadges.length > 0 && (
+                        <div style={S.comboBanner}>
+                            <div style={S.comboBannerTitle}>🏆 שילובים שנבחרו</div>
+                            <div style={S.comboBannerRow}>
+                                {comboBadges.map(b => (
+                                    <div key={b.id} style={S.badgePill}>
+                                        <span style={{ fontSize: "16px" }}>{b.icon}</span>
+                                        <span style={{ fontSize: "11px", fontWeight: 700, color: "#edd87e" }}>{b.he}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {grouped.map(({ s, items }) => (
+                        <div key={s.id} style={{ ...S.groupCard, ...(highlightedStep === s.id ? S.groupCardHighlight : {}) }}>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "5px 0" }}>
+                                <div style={{ fontSize: "11px", fontWeight: 700, color: "rgba(200,168,78,0.7)" }}>{s.emoji} {s.title} <span style={{ fontWeight: 500, color: "rgba(255,255,255,0.3)", fontSize: "10px" }}>· {items.length}</span></div>
+                                {onEdit && (
+                                    <button onClick={() => onEdit(STEPS.findIndex(st => st.id === s.id))} style={S.editBtn} aria-label={`ערוך ${s.title}`}>
+                                        ✏️ ערוך
+                                    </button>
+                                )}
+                            </div>
+                            {items.map(item => {
+                                return (
+                                    <div key={item.id} style={S.sumRow}>
+                                        <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                                            {item.icon} {item.he}
+                                        </span>
+                                        {item.price > 0 && <span style={{ color: "#dfc06e", fontWeight: 700, fontSize: "12px" }}>+₪{item.price}</span>}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ))}
+
+                    {/* Notes — collapsed by default */}
+                    <div style={S.notesBox}>
+                        <button
+                            style={S.notesToggle}
+                            onClick={() => setNotesOpen(o => !o)}
+                            aria-expanded={notesOpen}
+                        >
+                            <span>📝 הערה לבשלן</span>
+                            {notes.length > 0 && !notesOpen && (
+                                <span style={{ fontSize: "10px", color: "rgba(200,168,78,0.7)", fontWeight: 600 }}>✓ נוספה</span>
+                            )}
+                            <span style={{ marginRight: "auto", fontSize: "12px", color: "rgba(255,255,255,0.3)", transition: "transform 0.2s", transform: notesOpen ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
+                        </button>
+                        {notesOpen && (
+                            <div style={{ marginTop: "8px" }}>
+                                <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "4px" }}>
+                                    <span style={{ fontSize: "9px", color: notes.length > MAX_NOTES_LENGTH * 0.8 ? "#e57373" : "rgba(255,255,255,0.3)" }}>
+                                        {MAX_NOTES_LENGTH - notes.length} תווים נותרו
+                                    </span>
+                                </div>
+                                <textarea
+                                    value={notes}
+                                    onChange={handleNotesChange}
+                                    placeholder="לדוגמה: בלי גרעינים, לחתוך קטן..."
+                                    rows={3}
+                                    maxLength={MAX_NOTES_LENGTH}
+                                    aria-label="הערות מיוחדות להזמנה"
+                                    style={{ ...S.notesInput }}
+                                    autoFocus
+                                />
+                                {notesError && <div style={{ fontSize: "10px", color: "#ef5350", marginTop: "4px" }}>⚠️ {notesError}</div>}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Pickup time picker */}
+                    <PickupTimePicker value={pickupTime} onChange={setPickupTime} />
+
+                    {/* Price breakdown */}
+                    <div style={S.sumPriceCard}>
+                        <div style={S.sumPriceLine}>
+                            <span>סלט בסיס{sizeLabel ? <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)", fontWeight: 500 }}> · {sizeLabel}</span> : null}</span>
+                            <span style={{ fontWeight: 700 }}>₪{base}</span>
+                        </div>
+                        {extras.map(it => (
+                            <div key={it.id} style={S.sumPriceLine}>
+                                <span style={{ opacity: 0.45, fontSize: "12px" }}>+ {it.he}</span>
+                                <span style={{ color: "#edd87e", fontWeight: 600 }}>₪{it.price}</span>
+                            </div>
+                        ))}
+                        <div style={S.sumTotal}>
+                            <span style={{ fontSize: "16px", fontWeight: 700, color: "rgba(255,255,255,0.55)" }}>סה"כ</span>
+                            <span>₪{total}</span>
+                        </div>
+                    </div>
+                    <div style={S.trustCopy}>
+                        <span style={{ opacity: 0.4 }}>🌿</span>
+                        <span>אנחנו משתמשים בחומרי גלם טריים בלבד</span>
+                    </div>
+                    <div style={{ height: "110px" }} />
+                </div>
+
+                <div style={S.bar}>
+                    {/* Order meta pills */}
+                    <div style={S.barMeta}>
+                        <div style={S.metaPill}>
+                            <span style={S.metaPillIcon}>🥗</span>
+                            <span style={S.metaPillText}>{all.length} מרכיבים</span>
+                        </div>
+                        <div style={{ ...S.metaPill, ...S.metaPillGold }}>
+                            <span style={S.metaPillIcon}>⏰</span>
+                            <span style={{ ...S.metaPillText, color: "#f0d060", fontWeight: 800 }}>
+                                {pickupTime ?? 'בחר זמן'}
+                            </span>
+                        </div>
+                    </div>
+                    {/* CTA */}
+                    <button style={S.orderBtn} onClick={() => {
+                        if (navigator.vibrate) navigator.vibrate([15, 40, 30]);
+                        setShowMixing(true);
+                        // Fire API in parallel — animation gives it ~5s to complete
+                        fetch('/api/orders', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                items: all.map(i => ({ id: i.id, he: i.he, icon: i.icon, price: i.price || 0 })),
+                                total,
+                                pickupTime,
+                                notes,
+                                size: base,
+                            }),
+                        })
+                            .then(r => r.ok ? r.json() : null)
+                            .then(async data => {
+                                if (data?.orderNum) setRealOrderNum(data.orderNum);
+                                if (data?.id) setRealOrderId(data.id);
+                                // If payment is enabled, redirect to payment page
+                                if (data?.id && !data?.demo) {
+                                    const payRes = await fetch('/api/payment/create', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ orderId: data.id, orderNum: data.orderNum, total }),
+                                    }).then(r => r.ok ? r.json() : null).catch(() => null);
+                                    if (payRes?.paymentUrl) {
+                                        window.location.href = payRes.paymentUrl;
+                                    }
+                                }
+                            })
+                            .catch(() => {}); // silent fallback
+                    }}>
+                        <span>שלח הזמנה</span>
+                        <span style={S.orderBtnPrice}>₪{total}</span>
+                    </button>
+                </div>
+            </div>
+            <style>{KF}</style>
+        </div>
+    );
+}
+
+// ─── Nutritional arc ring ─────────────────────────────────────
+function NutriRing({ all }) {
+    const totals = all.reduce((acc, item) => {
+        const n = NUTRI[item.id];
+        if (!n) return acc;
+        acc.p += n.p || 0;
+        acc.f += n.f || 0;
+        acc.c += n.c || 0;
+        return acc;
+    }, { p: 0, f: 0, c: 0 });
+
+    const sum = totals.p + totals.f + totals.c;
+    if (sum < 1) return null;
+
+    const R = 28, cx = 36, cy = 36, stroke = 7;
+    const circ = 2 * Math.PI * R;
+    const pct = { p: totals.p / sum, f: totals.f / sum, c: totals.c / sum };
+
+    // Build arc segments: protein (gold), fat (green), carbs (teal)
+    const segments = [
+        { key: "p", color: "#c8a832", label: "חלבון", pct: pct.p },
+        { key: "f", color: "#5a9e5a", label: "שומן", pct: pct.f },
+        { key: "c", color: "#3a8a8a", label: "פחמימות", pct: pct.c },
+    ];
+
+    let offset = 0;
+    const arcs = segments.map(seg => {
+        const dash = seg.pct * circ;
+        const gap = circ - dash;
+        const rotation = -90 + (offset / circ) * 360;
+        offset += dash;
+        return { ...seg, dash, gap, rotation };
+    });
+
+    return (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: "6px", animation: "pFadeIn 0.6s ease 0.4s both" }}>
+            <svg width={72} height={72} viewBox="0 0 72 72">
+                {/* track */}
+                <circle cx={cx} cy={cy} r={R} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={stroke} />
+                {arcs.map(arc => (
+                    <circle
+                        key={arc.key}
+                        cx={cx} cy={cy} r={R}
+                        fill="none"
+                        stroke={arc.color}
+                        strokeWidth={stroke}
+                        strokeDasharray={`${arc.dash} ${arc.gap}`}
+                        strokeDashoffset={0}
+                        strokeLinecap="butt"
+                        transform={`rotate(${arc.rotation} ${cx} ${cy})`}
+                        opacity={0.85}
+                    />
+                ))}
+            </svg>
+            <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
+                {segments.map(seg => (
+                    <div key={seg.key} style={{ display: "flex", alignItems: "center", gap: "3px" }}>
+                        <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: seg.color, opacity: 0.8 }} />
+                        <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", fontWeight: 600 }}>{seg.label}</span>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+const SHOP_WA = process.env.NEXT_PUBLIC_SHOP_WA_NUMBER || '972501234567';
+
+// ─── Post-order confirmation screen ─────────────────────────
+function OrderedScreen({ total, all, pickupTime, notes, orderNum: propOrderNum, orderId, onNewOrder }) {
+    const fallbackNum = useMemo(() => `BB-${((Date.now() % 9000) + 1000)}`, []);
+    const orderNum = propOrderNum || fallbackNum;
+
+    const waLink = useMemo(() => {
+        const items = all.map(i => i.he).join(', ');
+        const timeLine = pickupTime ? `⏰ איסוף: ${pickupTime}\n` : '';
+        const noteLine = notes ? `📝 ${notes}\n` : '';
+        const msg = `🥗 *הזמנה ${orderNum}*\n${timeLine}💰 סה"כ: ₪${total}\n\n*מרכיבים:*\n${items}\n${noteLine}`;
+        return `https://wa.me/${SHOP_WA}?text=${encodeURIComponent(msg)}`;
+    }, [orderNum, all, total, pickupTime, notes]);
+
+    return (
+        <div style={OS.root}>
+            <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+            <div style={OS.bg} />
+            <div style={OS.content}>
+                <div style={OS.ring}>
+                    <div style={OS.checkmark}>✓</div>
+                </div>
+                <div style={OS.title}>בהכנה!</div>
+                <div style={OS.subtitle}>מכינים את הסלט שלכם עכשיו</div>
+                <div style={OS.orderNumBadge}>הזמנה {orderNum}</div>
+                <div style={OS.price}>₪{total}</div>
+                <div style={OS.meta}>{all.length} מרכיבים{pickupTime ? ` · איסוף: ${pickupTime}` : ' · מוכן בכ-8 דקות'}</div>
+                <div style={OS.divider} />
+                <a href={waLink} target="_blank" rel="noopener noreferrer" style={OS.waBtn}>
+                    <span style={{ fontSize: "18px" }}>💬</span>
+                    <span>שלח לקופה ב-WhatsApp</span>
+                </a>
+                {orderId && (
+                    <a href={`/order/${orderId}`} style={OS.trackBtn}>
+                        🔍 עקוב אחר ההזמנה
+                    </a>
+                )}
+                <button style={OS.newOrderBtn} onClick={onNewOrder}>
+                    הזמנה חדשה ←
+                </button>
+            </div>
+            <style>{`
+                @keyframes ringPop { 0%{transform:scale(0.5);opacity:0} 60%{transform:scale(1.08)} 100%{transform:scale(1);opacity:1} }
+                @keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+                @keyframes goldShimmer { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
+                @keyframes ringGlow { 0%,100%{box-shadow:0 0 30px rgba(200,168,78,0.4),0 0 60px rgba(200,168,78,0.15)} 50%{box-shadow:0 0 50px rgba(200,168,78,0.7),0 0 90px rgba(200,168,78,0.3)} }
+            `}</style>
+        </div>
+    );
+}
+
+const OS = {
+    root: { position: "fixed", inset: 0, zIndex: 500, background: "linear-gradient(155deg, #030a03 0%, #071a07 30%, #0a200a 60%, #071a07 100%)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Heebo',sans-serif", direction: "rtl" },
+    bg: { position: "absolute", inset: 0, background: "radial-gradient(ellipse 80% 60% at 50% 40%, rgba(200,168,78,0.08) 0%, transparent 70%)", pointerEvents: "none" },
+    content: { position: "relative", zIndex: 1, textAlign: "center", padding: "20px" },
+    ring: {
+        width: "120px", height: "120px", borderRadius: "50%", margin: "0 auto 28px",
+        background: "linear-gradient(135deg, rgba(200,168,78,0.15), rgba(240,208,96,0.08))",
+        border: "3px solid rgba(200,168,78,0.7)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        animation: "ringPop 0.6s cubic-bezier(0.34,1.56,0.64,1) both, ringGlow 2.5s ease-in-out 0.6s infinite",
+        boxShadow: "0 0 40px rgba(200,168,78,0.35), inset 0 1px 0 rgba(255,255,255,0.1)",
+    },
+    checkmark: { fontSize: "52px", fontWeight: 900, color: "#f0d060", textShadow: "0 0 20px rgba(200,168,78,0.8)" },
+    title: { fontSize: "28px", fontWeight: 900, color: "#ffffff", textShadow: "0 2px 8px rgba(0,0,0,0.5)", animation: "fadeUp 0.5s ease 0.3s both" },
+    subtitle: { fontSize: "14px", fontWeight: 600, color: "rgba(255,255,255,0.5)", marginTop: "6px", animation: "fadeUp 0.5s ease 0.4s both" },
+    price: {
+        fontSize: "44px", fontWeight: 900, marginTop: "24px",
+        backgroundImage: "linear-gradient(135deg, #c8a832, #f0d060, #ffe066, #c8a832)",
+        backgroundSize: "200% 200%",
+        WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+        animation: "fadeUp 0.5s ease 0.5s both, goldShimmer 3s ease 1s infinite",
+        textShadow: "none",
+    },
+    meta: { fontSize: "12px", color: "rgba(255,255,255,0.3)", marginTop: "8px", fontWeight: 600, animation: "fadeUp 0.5s ease 0.6s both" },
+    orderNumBadge: {
+        display: "inline-block", marginTop: "14px",
+        padding: "4px 14px", borderRadius: "20px",
+        background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
+        fontSize: "12px", fontWeight: 700, color: "rgba(255,255,255,0.35)",
+        letterSpacing: "0.08em", animation: "fadeUp 0.5s ease 0.35s both",
+    },
+    divider: { width: "60px", height: "1px", background: "linear-gradient(90deg, transparent, rgba(200,168,78,0.4), transparent)", margin: "24px auto" },
+    waBtn: {
+        display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+        width: "100%", padding: "14px 22px", borderRadius: "14px",
+        background: "rgba(37,211,102,0.12)", border: "1.5px solid rgba(37,211,102,0.35)",
+        color: "#4ddb80", fontSize: "15px", fontWeight: 800,
+        fontFamily: "'Heebo',sans-serif", textDecoration: "none",
+        boxShadow: "0 4px 16px rgba(37,211,102,0.12)",
+        animation: "fadeUp 0.5s ease 0.65s both",
+        marginBottom: "10px",
+    },
+    trackBtn: {
+        display: "block", width: "100%", padding: "12px 22px", borderRadius: "14px",
+        background: "rgba(200,168,78,0.08)", border: "1px solid rgba(200,168,78,0.25)",
+        color: "rgba(200,168,78,0.7)", fontSize: "13px", fontWeight: 700,
+        fontFamily: "'Heebo',sans-serif", textDecoration: "none", textAlign: "center",
+        animation: "fadeUp 0.5s ease 0.7s both", marginBottom: "10px",
+    },
+    newOrderBtn: {
+        display: "block", width: "100%",
+        padding: "13px 22px", borderRadius: "14px", cursor: "pointer",
+        background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
+        color: "rgba(255,255,255,0.45)", fontSize: "14px", fontWeight: 700,
+        fontFamily: "'Heebo',sans-serif",
+        animation: "fadeUp 0.5s ease 0.75s both",
+    },
+};
+
+const S = {
+    root: { position: "relative", width: "100%", maxWidth: "430px", minHeight: "100vh", margin: "0 auto", overflow: "hidden", fontFamily: "'Heebo',sans-serif", direction: "rtl" },
+    bg: { position: "fixed", inset: 0, zIndex: 0, background: `url(${bgImage}) center top / cover no-repeat, linear-gradient(155deg, #030a03 0%, #071a07 20%, #0a200a 45%, #071a07 70%, #030a03 100%)`, filter: "blur(2px) brightness(0.65)" },
+    bgRay: { position: "fixed", top: "-30%", left: "50%", transform: "translateX(-50%)", width: "110%", height: "70%", zIndex: 0, pointerEvents: "none", background: "radial-gradient(ellipse 70% 60% at 50% 20%, rgba(255,224,100,0.05) 0%, rgba(200,168,78,0.02) 50%, transparent 70%)" },
+    main: { position: "relative", zIndex: 2, display: "flex", flexDirection: "column", height: "100vh" },
+    header: { background: `linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.5)), url(/builder-assets/header-brand.png) center / cover no-repeat`, borderBottom: "2px solid rgba(200,168,78,0.4)" },
+    headerTop: { display: "flex", alignItems: "center", gap: "8px", padding: "8px 12px 10px" },
+    backBtn: { width: "34px", height: "34px", borderRadius: "10px", cursor: "pointer", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)", color: "#a5d6a7", fontSize: "16px", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Heebo',sans-serif", flexShrink: 0 },
+    pricePill: { display: "flex", alignItems: "baseline", gap: "1px", background: "linear-gradient(135deg, rgba(200,168,78,0.22), rgba(184,134,11,0.1))", border: "1px solid rgba(200,168,78,0.4)", padding: "4px 11px", borderRadius: "12px" },
+    priceS: { fontSize: "10px", color: "#d4b84a", fontWeight: 600 },
+    priceV: { fontSize: "20px", color: "#ffffff", fontWeight: 900, textShadow: "0 2px 8px rgba(200,168,78,0.5)" },
+    content: { flex: 1, overflowY: "auto", overflowX: "hidden", padding: "12px 16px", scrollbarWidth: "none" },
+    sumBowlWrap: { position: "relative", margin: "8px auto 18px", width: "100%", maxWidth: "320px", display: "flex", flexDirection: "column", alignItems: "center" },
+    sumBowlGlow: { position: "absolute", bottom: "20px", left: "50%", transform: "translateX(-50%)", width: "200px", height: "60px", borderRadius: "50%", background: "radial-gradient(ellipse, rgba(200,168,78,0.18) 0%, transparent 70%)", pointerEvents: "none", filter: "blur(8px)" },
+    sumBowl: { position: "relative", zIndex: 1, width: "280px", minHeight: "120px", padding: "14px 14px 10px", borderRadius: "16px 16px 50% 50% / 16px 16px 44% 44%", background: "linear-gradient(170deg, rgba(22,65,22,0.85), rgba(15,48,15,0.8))", border: "1px solid rgba(200,168,78,0.28)", boxShadow: "0 10px 36px rgba(0,0,0,0.5), 0 0 0 1px rgba(200,168,78,0.08), inset 0 2px 6px rgba(0,0,0,0.25)", display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" },
+    sumBowlMeta: { marginTop: "10px", display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", fontWeight: 600, color: "rgba(255,255,255,0.3)", letterSpacing: "0.03em" },
+    bowlLayer: { display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "3px" },
+    comboBanner: { marginBottom: "14px", padding: "12px 14px", borderRadius: "14px", background: "linear-gradient(135deg, rgba(200,168,78,0.14) 0%, rgba(180,140,40,0.08) 100%)", border: "1.5px solid rgba(200,168,78,0.4)", boxShadow: "0 0 24px rgba(200,168,78,0.12), inset 0 1px 0 rgba(255,255,255,0.06)", animation: "pFadeIn 0.5s ease both" },
+    comboBannerTitle: { fontSize: "10px", fontWeight: 800, color: "rgba(200,168,78,0.6)", letterSpacing: "0.06em", marginBottom: "8px" },
+    comboBannerRow: { display: "flex", gap: "8px", flexWrap: "wrap" },
+    badgePill: { display: "flex", alignItems: "center", gap: "6px", padding: "5px 10px", borderRadius: "10px", background: "rgba(200,168,78,0.12)", border: "1px solid rgba(200,168,78,0.3)" },
+    groupCard: { marginBottom: "10px", padding: "5px 12px", borderRadius: "12px", background: "rgba(15,45,15,0.55)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", border: "1px solid rgba(200,168,78,0.15)", transition: "border-color 0.2s, box-shadow 0.2s" },
+    groupCardHighlight: { border: "1px solid rgba(200,168,78,0.7)", boxShadow: "0 0 18px rgba(200,168,78,0.25), inset 0 0 12px rgba(200,168,78,0.06)" },
+    sumRow: { display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "13px", color: "rgba(255,255,255,0.75)", padding: "5px 8px", background: "rgba(255,255,255,0.03)", borderRadius: "8px", marginBottom: "2px" },
+    notesBox: { margin: "12px 0", padding: "10px", borderRadius: "12px", background: "rgba(15,45,15,0.6)", backdropFilter: "blur(8px)", border: "1px solid rgba(200,168,78,0.15)" },
+    notesToggle: { width: "100%", display: "flex", alignItems: "center", gap: "8px", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "'Heebo',sans-serif", fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.45)", direction: "rtl", textAlign: "right" },
+    notesInput: { width: "100%", padding: "8px 10px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.04)", color: "#e8f5e9", fontSize: "12px", fontFamily: "'Heebo',sans-serif", outline: "none", direction: "rtl", resize: "vertical", minHeight: "60px" },
+    sumPriceCard: { marginTop: "14px", padding: "14px 16px", borderRadius: "14px", background: "linear-gradient(145deg, rgba(15,45,15,0.9), rgba(20,55,20,0.85))", border: "1px solid rgba(200,168,78,0.25)", boxShadow: "0 4px 16px rgba(0,0,0,0.3)" },
+    sumPriceLine: { display: "flex", justifyContent: "space-between", fontSize: "13px", color: "rgba(255,255,255,0.5)", padding: "3px 0" },
+    sumTotal: { display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: "36px", fontWeight: 900, color: "#f0d060", textShadow: "0 0 24px rgba(200,168,78,0.55), 0 2px 8px rgba(200,168,78,0.3)", padding: "12px 0 2px", marginTop: "10px", borderTop: "1px solid rgba(200,168,78,0.2)" },
+    bar: {
+        display: "flex", flexDirection: "column", gap: "10px",
+        padding: "12px 14px 18px",
+        background: `linear-gradient(rgba(0,0,0,0.72), rgba(0,0,0,0.68)), url(/builder-assets/footer-brand.png) center top / cover no-repeat`,
+        borderTop: "2px solid rgba(200,168,78,0.4)",
+        boxShadow: "0 -6px 28px rgba(0,0,0,0.55)",
+    },
+    barMeta: {
+        display: "flex", gap: "10px", justifyContent: "center",
+    },
+    metaPill: {
+        display: "flex", alignItems: "center", gap: "6px",
+        padding: "8px 16px", borderRadius: "12px",
+        background: "rgba(255,255,255,0.07)",
+        border: "1px solid rgba(255,255,255,0.1)",
+        flex: 1, justifyContent: "center",
+    },
+    metaPillGold: {
+        background: "rgba(200,168,78,0.12)",
+        border: "1px solid rgba(200,168,78,0.35)",
+        boxShadow: "0 0 12px rgba(200,168,78,0.12)",
+    },
+    metaPillIcon: { fontSize: "16px", lineHeight: 1 },
+    metaPillText: { fontSize: "13px", fontWeight: 700, color: "rgba(255,255,255,0.7)", fontFamily: "'Heebo',sans-serif" },
+    orderBtn: {
+        display: "flex", alignItems: "center", justifyContent: "center", gap: "12px",
+        width: "100%", padding: "16px 22px", borderRadius: "16px", cursor: "pointer",
+        backgroundImage: "linear-gradient(135deg, #c8a832 0%, #f0d060 45%, #ffe066 55%, #c8a832 100%)",
+        backgroundSize: "200% 100%",
+        border: "none", color: "#0d2e0d", fontSize: "17px", fontWeight: 900,
+        fontFamily: "'Heebo',sans-serif",
+        boxShadow: "0 6px 28px rgba(200,168,78,0.5), 0 0 0 1px rgba(200,168,78,0.3), inset 0 1px 0 rgba(255,255,255,0.35)",
+        transition: "transform 0.15s, box-shadow 0.15s",
+    },
+    orderBtnPrice: {
+        fontSize: "15px", fontWeight: 900,
+        background: "rgba(0,0,0,0.18)", padding: "3px 10px", borderRadius: "8px",
+    },
+    trustCopy: { display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", marginTop: "16px", fontSize: "11px", fontWeight: 500, color: "rgba(255,255,255,0.2)", letterSpacing: "0.03em", animation: "pFadeIn 0.5s ease 0.8s both" },
+    trustLine: { display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", fontSize: "11px", fontWeight: 600, color: "rgba(255,255,255,0.3)", marginBottom: "8px", letterSpacing: "0.02em" },
+    editBtn: { padding: "8px 14px", minHeight: "36px", borderRadius: "8px", cursor: "pointer", background: "rgba(200,168,78,0.12)", border: "1px solid rgba(200,168,78,0.28)", color: "#dfc06e", fontSize: "11px", fontWeight: 700, fontFamily: "'Heebo',sans-serif", display: "flex", alignItems: "center", gap: "3px" },
+};
+
+// ─── Pickup time picker ────────────────────────────────────────
+function PickupTimePicker({ value, onChange }) {
+    const localSlots = useMemo(() => generatePickupSlots(), []);
+    const [liveSlots, setLiveSlots] = useState(null); // null = loading
+
+    // Fetch live capacity from API
+    useEffect(() => {
+        fetch('/api/slots')
+            .then(r => r.ok ? r.json() : null)
+            .then(data => {
+                if (data?.slots) setLiveSlots(data.slots);
+                else setLiveSlots([]); // fallback to local if API fails
+            })
+            .catch(() => setLiveSlots([]));
+    }, []);
+
+    // Merge live availability into local slots (or use local while loading)
+    const slots = useMemo(() => {
+        if (!localSlots) return null;
+        if (!liveSlots) return localSlots; // still loading — show all as available
+        const liveMap = Object.fromEntries(liveSlots.map(s => [s.time, s]));
+        return localSlots.map(s => ({
+            ...s,
+            full: liveMap[s.id]?.full ?? false,
+            available: liveMap[s.id]?.available ?? 5,
+        }));
+    }, [localSlots, liveSlots]);
+
+    if (slots === null) {
+        return (
+            <div style={PT.box}>
+                <div style={PT.title}>⏰ זמן איסוף</div>
+                <div style={PT.closedMsg}>המסעדה סגורה כרגע · נפתח מחדש ביום ראשון</div>
+            </div>
+        );
+    }
+
+    return (
+        <div style={PT.box}>
+            <div style={PT.header}>
+                <span style={PT.title}>⏰ זמן איסוף</span>
+                {value && <span style={PT.selectedLabel}>{value}</span>}
+            </div>
+            <div style={PT.row}>
+                {slots.map(slot => (
+                    <button
+                        key={slot.id}
+                        disabled={slot.full}
+                        onClick={() => !slot.full && onChange(slot.id)}
+                        style={{
+                            ...PT.chip,
+                            ...(value === slot.id ? PT.chipActive : {}),
+                            ...(slot.full ? PT.chipFull : {}),
+                        }}
+                    >
+                        {slot.label}
+                        {slot.isPeak && !slot.full && <span style={PT.peakDot} />}
+                        {slot.full && <span style={PT.fullTag}>מלא</span>}
+                    </button>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+const PT = {
+    box: { margin: "12px 0", padding: "12px 14px", borderRadius: "12px", background: "rgba(15,45,15,0.6)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", border: "1px solid rgba(200,168,78,0.15)" },
+    header: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" },
+    title: { fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.45)" },
+    selectedLabel: { fontSize: "14px", fontWeight: 900, color: "#f0d060", letterSpacing: "0.04em" },
+    row: { display: "flex", gap: "8px", overflowX: "auto", paddingBottom: "2px", scrollbarWidth: "none", WebkitOverflowScrolling: "touch" },
+    chip: { flexShrink: 0, padding: "8px 16px", borderRadius: "10px", border: "1px solid rgba(200,168,78,0.22)", background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.5)", fontSize: "13px", fontWeight: 700, fontFamily: "'Heebo',sans-serif", cursor: "pointer", transition: "all 0.15s" },
+    chipActive: { background: "linear-gradient(135deg, rgba(200,168,78,0.28), rgba(200,168,78,0.12))", border: "1px solid rgba(200,168,78,0.7)", color: "#f0d060", boxShadow: "0 0 12px rgba(200,168,78,0.2)" },
+    closedMsg: { fontSize: "12px", color: "rgba(255,255,255,0.35)", fontWeight: 600 },
+    peakDot: { display: "inline-block", width: "5px", height: "5px", borderRadius: "50%", background: "#e57373", marginRight: "4px", verticalAlign: "middle", flexShrink: 0 },
+    chipFull: { opacity: 0.3, cursor: "not-allowed", border: "1px solid rgba(255,255,255,0.06)" },
+    fullTag: { fontSize: "9px", fontWeight: 800, color: "#e57373", marginRight: "4px", letterSpacing: "0.04em" },
+};
+
+const KF = `
+@keyframes popBounce { 0%{transform:scale(0.3);opacity:0} 60%{transform:scale(1.15)} 100%{transform:scale(1);opacity:1} }
+@keyframes pFadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+* { -webkit-tap-highlight-color:transparent; box-sizing:border-box; margin:0; padding:0; }
+::-webkit-scrollbar{display:none}
+`;

@@ -1,0 +1,15 @@
+# Glow PNG Files Directory
+
+Place your glow PNG files here:
+- build.png       - Glow for "בנה סלט כפר" card
+- recommended.png - Glow for "המומלצים שלו" card
+- login.png       - Glow for "התחברות משתמש" card
+
+PNG requirements:
+- Transparent PNG format
+- Match video's lighting and perspective
+- Size: slightly larger than card hotspot area (~20% padding for glow bleed)
+- Recommended resolution: match video resolution (1080x1920)
+
+Note: If PNG files are missing, the app will automatically use CSS gradient fallbacks,
+so the app will work even without these files.
