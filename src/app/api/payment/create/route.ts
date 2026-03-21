@@ -64,7 +64,7 @@ function buildYaadPayUrl(orderId: string, orderNum: string, total: number, succe
 // ─── Hyp Online ──────────────────────────────────────────────────
 // Ask Hyp support for your online API key — same account as physical terminal
 // Credentials: HYP_API_KEY, HYP_TERMINAL_ID
-function buildHypUrl(orderId: string, orderNum: string, total: number, successUrl: string, failUrl: string) {
+function buildHypUrl(orderId: string, orderNum: string, total: number, successUrl: string, failUrl: string): string {
     const apiKey = process.env.HYP_API_KEY;
     const terminalId = process.env.HYP_TERMINAL_ID;
     if (!apiKey || !terminalId) throw new Error('HYP_API_KEY / HYP_TERMINAL_ID not set');
