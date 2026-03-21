@@ -310,8 +310,7 @@ export default function HomeV2() {
         if (navigator.vibrate) navigator.vibrate([20, 40, 30]);
         setTimeout(() => {
             if ('startViewTransition' in document) {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                (document as any).startViewTransition(() => router.push(`/build?size=${size}`));
+                (document as unknown as { startViewTransition: (cb: () => void) => void }).startViewTransition(() => router.push(`/build?size=${size}`));
             } else {
                 router.push(`/build?size=${size}`);
             }
