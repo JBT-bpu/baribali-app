@@ -1,7 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const PLACEHOLDER = 'https://placeholder.supabase.co';
+
+const url      = process.env.NEXT_PUBLIC_SUPABASE_URL      || PLACEHOLDER;
+const anonKey  = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder';
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 // Browser / client-side client (uses anon key, respects RLS)
