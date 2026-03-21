@@ -166,6 +166,63 @@ function parseSizeParam(raw) {
   } catch(e) { return null; }
 }
 
+// ─── BUILDER PARTICLES ──────────────────────────────────────
+function BuilderParticles() {
+  const ref = useRef(null);
+  useEffect(() => {
+    const c = ref.current; if (!c) return;
+    const ctx = c.getContext('2d');
+    const resize = () => { c.width = c.offsetWidth; c.height = c.offsetHeight; };
+    resize();
+    window.addEventListener('resize', resize);
+
+    const sparkCols = ['#f0c832','#ffe066','#f0a820','#c8d830','#fffacc'];
+    const bokehCols = ['#c8a832','#f0d060','#ffe066','#d4a820'];
+
+    const sparks = Array.from({ length: 45 }, () => ({
+      x: Math.random() * c.width, y: Math.random() * c.height,
+      r: Math.random() * 2 + 0.4, s: Math.random() * 0.45 + 0.1,
+      o: Math.random() * 0.3 + 0.06, col: sparkCols[Math.floor(Math.random() * sparkCols.length)],
+      d: (Math.random() - 0.5) * 0.22, ph: Math.random() * Math.PI * 2,
+    }));
+    const bokeh = Array.from({ length: 8 }, () => ({
+      x: Math.random() * c.width, y: c.height * 0.4 + Math.random() * c.height * 0.6,
+      r: Math.random() * 26 + 12, s: Math.random() * 0.07 + 0.02,
+      o: Math.random() * 0.05 + 0.015, col: bokehCols[Math.floor(Math.random() * bokehCols.length)],
+      ph: Math.random() * Math.PI * 2,
+    }));
+
+    let raf, t = 0;
+    const draw = () => {
+      t += 0.012; ctx.clearRect(0, 0, c.width, c.height);
+      for (const b of bokeh) {
+        b.y -= b.s; b.x += Math.sin(t * 0.4 + b.ph) * 0.16;
+        b.o = 0.015 + Math.sin(t * 0.5 + b.ph) * 0.035 + 0.02;
+        if (b.y < -b.r * 2) { b.y = c.height + b.r; b.x = Math.random() * c.width; }
+        const g = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r);
+        g.addColorStop(0, b.col); g.addColorStop(1, 'transparent');
+        ctx.save(); ctx.globalAlpha = Math.min(0.1, Math.max(0, b.o));
+        ctx.fillStyle = g; ctx.beginPath();
+        ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+      }
+      for (const p of sparks) {
+        p.y -= p.s; p.x += p.d + Math.sin(t + p.ph) * 0.11;
+        p.o = 0.05 + Math.sin(t * 0.9 + p.ph) * 0.2 + 0.08;
+        if (p.y < -6) { p.y = c.height + 6; p.x = Math.random() * c.width; }
+        if (p.x < 0) p.x = c.width; if (p.x > c.width) p.x = 0;
+        ctx.save(); ctx.globalAlpha = Math.min(0.6, Math.max(0, p.o));
+        ctx.shadowBlur = p.r * 6; ctx.shadowColor = p.col;
+        ctx.fillStyle = p.col; ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+      }
+      raf = requestAnimationFrame(draw);
+    };
+    draw();
+    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', resize); };
+  }, []);
+  return <canvas ref={ref} style={{ position: 'fixed', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 2 }} />;
+}
+
 // ─── MAIN ───────────────────────────────────────────────────
 
 /** @param {{ sizeParam?: string | null }} props */
@@ -429,6 +486,7 @@ export default function BariBaliBuilder({ sizeParam = null }) {
           <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
           <div style={S.bg} /><div style={S.bgRay} />
           <MagicBackground isTransforming={isTransforming} />
+          <BuilderParticles />
           <div style={{ ...S.main, padding: "0 0 40px", opacity: anim === "enter" ? 0 : 1, transition: "all 0.5s" }}>
             <img src={headerImage} alt="" aria-hidden="true" style={{ width: "100%", display: "block", height: "80px", objectFit: "cover", objectPosition: "center top", flexShrink: 0 }} />
             <div style={{ display: "flex", flexDirection: "column", gap: "12px", flex: 1, padding: "24px 16px 0" }}>
@@ -468,6 +526,7 @@ export default function BariBaliBuilder({ sizeParam = null }) {
         <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
         <div style={S.bg} /><div style={S.bgRay} />
         <MagicBackground isTransforming={isTransforming} />
+        <BuilderParticles />
         <div style={{
           ...S.main, justifyContent: "space-between", padding: "0 0 90px",
           opacity: anim === "enter" ? 0 : 1, transform: anim === "enter" ? "translateY(12px)" : "none", transition: "all 0.5s"
