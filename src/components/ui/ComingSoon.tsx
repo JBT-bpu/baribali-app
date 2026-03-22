@@ -44,7 +44,7 @@ export default function ComingSoon({ icon, title }: ComingSoonProps) {
             <div
                 style={{
                     minHeight: '100vh',
-                    background: 'url(/homepage-assets/bg-bokeh.jpg) center top / cover no-repeat, linear-gradient(155deg, #030a03 0%, #071a07 30%, #0a200a 60%, #071a07 100%)',
+                    background: 'url(/homepage-assets/bg-bokeh.webp) center top / cover no-repeat, linear-gradient(155deg, #030a03 0%, #071a07 30%, #0a200a 60%, #071a07 100%)',
                     fontFamily: "'Heebo', sans-serif",
                     direction: 'rtl',
                     display: 'flex',

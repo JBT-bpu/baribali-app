@@ -29,7 +29,6 @@ function generatePickupSlots() {
     return slots.length ? slots : null;
 }
 import { STEPS, NUTRI, BASE } from "../../data/salad-data.js"; // NUTRI used in bowl calorie total
-const bgImage = "/builder-assets/BG/bg-gradient-base-mobile.png";
 const headerImage = "/builder-assets/header-brand.png";
 import MagicBackground from "./background/MagicBackground.jsx";
 import MixingAnimation from "./ui/MixingAnimation.jsx";
@@ -535,7 +534,7 @@ const OS = {
 
 const S = {
     root: { position: "relative", width: "100%", maxWidth: "430px", minHeight: "100vh", margin: "0 auto", overflow: "hidden", fontFamily: "'Heebo',sans-serif", direction: "rtl" },
-    bg: { position: "fixed", inset: 0, zIndex: 0, background: `url(${bgImage}) center top / cover no-repeat, linear-gradient(155deg, #030a03 0%, #071a07 20%, #0a200a 45%, #071a07 70%, #030a03 100%)`, filter: "blur(2px) brightness(0.65)" },
+    bg: { position: "fixed", inset: 0, zIndex: 0, background: "linear-gradient(155deg, #030a03 0%, #071a07 20%, #0a200a 45%, #071a07 70%, #030a03 100%)", filter: "blur(2px) brightness(0.65)" },
     bgRay: { position: "fixed", top: "-30%", left: "50%", transform: "translateX(-50%)", width: "110%", height: "70%", zIndex: 0, pointerEvents: "none", background: "radial-gradient(ellipse 70% 60% at 50% 20%, rgba(255,224,100,0.05) 0%, rgba(200,168,78,0.02) 50%, transparent 70%)" },
     main: { position: "relative", zIndex: 2, display: "flex", flexDirection: "column", height: "100vh" },
     header: { background: `linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.5)), url(/builder-assets/header-brand.png) center / cover no-repeat`, borderBottom: "2px solid rgba(200,168,78,0.4)" },

@@ -1,7 +1,6 @@
 'use client';
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 
-const bgImage = "/builder-assets/BG/bg-gradient-base-mobile.png";
 const headerImage = "/builder-assets/header-brand.png";
 const footerImage = "/builder-assets/footer-brand.png";
 
@@ -1074,7 +1073,7 @@ button:active:not(:disabled) {
 
 const S = {
   root: { position: "relative", width: "100%", maxWidth: "430px", minHeight: "100vh", margin: "0 auto", overflow: "hidden", fontFamily: "'Heebo',sans-serif", direction: "rtl", color: "#ffffff" },
-  bg: { position: "fixed", inset: 0, zIndex: 0, background: `url(${bgImage}) center top / cover no-repeat, linear-gradient(155deg, #030a03 0%, #071a07 20%, #0a200a 45%, #071a07 70%, #030a03 100%)`, filter: "blur(2px) brightness(0.65)" },
+  bg: { position: "fixed", inset: 0, zIndex: 0, background: "linear-gradient(155deg, #030a03 0%, #071a07 20%, #0a200a 45%, #071a07 70%, #030a03 100%)", filter: "blur(2px) brightness(0.65)" },
   bgRay: { position: "fixed", top: "-30%", left: "50%", transform: "translateX(-50%)", width: "100%", height: "80%", zIndex: 0, pointerEvents: "none", borderRadius: "50%", background: "radial-gradient(ellipse 70% 60% at 50% 20%, rgba(255,224,100,0.05) 0%, rgba(255,200,80,0.02) 35%, transparent 70%)", animation: "rayPulse 8s ease-in-out infinite" },
   main: { position: "relative", zIndex: 2, display: "flex", flexDirection: "column", height: "100vh" },
 

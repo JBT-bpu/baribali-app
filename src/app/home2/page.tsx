@@ -404,7 +404,7 @@ export default function HomeV2() {
             fontFamily: "'Heebo',sans-serif", direction: 'rtl',
             display: 'flex', flexDirection: 'column', alignItems: 'center',
             justifyContent: 'space-between', overflow: 'hidden', userSelect: 'none',
-            background: 'url(/homepage-assets/bg-bokeh.jpg) center top / cover no-repeat, #020a02',
+            background: 'url(/homepage-assets/bg-bokeh.webp) center top / cover no-repeat, #020a02',
         }}>
             <style>{`
                 @keyframes pageIn   { from{opacity:0;transform:translateY(18px) scale(0.97)} to{opacity:1;transform:none} }

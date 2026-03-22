@@ -412,7 +412,7 @@ function NotFound() {
 const shimmerGradient = 'linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.04) 75%)';
 
 const P: Record<string, React.CSSProperties> = {
-    root: { minHeight: '100vh', background: 'url(/homepage-assets/bg-bokeh.jpg) center top / cover no-repeat, linear-gradient(155deg, #030a03 0%, #071a07 30%, #0a200a 60%, #071a07 100%)', fontFamily: "'Heebo',sans-serif", direction: 'rtl', color: '#fff' },
+    root: { minHeight: '100vh', background: 'url(/homepage-assets/bg-bokeh.webp) center top / cover no-repeat, linear-gradient(155deg, #030a03 0%, #071a07 30%, #0a200a 60%, #071a07 100%)', fontFamily: "'Heebo',sans-serif", direction: 'rtl', color: '#fff' },
     bg: { position: 'fixed', inset: 0, background: 'radial-gradient(ellipse 80% 50% at 50% 30%, rgba(200,168,78,0.06) 0%, transparent 70%)', pointerEvents: 'none' },
     content: { position: 'relative', zIndex: 1, maxWidth: '420px', margin: '0 auto', padding: '32px 20px 60px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' },
 
