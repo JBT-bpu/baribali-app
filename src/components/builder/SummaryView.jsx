@@ -1,5 +1,5 @@
 'use client';
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 
 // ─── Pickup slot generator ─────────────────────────────────────
 function generatePickupSlots() {
@@ -77,7 +77,6 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
 
     return (
         <div style={S.root}>
-            <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
             <div style={S.bg} /><div style={S.bgRay} />
             <MagicBackground />
 
@@ -350,6 +349,78 @@ function NutriRing({ all }) {
 const SHOP_WA = process.env.NEXT_PUBLIC_SHOP_WA_NUMBER || '972501234567';
 
 // ─── Post-order confirmation screen ─────────────────────────
+function ConfettiCanvas({ all }) {
+    const ref = useRef(null);
+    useEffect(() => {
+        const c = ref.current; if (!c) return;
+        const ctx = c.getContext('2d');
+        c.width = window.innerWidth;
+        c.height = window.innerHeight;
+
+        const colors = ['#f0d060', '#ffe08a', '#c8a832', '#ffffff', '#a5d6a7', '#edd87e'];
+        const icons = all.slice(0, 6).map(i => i.icon);
+
+        const particles = Array.from({ length: 68 }, (_, i) => ({
+            x: c.width / 2 + (Math.random() - 0.5) * 60,
+            y: c.height * 0.42,
+            vx: (Math.random() - 0.5) * 14,
+            vy: -(Math.random() * 12 + 6),
+            gravity: 0.38,
+            alpha: 1,
+            color: colors[i % colors.length],
+            r: Math.random() * 5 + 2,
+            rot: Math.random() * Math.PI * 2,
+            rotV: (Math.random() - 0.5) * 0.25,
+            shape: i % 5 === 0 ? 'circle' : i % 5 === 1 ? 'rect' : 'dot',
+            emoji: icons.length && i % 7 === 0 ? icons[i % icons.length] : null,
+        }));
+
+        let raf;
+        const draw = () => {
+            ctx.clearRect(0, 0, c.width, c.height);
+            let alive = 0;
+            for (const p of particles) {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += p.gravity;
+                p.vx *= 0.99;
+                p.rot += p.rotV;
+                p.alpha -= 0.012;
+                if (p.alpha <= 0) continue;
+                alive++;
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, p.alpha);
+                ctx.translate(p.x, p.y);
+                ctx.rotate(p.rot);
+                if (p.emoji) {
+                    ctx.font = `${p.r * 4}px serif`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(p.emoji, 0, 0);
+                } else if (p.shape === 'circle') {
+                    ctx.beginPath();
+                    ctx.arc(0, 0, p.r, 0, Math.PI * 2);
+                    ctx.fillStyle = p.color;
+                    ctx.fill();
+                } else if (p.shape === 'rect') {
+                    ctx.fillStyle = p.color;
+                    ctx.fillRect(-p.r, -p.r / 2, p.r * 2, p.r);
+                } else {
+                    ctx.beginPath();
+                    ctx.arc(0, 0, p.r / 2, 0, Math.PI * 2);
+                    ctx.fillStyle = p.color;
+                    ctx.fill();
+                }
+                ctx.restore();
+            }
+            if (alive > 0) raf = requestAnimationFrame(draw);
+        };
+        raf = requestAnimationFrame(draw);
+        return () => cancelAnimationFrame(raf);
+    }, [all]);
+    return <canvas ref={ref} style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 501 }} />;
+}
+
 function OrderedScreen({ total, all, pickupTime, notes, orderNum: propOrderNum, orderId, onNewOrder }) {
     const fallbackNum = useMemo(() => `BB-${((Date.now() % 9000) + 1000)}`, []);
     const orderNum = propOrderNum || fallbackNum;
@@ -363,44 +434,48 @@ function OrderedScreen({ total, all, pickupTime, notes, orderNum: propOrderNum, 
     }, [orderNum, all, total, pickupTime, notes]);
 
     return (
-        <div style={OS.root}>
-            <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-            <div style={OS.bg} />
-            <div style={OS.content}>
-                <div style={OS.ring}>
-                    <div style={OS.checkmark}>✓</div>
-                </div>
-                <div style={OS.title}>בהכנה!</div>
-                <div style={OS.subtitle}>מכינים את הסלט שלכם עכשיו</div>
-                <div style={OS.orderNumBadge}>הזמנה {orderNum}</div>
-                <div style={OS.price}>₪{total}</div>
-                <div style={OS.meta}>{all.length} מרכיבים{pickupTime ? ` · איסוף: ${pickupTime}` : ' · מוכן בכ-8 דקות'}</div>
-                <div style={OS.divider} />
-                <a href={waLink} target="_blank" rel="noopener noreferrer" style={OS.waBtn}>
-                    <span style={{ fontSize: "18px" }}>💬</span>
-                    <span>שלח לקופה ב-WhatsApp</span>
-                </a>
-                {orderId && (
-                    <a href={`/order/${orderId}`} style={OS.trackBtn}>
-                        🔍 עקוב אחר ההזמנה
+        <>
+            <ConfettiCanvas all={all} />
+            <div style={OS.root}>
+                <div style={OS.bg} />
+                <div style={OS.content}>
+                    <div style={OS.ring}>
+                        <div style={OS.checkmark}>✓</div>
+                    </div>
+                    <div style={OS.title}>בהכנה!</div>
+                    <div style={OS.subtitle}>מכינים את הסלט שלכם עכשיו</div>
+                    <div style={OS.orderNumBadge}>הזמנה {orderNum}</div>
+                    <div style={OS.price}>₪{total}</div>
+                    <div style={OS.meta}>{all.length} מרכיבים{pickupTime ? ` · איסוף: ${pickupTime}` : ' · מוכן בכ-8 דקות'}</div>
+                    <div style={OS.divider} />
+                    <a href={waLink} target="_blank" rel="noopener noreferrer" style={OS.waBtn}>
+                        <span style={{ fontSize: "18px" }}>💬</span>
+                        <span>שלח לקופה ב-WhatsApp</span>
                     </a>
-                )}
-                <button style={OS.newOrderBtn} onClick={onNewOrder}>
-                    הזמנה חדשה ←
-                </button>
+                    {orderId && (
+                        <a href={`/order/${orderId}`} style={OS.trackBtn}>
+                            🔍 עקוב אחר ההזמנה
+                        </a>
+                    )}
+                    <button style={OS.newOrderBtn} onClick={onNewOrder}>
+                        הזמנה חדשה ←
+                    </button>
+                </div>
+                <style>{`
+                    @keyframes ringPop { 0%{transform:scale(0.4);opacity:0} 55%{transform:scale(1.12)} 100%{transform:scale(1);opacity:1} }
+                    @keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+                    @keyframes goldShimmer { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
+                    @keyframes ringGlow { 0%,100%{box-shadow:0 0 30px rgba(200,168,78,0.4),0 0 60px rgba(200,168,78,0.15)} 50%{box-shadow:0 0 55px rgba(200,168,78,0.75),0 0 100px rgba(200,168,78,0.3)} }
+                    @keyframes screenIn { from{opacity:0} to{opacity:1} }
+                `}</style>
             </div>
-            <style>{`
-                @keyframes ringPop { 0%{transform:scale(0.5);opacity:0} 60%{transform:scale(1.08)} 100%{transform:scale(1);opacity:1} }
-                @keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
-                @keyframes goldShimmer { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
-                @keyframes ringGlow { 0%,100%{box-shadow:0 0 30px rgba(200,168,78,0.4),0 0 60px rgba(200,168,78,0.15)} 50%{box-shadow:0 0 50px rgba(200,168,78,0.7),0 0 90px rgba(200,168,78,0.3)} }
-            `}</style>
-        </div>
+        </>
     );
 }
 
+
 const OS = {
-    root: { position: "fixed", inset: 0, zIndex: 500, background: "linear-gradient(155deg, #030a03 0%, #071a07 30%, #0a200a 60%, #071a07 100%)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Heebo',sans-serif", direction: "rtl" },
+    root: { position: "fixed", inset: 0, zIndex: 500, background: "linear-gradient(155deg, #030a03 0%, #071a07 30%, #0a200a 60%, #071a07 100%)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Heebo',sans-serif", direction: "rtl", animation: "screenIn 0.55s ease both" },
     bg: { position: "absolute", inset: 0, background: "radial-gradient(ellipse 80% 60% at 50% 40%, rgba(200,168,78,0.08) 0%, transparent 70%)", pointerEvents: "none" },
     content: { position: "relative", zIndex: 1, textAlign: "center", padding: "20px" },
     ring: {
@@ -469,7 +544,7 @@ const S = {
     pricePill: { display: "flex", alignItems: "baseline", gap: "1px", background: "linear-gradient(135deg, rgba(200,168,78,0.22), rgba(184,134,11,0.1))", border: "1px solid rgba(200,168,78,0.4)", padding: "4px 11px", borderRadius: "12px" },
     priceS: { fontSize: "10px", color: "#d4b84a", fontWeight: 600 },
     priceV: { fontSize: "20px", color: "#ffffff", fontWeight: 900, textShadow: "0 2px 8px rgba(200,168,78,0.5)" },
-    content: { flex: 1, overflowY: "auto", overflowX: "hidden", padding: "12px 16px", scrollbarWidth: "none" },
+    content: { flex: 1, overflowY: "auto", overflowX: "hidden", padding: "12px 16px max(24px, env(safe-area-inset-bottom))", scrollbarWidth: "none" },
     sumBowlWrap: { position: "relative", margin: "8px auto 18px", width: "100%", maxWidth: "320px", display: "flex", flexDirection: "column", alignItems: "center" },
     sumBowlGlow: { position: "absolute", bottom: "20px", left: "50%", transform: "translateX(-50%)", width: "200px", height: "60px", borderRadius: "50%", background: "radial-gradient(ellipse, rgba(200,168,78,0.18) 0%, transparent 70%)", pointerEvents: "none", filter: "blur(8px)" },
     sumBowl: { position: "relative", zIndex: 1, width: "280px", minHeight: "120px", padding: "14px 14px 10px", borderRadius: "16px 16px 50% 50% / 16px 16px 44% 44%", background: "linear-gradient(170deg, rgba(22,65,22,0.85), rgba(15,48,15,0.8))", border: "1px solid rgba(200,168,78,0.28)", boxShadow: "0 10px 36px rgba(0,0,0,0.5), 0 0 0 1px rgba(200,168,78,0.08), inset 0 2px 6px rgba(0,0,0,0.25)", display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" },

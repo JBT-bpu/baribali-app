@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import ParticleCanvas from '@/components/ui/ParticleCanvas';
 
 type OrderStatus = 'waiting' | 'preparing' | 'ready' | 'collected';
 
@@ -23,9 +24,194 @@ const STATUS_STEPS: { key: OrderStatus; label: string; icon: string }[] = [
     { key: 'collected', label: 'נאסף',    icon: '🎉' },
 ];
 
+/* ── Confetti System ── */
+interface Particle {
+    x: number; y: number;
+    vx: number; vy: number;
+    w: number; h: number;
+    color: string;
+    shape: 'rect' | 'circle';
+    life: number;
+    rotation: number;
+    rotationSpeed: number;
+}
+
+function fireConfetti(canvas: HTMLCanvasElement) {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const colors = ['#f0d060', '#c8a84e', '#4caf50', '#66bb6a'];
+    const particles: Particle[] = [];
+    const count = 80 + Math.floor(Math.random() * 21); // 80–100
+
+    for (let i = 0; i < count; i++) {
+        particles.push({
+            x: canvas.width / 2 + (Math.random() - 0.5) * 120,
+            y: canvas.height * 0.35,
+            vx: (Math.random() - 0.5) * 12,
+            vy: -Math.random() * 14 - 4,
+            w: Math.random() * 6 + 3,
+            h: Math.random() * 6 + 3,
+            color: colors[Math.floor(Math.random() * colors.length)],
+            shape: Math.random() > 0.5 ? 'rect' : 'circle',
+            life: 1,
+            rotation: Math.random() * Math.PI * 2,
+            rotationSpeed: (Math.random() - 0.5) * 0.2,
+        });
+    }
+
+    const gravity = 0.35;
+    const wind = 0.15;
+    const duration = 3000;
+    const start = performance.now();
+    let rafId: number;
+
+    function frame(now: number) {
+        const elapsed = now - start;
+        if (elapsed > duration) {
+            ctx!.clearRect(0, 0, canvas.width, canvas.height);
+            cancelAnimationFrame(rafId);
+            return;
+        }
+
+        ctx!.clearRect(0, 0, canvas.width, canvas.height);
+
+        for (const p of particles) {
+            p.vy += gravity;
+            p.vx += wind * (Math.random() - 0.45);
+            p.x += p.vx;
+            p.y += p.vy;
+            p.rotation += p.rotationSpeed;
+            p.life = Math.max(0, 1 - elapsed / duration);
+
+            ctx!.save();
+            ctx!.translate(p.x, p.y);
+            ctx!.rotate(p.rotation);
+            ctx!.globalAlpha = p.life;
+            ctx!.fillStyle = p.color;
+
+            if (p.shape === 'rect') {
+                ctx!.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+            } else {
+                ctx!.beginPath();
+                ctx!.arc(0, 0, p.w / 2, 0, Math.PI * 2);
+                ctx!.fill();
+            }
+            ctx!.restore();
+        }
+
+        rafId = requestAnimationFrame(frame);
+    }
+
+    rafId = requestAnimationFrame(frame);
+}
+
+/* ── Celebration Sound (Web Audio API) ── */
+function playCelebrationChime() {
+    try {
+        const ac = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const gain1 = ac.createGain();
+        gain1.gain.setValueAtTime(0.18, ac.currentTime);
+        gain1.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.15);
+        gain1.connect(ac.destination);
+        const osc1 = ac.createOscillator();
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(523, ac.currentTime); // C5
+        osc1.connect(gain1);
+        osc1.start(ac.currentTime);
+        osc1.stop(ac.currentTime + 0.15);
+
+        const gain2 = ac.createGain();
+        gain2.gain.setValueAtTime(0.18, ac.currentTime + 0.18);
+        gain2.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.38);
+        gain2.connect(ac.destination);
+        const osc2 = ac.createOscillator();
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(659, ac.currentTime + 0.18); // E5
+        osc2.connect(gain2);
+        osc2.start(ac.currentTime + 0.18);
+        osc2.stop(ac.currentTime + 0.38);
+
+        // cleanup
+        setTimeout(() => ac.close(), 500);
+    } catch {
+        // Audio not supported — silently ignore
+    }
+}
+
+/* ── Haptic Vibration ── */
+function fireHaptic() {
+    try {
+        navigator.vibrate?.([100, 50, 100, 50, 200]);
+    } catch {
+        // Not supported
+    }
+}
+
+/* ── Countdown Hook ── */
+function useCountdown(pickupTime: string | null) {
+    const [now, setNow] = useState(Date.now());
+
+    useEffect(() => {
+        if (!pickupTime) return;
+        const id = setInterval(() => setNow(Date.now()), 1000);
+        return () => clearInterval(id);
+    }, [pickupTime]);
+
+    if (!pickupTime) return null;
+
+    // Parse pickup_time. It may be "HH:MM" or a full datetime string.
+    let target: Date;
+    if (/^\d{1,2}:\d{2}$/.test(pickupTime)) {
+        const [h, m] = pickupTime.split(':').map(Number);
+        target = new Date();
+        target.setHours(h, m, 0, 0);
+        // If the time already passed today, assume it's today (already past)
+    } else {
+        target = new Date(pickupTime);
+    }
+
+    const diffMs = target.getTime() - now;
+
+    if (diffMs <= 0) {
+        return { text: 'עכשיו!', urgent: false, arrived: true, diffMs: 0 };
+    }
+
+    const totalSec = Math.floor(diffMs / 1000);
+    const min = Math.floor(totalSec / 60);
+    const sec = totalSec % 60;
+    const text = `${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')} נותרו`;
+    const urgent = totalSec < 120;
+
+    return { text, urgent, arrived: false, diffMs };
+}
+
 export default function OrderStatusPage({ params }: { params: { id: string } }) {
     const [order, setOrder] = useState<Order | null>(null);
     const [notFound, setNotFound] = useState(false);
+    const prevStatusRef = useRef<OrderStatus | null>(null);
+    const canvasRef = useRef<HTMLCanvasElement | null>(null);
+    const [ringScale, setRingScale] = useState(false);
+    const [labelSlide, setLabelSlide] = useState(false);
+
+    const countdown = useCountdown(order?.pickup_time ?? null);
+
+    // Celebration trigger
+    const triggerCelebration = useCallback(() => {
+        if (canvasRef.current) fireConfetti(canvasRef.current);
+        fireHaptic();
+        playCelebrationChime();
+    }, []);
+
+    // Ring scale-up animation trigger
+    const triggerRingPop = useCallback(() => {
+        setRingScale(true);
+        setLabelSlide(true);
+        setTimeout(() => setRingScale(false), 400);
+        setTimeout(() => setLabelSlide(false), 500);
+    }, []);
 
     useEffect(() => {
         // Initial load
@@ -36,7 +222,11 @@ export default function OrderStatusPage({ params }: { params: { id: string } }) 
             .single()
             .then(({ data, error }) => {
                 if (error || !data) setNotFound(true);
-                else setOrder(data as Order);
+                else {
+                    const d = data as Order;
+                    setOrder(d);
+                    prevStatusRef.current = d.status;
+                }
             });
 
         // Realtime subscription
@@ -55,16 +245,47 @@ export default function OrderStatusPage({ params }: { params: { id: string } }) 
         return () => { supabase.removeChannel(channel); };
     }, [params.id]);
 
+    // Track status changes and fire effects
+    useEffect(() => {
+        if (!order) return;
+        const prev = prevStatusRef.current;
+        if (prev !== null && prev !== order.status) {
+            // Status changed
+            triggerRingPop();
+            if (order.status === 'ready') {
+                triggerCelebration();
+            }
+        }
+        prevStatusRef.current = order.status;
+    }, [order?.status, triggerCelebration, triggerRingPop, order]);
+
     if (notFound) return <NotFound />;
     if (!order) return <Loading />;
 
     const currentStep = STATUS_STEPS.findIndex(s => s.key === order.status);
     const isReady = order.status === 'ready';
 
+    const ringStyle: React.CSSProperties = {
+        ...P.ring,
+        ...(isReady ? P.ringReady : {}),
+        ...(ringScale ? { transform: 'scale(1.15)', transition: 'transform 0.2s cubic-bezier(0.34,1.56,0.64,1)' } : { transform: 'scale(1)', transition: 'transform 0.3s cubic-bezier(0.34,1.56,0.64,1)' }),
+    };
+
+    const labelStyle: React.CSSProperties = {
+        ...P.statusLabel,
+        ...(isReady ? { color: '#4caf50', fontSize: '28px' } : {}),
+        ...(labelSlide
+            ? { animation: 'statusSlideIn 0.45s ease both' }
+            : {}),
+    };
+
     return (
         <div style={P.root}>
-            <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
             <div style={P.bg} />
+            <ParticleCanvas intensity="medium" />
+
+            {/* Confetti canvas overlay */}
+            <canvas ref={canvasRef} style={P.confettiCanvas} />
 
             <div style={P.content}>
                 {/* Header */}
@@ -72,15 +293,31 @@ export default function OrderStatusPage({ params }: { params: { id: string } }) 
                 <div style={P.orderNum}>{order.order_num}</div>
 
                 {/* Status ring */}
-                <div style={{ ...P.ring, ...(isReady ? P.ringReady : {}) }}>
+                <div style={ringStyle}>
                     <div style={P.ringIcon}>{STATUS_STEPS[currentStep]?.icon ?? '📋'}</div>
                 </div>
 
-                <div style={{ ...P.statusLabel, ...(isReady ? { color: '#4caf50', fontSize: '28px' } : {}) }}>
+                <div style={labelStyle}>
                     {STATUS_STEPS[currentStep]?.label}
                 </div>
 
-                {order.pickup_time && (
+                {/* Countdown */}
+                {order.pickup_time && countdown && (
+                    <div style={{
+                        ...P.pickupTime,
+                        ...(countdown.arrived ? P.countdownArrived : {}),
+                        ...(countdown.urgent && !countdown.arrived ? P.countdownUrgent : {}),
+                    }}>
+                        {countdown.arrived ? (
+                            <span style={P.countdownNow}>עכשיו!</span>
+                        ) : (
+                            <>⏰ {countdown.text}</>
+                        )}
+                    </div>
+                )}
+
+                {/* Static pickup time when no countdown active */}
+                {order.pickup_time && !countdown && (
                     <div style={P.pickupTime}>
                         ⏰ זמן איסוף: <strong>{order.pickup_time}</strong>
                     </div>
@@ -124,15 +361,34 @@ export default function OrderStatusPage({ params }: { params: { id: string } }) 
             <style>{`
                 @keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(76,175,80,0.4)} 50%{box-shadow:0 0 0 16px rgba(76,175,80,0)} }
                 @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+                @keyframes statusSlideIn { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+                @keyframes shimmerMove { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+                @keyframes shimmerPulse { 0%,100%{opacity:0.4} 50%{opacity:0.15} }
+                @keyframes countdownPulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.7;transform:scale(1.04)} }
+                @keyframes countdownGlow { 0%,100%{text-shadow:0 0 8px rgba(76,175,80,0.6)} 50%{text-shadow:0 0 20px rgba(76,175,80,0.9)} }
             `}</style>
         </div>
     );
 }
 
+/* ── Shimmer Loading State ── */
 function Loading() {
     return (
-        <div style={{ ...P.root, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '16px', fontFamily: "'Heebo',sans-serif" }}>טוען הזמנה...</div>
+        <div style={{ ...P.root, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }}>
+            <div style={P.shimmerWrap}>
+                {/* Circle placeholder for status ring */}
+                <div style={P.shimmerCircle} />
+
+                {/* Shimmer text bars */}
+                <div style={{ ...P.shimmerBar, width: '140px' }} />
+                <div style={{ ...P.shimmerBar, width: '100px' }} />
+                <div style={{ ...P.shimmerBar, width: '180px' }} />
+            </div>
+
+            <style>{`
+                @keyframes shimmerMove { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+                @keyframes shimmerPulse { 0%,100%{opacity:0.4} 50%{opacity:0.15} }
+            `}</style>
         </div>
     );
 }
@@ -146,10 +402,14 @@ function NotFound() {
     );
 }
 
+const shimmerGradient = 'linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.04) 75%)';
+
 const P: Record<string, React.CSSProperties> = {
-    root: { minHeight: '100vh', background: 'linear-gradient(155deg, #030a03 0%, #071a07 30%, #0a200a 60%, #071a07 100%)', fontFamily: "'Heebo',sans-serif", direction: 'rtl', color: '#fff' },
+    root: { minHeight: '100vh', background: 'url(/homepage-assets/bg-bokeh.jpg) center top / cover no-repeat, linear-gradient(155deg, #030a03 0%, #071a07 30%, #0a200a 60%, #071a07 100%)', fontFamily: "'Heebo',sans-serif", direction: 'rtl', color: '#fff' },
     bg: { position: 'fixed', inset: 0, background: 'radial-gradient(ellipse 80% 50% at 50% 30%, rgba(200,168,78,0.06) 0%, transparent 70%)', pointerEvents: 'none' },
     content: { position: 'relative', zIndex: 1, maxWidth: '420px', margin: '0 auto', padding: '32px 20px 60px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' },
+
+    confettiCanvas: { position: 'fixed', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 9999 },
 
     logo: { fontSize: '18px', fontWeight: 900, color: '#f0d060', letterSpacing: '0.04em', animation: 'fadeUp 0.4s ease both' },
     orderNum: { fontSize: '13px', color: 'rgba(255,255,255,0.3)', fontWeight: 700, letterSpacing: '0.08em', animation: 'fadeUp 0.4s ease 0.05s both' },
@@ -160,6 +420,10 @@ const P: Record<string, React.CSSProperties> = {
 
     statusLabel: { fontSize: '22px', fontWeight: 900, color: '#fff', animation: 'fadeUp 0.4s ease 0.15s both' },
     pickupTime: { fontSize: '14px', color: 'rgba(255,255,255,0.45)', fontWeight: 600, animation: 'fadeUp 0.4s ease 0.2s both' },
+
+    countdownUrgent: { color: '#f0d060', fontWeight: 800, fontSize: '16px', animation: 'countdownPulse 1s ease-in-out infinite' },
+    countdownArrived: { color: '#4caf50', fontWeight: 900, fontSize: '18px', animation: 'countdownGlow 1.5s ease-in-out infinite' },
+    countdownNow: { textShadow: '0 0 12px rgba(76,175,80,0.7)' },
 
     stepsRow: { display: 'flex', alignItems: 'flex-start', justifyContent: 'center', width: '100%', position: 'relative', marginTop: '8px', animation: 'fadeUp 0.4s ease 0.25s both' },
     stepWrap: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', flex: 1, position: 'relative' },
@@ -179,4 +443,19 @@ const P: Record<string, React.CSSProperties> = {
     total: { fontSize: '20px', fontWeight: 900, color: '#f0d060', marginTop: '12px', textAlign: 'right' as const },
 
     footer: { fontSize: '11px', color: 'rgba(255,255,255,0.2)', fontWeight: 600, marginTop: '8px' },
+
+    /* Shimmer loading */
+    shimmerWrap: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' },
+    shimmerCircle: {
+        width: '100px', height: '100px', borderRadius: '50%',
+        background: shimmerGradient,
+        backgroundSize: '200% 100%',
+        animation: 'shimmerMove 1.5s ease-in-out infinite, shimmerPulse 2s ease-in-out infinite',
+    },
+    shimmerBar: {
+        height: '14px', borderRadius: '7px',
+        background: shimmerGradient,
+        backgroundSize: '200% 100%',
+        animation: 'shimmerMove 1.5s ease-in-out infinite',
+    },
 };

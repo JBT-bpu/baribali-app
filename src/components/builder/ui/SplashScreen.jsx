@@ -78,7 +78,7 @@ export default function SplashScreen({ onDone }) {
 const S = {
     root: {
         position: "fixed", inset: 0, zIndex: 9999,
-        background: "linear-gradient(160deg, #020802 0%, #061306 40%, #09180a 70%, #061306 100%)",
+        background: "linear-gradient(160deg, rgba(2,8,2,0.84) 0%, rgba(6,19,6,0.86) 40%, rgba(9,24,10,0.88) 70%, rgba(6,19,6,0.86) 100%), url(/homepage-assets/bg-bokeh.jpg) center top / cover no-repeat",
         display: "flex", flexDirection: "column",
         alignItems: "center", justifyContent: "center",
         fontFamily: "'Heebo', sans-serif",

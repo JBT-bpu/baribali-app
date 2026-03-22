@@ -65,38 +65,38 @@ function Particles() {
         const bokehCols = ['#c8a832', '#f0d060', '#ffe066', '#d4a820'];
         type Spark = { x: number; y: number; r: number; s: number; o: number; col: string; d: number; ph: number };
         type Bokeh = { x: number; y: number; r: number; s: number; o: number; col: string; ph: number };
-        const sparks: Spark[] = Array.from({ length: 55 }, () => ({
+        const sparks: Spark[] = Array.from({ length: 120 }, () => ({
             x: Math.random() * c.width, y: Math.random() * c.height,
-            r: Math.random() * 2.2 + 0.5, s: Math.random() * 0.5 + 0.12,
-            o: Math.random() * 0.35 + 0.08, col: sparkCols[Math.floor(Math.random() * sparkCols.length)],
-            d: (Math.random() - 0.5) * 0.24, ph: Math.random() * Math.PI * 2,
+            r: Math.random() * 2.8 + 0.5, s: Math.random() * 0.65 + 0.18,
+            o: Math.random() * 0.45 + 0.12, col: sparkCols[Math.floor(Math.random() * sparkCols.length)],
+            d: (Math.random() - 0.5) * 0.32, ph: Math.random() * Math.PI * 2,
         }));
-        const bokeh: Bokeh[] = Array.from({ length: 10 }, () => ({
-            x: Math.random() * c.width, y: c.height * 0.4 + Math.random() * c.height * 0.6,
-            r: Math.random() * 28 + 14, s: Math.random() * 0.08 + 0.02,
-            o: Math.random() * 0.06 + 0.02, col: bokehCols[Math.floor(Math.random() * bokehCols.length)],
+        const bokeh: Bokeh[] = Array.from({ length: 26 }, () => ({
+            x: Math.random() * c.width, y: Math.random() * c.height,
+            r: Math.random() * 54 + 18, s: Math.random() * 0.14 + 0.03,
+            o: Math.random() * 0.10 + 0.04, col: bokehCols[Math.floor(Math.random() * bokehCols.length)],
             ph: Math.random() * Math.PI * 2,
         }));
         let raf: number, t = 0;
         const draw = () => {
-            t += 0.012; ctx.clearRect(0, 0, c.width, c.height);
+            t += 0.013; ctx.clearRect(0, 0, c.width, c.height);
             for (const b of bokeh) {
-                b.y -= b.s; b.x += Math.sin(t * 0.4 + b.ph) * 0.18;
-                b.o = 0.02 + Math.sin(t * 0.5 + b.ph) * 0.04 + 0.025;
+                b.y -= b.s; b.x += Math.sin(t * 0.35 + b.ph) * 0.28;
+                b.o = 0.04 + Math.sin(t * 0.45 + b.ph) * 0.07 + 0.04;
                 if (b.y < -b.r * 2) { b.y = c.height + b.r; b.x = Math.random() * c.width; }
                 const grad = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r);
-                grad.addColorStop(0, b.col); grad.addColorStop(1, 'transparent');
-                ctx.save(); ctx.globalAlpha = Math.min(0.12, Math.max(0, b.o));
+                grad.addColorStop(0, b.col); grad.addColorStop(0.55, b.col); grad.addColorStop(1, 'transparent');
+                ctx.save(); ctx.globalAlpha = Math.min(0.22, Math.max(0, b.o));
                 ctx.fillStyle = grad; ctx.beginPath();
                 ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill(); ctx.restore();
             }
             for (const p of sparks) {
-                p.y -= p.s; p.x += p.d + Math.sin(t + p.ph) * 0.12;
-                p.o = 0.06 + Math.sin(t * 0.9 + p.ph) * 0.22 + 0.1;
+                p.y -= p.s; p.x += p.d + Math.sin(t + p.ph) * 0.16;
+                p.o = 0.08 + Math.sin(t * 0.9 + p.ph) * 0.28 + 0.12;
                 if (p.y < -6) { p.y = c.height + 6; p.x = Math.random() * c.width; }
                 if (p.x < 0) p.x = c.width; if (p.x > c.width) p.x = 0;
-                ctx.save(); ctx.globalAlpha = Math.min(0.65, Math.max(0, p.o));
-                ctx.shadowBlur = p.r * 6; ctx.shadowColor = p.col;
+                ctx.save(); ctx.globalAlpha = Math.min(0.75, Math.max(0, p.o));
+                ctx.shadowBlur = p.r * 7; ctx.shadowColor = p.col;
                 ctx.fillStyle = p.col; ctx.beginPath();
                 ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill(); ctx.restore();
             }
@@ -113,14 +113,17 @@ function SizePicker({ onSelect, onBack }: { onSelect: (s: string) => void; onBac
     const [activeIdx, setActiveIdx] = useState(1);
     const [dragX, setDragX]         = useState(0);
     const [out, setOut]             = useState(false);
+    const [glowCard, setGlowCard]   = useState<number | null>(null);
     const dragging = useRef(false);
     const startX   = useRef(0);
     const dragged  = useRef(false);
 
     const snapTo = (idx: number) => {
         if (idx < 0 || idx >= SIZE_CARDS.length) return;
-        if (navigator.vibrate) navigator.vibrate(16);
+        navigator.vibrate?.(8);
         setActiveIdx(idx);
+        setGlowCard(idx);
+        setTimeout(() => setGlowCard(null), 600);
     };
 
     const onDown = (e: React.PointerEvent) => {
@@ -158,18 +161,32 @@ function SizePicker({ onSelect, onBack }: { onSelect: (s: string) => void; onBac
     return (
         <div style={{
             position: 'fixed', inset: 0, zIndex: 60,
-            background: 'rgba(2,6,2,0.95)', backdropFilter: 'blur(24px)',
+            background: 'rgba(3,8,3,0.88)',
+            backdropFilter: 'blur(28px) saturate(1.3)',
             display: 'flex', flexDirection: 'column', alignItems: 'center',
-            justifyContent: 'center', gap: '12px', direction: 'rtl',
+            justifyContent: 'center', gap: 'min(12px, 2vh)', direction: 'rtl',
             fontFamily: "'Heebo',sans-serif",
-            animation: out ? 'pageOut 0.28s ease forwards' : 'pageIn 0.4s cubic-bezier(0.34,1.3,0.64,1) both',
+            paddingTop: 'max(16px, env(safe-area-inset-top))',
+            paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
+            overflowY: 'auto',
+            animation: out ? 'sizePickerOut 0.28s ease forwards' : 'sizePickerIn 0.45s cubic-bezier(0.22,1.4,0.36,1) both',
         }}>
-            <div style={{ fontSize: '11px', fontWeight: 800, color: 'rgba(240,200,50,0.65)', letterSpacing: '0.16em' }}>בחר גודל</div>
+
+            {/* Step breadcrumb */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '-4px' }}>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.06em' }}>בנה סלט</span>
+                <span style={{ fontSize: '10px', color: 'rgba(240,200,50,0.45)' }}>←</span>
+                <span style={{ fontSize: '11px', fontWeight: 800, color: '#f0c832', letterSpacing: '0.06em', animation: 'stepGlow 2.2s ease-in-out infinite' }}>בחר גודל</span>
+            </div>
+
+            {/* Thin gold divider */}
+            <div style={{ width: '44px', height: '1.5px', background: 'linear-gradient(90deg,transparent,rgba(240,200,50,0.35),transparent)', marginBottom: '-2px' }} />
+
             <div style={{ fontSize: '24px', fontWeight: 900, color: '#fff' }}>כמה אתם רעבים?</div>
 
-            {/* Stage — same reliable centering as main carousel */}
+            {/* Stage */}
             <div
-                style={{ position: 'relative', width: '100%', height: '310px', cursor: 'grab', touchAction: 'none', overflow: 'visible' }}
+                style={{ position: 'relative', width: '100%', height: 'clamp(210px, 40vh, 310px)', cursor: 'grab', touchAction: 'none', overflow: 'visible' }}
                 onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
             >
                 {SIZE_CARDS.map((card, i) => {
@@ -177,34 +194,74 @@ function SizePicker({ onSelect, onBack }: { onSelect: (s: string) => void; onBac
                     const absEff = Math.abs(eff);
                     const isActive = i === activeIdx && !dragging.current;
 
-                    const tx  = eff * 138;
-                    const ry  = eff * 46;                              // coverflow: face inward
-                    const sc  = 1 - Math.min(absEff, 1) * 0.44;
-                    const op  = 1 - Math.min(absEff, 1.1) * 0.55;
+                    const tx   = eff * 138;
+                    const ry   = eff * 46;
+                    const sc   = 1 - Math.min(absEff, 1) * 0.44;
+                    const op   = 1 - Math.min(absEff, 1) * 0.68;   // more dramatic fade on sides
                     const zIdx = Math.round(10 - absEff * 5);
-                    const tr  = dragging.current ? 'none'
-                        : 'transform 0.46s cubic-bezier(0.34,1.2,0.64,1), opacity 0.36s ease, border-color 0.3s, box-shadow 0.3s';
+                    const tr   = dragging.current ? 'none'
+                        : 'transform 0.46s cubic-bezier(0.34,1.56,0.64,1), opacity 0.36s ease';
+
+                    const isGlowing = glowCard === i;
+                    const glowShadow = isGlowing ? ', 0 0 32px rgba(240,200,50,0.5)' : '';
 
                     return (
-                        <div key={card.id} onClick={() => handleCardTap(i)} style={{
-                            position: 'absolute',
-                            top: '50%', left: '50%',
-                            width: `${S_W}px`, height: `${S_H}px`,
-                            marginLeft: `${-S_W / 2}px`, marginTop: `${-S_H / 2}px`,
-                            transform: `perspective(800px) translateX(${tx}px) rotateY(${ry}deg) scale(${sc})`,
-                            opacity: op,
-                            zIndex: zIdx,
-                            cursor: 'pointer',
-                            transition: tr,
-                            borderRadius: '16px',
-                            overflow: 'hidden',
-                            border: isActive ? '1.5px solid rgba(240,200,50,0.6)' : '1px solid rgba(255,255,255,0.07)',
-                            boxShadow: isActive
-                                ? '0 20px 60px rgba(0,0,0,0.9), 0 0 40px rgba(240,200,50,0.35), inset 0 1px 0 rgba(255,255,255,0.12)'
-                                : '0 6px 20px rgba(0,0,0,0.5)',
-                        }}>
-                            <Image src={card.img} alt={`גודל ${card.id}`} width={S_W} height={S_H}
-                                style={{ width: '100%', height: '100%', objectFit: 'contain', pointerEvents: 'none', display: 'block' }} />
+                        // Outer: coverflow positioning + opacity/zIndex
+                        <div
+                            key={card.id}
+                            onClick={() => handleCardTap(i)}
+                            style={{
+                                position: 'absolute',
+                                top: '50%', left: '50%',
+                                width: `${S_W}px`, height: `${S_H}px`,
+                                marginLeft: `${-S_W / 2}px`, marginTop: `${-S_H / 2}px`,
+                                transform: `perspective(800px) translateX(${tx}px) rotateY(${ry}deg) scale(${sc})`,
+                                opacity: op,
+                                zIndex: zIdx,
+                                cursor: 'pointer',
+                                transition: tr,
+                            }}
+                        >
+                            {/* Inner: entrance animation + visual styling */}
+                            <div style={{
+                                width: '100%', height: '100%',
+                                borderRadius: '16px',
+                                overflow: 'hidden',
+                                border: isActive ? '1.5px solid rgba(240,200,50,0.65)' : '1px solid rgba(255,255,255,0.07)',
+                                boxShadow: isActive
+                                    ? '0 24px 64px rgba(0,0,0,0.92), 0 0 44px rgba(240,200,50,0.38), inset 0 1px 0 rgba(255,255,255,0.14)' + glowShadow
+                                    : '0 6px 20px rgba(0,0,0,0.5)',
+                                transition: 'border-color 0.3s, box-shadow 0.5s',
+                                animation: `cardCascade 0.45s cubic-bezier(0.22,1.2,0.36,1) ${i * 75}ms both`,
+                                position: 'relative',
+                            }}>
+                                <Image
+                                    src={card.img} alt={`גודל ${card.id}`} width={S_W} height={S_H}
+                                    style={{ width: '100%', height: '100%', objectFit: 'contain', pointerEvents: 'none', display: 'block' }}
+                                />
+
+                                {/* Price badge — re-animates when this card becomes active */}
+                                {isActive && (
+                                    <div key={`price-${activeIdx}`} style={{
+                                        position: 'absolute', bottom: 0, left: 0, right: 0,
+                                        display: 'flex', justifyContent: 'center',
+                                        paddingBottom: '14px',
+                                        animation: 'priceBadge 0.32s cubic-bezier(0.34,1.4,0.64,1) both',
+                                    }}>
+                                        <div style={{
+                                            padding: '5px 18px', borderRadius: '20px',
+                                            background: 'linear-gradient(135deg,rgba(20,8,0,0.92),rgba(8,4,0,0.96))',
+                                            border: '1px solid rgba(240,200,50,0.45)',
+                                            backdropFilter: 'blur(8px)',
+                                            fontSize: '12px', fontWeight: 800, color: '#f0c832',
+                                            whiteSpace: 'nowrap',
+                                            boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+                                        }}>
+                                            {card.sub}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     );
                 })}
@@ -222,11 +279,8 @@ function SizePicker({ onSelect, onBack }: { onSelect: (s: string) => void; onBac
                 ))}
             </div>
 
-            <div style={{ fontSize: '14px', fontWeight: 700, color: 'rgba(255,255,255,0.5)', minHeight: '20px' }}>
-                {SIZE_CARDS[activeIdx].sub}
-            </div>
-
             <button type="button" onClick={doConfirm} style={{
+                marginTop: '4px',
                 padding: '14px 52px', borderRadius: '50px', border: 'none', cursor: 'pointer',
                 background: 'linear-gradient(135deg,#c8a832 0%,#f0d060 45%,#ffe066 55%,#c8a832 100%)',
                 color: '#0d2e0d', fontSize: '17px', fontWeight: 900, fontFamily: "'Heebo',sans-serif",
@@ -236,7 +290,11 @@ function SizePicker({ onSelect, onBack }: { onSelect: (s: string) => void; onBac
                 בנה סלט ←
             </button>
 
-            <button type="button" onClick={onBack} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.2)', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: "'Heebo',sans-serif", marginTop: '-4px' }}>
+            <button type="button" onClick={onBack} style={{
+                background: 'none', border: 'none', color: 'rgba(255,255,255,0.2)',
+                fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+                fontFamily: "'Heebo',sans-serif", marginTop: '-4px',
+            }}>
                 ← חזרה
             </button>
         </div>
@@ -250,6 +308,7 @@ export default function HomeV2() {
     // ── Carousel state ──
     const [activeIdx, setActiveIdx]   = useState(1);   // salad in center by default
     const [dragX, setDragX]           = useState(0);
+    const [glowCard, setGlowCard]     = useState<number | null>(null);
     const dragging = useRef(false);
     const startX   = useRef(0);
     const dragged  = useRef(false);
@@ -260,6 +319,22 @@ export default function HomeV2() {
     const [curtain, setCurtain]       = useState(false);
     const [ready, setReady]           = useState(false);
 
+    // ── Bottom nav state ──
+    const [navRipple, setNavRipple]   = useState<string | null>(null);
+
+    // ── Swipe hint — only show on first visit ──
+    const [showSwipeHint, setShowSwipeHint] = useState(false);
+    useEffect(() => {
+        if (!localStorage.getItem('bb-swipe-hint-seen')) {
+            setShowSwipeHint(true);
+            const t = setTimeout(() => {
+                localStorage.setItem('bb-swipe-hint-seen', '1');
+                setShowSwipeHint(false);
+            }, 6200); // ~2 cycles of 3s animation + 0.8s delay
+            return () => clearTimeout(t);
+        }
+    }, []);
+
     // ── Salad two-tap ──
     const { tapped: saladTapped, tap: saladTap, reset: saladReset } = useTwoTap(() => setSizePicker(true));
 
@@ -267,8 +342,10 @@ export default function HomeV2() {
 
     const snapTo = useCallback((idx: number) => {
         if (idx < 0 || idx >= MAIN_CARDS.length) return;
-        if (navigator.vibrate) navigator.vibrate(12);
+        navigator.vibrate?.(8);
         setActiveIdx(idx);
+        setGlowCard(idx);
+        setTimeout(() => setGlowCard(null), 600);
         if (idx !== 1) saladReset();
     }, [saladReset]);
 
@@ -327,8 +404,8 @@ export default function HomeV2() {
             fontFamily: "'Heebo',sans-serif", direction: 'rtl',
             display: 'flex', flexDirection: 'column', alignItems: 'center',
             justifyContent: 'space-between', overflow: 'hidden', userSelect: 'none',
+            background: 'url(/homepage-assets/bg-bokeh.jpg) center top / cover no-repeat, #020a02',
         }}>
-            <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;700;800;900&display=swap" rel="stylesheet" />
             <style>{`
                 @keyframes pageIn   { from{opacity:0;transform:translateY(18px) scale(0.97)} to{opacity:1;transform:none} }
                 @keyframes pageOut  { to{opacity:0;transform:scale(0.96)} }
@@ -339,8 +416,16 @@ export default function HomeV2() {
                 @keyframes hint     { 0%,100%{opacity:1} 50%{opacity:0.45} }
                 @keyframes sheetUp  { from{opacity:0;transform:translateY(40px)} to{opacity:1;transform:none} }
                 @keyframes swipeHint{ 0%,100%{transform:translateX(0);opacity:0.35} 40%{transform:translateX(-7px);opacity:0.7} 65%{transform:translateX(7px);opacity:0.7} }
+                @keyframes swipeHintFade{ 0%,80%{opacity:1} 100%{opacity:0} }
                 @keyframes glowPulse{ 0%,100%{filter:drop-shadow(0 0 22px rgba(240,200,50,.7)) drop-shadow(0 0 55px rgba(240,200,50,.3))} 50%{filter:drop-shadow(0 0 40px rgba(240,200,50,1)) drop-shadow(0 0 90px rgba(240,200,50,.55))} }
                 @keyframes greenGlow{ 0%,100%{filter:drop-shadow(0 0 22px rgba(90,220,40,.7)) drop-shadow(0 0 55px rgba(90,220,40,.3))} 50%{filter:drop-shadow(0 0 42px rgba(90,220,40,1)) drop-shadow(0 0 95px rgba(90,220,40,.6))} }
+                @keyframes navRipple{ 0%{transform:scale(0);opacity:0.5} 100%{transform:scale(1);opacity:0} }
+                @keyframes snapGlow      { 0%{box-shadow:0 0 30px rgba(240,200,50,0.4)} 100%{box-shadow:0 0 0px rgba(240,200,50,0)} }
+                @keyframes sizePickerIn  { from{opacity:0;transform:scale(0.93) translateY(24px)} to{opacity:1;transform:none} }
+                @keyframes sizePickerOut { to{opacity:0;transform:scale(0.96) translateY(-10px)} }
+                @keyframes cardCascade   { from{opacity:0;transform:translateY(26px) scale(0.86)} to{opacity:1;transform:none} }
+                @keyframes priceBadge    { from{opacity:0;transform:translateY(8px) scale(0.75)} to{opacity:1;transform:none} }
+                @keyframes stepGlow      { 0%,100%{opacity:0.55} 50%{opacity:1} }
             `}</style>
 
             {/* Background */}
@@ -387,7 +472,10 @@ export default function HomeV2() {
                         const zIdx = Math.round(10 - absEff * 5);
 
                         const tr = dragging.current ? 'none'
-                            : 'transform 0.46s cubic-bezier(0.34,1.2,0.64,1), opacity 0.36s ease, border-color 0.3s, box-shadow 0.3s';
+                            : 'transform 0.46s cubic-bezier(0.34,1.56,0.64,1), opacity 0.36s ease, border-color 0.3s, box-shadow 0.6s';
+
+                        const isGlowing = glowCard === i;
+                        const glowShadow = isGlowing ? ', 0 0 30px rgba(240,200,50,0.4)' : '';
 
                         return (
                             <div
@@ -410,7 +498,7 @@ export default function HomeV2() {
                                         ? (isSaladActive ? '1.5px solid rgba(90,220,40,0.6)' : '1.5px solid rgba(240,200,50,0.55)')
                                         : '1px solid rgba(255,255,255,0.08)',
                                     boxShadow: isActive
-                                        ? '0 20px 60px rgba(0,0,0,0.9), 0 4px 20px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.12)'
+                                        ? '0 20px 60px rgba(0,0,0,0.9), 0 4px 20px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.12)' + glowShadow
                                         : '0 6px 20px rgba(0,0,0,0.5)',
                                     animation: isActive
                                         ? (isSaladActive ? 'greenGlow 1.4s ease-in-out infinite' : 'glowPulse 2.4s ease-in-out infinite')
@@ -474,10 +562,35 @@ export default function HomeV2() {
                     ))}
                 </div>
 
-                {/* Swipe hint — fades after 2 loops */}
-                <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.22)', fontWeight: 600, marginTop: '10px', letterSpacing: '0.08em', animation: 'swipeHint 3s ease-in-out 0.8s 2 both' }}>
-                    ← גרור לסיבוב →
-                </div>
+                {/* Swipe hint — only on first visit, gold gradient arrow, fades after 2 cycles */}
+                {showSwipeHint && (
+                    <div style={{
+                        display: 'flex', alignItems: 'center', gap: '6px',
+                        marginTop: '10px',
+                        animation: 'swipeHint 3s ease-in-out 0.8s 2 both, swipeHintFade 6.2s ease 0.8s forwards',
+                    }}>
+                        <span style={{
+                            fontSize: '16px',
+                            background: 'linear-gradient(135deg,#f0c832,#ffe066,#f0a820)',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                            fontWeight: 900,
+                        }}>{'◂'}</span>
+                        <span style={{
+                            fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em',
+                            background: 'linear-gradient(135deg,#f0c832,#ffe066)',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                        }}>גרור לסיבוב</span>
+                        <span style={{
+                            fontSize: '16px',
+                            background: 'linear-gradient(135deg,#f0a820,#ffe066,#f0c832)',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                            fontWeight: 900,
+                        }}>{'▸'}</span>
+                    </div>
+                )}
             </div>
 
             {/* Bottom Nav */}
@@ -493,9 +606,52 @@ export default function HomeV2() {
                             { icon: '📋', label: 'הזמנות',   active: false },
                             { icon: '👤', label: 'פרופיל',   active: false },
                         ].map(item => (
-                            <div key={item.label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', opacity: item.active ? 1 : 0.45, cursor: 'pointer', padding: '4px 8px' }}>
-                                <span style={{ fontSize: '20px', filter: item.active ? 'drop-shadow(0 0 10px #f0c832)' : 'none' }}>{item.icon}</span>
-                                <span style={{ fontSize: '9px', fontWeight: 800, color: item.active ? '#f0c832' : '#fff', letterSpacing: '0.04em', textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>{item.label}</span>
+                            <div
+                                key={item.label}
+                                onClick={() => {
+                                    setNavRipple(item.label);
+                                    setTimeout(() => setNavRipple(null), 450);
+                                }}
+                                style={{
+                                    position: 'relative',
+                                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
+                                    opacity: item.active ? 1 : 0.5,
+                                    cursor: 'pointer', padding: '4px 12px',
+                                    transition: 'opacity 0.25s ease',
+                                }}
+                            >
+                                {/* Tap ripple */}
+                                {navRipple === item.label && (
+                                    <div style={{
+                                        position: 'absolute', top: '50%', left: '50%',
+                                        width: '48px', height: '48px',
+                                        marginLeft: '-24px', marginTop: '-24px',
+                                        borderRadius: '50%',
+                                        background: 'rgba(240,200,50,0.25)',
+                                        animation: 'navRipple 0.4s ease-out forwards',
+                                        pointerEvents: 'none',
+                                    }} />
+                                )}
+                                <span style={{
+                                    fontSize: item.active ? '22px' : '20px',
+                                    filter: item.active ? 'drop-shadow(0 0 10px #f0c832)' : 'none',
+                                    transition: 'font-size 0.25s ease, filter 0.25s ease',
+                                }}>{item.icon}</span>
+                                <span style={{
+                                    fontSize: '9px', fontWeight: 800,
+                                    color: item.active ? '#f0c832' : '#fff',
+                                    letterSpacing: '0.04em',
+                                    textShadow: '0 1px 4px rgba(0,0,0,0.8)',
+                                }}>{item.label}</span>
+                                {/* Active gold indicator line */}
+                                {item.active && (
+                                    <div style={{
+                                        width: '20px', height: '3px', borderRadius: '2px',
+                                        background: 'linear-gradient(90deg,#f0c832,#ffe066)',
+                                        marginTop: '1px',
+                                        boxShadow: '0 0 8px rgba(240,200,50,0.5)',
+                                    }} />
+                                )}
                             </div>
                         ))}
                     </div>
@@ -519,7 +675,7 @@ export default function HomeV2() {
                         position: 'absolute', bottom: 0, left: 0, right: 0,
                         background: 'rgba(3,12,3,0.97)', backdropFilter: 'blur(22px)',
                         borderRadius: '24px 24px 0 0', border: '1px solid rgba(240,200,50,0.12)',
-                        padding: '24px 24px 44px',
+                        padding: '24px 24px max(44px, env(safe-area-inset-bottom))',
                         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px',
                         animation: 'sheetUp 0.35s cubic-bezier(0.34,1.4,0.64,1) both',
                     }}>

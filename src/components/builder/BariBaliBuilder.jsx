@@ -121,6 +121,7 @@ function getStepColor(stepId) {
 // ─── PRESET COLOR SYSTEM ─────────────────────────────────────
 
 const PRESET_COLORS = {
+  // fallback
   balanced: {
     bg: "linear-gradient(145deg, rgba(200,168,78,0.22), rgba(184,134,11,0.14))",
     border: "rgba(200,168,78,0.5)",
@@ -128,26 +129,89 @@ const PRESET_COLORS = {
     text: "#edd87e",
     dot: "rgba(200,168,78,0.7)"
   },
-  protein: {
-    bg: "linear-gradient(145deg, rgba(66,165,245,0.22), rgba(30,136,229,0.14))",
-    border: "rgba(66,165,245,0.5)",
-    glow: "0 0 18px rgba(66,165,245,0.25), 0 4px 20px rgba(0,0,0,0.35)",
-    text: "#64b5f6",
-    dot: "rgba(66,165,245,0.7)"
+  signature: {
+    bg: "linear-gradient(145deg, rgba(240,190,60,0.26), rgba(180,130,10,0.16))",
+    border: "rgba(240,190,60,0.55)",
+    glow: "0 0 20px rgba(240,190,60,0.3), 0 4px 20px rgba(0,0,0,0.35)",
+    text: "#fad65a",
+    dot: "rgba(240,190,60,0.75)"
   },
-  vegan: {
-    bg: "linear-gradient(145deg, rgba(102,187,106,0.25), rgba(67,160,71,0.16))",
+  mediterranean: {
+    bg: "linear-gradient(145deg, rgba(77,182,172,0.24), rgba(38,166,154,0.14))",
+    border: "rgba(77,182,172,0.52)",
+    glow: "0 0 18px rgba(77,182,172,0.28), 0 4px 20px rgba(0,0,0,0.35)",
+    text: "#80cbc4",
+    dot: "rgba(77,182,172,0.72)"
+  },
+  asian_fusion: {
+    bg: "linear-gradient(145deg, rgba(149,117,205,0.26), rgba(103,58,183,0.16))",
+    border: "rgba(149,117,205,0.52)",
+    glow: "0 0 18px rgba(149,117,205,0.28), 0 4px 20px rgba(0,0,0,0.35)",
+    text: "#ce93d8",
+    dot: "rgba(149,117,205,0.72)"
+  },
+  protein_beast: {
+    bg: "linear-gradient(145deg, rgba(66,165,245,0.24), rgba(30,136,229,0.14))",
+    border: "rgba(66,165,245,0.52)",
+    glow: "0 0 18px rgba(66,165,245,0.28), 0 4px 20px rgba(0,0,0,0.35)",
+    text: "#64b5f6",
+    dot: "rgba(66,165,245,0.72)"
+  },
+  rainbow: {
+    bg: "linear-gradient(145deg, rgba(255,138,101,0.24), rgba(239,83,80,0.14))",
+    border: "rgba(255,138,101,0.52)",
+    glow: "0 0 18px rgba(255,138,101,0.28), 0 4px 20px rgba(0,0,0,0.35)",
+    text: "#ffab91",
+    dot: "rgba(255,138,101,0.72)"
+  },
+  fire_spice: {
+    bg: "linear-gradient(145deg, rgba(239,83,80,0.26), rgba(183,28,28,0.16))",
+    border: "rgba(239,83,80,0.55)",
+    glow: "0 0 20px rgba(239,83,80,0.32), 0 4px 20px rgba(0,0,0,0.35)",
+    text: "#ef9a9a",
+    dot: "rgba(239,83,80,0.75)"
+  },
+  warm_earth: {
+    bg: "linear-gradient(145deg, rgba(188,143,80,0.26), rgba(141,94,30,0.16))",
+    border: "rgba(188,143,80,0.52)",
+    glow: "0 0 18px rgba(188,143,80,0.28), 0 4px 20px rgba(0,0,0,0.35)",
+    text: "#d4a96a",
+    dot: "rgba(188,143,80,0.72)"
+  },
+  garden_fresh: {
+    bg: "linear-gradient(145deg, rgba(102,187,106,0.26), rgba(56,142,60,0.16))",
     border: "rgba(102,187,106,0.55)",
     glow: "0 0 18px rgba(102,187,106,0.3), 0 4px 20px rgba(0,0,0,0.35)",
     text: "#a5d6a7",
-    dot: "rgba(102,187,106,0.7)"
+    dot: "rgba(102,187,106,0.72)"
   },
-  light: {
+  pasta_garden: {
+    bg: "linear-gradient(145deg, rgba(255,167,38,0.22), rgba(230,81,0,0.14))",
+    border: "rgba(255,167,38,0.5)",
+    glow: "0 0 18px rgba(255,167,38,0.25), 0 4px 20px rgba(0,0,0,0.35)",
+    text: "#ffcc80",
+    dot: "rgba(255,167,38,0.7)"
+  },
+  detox_bowl: {
     bg: "linear-gradient(145deg, rgba(38,198,218,0.22), rgba(0,172,193,0.14))",
     border: "rgba(38,198,218,0.5)",
     glow: "0 0 18px rgba(38,198,218,0.25), 0 4px 20px rgba(0,0,0,0.35)",
     text: "#80deea",
     dot: "rgba(38,198,218,0.7)"
+  },
+  crunchy_master: {
+    bg: "linear-gradient(145deg, rgba(212,200,160,0.2), rgba(175,165,125,0.12))",
+    border: "rgba(212,200,160,0.45)",
+    glow: "0 0 16px rgba(212,200,160,0.2), 0 4px 20px rgba(0,0,0,0.35)",
+    text: "#e8dfc0",
+    dot: "rgba(212,200,160,0.65)"
+  },
+  eastern_night: {
+    bg: "linear-gradient(145deg, rgba(92,107,192,0.24), rgba(57,73,171,0.15))",
+    border: "rgba(92,107,192,0.52)",
+    glow: "0 0 18px rgba(92,107,192,0.28), 0 4px 20px rgba(0,0,0,0.35)",
+    text: "#9fa8da",
+    dot: "rgba(92,107,192,0.72)"
   },
 };
 
@@ -179,15 +243,15 @@ function BuilderParticles() {
     const sparkCols = ['#f0c832','#ffe066','#f0a820','#c8d830','#fffacc'];
     const bokehCols = ['#c8a832','#f0d060','#ffe066','#d4a820'];
 
-    const sparks = Array.from({ length: 45 }, () => ({
+    const sparks = Array.from({ length: 70 }, () => ({
       x: Math.random() * c.width, y: Math.random() * c.height,
-      r: Math.random() * 2 + 0.4, s: Math.random() * 0.45 + 0.1,
+      r: Math.random() * 2.5 + 0.4, s: Math.random() * 0.45 + 0.1,
       o: Math.random() * 0.3 + 0.06, col: sparkCols[Math.floor(Math.random() * sparkCols.length)],
       d: (Math.random() - 0.5) * 0.22, ph: Math.random() * Math.PI * 2,
     }));
-    const bokeh = Array.from({ length: 8 }, () => ({
-      x: Math.random() * c.width, y: c.height * 0.4 + Math.random() * c.height * 0.6,
-      r: Math.random() * 26 + 12, s: Math.random() * 0.07 + 0.02,
+    const bokeh = Array.from({ length: 18 }, () => ({
+      x: Math.random() * c.width, y: Math.random() * c.height,
+      r: Math.random() * 52 + 16, s: Math.random() * 0.07 + 0.02,
       o: Math.random() * 0.05 + 0.015, col: bokehCols[Math.floor(Math.random() * bokehCols.length)],
       ph: Math.random() * Math.PI * 2,
     }));
@@ -239,7 +303,7 @@ export default function BariBaliBuilder({ sizeParam = null }) {
   const [comboBadges, setComboBadges] = useState([]);
   const [badgeFlash, setBadgeFlash] = useState(null);
   const [shownBadges, setShownBadges] = useState(new Set());
-  const [detailItem, setDetailItem] = useState(null);
+  const [detailCtx, setDetailCtx] = useState(null); // { item, stepId, maxPicks }
   const [showLongPressHint, setShowLongPressHint] = useState(true);
   useEffect(() => {
     const t = setTimeout(() => setShowLongPressHint(false), 15000);
@@ -250,6 +314,7 @@ export default function BariBaliBuilder({ sizeParam = null }) {
   const [prevPrice, setPrevPrice] = useState(activeBase);
   const [activeAnchor, setActiveAnchor] = useState(0);
   const [notes, setNotes] = useState("");
+  const [expandedPreset, setExpandedPreset] = useState(null);
   const [isTransforming, setIsTransforming] = useState(false);
   const scrollRef = useRef(null);
   const touchRef = useRef({ x: 0, y: 0, t: 0 });
@@ -463,7 +528,7 @@ export default function BariBaliBuilder({ sizeParam = null }) {
   const onChipTouchStart = (item) => {
     setShowLongPressHint(false);
     longPressRef.current = setTimeout(() => {
-      setDetailItem(item); haptic("tap");
+      setDetailCtx({ item, stepId: cur?.id, maxPicks: cur?.maxPicks }); haptic("tap");
     }, 500);
   };
   const onChipTouchEnd = () => { clearTimeout(longPressRef.current); };
@@ -483,7 +548,6 @@ export default function BariBaliBuilder({ sizeParam = null }) {
       return (
         <div style={S.root}>
           {splash && <SplashScreen onDone={() => setSplash(false)} />}
-          <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
           <div style={S.bg} /><div style={S.bgRay} />
           <MagicBackground isTransforming={isTransforming} />
           <BuilderParticles />
@@ -523,7 +587,6 @@ export default function BariBaliBuilder({ sizeParam = null }) {
     return (
       <div style={S.root}>
         {splash && <SplashScreen onDone={() => setSplash(false)} />}
-        <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
         <div style={S.bg} /><div style={S.bgRay} />
         <MagicBackground isTransforming={isTransforming} />
         <BuilderParticles />
@@ -534,7 +597,7 @@ export default function BariBaliBuilder({ sizeParam = null }) {
           {/* Brand header banner */}
           <img src={headerImage} alt="" aria-hidden="true" style={{ width: "100%", display: "block", height: "80px", objectFit: "cover", objectPosition: "center top", flexShrink: 0 }} />
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "24px", flex: 1, padding: "20px 16px 0" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "24px", flex: 1, padding: "20px 16px 24px", overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
 
             {/* Size badge + change */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -581,32 +644,111 @@ export default function BariBaliBuilder({ sizeParam = null }) {
                   color: "rgba(255,255,255,0.5)",
                   textTransform: "uppercase", letterSpacing: "0.08em",
                   textShadow: "0 1px 2px rgba(0,0,0,0.5)"
-                }}>תבניות מוכנות</span>
+                }}>מתכוני שף</span>
                 <div style={{ flex: 1, height: "1px", background: "linear-gradient(90deg, rgba(255,255,255,0.15), transparent)" }} />
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                {PRESETS.map(p => {
-                  const pc = PRESET_COLORS[p.id] || PRESET_COLORS.balanced;
-                  return (
-                    <button
-                      key={p.id}
-                      onClick={() => loadPreset(p)}
-                      style={{
-                        ...S.presetCard,
-                        background: pc.bg,
-                        border: `1.5px solid ${pc.border}`,
-                        boxShadow: pc.glow,
-                      }}
-                      aria-label={`טען תבנית ${p.he} עם ${p.items.length} מרכיבים`}
-                      tabIndex={0}
-                    >
-                      <span style={{ fontSize: "30px", filter: `drop-shadow(0 2px 6px ${pc.dot})` }} aria-hidden="true">{p.icon}</span>
-                      <span style={{ fontSize: "13px", fontWeight: 800, color: pc.text, textShadow: "0 1px 3px rgba(0,0,0,0.7)" }}>{p.he}</span>
-                      <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.4)", fontWeight: 600, letterSpacing: "0.04em" }}>{p.items.length} מרכיבים</span>
-                    </button>
-                  );
-                })}
-              </div>
+              {(() => {
+                const allIngredients = STEPS.flatMap(s => s.subgroups.flatMap(sg => sg.items));
+                const ep = expandedPreset ? PRESETS.find(x => x.id === expandedPreset) : null;
+                const epc = ep ? (PRESET_COLORS[ep.id] || PRESET_COLORS.balanced) : null;
+                return (
+                  <>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "7px" }}>
+                      {PRESETS.map(p => {
+                        const pc = PRESET_COLORS[p.id] || PRESET_COLORS.balanced;
+                        const isOpen = expandedPreset === p.id;
+                        return (
+                          <button
+                            key={p.id}
+                            onClick={() => setExpandedPreset(isOpen ? null : p.id)}
+                            style={{
+                              ...S.presetCard,
+                              background: pc.bg,
+                              border: `1px solid ${isOpen ? pc.text : pc.border}`,
+                              boxShadow: isOpen ? `${pc.glow}, inset 0 0 0 1px ${pc.border}` : pc.glow,
+                              opacity: expandedPreset && !isOpen ? 0.55 : 1,
+                              transform: isOpen ? "scale(1.02)" : "scale(1)",
+                              transition: "all 0.2s cubic-bezier(0.34,1.56,0.64,1)",
+                            }}
+                            aria-expanded={isOpen}
+                            aria-label={`מתכון ${p.he}`}
+                            tabIndex={0}
+                          >
+                            <span style={{ fontSize: "18px", flexShrink: 0, filter: `drop-shadow(0 1px 4px ${pc.dot})` }} aria-hidden="true">{p.icon}</span>
+                            <span style={{ flex: 1, fontSize: "11.5px", fontWeight: 800, color: pc.text, textAlign: "right", lineHeight: 1.2 }}>{p.he}</span>
+                            <span style={{ fontSize: "9px", fontWeight: 700, color: isOpen ? pc.text : "rgba(255,255,255,0.28)", flexShrink: 0, transition: "transform 0.2s", transform: isOpen ? "rotate(180deg)" : "none" }}>▾</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Expansion Panel */}
+                    {ep && epc && (
+                      <div key={ep.id} style={{
+                        marginTop: "8px",
+                        borderRadius: "14px",
+                        background: epc.bg,
+                        border: `1.5px solid ${epc.border}`,
+                        boxShadow: epc.glow,
+                        overflow: "hidden",
+                        animation: "expandIn 0.28s cubic-bezier(0.22,1.2,0.36,1) both",
+                      }}>
+                        {/* Header */}
+                        <div style={{ padding: "14px 14px 10px", display: "flex", alignItems: "center", gap: "10px", borderBottom: `1px solid ${epc.border}` }}>
+                          <span style={{ fontSize: "26px", filter: `drop-shadow(0 2px 8px ${epc.dot})`, flexShrink: 0 }}>{ep.icon}</span>
+                          <span style={{ flex: 1, fontSize: "15px", fontWeight: 900, color: epc.text, textAlign: "right" }}>{ep.he}</span>
+                          <button
+                            onClick={() => setExpandedPreset(null)}
+                            style={{ background: "none", border: "none", color: "rgba(255,255,255,0.3)", fontSize: "14px", cursor: "pointer", padding: "2px 4px", lineHeight: 1, flexShrink: 0 }}
+                            aria-label="סגור"
+                          >✕</button>
+                        </div>
+
+                        {/* Description */}
+                        <div style={{ padding: "10px 14px 0" }}>
+                          <p style={{ fontSize: "12.5px", lineHeight: 1.65, color: "rgba(255,255,255,0.75)", margin: 0, fontWeight: 500, textAlign: "right" }}>{ep.desc}</p>
+                        </div>
+
+                        {/* Ingredient chips */}
+                        <div style={{ padding: "10px 14px", display: "flex", flexWrap: "wrap", gap: "5px", justifyContent: "flex-end" }}>
+                          {ep.items.map(id => {
+                            const item = allIngredients.find(i => i.id === id);
+                            if (!item) return null;
+                            return (
+                              <span key={id} style={{
+                                fontSize: "10px", fontWeight: 600,
+                                padding: "2px 8px", borderRadius: "8px",
+                                background: "rgba(255,255,255,0.08)",
+                                color: "rgba(255,255,255,0.6)",
+                                border: `1px solid ${epc.border}`,
+                                whiteSpace: "nowrap",
+                              }}>{item.icon} {item.he}</span>
+                            );
+                          })}
+                        </div>
+
+                        {/* CTA */}
+                        <div style={{ padding: "0 14px 14px" }}>
+                          <button
+                            onClick={() => { loadPreset(ep); setExpandedPreset(null); }}
+                            style={{
+                              width: "100%", padding: "11px 0", borderRadius: "10px",
+                              border: "none", cursor: "pointer",
+                              background: `linear-gradient(135deg, ${epc.dot}, ${epc.border})`,
+                              color: "#0a1a0a", fontSize: "14px", fontWeight: 900,
+                              fontFamily: "'Heebo',sans-serif",
+                              boxShadow: `0 4px 18px ${epc.dot}`,
+                              letterSpacing: "0.02em",
+                            }}
+                          >
+                            בנה את {ep.he} ←
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           </div>
 
@@ -631,14 +773,20 @@ export default function BariBaliBuilder({ sizeParam = null }) {
   return (
     <div style={S.root} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
       {splash && <SplashScreen onDone={() => setSplash(false)} />}
-      <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
       <div style={S.bg} /><div style={S.bgRay} />
       <MagicBackground isTransforming={isTransforming} stepId={step >= 0 ? STEPS[step]?.id : null} />
 
       {badgeFlash && <div style={S.badgeFlash}><span style={{ fontSize: "22px" }}>{badgeFlash.icon}</span><span style={S.badgeFlashTxt}>{badgeFlash.he}</span></div>}
 
       {/* Detail overlay */}
-      {detailItem && <DetailSheet item={detailItem} onClose={() => setDetailItem(null)} />}
+      {detailCtx && (
+        <DetailSheet
+          item={detailCtx.item}
+          isAdded={(sels[detailCtx.stepId] || []).some(i => i.id === detailCtx.item.id)}
+          onToggle={() => { toggle(detailCtx.stepId, detailCtx.item, detailCtx.maxPicks); setDetailCtx(null); }}
+          onClose={() => setDetailCtx(null)}
+        />
+      )}
 
       <div style={{ ...S.main, opacity: anim === "enter" ? 0 : 1, transition: "opacity 0.4s" }}>
 
@@ -881,6 +1029,7 @@ export default function BariBaliBuilder({ sizeParam = null }) {
 
 const KF = `
 @keyframes chipIn { 0%{opacity:0;transform:translateY(10px) scale(0.92)} 100%{opacity:1;transform:none} }
+@keyframes expandIn { 0%{opacity:0;transform:translateY(-6px) scaleY(0.94);transform-origin:top} 100%{opacity:1;transform:none} }
 @keyframes popBounce { 0%{transform:scale(0.3);opacity:0} 60%{transform:scale(1.15)} 100%{transform:scale(1);opacity:1} }
 @keyframes popOut { 0%{transform:scale(1);opacity:1} 100%{transform:scale(0.3);opacity:0} }
 @keyframes shimmer { 0%{background-position:200% center} 100%{background-position:-200% center} }
@@ -972,7 +1121,7 @@ const S = {
   chipName: { fontSize: "10.5px", fontWeight: 700, textAlign: "center", lineHeight: 1.15, color: "#ffffff", textShadow: "0 1px 3px rgba(0,0,0,0.6)" },
   chipCost: { fontSize: "8px", fontWeight: 800, color: "#f0d060", background: "linear-gradient(135deg, rgba(200,168,78,0.2), rgba(200,168,78,0.08))", border: "1px solid rgba(200,168,78,0.35)", padding: "1px 5px", borderRadius: "5px", marginTop: "2px", boxShadow: "0 1px 2px rgba(0,0,0,0.3)" },
 
-  bar: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 14px 11px", background: `linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.25) 100%), url(${footerImage}) center top / cover no-repeat`, borderTop: "2px solid rgba(200,168,78,0.4)", boxShadow: "0 -4px 20px rgba(0,0,0,0.5), 0 0 30px rgba(200,168,78,0.08)" },
+  bar: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 14px max(11px, env(safe-area-inset-bottom))", background: `linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.25) 100%), url(${footerImage}) center top / cover no-repeat`, borderTop: "2px solid rgba(200,168,78,0.4)", boxShadow: "0 -4px 20px rgba(0,0,0,0.5), 0 0 30px rgba(200,168,78,0.08)" },
   barInfo: { display: "flex", alignItems: "baseline", gap: "5px" },
   barCount: { fontSize: "18px", fontWeight: 900, color: "#ffffff", textShadow: "0 2px 4px rgba(0,0,0,0.5)" },
   barLabel: { fontSize: "11px", color: "rgba(255,255,255,0.35)", fontWeight: 600 },
@@ -993,12 +1142,12 @@ const S = {
     animation: "heroPulse 3s ease-in-out infinite"
   },
   presetCard: {
-    display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-    gap: "6px", padding: "16px 10px", borderRadius: "16px", cursor: "pointer",
-    background: "linear-gradient(155deg, rgba(13,46,13,0.95), rgba(8,28,8,0.9))",
-    backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
-    boxShadow: "0 0 0 1px rgba(200,168,78,0.08), 0 4px 20px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.05)",
-    transition: "all 0.25s cubic-bezier(0.34,1.56,0.64,1)", outline: "none"
+    display: "flex", flexDirection: "row", alignItems: "center",
+    gap: "7px", padding: "8px 10px", borderRadius: "10px", cursor: "pointer",
+    background: "linear-gradient(135deg, rgba(13,40,13,0.95), rgba(8,24,8,0.9))",
+    backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
+    boxShadow: "0 0 0 1px rgba(200,168,78,0.07), 0 2px 10px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)",
+    transition: "all 0.2s cubic-bezier(0.34,1.56,0.64,1)", outline: "none"
   },
   clearDraftBtn: { marginTop: "10px", padding: "6px 12px", borderRadius: "8px", cursor: "pointer", background: "rgba(239,83,80,0.1)", border: "1px solid rgba(239,83,80,0.25)", color: "#ef5350", fontSize: "11px", fontWeight: 600, fontFamily: "'Heebo',sans-serif", transition: "all 0.15s" },
   sizeCard: { display: "flex", alignItems: "center", width: "100%", padding: "18px 20px", borderRadius: "18px", cursor: "pointer", background: "linear-gradient(155deg, rgba(13,46,13,0.97), rgba(8,28,8,0.93))", border: "2px solid rgba(200,168,78,0.4)", boxShadow: "0 0 0 1px rgba(200,168,78,0.08), 0 8px 30px rgba(0,0,0,0.5), 0 0 20px rgba(200,168,78,0.06), inset 0 1px 0 rgba(255,255,255,0.06)", transition: "all 0.2s cubic-bezier(0.34,1.56,0.64,1)", outline: "none", fontFamily: "'Heebo',sans-serif" },

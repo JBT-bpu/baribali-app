@@ -268,8 +268,64 @@ export function getSuggestions(allTags, all) {
 }
 
 export const PRESETS = [
-    { id: "balanced", icon: "⚖️", he: "מאוזן", items: ["lettuce", "tomato", "cucumber", "carrot", "chickpeas", "egg", "olive_oil"] },
-    { id: "protein", icon: "💪", he: "חלבון", items: ["baby_leaf", "quinoa", "black_lentils", "mushrooms", "sunflower_seeds", "tuna", "tahini"] },
-    { id: "vegan", icon: "🌱", he: "טבעוני", items: ["lettuce", "tomato", "bell_pepper", "green_lentils", "baked_sweet_potato", "tofu_olive", "lemon"] },
-    { id: "light", icon: "🥬", he: "קליל", items: ["baby_leaf", "cucumber", "sprouts", "carrot", "celery", "lemon"] },
+    {
+        id: "signature", icon: "⭐", he: "חתימת הבית",
+        desc: "המתכון שהתחיל הכל — קינואה, בטטה אפויה וחומוס על מיטת עלי בייבי, עם ויניגרט טחינה ולימון שחיבר את הכל.",
+        items: ["baby_leaf", "tomato", "cucumber", "quinoa", "chickpeas", "baked_sweet_potato", "red_onion", "sunflower_seeds", "tahini", "lemon"],
+    },
+    {
+        id: "mediterranean", icon: "🫒", he: "ים תיכוני",
+        desc: "גבינת פטה מתפוררת, זיתים שחורים וירוקים, ירקות טריים ובלסמי עדין. חופשה ים-תיכונית בצלחת, בלי כרטיס טיסה.",
+        items: ["baby_leaf", "tomato", "cucumber", "bell_pepper", "red_onion", "black_olives", "green_olives", "feta5", "balsamic"],
+    },
+    {
+        id: "asian_fusion", icon: "🥢", he: "פיוז'ן אסייתי",
+        desc: "כרוב סגול פריך, גזר, תירס וטופו בציפוי טריאקי עם שומשום קלוי. מזרח רחוק בקערה — מתוק, מלוח ומסעיר.",
+        items: ["cabbage_purple", "baby_leaf", "carrot", "cucumber", "corn", "green_onion", "tofu_olive", "sesame", "teriyaki"],
+    },
+    {
+        id: "protein_beast", icon: "💪", he: "פצצת חלבון",
+        desc: "עדשים שחורות, קינואה, חומוס, פטריות וביצה קשה — מכונת חלבון. כ-35 גרם חלבון למנה, בלי להתפשר על טעם.",
+        items: ["lettuce", "mushrooms", "quinoa", "black_lentils", "chickpeas", "egg", "sunflower_seeds", "tahini"],
+    },
+    {
+        id: "rainbow", icon: "🌈", he: "קשת הבריאות",
+        desc: "שבעה צבעים בקערה אחת — עגבניה, גזר, סלק, גמבה, תירס, כרוב סגול ואפונה. ויטמינים מכל הקשת, בנגיסה אחת.",
+        items: ["baby_leaf", "tomato", "carrot", "bell_pepper", "fresh_beet", "corn", "cabbage_purple", "green_peas", "citrus_vin"],
+    },
+    {
+        id: "fire_spice", icon: "🔥", he: "חריף ומסעיר",
+        desc: "לנועזים בלבד. פלפל חריף, צנון, חמוצים וסחוג תימני אותנטי על בסיס ירקות וחומוס. חריף, אמיתי — לא לכולם.",
+        items: ["lettuce", "tomato", "radish", "hot_pepper", "pickles", "red_onion", "chickpeas", "tofu_olive", "zhug"],
+    },
+    {
+        id: "warm_earth", icon: "🍠", he: "חום וחמים",
+        desc: "חציל קלוי בתנור, בטטה אפויה, ביצה קשה וזעתר — עומק, חמימות וריח של מזרח-תיכוני אמיתי. מנחם ומזין.",
+        items: ["lettuce", "roasted_eggplant", "baked_sweet_potato", "chickpeas", "red_onion", "parsley", "zaatar", "egg", "tahini"],
+    },
+    {
+        id: "garden_fresh", icon: "🌿", he: "גן ירוק",
+        desc: "נבטים, כוסברה, פטרוזיליה, בצל ירוק וסלרי עם לימון סחוט טרי. קליל, מרענן, בלי אשמה — הסלט של הגוף הנקי.",
+        items: ["baby_leaf", "sprouts", "cucumber", "celery", "green_onion", "tomato", "cilantro", "parsley", "lemon"],
+    },
+    {
+        id: "pasta_garden", icon: "🍝", he: "פסטה גרדן",
+        desc: "פסטה פוזילי, גבינת פטה, זיתים שחורים ובלסמי איכותי — פשוטה, מהירה ומספקת. הקלאסיק הים-תיכוני שתמיד עובד.",
+        items: ["baby_leaf", "fusilli_pasta", "tomato", "cucumber", "bell_pepper", "black_olives", "parsley", "balsamic", "feta5"],
+    },
+    {
+        id: "detox_bowl", icon: "🥦", he: "בול דטוקס",
+        desc: "נבטים, סלק טרי, גזר, אפונה ירוקה וזרעי צ'יה עם לימון סחוט טרי. ניקוי מבפנים — ירוק, נקי, מאפס.",
+        items: ["baby_leaf", "sprouts", "fresh_beet", "carrot", "celery", "chia", "green_peas", "lemon", "green_onion"],
+    },
+    {
+        id: "crunchy_master", icon: "🥜", he: "מלך הקראנץ'",
+        desc: "כרוב לבן וסגול, גזר מגורד, צנון, חמוצים, גרעיני חמנייה ושומשום עם ויניגרט הדרים. פריך, מרענן — טרי שעות.",
+        items: ["cabbage_white", "cabbage_purple", "carrot", "celery", "radish", "pickles", "sunflower_seeds", "sesame", "citrus_vin"],
+    },
+    {
+        id: "eastern_night", icon: "🌙", he: "לילה מזרחי",
+        desc: "בורגול עדין, חציל קלוי, חומוס, כוסברה ופטרוזיליה עם טחינה ולימון. טעם שוק מחנה יהודה — כל נגיסה מספרת סיפור.",
+        items: ["baby_leaf", "bulgur", "roasted_eggplant", "chickpeas", "tomato", "parsley", "cilantro", "red_onion", "tahini", "lemon"],
+    },
 ];
