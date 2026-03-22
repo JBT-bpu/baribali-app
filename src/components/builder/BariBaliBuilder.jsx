@@ -827,7 +827,7 @@ export default function BariBaliBuilder({ sizeParam = null }) {
                     textShadow: "0 2px 6px rgba(0,0,0,0.6)"
                   }}>{cur.title}</span>
                 </div>
-                <span style={{ fontSize: "11px", color: "rgba(200,168,78,0.55)", fontWeight: 600 }}>{cur.subtitle}</span>
+                <span style={{ fontSize: "11px", color: "rgba(200,168,78,0.85)", fontWeight: 600 }}>{cur.subtitle}</span>
               </div>
               {/* Layer pills */}
               <div style={{ display: "flex", gap: "4px", marginTop: "4px", flexWrap: "wrap" }}>
@@ -1087,7 +1087,7 @@ const S = {
   priceV: { fontSize: "22px", color: "#ffffff", fontWeight: 900, textShadow: "0 2px 8px rgba(200,168,78,0.5)" },
   progressRow: { display: "flex", gap: "3px" },
 
-  bowlArea: { padding: "6px 12px 4px", background: "rgba(0,0,0,0.4)", borderBottom: "1px solid rgba(200,168,78,0.1)" },
+  bowlArea: { padding: "6px 12px 4px", background: "rgba(0,0,0,0.4)", borderBottom: "1px solid rgba(200,168,78,0.25)" },
   bowlScroll: { display: "flex", gap: "4px", overflowX: "auto", scrollbarWidth: "none" },
   bowlPiece: { width: "31px", height: "31px", borderRadius: "9px", flexShrink: 0, background: "linear-gradient(145deg, rgba(13,46,13,0.92), rgba(8,28,8,0.88))", border: "2px solid rgba(200,168,78,0.3)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 8px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05)", cursor: "pointer", position: "relative", transition: "all 0.15s" },
 
@@ -1099,7 +1099,7 @@ const S = {
   sugRow: { display: "flex", gap: "6px", padding: "5px 12px 2px" },
   sugPill: { display: "flex", alignItems: "center", gap: "4px", padding: "3px 9px", borderRadius: "9px", background: "rgba(200,168,78,0.22)", border: "1px solid rgba(200,168,78,0.4)" },
 
-  anchorRow: { display: "flex", gap: "5px", padding: "6px 10px", overflowX: "auto", scrollbarWidth: "none", borderBottom: "1px solid rgba(200,168,78,0.15)", background: "rgba(0,0,0,0.45)" },
+  anchorRow: { display: "flex", gap: "5px", padding: "6px 10px", overflowX: "auto", scrollbarWidth: "none", borderBottom: "1px solid rgba(200,168,78,0.3)", background: "rgba(0,0,0,0.55)", boxShadow: "inset 0 -1px 0 rgba(200,168,78,0.12)" },
   anchorTab: { padding: "5px 12px", borderRadius: "8px", border: "1px solid rgba(200,168,78,0.4)", background: "linear-gradient(145deg, rgba(18,52,18,0.95), rgba(12,36,12,0.92))", color: "rgba(255,255,255,0.8)", fontSize: "11px", fontWeight: 700, cursor: "pointer", flexShrink: 0, transition: "all 0.15s", fontFamily: "'Heebo',sans-serif", textShadow: "0 1px 2px rgba(0,0,0,0.5)" },
   anchorActive: { background: "linear-gradient(145deg, rgba(200,168,78,0.18), rgba(180,140,40,0.1))", borderColor: "rgba(200,168,78,0.45)", color: "#f0d060" },
 
@@ -1112,7 +1112,7 @@ const S = {
   sgLabel: { fontSize: "11px", fontWeight: 800, color: "rgba(200,168,78,0.85)", padding: "10px 4px 6px", textShadow: "0 1px 3px rgba(0,0,0,0.7), 0 0 8px rgba(0,0,0,0.3)" },
   grid: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "7px" },
 
-  chip: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "10px 3px 7px", borderRadius: "16px", cursor: "pointer", position: "relative", minHeight: "74px", background: "linear-gradient(155deg, rgba(35,90,35,0.85), rgba(20,55,20,0.8))", border: "2px solid rgba(200,168,78,0.45)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", boxShadow: "0 3px 12px rgba(0,0,0,0.5), 0 0 8px rgba(200,168,78,0.08), inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.25)", color: "#ffffff", transition: "all 0.2s cubic-bezier(0.34,1.56,0.64,1)", animation: "chipIn 0.25s ease both", outline: "none" },
+  chip: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "10px 3px 7px", borderRadius: "16px", cursor: "pointer", position: "relative", minHeight: "74px", background: "linear-gradient(155deg, rgba(50,115,50,0.9), rgba(30,75,30,0.85))", border: "2px solid rgba(200,168,78,0.55)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", boxShadow: "0 3px 12px rgba(0,0,0,0.5), 0 0 8px rgba(200,168,78,0.08), inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.25)", color: "#ffffff", transition: "all 0.2s cubic-bezier(0.34,1.56,0.64,1)", animation: "chipIn 0.25s ease both", outline: "none" },
   chipOn: { background: "linear-gradient(155deg, rgba(55,125,55,0.9), rgba(35,90,35,0.85))", border: "2.5px solid rgba(240,208,96,0.85)", boxShadow: "0 6px 20px rgba(200,168,78,0.5), 0 0 20px rgba(200,168,78,0.3), inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -1px 0 rgba(0,0,0,0.15)", transform: "translateY(-2px)" },
   chipOff: { opacity: 0.2, cursor: "not-allowed", filter: "grayscale(0.5)" },
   check: { position: "absolute", top: "3px", left: "3px", width: "16px", height: "16px", borderRadius: "50%", background: "linear-gradient(135deg, #ffe066, #d4b84a)", color: "#0d2e0d", fontSize: "8px", fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 6px rgba(200,168,78,0.5)" },

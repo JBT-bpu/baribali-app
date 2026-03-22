@@ -227,7 +227,7 @@ function SizePicker({ onSelect, onBack }: { onSelect: (s: string) => void; onBac
                                 width: '100%', height: '100%',
                                 borderRadius: '16px',
                                 overflow: 'hidden',
-                                border: isActive ? '1.5px solid rgba(240,200,50,0.65)' : '1px solid rgba(255,255,255,0.07)',
+                                border: isActive ? '1.5px solid rgba(240,200,50,0.65)' : '1px solid rgba(255,255,255,0.22)',
                                 boxShadow: isActive
                                     ? '0 24px 64px rgba(0,0,0,0.92), 0 0 44px rgba(240,200,50,0.38), inset 0 1px 0 rgba(255,255,255,0.14)' + glowShadow
                                     : '0 6px 20px rgba(0,0,0,0.5)',
@@ -272,7 +272,7 @@ function SizePicker({ onSelect, onBack }: { onSelect: (s: string) => void; onBac
                 {SIZE_CARDS.map((_, i) => (
                     <div key={i} onClick={() => snapTo(i)} style={{
                         width: i === activeIdx ? '22px' : '7px', height: '7px', borderRadius: '4px',
-                        background: i === activeIdx ? '#f0c832' : 'rgba(255,255,255,0.2)',
+                        background: i === activeIdx ? '#f0c832' : 'rgba(255,255,255,0.45)',
                         transition: 'all 0.3s cubic-bezier(0.34,1.4,0.64,1)',
                         boxShadow: i === activeIdx ? '0 0 10px rgba(240,200,50,0.6)' : 'none', cursor: 'pointer',
                     }} />
@@ -291,8 +291,8 @@ function SizePicker({ onSelect, onBack }: { onSelect: (s: string) => void; onBac
             </button>
 
             <button type="button" onClick={onBack} style={{
-                background: 'none', border: 'none', color: 'rgba(255,255,255,0.2)',
-                fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+                background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.55)',
+                fontSize: '13px', fontWeight: 600, cursor: 'pointer', padding: '6px 14px', borderRadius: '20px',
                 fontFamily: "'Heebo',sans-serif", marginTop: '-4px',
             }}>
                 ← חזרה
@@ -415,7 +415,7 @@ export default function HomeV2() {
                 @keyframes burst    { from{transform:scale(0)} to{transform:scale(55)} }
                 @keyframes hint     { 0%,100%{opacity:1} 50%{opacity:0.45} }
                 @keyframes sheetUp  { from{opacity:0;transform:translateY(40px)} to{opacity:1;transform:none} }
-                @keyframes swipeHint{ 0%,100%{transform:translateX(0);opacity:0.35} 40%{transform:translateX(-7px);opacity:0.7} 65%{transform:translateX(7px);opacity:0.7} }
+                @keyframes swipeHint{ 0%,100%{transform:translateX(0);opacity:0.55} 40%{transform:translateX(-7px);opacity:0.9} 65%{transform:translateX(7px);opacity:0.9} }
                 @keyframes swipeHintFade{ 0%,80%{opacity:1} 100%{opacity:0} }
                 @keyframes glowPulse{ 0%,100%{filter:drop-shadow(0 0 22px rgba(240,200,50,.7)) drop-shadow(0 0 55px rgba(240,200,50,.3))} 50%{filter:drop-shadow(0 0 40px rgba(240,200,50,1)) drop-shadow(0 0 90px rgba(240,200,50,.55))} }
                 @keyframes greenGlow{ 0%,100%{filter:drop-shadow(0 0 22px rgba(90,220,40,.7)) drop-shadow(0 0 55px rgba(90,220,40,.3))} 50%{filter:drop-shadow(0 0 42px rgba(90,220,40,1)) drop-shadow(0 0 95px rgba(90,220,40,.6))} }
@@ -496,7 +496,7 @@ export default function HomeV2() {
                                     overflow: 'hidden',
                                     border: isActive
                                         ? (isSaladActive ? '1.5px solid rgba(90,220,40,0.6)' : '1.5px solid rgba(240,200,50,0.55)')
-                                        : '1px solid rgba(255,255,255,0.08)',
+                                        : '1px solid rgba(255,255,255,0.22)',
                                     boxShadow: isActive
                                         ? '0 20px 60px rgba(0,0,0,0.9), 0 4px 20px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.12)' + glowShadow
                                         : '0 6px 20px rgba(0,0,0,0.5)',
@@ -544,7 +544,7 @@ export default function HomeV2() {
                     <div style={{ fontSize: '20px', fontWeight: 900, color: '#fff', letterSpacing: '0.01em', textShadow: '0 2px 14px rgba(0,0,0,0.9)' }}>
                         {card.label}
                     </div>
-                    <div style={{ fontSize: '12px', fontWeight: 600, color: 'rgba(255,255,255,0.38)', letterSpacing: '0.04em' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 600, color: 'rgba(255,255,255,0.65)', letterSpacing: '0.04em' }}>
                         {card.sub}
                     </div>
                 </div>
@@ -554,7 +554,7 @@ export default function HomeV2() {
                     {MAIN_CARDS.map((_, i) => (
                         <div key={i} onClick={() => snapTo(i)} style={{
                             width: i === activeIdx ? '22px' : '7px', height: '7px', borderRadius: '4px',
-                            background: i === activeIdx ? '#f0c832' : 'rgba(255,255,255,0.2)',
+                            background: i === activeIdx ? '#f0c832' : 'rgba(255,255,255,0.45)',
                             transition: 'all 0.3s cubic-bezier(0.34,1.4,0.64,1)',
                             boxShadow: i === activeIdx ? '0 0 10px rgba(240,200,50,0.6)' : 'none',
                             cursor: 'pointer',
@@ -633,12 +633,12 @@ export default function HomeV2() {
                                     }} />
                                 )}
                                 <span style={{
-                                    fontSize: item.active ? '22px' : '20px',
+                                    fontSize: item.active ? '24px' : '19px',
                                     filter: item.active ? 'drop-shadow(0 0 10px #f0c832)' : 'none',
                                     transition: 'font-size 0.25s ease, filter 0.25s ease',
                                 }}>{item.icon}</span>
                                 <span style={{
-                                    fontSize: '9px', fontWeight: 800,
+                                    fontSize: '11px', fontWeight: 700,
                                     color: item.active ? '#f0c832' : '#fff',
                                     letterSpacing: '0.04em',
                                     textShadow: '0 1px 4px rgba(0,0,0,0.8)',

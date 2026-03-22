@@ -398,6 +398,13 @@ function NotFound() {
         <div style={{ ...P.root, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px' }}>
             <div style={{ fontSize: '48px' }}>🤔</div>
             <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '16px', fontFamily: "'Heebo',sans-serif" }}>ההזמנה לא נמצאה</div>
+            <a href="/" style={{
+                marginTop: '8px', padding: '12px 32px', borderRadius: '50px', textDecoration: 'none',
+                background: 'linear-gradient(135deg,#c8a832 0%,#f0d060 45%,#ffe066 55%,#c8a832 100%)',
+                color: '#0d2e0d', fontSize: '15px', fontWeight: 900,
+                fontFamily: "'Heebo',sans-serif",
+                boxShadow: '0 4px 20px rgba(200,168,78,0.4)',
+            }}>חזרה לדף הבית</a>
         </div>
     );
 }
@@ -412,7 +419,7 @@ const P: Record<string, React.CSSProperties> = {
     confettiCanvas: { position: 'fixed', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 9999 },
 
     logo: { fontSize: '18px', fontWeight: 900, color: '#f0d060', letterSpacing: '0.04em', animation: 'fadeUp 0.4s ease both' },
-    orderNum: { fontSize: '13px', color: 'rgba(255,255,255,0.3)', fontWeight: 700, letterSpacing: '0.08em', animation: 'fadeUp 0.4s ease 0.05s both' },
+    orderNum: { fontSize: '13px', color: 'rgba(255,255,255,0.55)', fontWeight: 700, letterSpacing: '0.08em', animation: 'fadeUp 0.4s ease 0.05s both' },
 
     ring: { width: '100px', height: '100px', borderRadius: '50%', border: '3px solid rgba(200,168,78,0.5)', background: 'rgba(200,168,78,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: '8px', transition: 'all 0.4s ease', animation: 'fadeUp 0.4s ease 0.1s both' },
     ringReady: { border: '3px solid #4caf50', background: 'rgba(76,175,80,0.12)', animation: 'fadeUp 0.4s ease 0.1s both, pulse 1.5s ease-in-out 0.5s 3' },
@@ -430,8 +437,8 @@ const P: Record<string, React.CSSProperties> = {
     stepDot: { width: '36px', height: '36px', borderRadius: '50%', border: '2px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', transition: 'all 0.3s ease' },
     stepDotDone: { background: 'rgba(200,168,78,0.2)', border: '2px solid rgba(200,168,78,0.6)', color: '#f0d060' },
     stepDotActive: { background: 'rgba(200,168,78,0.25)', border: '2px solid #f0d060', boxShadow: '0 0 16px rgba(200,168,78,0.3)' },
-    stepLabel: { fontSize: '10px', fontWeight: 700, color: 'rgba(255,255,255,0.3)', textAlign: 'center' as const },
-    stepLine: { position: 'absolute', top: '18px', right: '-50%', width: '100%', height: '2px', background: 'rgba(255,255,255,0.1)', zIndex: -1 },
+    stepLabel: { fontSize: '10px', fontWeight: 700, color: 'rgba(255,255,255,0.5)', textAlign: 'center' as const },
+    stepLine: { position: 'absolute', top: '18px', right: '-50%', width: '100%', height: '2px', background: 'rgba(255,255,255,0.28)', zIndex: -1 },
     stepLineDone: { background: 'rgba(200,168,78,0.5)' },
 
     itemsCard: { width: '100%', padding: '16px', borderRadius: '16px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', animation: 'fadeUp 0.4s ease 0.3s both' },
@@ -442,7 +449,7 @@ const P: Record<string, React.CSSProperties> = {
     notes: { fontSize: '12px', color: 'rgba(255,200,100,0.7)', marginTop: '8px', fontWeight: 600 },
     total: { fontSize: '20px', fontWeight: 900, color: '#f0d060', marginTop: '12px', textAlign: 'right' as const },
 
-    footer: { fontSize: '11px', color: 'rgba(255,255,255,0.2)', fontWeight: 600, marginTop: '8px' },
+    footer: { fontSize: '11px', color: 'rgba(255,255,255,0.4)', fontWeight: 600, marginTop: '8px' },
 
     /* Shimmer loading */
     shimmerWrap: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' },
@@ -450,12 +457,12 @@ const P: Record<string, React.CSSProperties> = {
         width: '100px', height: '100px', borderRadius: '50%',
         background: shimmerGradient,
         backgroundSize: '200% 100%',
-        animation: 'shimmerMove 1.5s ease-in-out infinite, shimmerPulse 2s ease-in-out infinite',
+        animation: 'shimmerMove 0.85s linear infinite, shimmerPulse 1.4s ease-in-out infinite',
     },
     shimmerBar: {
         height: '14px', borderRadius: '7px',
         background: shimmerGradient,
         backgroundSize: '200% 100%',
-        animation: 'shimmerMove 1.5s ease-in-out infinite',
+        animation: 'shimmerMove 0.85s linear infinite',
     },
 };

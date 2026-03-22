@@ -206,7 +206,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                         </div>
                         {extras.map(it => (
                             <div key={it.id} style={S.sumPriceLine}>
-                                <span style={{ opacity: 0.45, fontSize: "12px" }}>+ {it.he}</span>
+                                <span style={{ opacity: 0.7, fontSize: "12px" }}>+ {it.he}</span>
                                 <span style={{ color: "#edd87e", fontWeight: 600 }}>₪{it.price}</span>
                             </div>
                         ))}
@@ -216,7 +216,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                         </div>
                     </div>
                     <div style={S.trustCopy}>
-                        <span style={{ opacity: 0.4 }}>🌿</span>
+                        <span style={{ opacity: 0.75 }}>🌿</span>
                         <span>אנחנו משתמשים בחומרי גלם טריים בלבד</span>
                     </div>
                     <div style={{ height: "110px" }} />
@@ -548,13 +548,13 @@ const S = {
     sumBowlWrap: { position: "relative", margin: "8px auto 18px", width: "100%", maxWidth: "320px", display: "flex", flexDirection: "column", alignItems: "center" },
     sumBowlGlow: { position: "absolute", bottom: "20px", left: "50%", transform: "translateX(-50%)", width: "200px", height: "60px", borderRadius: "50%", background: "radial-gradient(ellipse, rgba(200,168,78,0.18) 0%, transparent 70%)", pointerEvents: "none", filter: "blur(8px)" },
     sumBowl: { position: "relative", zIndex: 1, width: "280px", minHeight: "120px", padding: "14px 14px 10px", borderRadius: "16px 16px 50% 50% / 16px 16px 44% 44%", background: "linear-gradient(170deg, rgba(22,65,22,0.85), rgba(15,48,15,0.8))", border: "1px solid rgba(200,168,78,0.28)", boxShadow: "0 10px 36px rgba(0,0,0,0.5), 0 0 0 1px rgba(200,168,78,0.08), inset 0 2px 6px rgba(0,0,0,0.25)", display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" },
-    sumBowlMeta: { marginTop: "10px", display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", fontWeight: 600, color: "rgba(255,255,255,0.3)", letterSpacing: "0.03em" },
+    sumBowlMeta: { marginTop: "10px", display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", fontWeight: 600, color: "rgba(255,255,255,0.5)", letterSpacing: "0.03em" },
     bowlLayer: { display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "3px" },
     comboBanner: { marginBottom: "14px", padding: "12px 14px", borderRadius: "14px", background: "linear-gradient(135deg, rgba(200,168,78,0.14) 0%, rgba(180,140,40,0.08) 100%)", border: "1.5px solid rgba(200,168,78,0.4)", boxShadow: "0 0 24px rgba(200,168,78,0.12), inset 0 1px 0 rgba(255,255,255,0.06)", animation: "pFadeIn 0.5s ease both" },
     comboBannerTitle: { fontSize: "10px", fontWeight: 800, color: "rgba(200,168,78,0.6)", letterSpacing: "0.06em", marginBottom: "8px" },
     comboBannerRow: { display: "flex", gap: "8px", flexWrap: "wrap" },
     badgePill: { display: "flex", alignItems: "center", gap: "6px", padding: "5px 10px", borderRadius: "10px", background: "rgba(200,168,78,0.12)", border: "1px solid rgba(200,168,78,0.3)" },
-    groupCard: { marginBottom: "10px", padding: "5px 12px", borderRadius: "12px", background: "rgba(15,45,15,0.55)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", border: "1px solid rgba(200,168,78,0.15)", transition: "border-color 0.2s, box-shadow 0.2s" },
+    groupCard: { marginBottom: "10px", padding: "5px 12px", borderRadius: "12px", background: "rgba(15,45,15,0.55)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", border: "1px solid rgba(200,168,78,0.28)", transition: "border-color 0.2s, box-shadow 0.2s" },
     groupCardHighlight: { border: "1px solid rgba(200,168,78,0.7)", boxShadow: "0 0 18px rgba(200,168,78,0.25), inset 0 0 12px rgba(200,168,78,0.06)" },
     sumRow: { display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "13px", color: "rgba(255,255,255,0.75)", padding: "5px 8px", background: "rgba(255,255,255,0.03)", borderRadius: "8px", marginBottom: "2px" },
     notesBox: { margin: "12px 0", padding: "10px", borderRadius: "12px", background: "rgba(15,45,15,0.6)", backdropFilter: "blur(8px)", border: "1px solid rgba(200,168,78,0.15)" },
@@ -601,9 +601,9 @@ const S = {
         fontSize: "15px", fontWeight: 900,
         background: "rgba(0,0,0,0.18)", padding: "3px 10px", borderRadius: "8px",
     },
-    trustCopy: { display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", marginTop: "16px", fontSize: "11px", fontWeight: 500, color: "rgba(255,255,255,0.2)", letterSpacing: "0.03em", animation: "pFadeIn 0.5s ease 0.8s both" },
+    trustCopy: { display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", marginTop: "16px", fontSize: "11px", fontWeight: 500, color: "rgba(255,255,255,0.45)", letterSpacing: "0.03em", animation: "pFadeIn 0.5s ease 0.8s both" },
     trustLine: { display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", fontSize: "11px", fontWeight: 600, color: "rgba(255,255,255,0.3)", marginBottom: "8px", letterSpacing: "0.02em" },
-    editBtn: { padding: "8px 14px", minHeight: "36px", borderRadius: "8px", cursor: "pointer", background: "rgba(200,168,78,0.12)", border: "1px solid rgba(200,168,78,0.28)", color: "#dfc06e", fontSize: "11px", fontWeight: 700, fontFamily: "'Heebo',sans-serif", display: "flex", alignItems: "center", gap: "3px" },
+    editBtn: { padding: "10px 16px", minHeight: "44px", borderRadius: "8px", cursor: "pointer", background: "rgba(200,168,78,0.16)", border: "1px solid rgba(200,168,78,0.45)", color: "#dfc06e", fontSize: "13px", fontWeight: 700, fontFamily: "'Heebo',sans-serif", display: "flex", alignItems: "center", gap: "3px" },
 };
 
 // ─── Pickup time picker ────────────────────────────────────────
