@@ -1,5 +1,7 @@
 'use client';
 import { useMemo, useState, useEffect, useRef } from "react";
+import dynamic from "next/dynamic";
+const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
 
 // ─── Pickup slot generator ─────────────────────────────────────
 function generatePickupSlots() {
@@ -423,6 +425,8 @@ function ConfettiCanvas({ all }) {
 function OrderedScreen({ total, all, pickupTime, notes, orderNum: propOrderNum, orderId, onNewOrder }) {
     const fallbackNum = useMemo(() => `BB-${((Date.now() % 9000) + 1000)}`, []);
     const orderNum = propOrderNum || fallbackNum;
+    const [animData, setAnimData] = useState(null);
+    useEffect(() => { fetch("/cat-salad-final.json").then(r => r.json()).then(setAnimData).catch(() => {}); }, []);
 
     const waLink = useMemo(() => {
         const items = all.map(i => i.he).join(', ');
@@ -438,11 +442,11 @@ function OrderedScreen({ total, all, pickupTime, notes, orderNum: propOrderNum, 
             <div style={OS.root}>
                 <div style={OS.bg} />
                 <div style={OS.content}>
-                    <div style={OS.ring}>
-                        <div style={OS.checkmark}>✓</div>
+                    <div style={OS.lottieWrap}>
+                        {animData && <Lottie animationData={animData} loop autoplay style={{ width: "100%", height: "100%" }} />}
                     </div>
                     <div style={OS.title}>בהכנה!</div>
-                    <div style={OS.subtitle}>מכינים את הסלט שלכם עכשיו</div>
+                    <div style={OS.subtitle}>מכינים את הסלט שלכם עכשיו 🐱</div>
                     <div style={OS.orderNumBadge}>הזמנה {orderNum}</div>
                     <div style={OS.price}>₪{total}</div>
                     <div style={OS.meta}>{all.length} מרכיבים{pickupTime ? ` · איסוף: ${pickupTime}` : ' · מוכן בכ-8 דקות'}</div>
@@ -477,15 +481,11 @@ const OS = {
     root: { position: "fixed", inset: 0, zIndex: 500, background: "linear-gradient(155deg, #030a03 0%, #071a07 30%, #0a200a 60%, #071a07 100%)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Heebo',sans-serif", direction: "rtl", animation: "screenIn 0.55s ease both" },
     bg: { position: "absolute", inset: 0, background: "radial-gradient(ellipse 80% 60% at 50% 40%, rgba(200,168,78,0.08) 0%, transparent 70%)", pointerEvents: "none" },
     content: { position: "relative", zIndex: 1, textAlign: "center", padding: "20px" },
-    ring: {
-        width: "120px", height: "120px", borderRadius: "50%", margin: "0 auto 28px",
-        background: "linear-gradient(135deg, rgba(200,168,78,0.15), rgba(240,208,96,0.08))",
-        border: "3px solid rgba(200,168,78,0.7)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        animation: "ringPop 0.6s cubic-bezier(0.34,1.56,0.64,1) both, ringGlow 2.5s ease-in-out 0.6s infinite",
-        boxShadow: "0 0 40px rgba(200,168,78,0.35), inset 0 1px 0 rgba(255,255,255,0.1)",
+    lottieWrap: {
+        width: "220px", height: "220px", margin: "0 auto 8px",
+        animation: "ringPop 0.6s cubic-bezier(0.34,1.56,0.64,1) both",
+        filter: "drop-shadow(0 8px 32px rgba(200,168,78,0.25))",
     },
-    checkmark: { fontSize: "52px", fontWeight: 900, color: "#f0d060", textShadow: "0 0 20px rgba(200,168,78,0.8)" },
     title: { fontSize: "28px", fontWeight: 900, color: "#ffffff", textShadow: "0 2px 8px rgba(0,0,0,0.5)", animation: "fadeUp 0.5s ease 0.3s both" },
     subtitle: { fontSize: "14px", fontWeight: 600, color: "rgba(255,255,255,0.5)", marginTop: "6px", animation: "fadeUp 0.5s ease 0.4s both" },
     price: {

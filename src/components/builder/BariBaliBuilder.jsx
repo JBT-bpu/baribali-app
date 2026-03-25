@@ -1,14 +1,16 @@
 'use client';
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import dynamic from "next/dynamic";
+const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
 
 const headerImage = "/builder-assets/header-brand.png";
 const footerImage = "/builder-assets/footer-brand.png";
 
 import { STEPS, BASE, COMBOS, PRESETS, getSuggestions } from "../../data/salad-data.js";
-import MagicBackground from "./background/MagicBackground.jsx";
 import DetailSheet from "./ui/DetailSheet.jsx";
 import SummaryView from "./SummaryView.jsx";
 import SplashScreen from "./ui/SplashScreen.jsx";
+import HeroBowlCard from "./ui/HeroBowlCard.jsx";
 
 /*
   BariBali Builder — COMPLETE v3
@@ -315,6 +317,8 @@ export default function BariBaliBuilder({ sizeParam = null }) {
   const [notes, setNotes] = useState("");
   const [expandedPreset, setExpandedPreset] = useState(null);
   const [isTransforming, setIsTransforming] = useState(false);
+  const [bowlAnim, setBowlAnim] = useState(null);
+  useEffect(() => { fetch("/cat-salad-bowl.json").then(r => r.json()).then(setBowlAnim).catch(() => {}); }, []);
   const scrollRef = useRef(null);
   const touchRef = useRef({ x: 0, y: 0, t: 0 });
   const longPressRef = useRef(null);
@@ -365,6 +369,7 @@ export default function BariBaliBuilder({ sizeParam = null }) {
   const getSel = id => sels[id] || [];
   const all = useMemo(() => Object.values(sels).flat(), [sels]);
   const allTags = useMemo(() => all.flatMap(i => i.tags || []), [all]);
+
   const extras = all.reduce((s, i) => s + (i.price || 0), 0);
   const total = activeBase + extras;
   const curSel = cur ? getSel(cur.id) : [];
@@ -547,8 +552,7 @@ export default function BariBaliBuilder({ sizeParam = null }) {
       return (
         <div style={S.root}>
           {splash && <SplashScreen onDone={() => setSplash(false)} />}
-          <div style={S.bg} /><div style={S.bgRay} />
-          <MagicBackground isTransforming={isTransforming} />
+          <div style={S.bg} />
           <BuilderParticles />
           <div style={{ ...S.main, padding: "0 0 40px", opacity: anim === "enter" ? 0 : 1, transition: "all 0.5s" }}>
             <img src={headerImage} alt="" aria-hidden="true" style={{ width: "100%", display: "block", height: "80px", objectFit: "cover", objectPosition: "center top", flexShrink: 0 }} />
@@ -586,8 +590,7 @@ export default function BariBaliBuilder({ sizeParam = null }) {
     return (
       <div style={S.root}>
         {splash && <SplashScreen onDone={() => setSplash(false)} />}
-        <div style={S.bg} /><div style={S.bgRay} />
-        <MagicBackground isTransforming={isTransforming} />
+        <div style={S.bg} />
         <BuilderParticles />
         <div style={{
           ...S.main, justifyContent: "space-between", padding: "0 0 90px",
@@ -615,19 +618,30 @@ export default function BariBaliBuilder({ sizeParam = null }) {
               aria-label="התחל סלט ריק"
               tabIndex={0}
             >
-              <div style={{ fontSize: "48px", marginBottom: "10px", filter: "drop-shadow(0 4px 12px rgba(102,187,106,0.5))" }}>🥗</div>
-              <div style={{ fontSize: "22px", fontWeight: 900, color: "#e8f5e9", textShadow: "0 3px 8px rgba(0,0,0,0.8), 0 0 20px rgba(102,187,106,0.4)", marginBottom: "4px", letterSpacing: "0.02em" }}>בנו את הסלט שלכם</div>
-              <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.7)", textShadow: "0 2px 4px rgba(0,0,0,0.7)", fontWeight: 500, marginBottom: "14px" }}>5 שלבים פשוטים · בחירה חופשית</div>
-              <div style={{
-                display: "flex", alignItems: "center", gap: "10px",
-                padding: "6px 16px", borderRadius: "20px",
-                background: "rgba(0,0,0,0.25)",
-                border: "1px solid rgba(255,255,255,0.12)"
-              }}>
-                <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.5)", fontWeight: 600 }}>החל מ</span>
-                <span style={{ fontSize: "20px", fontWeight: 900, color: "#edd87e", textShadow: "0 2px 6px rgba(200,168,78,0.4)" }}>₪{sc.price}</span>
-                <span style={{ width: "1px", height: "14px", background: "rgba(255,255,255,0.15)" }} />
-                <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.5)", fontWeight: 600 }}>התחל ריק ←</span>
+              {/* Bowl ring — same size/shape as HeroBowlCard, responsive via CSS class */}
+              <div className="hero-ring">
+                <svg viewBox="0 0 158 158" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", transform: "rotate(-90deg)" }}>
+                  <circle cx="79" cy="79" r="64" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="5" />
+                  <circle cx="79" cy="79" r="64" fill="none" stroke="rgba(200,168,78,0.3)" strokeWidth="5"
+                    strokeLinecap="round" strokeDasharray={2 * Math.PI * 64} strokeDashoffset={2 * Math.PI * 64} />
+                </svg>
+                <div className="hero-bowl" style={{ filter: "drop-shadow(0 4px 16px rgba(200,168,78,0.25))" }}>
+                  {bowlAnim
+                    ? <Lottie animationData={bowlAnim} loop autoplay style={{ width: "100%", height: "100%" }} />
+                    : <span style={{ fontSize: "52px", lineHeight: "108px", display: "block", textAlign: "center" }}>🥗</span>
+                  }
+                </div>
+              </div>
+
+              {/* Text column */}
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "6px", textAlign: "right" }}>
+                <div style={{ fontSize: "20px", fontWeight: 900, color: "#e8f5e9", textShadow: "0 2px 6px rgba(0,0,0,0.7)", letterSpacing: "0.02em", lineHeight: 1.2 }}>בנו את הסלט שלכם</div>
+                <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.45)", fontWeight: 500 }}>5 שלבים פשוטים · בחירה חופשית</div>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "4px" }}>
+                  <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)", fontWeight: 600 }}>החל מ</span>
+                  <span style={{ fontSize: "22px", fontWeight: 900, color: "#f0d060", textShadow: "0 2px 6px rgba(200,168,78,0.4)", lineHeight: 1 }}>₪{sc.price}</span>
+                </div>
+                <div style={{ marginTop: "2px", fontSize: "11px", fontWeight: 700, color: "rgba(200,168,78,0.7)", letterSpacing: "0.04em" }}>התחל ←</div>
               </div>
             </button>
 
@@ -772,8 +786,7 @@ export default function BariBaliBuilder({ sizeParam = null }) {
   return (
     <div style={S.root} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
       {splash && <SplashScreen onDone={() => setSplash(false)} />}
-      <div style={S.bg} /><div style={S.bgRay} />
-      <MagicBackground isTransforming={isTransforming} stepId={step >= 0 ? STEPS[step]?.id : null} />
+      <div style={S.bg} />
 
       {badgeFlash && <div style={S.badgeFlash}><span style={{ fontSize: "22px" }}>{badgeFlash.icon}</span><span style={S.badgeFlashTxt}>{badgeFlash.he}</span></div>}
 
@@ -866,44 +879,14 @@ export default function BariBaliBuilder({ sizeParam = null }) {
           </div>
         </div>
 
-        {/* ── BOWL STRIP (tap to remove) ── */}
-        <div style={S.bowlArea}>
-          {all.length === 0 ? (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", padding: "6px 0" }}>
-              <span style={{ opacity: 0.25, fontSize: "18px" }}>🥗</span>
-              <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.25)" }}>הקערה ריקה</span>
-            </div>
-          ) : (
-            <div style={S.bowlScroll}>
-              {all.map(item => {
-                // Use metadata to get the correct step color
-                const stepId = item._meta?.stepId || "veggies";
-                const catColor = getStepColor(stepId);
-
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => removeFromBowl(item.id)}
-                    style={{
-                      ...S.bowlPiece,
-                      border: `2px solid ${catColor.border}`,
-                      boxShadow: `0 0 6px ${catColor.glow}, 0 2px 4px rgba(0,0,0,0.2)`,
-                      animation: lastAdd === item.id ? "popBounce 0.3s cubic-bezier(0.34,1.56,0.64,1)" : lastRemove === item.id ? "popOut 0.25s ease forwards" : "none",
-                      opacity: lastRemove === item.id ? 0 : 1,
-                    }}
-                  >
-                    <span style={{ fontSize: "15px", filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.2))" }}>{item.icon}</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-          {comboBadges.length > 0 && (
-            <div style={{ display: "flex", gap: "5px", marginTop: "4px", flexWrap: "wrap" }}>
-              {comboBadges.map(b => <div key={b.id} style={S.badgePill}><span style={{ fontSize: "10px" }}>{b.icon}</span><span style={S.badgePillTxt}>{b.he}</span></div>)}
-            </div>
-          )}
-        </div>
+        {/* ── HERO BOWL CARD ── */}
+        <HeroBowlCard
+          all={all}
+          onRemove={removeFromBowl}
+          comboBadges={comboBadges}
+          lastAdd={lastAdd}
+          lastRemove={lastRemove}
+        />
 
         {/* Suggestions */}
         {suggestions.length > 0 && <div style={S.sugRow}>{suggestions.map((s, i) => <div key={i} style={S.sugPill}><span style={{ fontSize: "11px" }}>{s.icon}</span><span style={{ fontSize: "11px", fontWeight: 700, color: "#f0d060", textShadow: "0 1px 2px rgba(0,0,0,0.5)" }}>{s.text}</span></div>)}</div>}
@@ -1040,6 +1023,12 @@ const KF = `
   0%, 100% { box-shadow: 0 0 0 1px rgba(200,168,78,0.12), 0 12px 40px rgba(0,0,0,0.55), 0 0 50px rgba(200,168,78,0.08), inset 0 1px 0 rgba(255,255,255,0.07); }
   50% { box-shadow: 0 0 0 1px rgba(200,168,78,0.22), 0 14px 50px rgba(0,0,0,0.55), 0 0 80px rgba(200,168,78,0.18), inset 0 1px 0 rgba(255,255,255,0.1); }
 }
+.hero-ring { position:relative; width:158px; height:158px; flex-shrink:0 }
+.hero-bowl { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:108px; height:108px; pointer-events:none }
+@media (max-width: 374px) {
+  .hero-ring { width:110px; height:110px }
+  .hero-bowl { width:76px;  height:76px  }
+}
 @keyframes logoFloat {
   0%, 100% { transform: translateY(0) scale(1); }
   50% { transform: translateY(-8px) scale(1.02); }
@@ -1073,8 +1062,8 @@ button:active:not(:disabled) {
 
 const S = {
   root: { position: "relative", width: "100%", maxWidth: "430px", minHeight: "100vh", margin: "0 auto", overflow: "hidden", fontFamily: "'Heebo',sans-serif", direction: "rtl", color: "#ffffff" },
-  bg: { position: "fixed", inset: 0, zIndex: 0, background: "linear-gradient(155deg, #030a03 0%, #071a07 20%, #0a200a 45%, #071a07 70%, #030a03 100%)", filter: "blur(2px) brightness(0.65)" },
-  bgRay: { position: "fixed", top: "-30%", left: "50%", transform: "translateX(-50%)", width: "100%", height: "80%", zIndex: 0, pointerEvents: "none", borderRadius: "50%", background: "radial-gradient(ellipse 70% 60% at 50% 20%, rgba(255,224,100,0.05) 0%, rgba(255,200,80,0.02) 35%, transparent 70%)", animation: "rayPulse 8s ease-in-out infinite" },
+  bg: { position: "fixed", inset: 0, zIndex: 0, background: "url(/homepage-assets/BG_8K.webp) center center / cover no-repeat, #020a02", filter: "brightness(0.45)" },
+  bgRay: {},
   main: { position: "relative", zIndex: 2, display: "flex", flexDirection: "column", height: "100vh" },
 
   header: { padding: "8px 12px 6px", background: `linear-gradient(to bottom, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.28) 100%), url(${headerImage}) center / cover no-repeat`, borderBottom: "2px solid rgba(200,168,78,0.4)", boxShadow: "0 4px 20px rgba(0,0,0,0.5), 0 0 30px rgba(200,168,78,0.08)", position: "relative" },
@@ -1130,15 +1119,14 @@ const S = {
   ctaGhost: { backgroundImage: "none", backgroundColor: "rgba(255,255,255,0.04)", backgroundSize: "100% 100%", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.25)", boxShadow: "none", animation: "none", textShadow: "none" },
 
   heroBtn: {
-    display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-    padding: "32px 28px", borderRadius: "24px", cursor: "pointer",
-    background: "linear-gradient(155deg, rgba(13,46,13,0.97), rgba(8,28,8,0.93))",
-    backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)",
+    display: "flex", flexDirection: "row", alignItems: "center", gap: "14px",
+    padding: "10px 14px", borderRadius: "16px", cursor: "pointer",
+    background: "linear-gradient(145deg, rgba(6,18,6,0.17), rgba(10,28,10,0.17)), url(/builder-assets/salad-card-bg.webp) center top / 102% auto no-repeat",
     border: "2px solid rgba(200,168,78,0.55)",
-    boxShadow: "0 0 0 1px rgba(200,168,78,0.12), 0 12px 40px rgba(0,0,0,0.55), 0 0 60px rgba(200,168,78,0.1), inset 0 1px 0 rgba(255,255,255,0.07), inset 0 -1px 0 rgba(0,0,0,0.2)",
+    boxShadow: "0 0 0 1px rgba(200,168,78,0.12), 0 8px 30px rgba(0,0,0,0.5), 0 0 40px rgba(200,168,78,0.08)",
     transition: "all 0.35s cubic-bezier(0.34,1.56,0.64,1)",
     outline: "none", fontFamily: "'Heebo',sans-serif", width: "100%",
-    animation: "heroPulse 3s ease-in-out infinite"
+    animation: "heroPulse 3s ease-in-out infinite", overflow: "hidden",
   },
   presetCard: {
     display: "flex", flexDirection: "row", alignItems: "center",

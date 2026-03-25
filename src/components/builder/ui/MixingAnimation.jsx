@@ -1,8 +1,12 @@
 'use client';
 import { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
+const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
 
 export default function MixingAnimation({ all, total, onComplete }) {
     const [phase, setPhase] = useState("drop"); // drop → glow → bloom
+    const [bowlAnim, setBowlAnim] = useState(null);
+    useEffect(() => { fetch("/cat-salad-bowl.json").then(r => r.json()).then(setBowlAnim).catch(() => {}); }, []);
 
     useEffect(() => {
         const t1 = setTimeout(() => setPhase("glow"),  1700);
@@ -21,127 +25,89 @@ export default function MixingAnimation({ all, total, onComplete }) {
         return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
     }, [onComplete]);
 
-    return (
-        <div style={S.overlay}>
-            <div style={{
-                ...S.bloomFlash,
-                opacity: phase === "bloom" ? 1 : 0,
-                transition: phase === "bloom" ? "opacity 0.18s ease-out" : "opacity 0.5s ease-in",
-            }} />
-
-            <div style={S.ambientGlow} />
-            <div style={S.container}>
-                <div style={{ ...S.phase, opacity: phase === "drop" ? 1 : 0 }}>
-                    <DropPhase all={all} />
-                </div>
-                <div style={{ ...S.phase, opacity: phase === "glow" || phase === "bloom" ? 1 : 0 }}>
-                    <GlowPhase bloom={phase === "bloom"} />
-                </div>
-            </div>
-            <style>{KF}</style>
-        </div>
-    );
-}
-
-// ── Phase 1: ingredients fall into bowl ──────────────────────
-function DropPhase({ all }) {
     const items = all.slice(0, 10);
-    return (
-        <div style={{ textAlign: "center", animation: "pFadeIn 0.4s ease both" }}>
-            <div style={{ position: "relative", width: "200px", height: "260px", margin: "0 auto" }}>
-                {items.map((item, i) => {
-                    const col = i % 5;
-                    const leftPct = 10 + col * 18;
-                    return (
-                        <div key={item.id} style={{
-                            position: "absolute",
-                            top: 0,
-                            left: `${leftPct}%`,
-                            fontSize: "28px",
-                            filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.5))",
-                            animation: `ingredientDrop 0.65s cubic-bezier(0.22,1,0.36,1) ${i * 0.1}s both`,
-                        }}>{item.icon}</div>
-                    );
-                })}
-                <div style={{
-                    position: "absolute", bottom: 0, left: "50%", transform: "translateX(-50%)",
-                    fontSize: "100px", lineHeight: 1,
-                    filter: "drop-shadow(0 8px 24px rgba(0,0,0,0.5))",
-                    animation: "bowlSettle 0.6s cubic-bezier(0.34,1.56,0.64,1) 0.1s both, bowlShimmy 0.4s ease-in-out 1.1s both",
-                }}>🥗</div>
-            </div>
-            <div style={S.label}>מכינים את הסלט שלכם</div>
-        </div>
-    );
-}
+    const isGlow  = phase === "glow" || phase === "bloom";
+    const isBloom = phase === "bloom";
 
-// ── Phase 2+3: bowl glows → then blooms ──────────────────────
-function GlowPhase({ bloom }) {
     const embers = Array.from({ length: 26 }, (_, i) => ({
-        id: i,
-        left: 12 + (i % 11) * 7,
+        id: i, left: 12 + (i % 11) * 7,
         delay: (i * 0.06).toFixed(2),
         dur: (1.0 + (i % 4) * 0.2).toFixed(1),
         size: i % 3 === 0 ? "10px" : i % 3 === 1 ? "7px" : "4px",
     }));
 
     return (
-        <div style={{ textAlign: "center", animation: "pFadeIn 0.4s ease both", position: "relative" }}>
-            <div style={{ position: "relative", height: "220px", overflow: "hidden" }}>
-                {embers.map(e => (
-                    <div key={e.id} style={{
-                        position: "absolute",
-                        bottom: "62px",
-                        left: `${e.left}%`,
-                        width: e.size, height: e.size,
-                        borderRadius: "50%",
-                        background: "radial-gradient(circle, #ffe080, #c8a832)",
-                        boxShadow: "0 0 6px rgba(200,168,78,0.9)",
-                        animation: `emberRise ${e.dur}s ease-in ${e.delay}s infinite`,
-                    }} />
-                ))}
-                {/* Starburst rays — bloom phase only, CSS --r fix */}
-                {bloom && Array.from({ length: 8 }, (_, i) => (
-                    <div key={i} style={{
-                        position: "absolute",
-                        bottom: "62px", left: "50%",
-                        width: "2px", height: "55px",
-                        marginLeft: "-1px",
-                        transformOrigin: "50% 100%",
-                        background: "linear-gradient(to top, rgba(240,208,96,0.8), transparent)",
-                        borderRadius: "1px",
-                        '--r': `${i * 45}deg`,
-                        animation: `rayBurst 0.55s cubic-bezier(0.34,1.2,0.64,1) ${i * 0.03}s both`,
-                    }} />
-                ))}
-                <div style={{
-                    position: "absolute", bottom: 0, left: "50%", transform: "translateX(-50%)",
-                    fontSize: bloom ? "120px" : "100px",
-                    lineHeight: 1,
-                    filter: bloom
-                        ? "drop-shadow(0 0 50px rgba(240,208,96,0.95)) drop-shadow(0 0 20px rgba(200,168,78,0.8))"
-                        : "drop-shadow(0 0 30px rgba(200,168,78,0.7)) drop-shadow(0 8px 20px rgba(0,0,0,0.4))",
-                    animation: bloom
-                        ? "bowlBloom 0.55s cubic-bezier(0.34,1.56,0.64,1) both"
-                        : "bowlGlow 1.4s ease-in-out infinite",
-                    transition: "font-size 0.3s ease, filter 0.3s ease",
-                }}>🥗</div>
-            </div>
-            {/* Expanding ring */}
+        <div style={S.overlay}>
+            {/* Bloom flash */}
             <div style={{
-                width: bloom ? "200px" : "140px", height: bloom ? "200px" : "140px",
-                borderRadius: "50%", margin: "-60px auto 0",
-                border: `${bloom ? "2px" : "1.5px"} solid rgba(200,168,78,${bloom ? "0.7" : "0.35"})`,
-                boxShadow: bloom
-                    ? "0 0 60px rgba(200,168,78,0.5), inset 0 0 40px rgba(200,168,78,0.15)"
-                    : "0 0 40px rgba(200,168,78,0.2), inset 0 0 30px rgba(200,168,78,0.06)",
-                animation: bloom ? "ringBloom 0.5s cubic-bezier(0.34,1.2,0.64,1) both" : "ringExpand 1.4s ease-out infinite",
-                transition: "border-width 0.2s ease",
-                pointerEvents: "none",
+                ...S.bloomFlash,
+                opacity: isBloom ? 1 : 0,
+                transition: isBloom ? "opacity 0.18s ease-out" : "opacity 0.5s ease-in",
             }} />
-            <div style={{ ...S.label, marginTop: "24px" }}>
-                {bloom ? "🎉 מוכן!" : "כמעט מוכן"}
+            <div style={S.ambientGlow} />
+
+            <div style={S.container}>
+                {/* ── Ingredients (drop phase only) ── */}
+                <div style={{ position: "relative", width: "320px", height: "60px", margin: "0 auto", opacity: isGlow ? 0 : 1, transition: "opacity 0.45s ease", pointerEvents: "none" }}>
+                    {items.map((item, i) => {
+                        const col = i % 5;
+                        const leftPct = 8 + col * 18;
+                        return (
+                            <div key={item.id} style={{
+                                position: "absolute", top: 0, left: `${leftPct}%`,
+                                fontSize: "28px",
+                                filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.5))",
+                                animation: `ingredientDrop 0.65s cubic-bezier(0.22,1,0.36,1) ${i * 0.1}s both`,
+                            }}>{item.icon}</div>
+                        );
+                    })}
+                </div>
+
+                {/* ── Single persistent Lottie bowl ── */}
+                <div style={{
+                    position: "relative", width: "320px", height: "320px", margin: "0 auto",
+                    filter: isBloom
+                        ? "drop-shadow(0 0 50px rgba(240,208,96,0.95)) drop-shadow(0 0 20px rgba(200,168,78,0.8))"
+                        : isGlow
+                            ? "drop-shadow(0 0 30px rgba(200,168,78,0.7)) drop-shadow(0 8px 20px rgba(0,0,0,0.4))"
+                            : "drop-shadow(0 8px 24px rgba(0,0,0,0.5))",
+                    animation: isBloom ? "bowlBloom 0.55s cubic-bezier(0.34,1.56,0.64,1) both" : undefined,
+                    transition: "filter 0.4s ease",
+                }}>
+                    {bowlAnim && <Lottie animationData={bowlAnim} loop autoplay style={{ width: "100%", height: "100%" }} />}
+
+                    {/* Embers — glow phase, layered on top of bowl */}
+                    <div style={{ position: "absolute", inset: 0, opacity: isGlow ? 1 : 0, transition: "opacity 0.45s ease", pointerEvents: "none" }}>
+                        {embers.map(e => (
+                            <div key={e.id} style={{
+                                position: "absolute", bottom: "20%", left: `${e.left}%`,
+                                width: e.size, height: e.size, borderRadius: "50%",
+                                background: "radial-gradient(circle, #ffe080, #c8a832)",
+                                boxShadow: "0 0 6px rgba(200,168,78,0.9)",
+                                animation: `emberRise ${e.dur}s ease-in ${e.delay}s infinite`,
+                            }} />
+                        ))}
+                        {/* Rays — bloom only */}
+                        {isBloom && Array.from({ length: 8 }, (_, i) => (
+                            <div key={i} style={{
+                                position: "absolute", bottom: "20%", left: "50%",
+                                width: "2px", height: "55px", marginLeft: "-1px",
+                                transformOrigin: "50% 100%",
+                                background: "linear-gradient(to top, rgba(240,208,96,0.8), transparent)",
+                                borderRadius: "1px",
+                                '--r': `${i * 45}deg`,
+                                animation: `rayBurst 0.55s cubic-bezier(0.34,1.2,0.64,1) ${i * 0.03}s both`,
+                            }} />
+                        ))}
+                    </div>
+                </div>
+
+                {/* Label */}
+                <div style={{ ...S.label, marginTop: "8px" }}>
+                    {isBloom ? "🎉 מוכן!" : isGlow ? "כמעט מוכן" : "מכינים את הסלט שלכם"}
+                </div>
             </div>
+            <style>{KF}</style>
         </div>
     );
 }
@@ -200,13 +166,8 @@ const S = {
     },
     container: {
         position: "relative", zIndex: 1,
-        width: "100%", maxWidth: "340px", padding: "20px", height: "360px",
-    },
-    phase: {
-        position: "absolute", inset: 0,
-        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-        transition: "opacity 0.45s ease",
-        pointerEvents: "none",
+        width: "100%", maxWidth: "380px", padding: "0 20px 20px",
+        display: "flex", flexDirection: "column", alignItems: "center",
     },
     label: {
         marginTop: "24px", fontSize: "14px", fontWeight: 700,
@@ -247,9 +208,9 @@ const KF = `
 }
 
 @keyframes bowlBloom {
-    0%   { transform:translateX(-50%) scale(0.95); }
-    55%  { transform:translateX(-50%) scale(1.15); }
-    100% { transform:translateX(-50%) scale(1.07); }
+    0%   { transform:scale(0.95); }
+    55%  { transform:scale(1.15); }
+    100% { transform:scale(1.07); }
 }
 
 @keyframes emberRise {
