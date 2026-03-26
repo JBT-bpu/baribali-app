@@ -146,6 +146,102 @@ export const STEPS = [
 
 export const BASE = 54;
 
+// ─── TORTILLA BUILDER ───────────────────────────────────────
+
+export const TORTILLA_BASE = 42;
+
+export const TORTILLA_STEPS = [
+    {
+        id: "wrap", title: "בחרו טורטייה", subtitle: "כלולה במחיר", emoji: "🌯", maxPicks: 1,
+        intro: "בחרו את סוג הטורטייה שלכם",
+        subgroups: [{
+            label: null, items: [
+                { id: "wrap_flour",  he: "קמח לבן",    icon: "🌯", price: 0, tags: ["wrap"],           desc: "טורטייה קמח לבן קלאסית" },
+                { id: "wrap_wheat",  he: "קמח מלא",    icon: "🌾", price: 0, tags: ["wrap", "fiber"],   desc: "טורטייה חיטה מלאה" },
+                { id: "wrap_spinach",he: "תרד",         icon: "🥬", price: 0, tags: ["wrap", "green"],   desc: "טורטייה תרד ירוקה" },
+                { id: "wrap_corn",   he: "תירס",        icon: "🌽", price: 0, tags: ["wrap"],            desc: "טורטייה קמח תירס" },
+                { id: "wrap_gf",     he: "ללא גלוטן",  icon: "⭐", price: 3, tags: ["wrap"],            desc: "טורטייה ללא גלוטן +₪3" },
+            ]
+        }],
+    },
+    {
+        id: "t_fillings", title: "מילויים", subtitle: "כמה שרוצים", emoji: "🥗",
+        intro: "בחרו ירקות ומילויים לטורטייה",
+        subgroups: [
+            {
+                label: "ירקות", shortLabel: "ירקות", items: [
+                    { id: "t_lettuce",     he: "חסה",       icon: "🥬", price: 0, tags: ["green"] },
+                    { id: "t_cab_purple",  he: "כרוב סגול", icon: "🟣", price: 0, tags: ["crunch"] },
+                    { id: "t_tomato",      he: "עגבניות",   icon: "🍅", price: 0, tags: ["fresh"] },
+                    { id: "t_cucumber",    he: "מלפפון",    icon: "🥒", price: 0, tags: ["crunch"] },
+                    { id: "t_bell_pepper", he: "גמבה",      icon: "🌶️", price: 0, tags: ["crunch"] },
+                    { id: "t_carrot",      he: "גזר",       icon: "🥕", price: 0, tags: ["crunch"] },
+                    { id: "t_red_onion",   he: "בצל סגול",  icon: "🧅", price: 0, tags: ["flavor"] },
+                    { id: "t_corn",        he: "תירס",      icon: "🌽", price: 0, tags: ["sweet"] },
+                    { id: "t_mushrooms",   he: "פטריות",    icon: "🍄", price: 0, tags: [] },
+                ]
+            },
+            {
+                label: "תוספים", shortLabel: "תוספים", items: [
+                    { id: "t_pickles",     he: "חמוצים",    icon: "🥒", price: 0, tags: ["crunch"] },
+                    { id: "t_cilantro",    he: "כוסברה",    icon: "🌿", price: 0, tags: ["herb"] },
+                    { id: "t_hot_pepper",  he: "חריף",      icon: "🌶️", price: 0, tags: ["spicy"] },
+                    { id: "t_olives",      he: "זיתים",     icon: "⚫", price: 0, tags: ["fat"] },
+                    { id: "t_sesame",      he: "שומשום",    icon: "⚪", price: 0, tags: ["crunch"] },
+                ]
+            },
+        ],
+    },
+    {
+        id: "t_protein", title: "תוספת כלולה", subtitle: "אחת כלולה", emoji: "🥚", maxPicks: 1,
+        intro: "בחרו תוספת חלבון אחת — כלולה במחיר",
+        subgroups: [{
+            label: null, items: [
+                { id: "t_egg",        he: "ביצה קשה",       icon: "🥚", price: 0, tags: ["protein"] },
+                { id: "t_tuna",       he: "טונה",            icon: "🐟", price: 0, tags: ["protein"] },
+                { id: "t_tofu_olive", he: "טופו שמן זית",   icon: "🥦", price: 0, tags: ["protein", "vegan"] },
+                { id: "t_feta5",      he: "פטה 5%",          icon: "🧀", price: 0, tags: ["protein"] },
+                { id: "t_mozz",       he: "מוצרלה",         icon: "🧈", price: 0, tags: ["protein"] },
+            ]
+        }],
+    },
+    {
+        id: "t_sauces", title: "רטבים", subtitle: "עד 2", emoji: "🥣", maxPicks: 2,
+        intro: "הוסיפו עד 2 רטבים לטורטייה",
+        subgroups: [
+            {
+                label: "קלאסיים", items: [
+                    { id: "t_olive_oil",  he: "שמן זית",      icon: "🌿", price: 3, tags: [] },
+                    { id: "t_lemon",      he: "לימון טרי",     icon: "🍋", price: 3, tags: [] },
+                    { id: "t_tahini",     he: "טחינה",         icon: "🥣", price: 3, tags: [] },
+                    { id: "t_balsamic",   he: "בלסמי",         icon: "🍷", price: 3, tags: [] },
+                ]
+            },
+            {
+                label: "מיוחדים", items: [
+                    { id: "t_garlic_s",   he: "רוטב שום",     icon: "🧄", price: 3, tags: [] },
+                    { id: "t_sweet_chili",he: "צ'ילי מתוק",   icon: "🌶️", price: 3, tags: ["spicy"] },
+                    { id: "t_caesar",     he: "קיסר",         icon: "🥗", price: 5, tags: [] },
+                    { id: "t_zhug",       he: "סחוג",         icon: "🔥", price: 4, tags: ["spicy"] },
+                ]
+            },
+        ],
+    },
+    {
+        id: "t_upgrade", title: "שדרוג?", subtitle: "תוספות פרימיום", emoji: "👑",
+        intro: "אפשר לדלג — או לשדרג",
+        subgroups: [{
+            label: null, items: [
+                { id: "t_halloumi_p",  he: "חלומי",    icon: "🧀", price: 12, tags: ["protein"], pop: true },
+                { id: "t_tuna_p",      he: "טונה",     icon: "🐟", price: 7,  tags: ["protein"] },
+                { id: "t_feta_p",      he: "פטה",      icon: "🧀", price: 7,  tags: ["protein"] },
+                { id: "t_egg_p",       he: "ביצה",     icon: "🥚", price: 5,  tags: ["protein"] },
+                { id: "t_parmesan_p",  he: "פרמז'ן",  icon: "🧀", price: 4,  tags: ["flavor"] },
+            ]
+        }],
+    },
+];
+
 // ─── NUTRITION DATABASE ─────────────────────────────────────
 // Real values per typical salad portion (~40-80g depending on item)
 // kcal, protein(g), carbs(g), fat(g), fiber(g), plus a fun fact

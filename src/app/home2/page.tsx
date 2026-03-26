@@ -376,7 +376,7 @@ export default function HomeV2() {
         if (idx !== activeIdx) { snapTo(idx); return; }
         // Active card — trigger its action
         if (navigator.vibrate) navigator.vibrate(18);
-        if (idx === 0) { /* tortilla — coming soon, no-op */ }
+        if (idx === 0) { router.push('/build?type=tortilla'); }
         else if (idx === 1) saladTap();
         else if (idx === 2) setLoginSheet(true);
     };
@@ -404,7 +404,7 @@ export default function HomeV2() {
             fontFamily: "'Heebo',sans-serif", direction: 'rtl',
             display: 'flex', flexDirection: 'column', alignItems: 'center',
             justifyContent: 'space-between', overflow: 'hidden', userSelect: 'none',
-            background: 'url(/homepage-assets/bg-bokeh.webp) center top / cover no-repeat, #020a02',
+            background: 'url(/homepage-assets/BG_8K.webp) center center / cover no-repeat, #020a02',
         }}>
             <style>{`
                 @keyframes pageIn   { from{opacity:0;transform:translateY(18px) scale(0.97)} to{opacity:1;transform:none} }
@@ -430,7 +430,6 @@ export default function HomeV2() {
 
             {/* Background */}
             <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
-                <Image src="/homepage-assets/bg.png" alt="" fill style={{ objectFit: 'cover', objectPosition: 'center top' }} priority />
                 <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom,rgba(0,0,0,0.04) 0%,rgba(0,0,0,0.2) 50%,rgba(0,0,0,0.62) 100%)' }} />
             </div>
 
@@ -523,17 +522,6 @@ export default function HomeV2() {
                                     </div>
                                 )}
 
-                                {/* Coming soon badge on tortilla */}
-                                {i === 0 && isActive && (
-                                    <div style={{
-                                        position: 'absolute', top: '14px', left: '50%', transform: 'translateX(-50%)',
-                                        fontSize: '10px', fontWeight: 800, color: 'rgba(255,255,255,0.5)',
-                                        background: 'rgba(0,0,0,0.6)', padding: '3px 12px', borderRadius: '20px',
-                                        backdropFilter: 'blur(6px)', border: '1px solid rgba(255,255,255,0.1)', whiteSpace: 'nowrap',
-                                    }}>
-                                        בקרוב...
-                                    </div>
-                                )}
                             </div>
                         );
                     })}
@@ -665,6 +653,7 @@ export default function HomeV2() {
                 </div>
             )}
 
+            {/* Cat popup */}
             {/* Size picker overlay */}
             {sizePicker && <SizePicker onSelect={handleSizeSelect} onBack={() => { setSizePicker(false); saladReset(); }} />}
 

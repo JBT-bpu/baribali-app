@@ -35,13 +35,15 @@ const KF = `
 }
 `;
 
-export default function HeroBowlCard({ all, onRemove, comboBadges, lastAdd }) {
+export default function HeroBowlCard({ all, onRemove, comboBadges, lastAdd, animFile = "/cat-salad-bowl.json", freePlay = false }) {
     const lottieRef      = useRef(null);
     const prevIdsRef     = useRef(null);   // null = not yet seeded
     const targetFrameRef = useRef(null);   // frame to stop at during playback
     const [dropKey, setDropKey]   = useState(null);
     const [bowlAnim, setBowlAnim] = useState(null);
-    useEffect(() => { fetch("/cat-salad-bowl.json").then(r => r.json()).then(setBowlAnim).catch(() => {}); }, []);
+    const [mounted, setMounted]   = useState(false);
+    useEffect(() => { setMounted(true); }, []);
+    useEffect(() => { fetch(animFile).then(r => r.json()).then(setBowlAnim).catch(() => {}); }, [animFile]);
 
     const fillPct  = Math.min(all.length / MAX, 1);
     const offset   = CIRC * (1 - fillPct);
@@ -124,14 +126,14 @@ export default function HeroBowlCard({ all, onRemove, comboBadges, lastAdd }) {
             overflow: "hidden",
             boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
         }}>
-            <style>{KF}{`
+            {mounted && <style>{KF}{`
 .hbc-ring { position:relative; width:158px; height:158px; flex-shrink:0 }
 .hbc-bowl { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:108px; height:108px; pointer-events:none }
 @media (max-width: 374px) {
   .hbc-ring { width:118px; height:118px }
   .hbc-bowl { width:80px;  height:80px  }
 }
-            `}</style>
+            `}</style>}
 
             {/* ── Main row: ring+bowl left, stats right ── */}
             <div style={{ display: "flex", alignItems: "center", gap: "14px", padding: "10px 14px 8px" }}>
@@ -166,11 +168,11 @@ export default function HeroBowlCard({ all, onRemove, comboBadges, lastAdd }) {
                             <Lottie
                                 lottieRef={lottieRef}
                                 animationData={bowlAnim}
-                                loop={false}
-                                autoplay={false}
+                                loop={freePlay}
+                                autoplay={freePlay}
                                 style={{ width: "100%", height: "100%" }}
-                                onDOMLoaded={handleLoaded}
-                                onEnterFrame={handleEnterFrame}
+                                onDOMLoaded={freePlay ? undefined : handleLoaded}
+                                onEnterFrame={freePlay ? undefined : handleEnterFrame}
                             />
                         )}
                     </div>

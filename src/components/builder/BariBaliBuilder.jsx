@@ -6,7 +6,7 @@ const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
 const headerImage = "/builder-assets/header-brand.png";
 const footerImage = "/builder-assets/footer-brand.png";
 
-import { STEPS, BASE, COMBOS, PRESETS, getSuggestions } from "../../data/salad-data.js";
+import { STEPS, BASE, COMBOS, PRESETS, getSuggestions, TORTILLA_STEPS, TORTILLA_BASE } from "../../data/salad-data.js";
 import DetailSheet from "./ui/DetailSheet.jsx";
 import SummaryView from "./SummaryView.jsx";
 import SplashScreen from "./ui/SplashScreen.jsx";
@@ -232,6 +232,49 @@ function parseSizeParam(raw) {
 }
 
 // ─── BUILDER PARTICLES ──────────────────────────────────────
+function HeaderBanner() {
+  return (
+    <>
+      <div style={{ position: "relative", width: "100%", flexShrink: 0 }}>
+        <img
+          src={headerImage}
+          alt=""
+          aria-hidden="true"
+          style={{ width: "100%", display: "block", height: "80px", objectFit: "cover", objectPosition: "center top" }}
+        />
+        {/* Fade dissolve — image melts into dark bg */}
+        <div style={{
+          position: "absolute", bottom: 0, left: 0, right: 0, height: "52px",
+          background: "linear-gradient(to bottom, transparent, #020a02)",
+          pointerEvents: "none",
+        }} />
+        {/* Gold glow line */}
+        <div style={{
+          position: "absolute", bottom: 0, left: 0, right: 0, height: "2px",
+          background: "linear-gradient(90deg, transparent 0%, rgba(200,168,78,0.7) 20%, rgba(240,208,96,1) 50%, rgba(200,168,78,0.7) 80%, transparent 100%)",
+          boxShadow: "0 0 10px rgba(200,168,78,0.55), 0 0 22px rgba(200,168,78,0.22)",
+          pointerEvents: "none",
+        }} />
+      </div>
+      {/* Scalloped wave separator */}
+      <div style={{ width: "100%", lineHeight: 0, flexShrink: 0, marginTop: "-1px" }}>
+        <svg
+          viewBox="0 0 430 16"
+          preserveAspectRatio="none"
+          style={{ width: "100%", height: "16px", display: "block", filter: "drop-shadow(0 0 5px rgba(200,168,78,0.4))" }}
+        >
+          <path
+            d="M0,0 Q26.875,12 53.75,0 Q80.625,12 107.5,0 Q134.375,12 161.25,0 Q188.125,12 215,0 Q241.875,12 268.75,0 Q295.625,12 322.5,0 Q349.375,12 376.25,0 Q403.125,12 430,0"
+            fill="none"
+            stroke="rgba(200,168,78,0.45)"
+            strokeWidth="1.5"
+          />
+        </svg>
+      </div>
+    </>
+  );
+}
+
 function BuilderParticles() {
   const ref = useRef(null);
   useEffect(() => {
@@ -290,10 +333,16 @@ function BuilderParticles() {
 
 // ─── MAIN ───────────────────────────────────────────────────
 
-/** @param {{ sizeParam?: string | null }} props */
-export default function BariBaliBuilder({ sizeParam = null }) {
-  const [splash, setSplash] = useState(true);
-  const [step, setStep] = useState(-1);
+/** @param {{ sizeParam?: string | null, type?: string }} props */
+export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
+  const isTortilla = type === "tortilla";
+  const steps = isTortilla ? TORTILLA_STEPS : STEPS;
+  const [splash, setSplash] = useState(() => {
+    if (typeof sessionStorage === "undefined") return false;
+    const seen = sessionStorage.getItem("bb-splash-seen");
+    return !seen;
+  });
+  const [step, setStep] = useState(isTortilla ? 0 : -1);
   const [selectedSize, setSelectedSize] = useState(() => parseSizeParam(sizeParam));
   const [sels, setSels] = useState({});
   const [lastAdd, setLastAdd] = useState(null);
@@ -311,14 +360,17 @@ export default function BariBaliBuilder({ sizeParam = null }) {
     return () => clearTimeout(t);
   }, []);
   const [priceFlash, setPriceFlash] = useState(null);
-  const activeBase = selectedSize ? SIZE_CONFIG[selectedSize].price : BASE;
+  const activeBase = isTortilla ? TORTILLA_BASE : (selectedSize ? SIZE_CONFIG[selectedSize].price : BASE);
   const [prevPrice, setPrevPrice] = useState(activeBase);
   const [activeAnchor, setActiveAnchor] = useState(0);
   const [notes, setNotes] = useState("");
   const [expandedPreset, setExpandedPreset] = useState(null);
   const [isTransforming, setIsTransforming] = useState(false);
   const [bowlAnim, setBowlAnim] = useState(null);
-  useEffect(() => { fetch("/cat-salad-bowl.json").then(r => r.json()).then(setBowlAnim).catch(() => {}); }, []);
+  useEffect(() => {
+    const file = isTortilla ? "/mexican-burrito.json" : "/cat-salad-bowl.json";
+    fetch(file).then(r => r.json()).then(setBowlAnim).catch(() => {});
+  }, [isTortilla]);
   const scrollRef = useRef(null);
   const touchRef = useRef({ x: 0, y: 0, t: 0 });
   const longPressRef = useRef(null);
@@ -365,7 +417,7 @@ export default function BariBaliBuilder({ sizeParam = null }) {
     } catch (e) { }
   }, [sels, notes]);
 
-  const cur = step >= 0 ? STEPS[step] : null;
+  const cur = step >= 0 ? steps[step] : null;
   const getSel = id => sels[id] || [];
   const all = useMemo(() => Object.values(sels).flat(), [sels]);
   const allTags = useMemo(() => all.flatMap(i => i.tags || []), [all]);
@@ -413,7 +465,7 @@ export default function BariBaliBuilder({ sizeParam = null }) {
       const itemWithMeta = { ...item, _meta: { stepId: sid } };
 
       if (sid === "finish") {
-        const st = STEPS.find(s => s.id === sid);
+        const st = steps.find(s => s.id === sid);
         let sgIds = [];
         st.subgroups.forEach(sg => { if (sg.items.some(i => i.id === item.id)) sgIds = sg.items.map(i => i.id); });
         haptic("tap"); playSound("add");
@@ -443,12 +495,12 @@ export default function BariBaliBuilder({ sizeParam = null }) {
 
   // ─── Presets ───
   const loadPreset = useCallback((preset) => {
-    const allItems = STEPS.flatMap(s => s.subgroups.flatMap(sg => sg.items));
+    const allItems = steps.flatMap(s => s.subgroups.flatMap(sg => sg.items));
     const v = [], p = [], sc = [];
     preset.items.forEach(id => {
       const item = allItems.find(i => i.id === id);
       if (!item) return;
-      const inStep = STEPS.find(s => s.subgroups.some(sg => sg.items.some(i => i.id === id)));
+      const inStep = steps.find(s => s.subgroups.some(sg => sg.items.some(i => i.id === id)));
 
       // Add metadata to preset items
       const itemWithMeta = { ...item, _meta: { stepId: inStep?.id } };
@@ -492,11 +544,11 @@ export default function BariBaliBuilder({ sizeParam = null }) {
     setTimeout(() => {
       setStep(target); setAnim("in"); setActiveAnchor(0);
       scrollRef.current?.scrollTo(0, 0);
-      setTimeout(() => setAnim(null), 220);
-    }, 160);
+      setTimeout(() => setAnim(null), 300);
+    }, 200);
   }, [step]);
 
-  const next = () => step < STEPS.length - 1 ? goTo(step + 1) : setSummary(true);
+  const next = () => step < steps.length - 1 ? goTo(step + 1) : setSummary(true);
   const back = () => {
     if (summary) setSummary(false);
     else if (step > 0) goTo(step - 1);
@@ -522,10 +574,14 @@ export default function BariBaliBuilder({ sizeParam = null }) {
     const dx = e.changedTouches[0].clientX - touchRef.current.x;
     const dy = e.changedTouches[0].clientY - touchRef.current.y;
     const dt = Date.now() - touchRef.current.t;
-    if (dt > 500 || Math.abs(dy) > 40 || Math.abs(dx) < 60) return;
+    if (dt > 500 || Math.abs(dy) > 40) return;
+    const velocity = Math.abs(dx) / dt; // px/ms
+    const isFlick = velocity > 0.3 && Math.abs(dx) > 20;
+    const isSlide = Math.abs(dx) > 45;
+    if (!isFlick && !isSlide) return;
     // RTL: swipe right = next, swipe left = back
-    if (dx > 60) next();
-    else if (dx < -60) back();
+    if (dx > 0) next();
+    else back();
   }, [step, summary]);
 
   // ─── Long-press for detail ───
@@ -551,11 +607,11 @@ export default function BariBaliBuilder({ sizeParam = null }) {
     if (!selectedSize) {
       return (
         <div style={S.root}>
-          {splash && <SplashScreen onDone={() => setSplash(false)} />}
+          {splash && <SplashScreen onDone={() => { sessionStorage.setItem("bb-splash-seen", "1"); setSplash(false); }} />}
           <div style={S.bg} />
           <BuilderParticles />
           <div style={{ ...S.main, padding: "0 0 40px", opacity: anim === "enter" ? 0 : 1, transition: "all 0.5s" }}>
-            <img src={headerImage} alt="" aria-hidden="true" style={{ width: "100%", display: "block", height: "80px", objectFit: "cover", objectPosition: "center top", flexShrink: 0 }} />
+            <HeaderBanner />
             <div style={{ display: "flex", flexDirection: "column", gap: "12px", flex: 1, padding: "24px 16px 0" }}>
               <div style={{ textAlign: "center", marginBottom: "8px" }}>
                 <div style={{ fontSize: "20px", fontWeight: 900, color: "#f0d060", textShadow: "0 2px 8px rgba(0,0,0,0.6)" }}>בחרו גודל סלט</div>
@@ -589,7 +645,7 @@ export default function BariBaliBuilder({ sizeParam = null }) {
     const sc = SIZE_CONFIG[selectedSize];
     return (
       <div style={S.root}>
-        {splash && <SplashScreen onDone={() => setSplash(false)} />}
+        {splash && <SplashScreen onDone={() => { sessionStorage.setItem("bb-splash-seen", "1"); setSplash(false); }} />}
         <div style={S.bg} />
         <BuilderParticles />
         <div style={{
@@ -597,7 +653,7 @@ export default function BariBaliBuilder({ sizeParam = null }) {
           opacity: anim === "enter" ? 0 : 1, transform: anim === "enter" ? "translateY(12px)" : "none", transition: "all 0.5s"
         }}>
           {/* Brand header banner */}
-          <img src={headerImage} alt="" aria-hidden="true" style={{ width: "100%", display: "block", height: "80px", objectFit: "cover", objectPosition: "center top", flexShrink: 0 }} />
+          <HeaderBanner />
 
           <div style={{ display: "flex", flexDirection: "column", gap: "24px", flex: 1, padding: "20px 16px 24px", overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
 
@@ -661,7 +717,7 @@ export default function BariBaliBuilder({ sizeParam = null }) {
                 <div style={{ flex: 1, height: "1px", background: "linear-gradient(90deg, rgba(255,255,255,0.15), transparent)" }} />
               </div>
               {(() => {
-                const allIngredients = STEPS.flatMap(s => s.subgroups.flatMap(sg => sg.items));
+                const allIngredients = steps.flatMap(s => s.subgroups.flatMap(sg => sg.items));
                 const ep = expandedPreset ? PRESETS.find(x => x.id === expandedPreset) : null;
                 const epc = ep ? (PRESET_COLORS[ep.id] || PRESET_COLORS.balanced) : null;
                 return (
@@ -781,11 +837,11 @@ export default function BariBaliBuilder({ sizeParam = null }) {
 
   if (summary) return <SummaryView sels={sels} total={total} all={all} comboBadges={comboBadges} notes={notes} setNotes={setNotes} onBack={back} onEdit={(stepIndex) => { setSummary(false); setStep(stepIndex); }} onNewOrder={resetAll} base={activeBase} sizeLabel={selectedSize ? SIZE_CONFIG[selectedSize].label : null} />;
 
-  const slideX = anim === "out" ? (slideDir > 0 ? "-16px" : "16px") : anim === "in" ? "0" : undefined;
+  const slideX = anim === "out" ? (slideDir > 0 ? "-60px" : "60px") : anim === "in" ? "0" : undefined;
 
   return (
     <div style={S.root} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-      {splash && <SplashScreen onDone={() => setSplash(false)} />}
+      {splash && <SplashScreen onDone={() => { sessionStorage.setItem("bb-splash-seen", "1"); setSplash(false); }} />}
       <div style={S.bg} />
 
       {badgeFlash && <div style={S.badgeFlash}><span style={{ fontSize: "22px" }}>{badgeFlash.icon}</span><span style={S.badgeFlashTxt}>{badgeFlash.he}</span></div>}
@@ -859,22 +915,28 @@ export default function BariBaliBuilder({ sizeParam = null }) {
             </div>
           </div>
 
-          {/* Tappable progress dots */}
-          <div style={S.progressRow} role="progressbar" aria-valuemin={0} aria-valuemax={STEPS.length - 1} aria-valuenow={step} aria-label={`שלב ${step + 1} מתוך ${STEPS.length}`}>
-            {STEPS.map((s, i) => (
+          {/* Tappable progress segments */}
+          <div style={{ ...S.progressRow, alignItems: "center" }} role="progressbar" aria-valuemin={0} aria-valuemax={steps.length - 1} aria-valuenow={step} aria-label={`שלב ${step + 1} מתוך ${steps.length}`}>
+            {steps.map((s, i) => (
               <button
                 key={s.id}
                 onClick={() => { if (i <= step + 1) goTo(i); }}
                 disabled={i > step + 1}
                 aria-label={`${s.title}${i < step ? " - הושלם" : i === step ? " - נוכחי" : i === step + 1 ? " - הבא" : " - לא זמין"}`}
                 style={{
-                  height: "4px", flex: 1, borderRadius: "2px", border: "none", padding: 0, cursor: i <= step + 1 ? "pointer" : "default",
+                  height: "20px", flex: 1, border: "none", padding: "8px 0",
+                  cursor: i <= step + 1 ? "pointer" : "default",
+                  background: "transparent", display: "flex", alignItems: "center",
+                }}
+              >
+                <div style={{
+                  height: "5px", width: "100%", borderRadius: "3px",
                   background: i < step ? "linear-gradient(90deg, #d4b84a, #f0d060)" : i === step ? "linear-gradient(90deg, #f0d060, #ffe066)" : "rgba(255,255,255,0.08)",
                   transition: "all 0.4s cubic-bezier(0.34,1.56,0.64,1)",
                   boxShadow: i <= step ? "0 0 6px rgba(200,168,78,0.4)" : "none",
                   opacity: i > step + 1 ? 0.4 : 1,
-                }}
-              />
+                }} />
+              </button>
             ))}
           </div>
         </div>
@@ -886,6 +948,8 @@ export default function BariBaliBuilder({ sizeParam = null }) {
           comboBadges={comboBadges}
           lastAdd={lastAdd}
           lastRemove={lastRemove}
+          animFile={isTortilla ? "/mexican-burrito.json" : "/cat-salad-bowl.json"}
+          freePlay={isTortilla}
         />
 
         {/* Suggestions */}
@@ -919,7 +983,7 @@ export default function BariBaliBuilder({ sizeParam = null }) {
         )}
 
         {/* ── CONTENT (directional slide) ── */}
-        <div style={{ ...S.content, opacity: anim === "out" ? 0 : 1, transform: anim === "out" ? `translateX(${slideX})` : "translateX(0)", transition: "all 0.16s ease" }} ref={scrollRef} role="main" aria-label={`${cur.title} - בחרו מרכיבים`}>
+        <div style={{ ...S.content, opacity: anim === "out" ? 0 : 1, transform: anim === "out" ? `translateX(${slideX})` : "translateX(0)", transition: "opacity 0.22s ease, transform 0.28s cubic-bezier(0.25,0.46,0.45,0.94)" }} ref={scrollRef} role="main" aria-label={`${cur.title} - בחרו מרכיבים`}>
 
           {/* Long-press discovery hint — shows once on load, fades out */}
           {showLongPressHint && (
@@ -973,32 +1037,51 @@ export default function BariBaliBuilder({ sizeParam = null }) {
           <div style={{ height: "110px" }} />
         </div>
 
-        {/* ── BOTTOM ── */}
+        {/* ── BOTTOM ACTION ZONE ── */}
         <div style={S.bar}>
-          <div style={S.barInfo}>
-            <div style={{
-              position: "relative",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "8px",
-              padding: "8px 16px",
-              borderRadius: "12px",
-              background: "linear-gradient(145deg, rgba(8,22,8,0.98), rgba(13,40,13,0.96))",
-              border: "1px solid rgba(200,168,78,0.3)"
-            }}>
-              <span style={{ fontSize: "18px", fontWeight: 900, color: "#ffffff", textShadow: "0 2px 4px rgba(0,0,0,0.5)" }}>{all.length}</span>
-              <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", fontWeight: 600 }}>מרכיבים</span>
-              <div style={{ width: "1px", height: "14px", background: "rgba(200,168,78,0.3)" }} />
-              <span style={{ fontSize: "18px", fontWeight: 900, color: "#f0d060", textShadow: "0 2px 6px rgba(200,168,78,0.4)" }}>₪{total}</span>
-            </div>
-          </div>
           <button
-            style={{ ...S.cta, ...(cur.id === "upgrade" && curSel.length === 0 ? S.ctaGhost : {}) }}
+            style={{
+              flex: 1,
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "12px 20px",
+              borderRadius: "14px",
+              border: "1px solid rgba(200,168,78,0.35)",
+              background: "linear-gradient(145deg, rgba(8,22,8,0.97), rgba(13,40,13,0.95))",
+              cursor: "pointer",
+              fontFamily: "'Heebo',sans-serif",
+              boxShadow: "0 4px 18px rgba(0,0,0,0.4), 0 0 0 1px rgba(200,168,78,0.08)",
+              animation: "goldPulse 3s ease-in-out infinite",
+              ...(cur.id === "upgrade" && curSel.length === 0 ? { opacity: 0.5, animation: "none" } : {}),
+            }}
             onClick={next}
-            aria-label={step === STEPS.length - 1 ? (curSel.length > 0 ? "עבור לסיכום" : "דלג ועבור לסיכום") : `עבור לשלב הבא - ${STEPS[step + 1]?.title || ""}`}
+            aria-label={step === steps.length - 1 ? (curSel.length > 0 ? "עבור לסיכום" : "דלג ועבור לסיכום") : `עבור לשלב הבא - ${steps[step + 1]?.title || ""}`}
             tabIndex={0}
           >
-            {step === STEPS.length - 1 ? (curSel.length > 0 ? "לסיכום" : "דלגו") : "המשך"}<span style={{ marginRight: "6px" }}>←</span>
+            {/* Left: counts */}
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ fontSize: "17px", fontWeight: 900, color: "#ffffff", textShadow: "0 2px 4px rgba(0,0,0,0.5)" }}>{all.length}</span>
+              <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)", fontWeight: 600 }}>מרכיבים</span>
+              <div style={{ width: "1px", height: "14px", background: "rgba(200,168,78,0.25)" }} />
+              <span style={{ fontSize: "17px", fontWeight: 900, color: "#f0d060", textShadow: "0 2px 6px rgba(200,168,78,0.4)" }}>₪{total}</span>
+            </div>
+            {/* Right: CTA label + arrow */}
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <span style={{
+                fontSize: "14px", fontWeight: 900, color: "#f0d060",
+                textShadow: "0 1px 4px rgba(200,168,78,0.5)",
+              }}>
+                {step === steps.length - 1 ? (curSel.length > 0 ? "לסיכום" : "דלגו") : "המשך"}
+              </span>
+              <div style={{
+                width: "60px", height: "30px", borderRadius: "10px",
+                backgroundImage: "linear-gradient(135deg, #c8a832 0%, #f0d060 40%, #ffe599 52%, #c8a832 100%)",
+                backgroundSize: "200% 100%",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: "16px", color: "#0d2e0d", fontWeight: 900,
+                boxShadow: "0 2px 10px rgba(200,168,78,0.5)",
+                animation: "shimmer 3s ease-in-out infinite",
+              }}>←</div>
+            </div>
           </button>
         </div>
       </div>
@@ -1109,7 +1192,7 @@ const S = {
   chipName: { fontSize: "10.5px", fontWeight: 700, textAlign: "center", lineHeight: 1.15, color: "#ffffff", textShadow: "0 1px 3px rgba(0,0,0,0.6)" },
   chipCost: { fontSize: "8px", fontWeight: 800, color: "#f0d060", background: "linear-gradient(135deg, rgba(200,168,78,0.2), rgba(200,168,78,0.08))", border: "1px solid rgba(200,168,78,0.35)", padding: "1px 5px", borderRadius: "5px", marginTop: "2px", boxShadow: "0 1px 2px rgba(0,0,0,0.3)" },
 
-  bar: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 14px max(11px, env(safe-area-inset-bottom))", background: `linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.25) 100%), url(${footerImage}) center top / cover no-repeat`, borderTop: "2px solid rgba(200,168,78,0.4)", boxShadow: "0 -4px 20px rgba(0,0,0,0.5), 0 0 30px rgba(200,168,78,0.08)" },
+  bar: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 20px max(14px, env(safe-area-inset-bottom))", background: `linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.25) 100%), url(${footerImage}) center top / cover no-repeat`, borderTop: "2px solid rgba(200,168,78,0.4)", boxShadow: "0 -4px 20px rgba(0,0,0,0.5), 0 0 30px rgba(200,168,78,0.08)" },
   barInfo: { display: "flex", alignItems: "baseline", gap: "5px" },
   barCount: { fontSize: "18px", fontWeight: 900, color: "#ffffff", textShadow: "0 2px 4px rgba(0,0,0,0.5)" },
   barLabel: { fontSize: "11px", color: "rgba(255,255,255,0.35)", fontWeight: 600 },

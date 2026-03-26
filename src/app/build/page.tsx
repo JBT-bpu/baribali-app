@@ -8,6 +8,7 @@ import ParticleCanvas from '@/components/ui/ParticleCanvas';
 function BuilderWithSize() {
     const searchParams = useSearchParams();
     const size = searchParams.get('size');
+    const type = searchParams.get('type') ?? 'salad';
     const [visible, setVisible] = useState(false);
 
     useEffect(() => {
@@ -28,7 +29,7 @@ function BuilderWithSize() {
             <ParticleCanvas intensity="medium" mode="bokeh" style={{ zIndex: 1 }} />
             {/* Golden sparks — float over ingredient cards, under modals (zIndex 5) */}
             <ParticleCanvas intensity="low" mode="sparks" style={{ zIndex: 5 }} />
-            <BariBaliBuilder sizeParam={size ?? null} />
+            <BariBaliBuilder sizeParam={size ?? null} type={type} />
         </div>
     );
 }
