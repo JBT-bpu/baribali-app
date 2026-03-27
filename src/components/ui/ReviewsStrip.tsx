@@ -38,24 +38,27 @@ export default function ReviewsStrip() {
         return () => clearInterval(t);
     }, [reviews]);
 
-    if (reviews.length === 0) return null;
-
     const r = reviews[idx];
 
+    // Fixed height = header (20px) + gap (5px) + text (2 lines × 18.6px = 37px) + gap (5px) + dots (9px) + padding (20px) = ~96px
+    // We always render this fixed-size box, even while loading (skeleton state)
     return (
         <div style={{
             position: 'relative', zIndex: 2,
             width: '100%', padding: '0 16px 10px',
+            height: '96px', flexShrink: 0,   // ← fixed height, never shifts layout
         }}>
             <div style={{
+                height: '100%',
                 borderRadius: '16px',
                 background: 'linear-gradient(135deg, rgba(10,26,10,0.82), rgba(6,16,6,0.88))',
                 border: '1px solid rgba(240,200,50,0.14)',
                 backdropFilter: 'blur(12px)',
                 padding: '10px 14px',
                 display: 'flex', flexDirection: 'column', gap: '5px',
-                opacity: visible ? 1 : 0,
+                opacity: r ? (visible ? 1 : 0) : 0,
                 transition: 'opacity 0.35s ease',
+                overflow: 'hidden',
             }}>
                 {/* Header row */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'space-between' }}>
@@ -81,18 +84,19 @@ export default function ReviewsStrip() {
                     </div>
                 </div>
 
-                {/* Review text */}
+                {/* Review text — fixed 2-line height, never expands */}
                 <p style={{
                     margin: 0,
                     fontSize: '12px', fontWeight: 500,
                     color: 'rgba(255,255,255,0.72)',
-                    lineHeight: 1.55,
+                    lineHeight: '18px',
+                    height: '36px',        // exactly 2 lines, always
+                    overflow: 'hidden',
                     display: '-webkit-box',
                     WebkitLineClamp: 2,
                     WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden',
                 }}>
-                    "{r.text}"
+                    "{r && r.text}"
                 </p>
 
                 {/* Dot indicators */}
