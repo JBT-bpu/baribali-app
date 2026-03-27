@@ -398,6 +398,9 @@ function NutriStats({ all }) {
                     {msg.text}
                 </div>
             )}
+            <div style={{ textAlign: "center", marginTop: "6px", fontSize: "8.5px", fontWeight: 500, color: "rgba(255,255,255,0.22)", letterSpacing: "0.03em" }}>
+                * הערכה בלבד · לא מהווה ייעוץ תזונתי
+            </div>
         </div>
     );
 }

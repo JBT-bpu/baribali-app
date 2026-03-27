@@ -12,24 +12,19 @@ const TAG_MAP = {
     spicy:    { he: "חריף",    icon: "🌶️", color: "#ef5350", bg: "rgba(239,83,80,0.15)"  },
 };
 
+const MACROS = [
+    { key: "p",  label: "חלבון",    color: "#c8a832" },
+    { key: "c",  label: "פחמימות",  color: "#4caf82" },
+    { key: "f",  label: "שומן",     color: "#64b5f6" },
+    { key: "fb", label: "סיבים",    color: "#a5d6a7" },
+];
+
 export default function DetailSheet({ item, isAdded, onToggle, onClose }) {
     const n = NUTRI[item.id];
     const sheetRef = useRef(null);
     const touchStartY = useRef(0);
-
-    const maxVal = n ? Math.max(n.p || 0, n.c || 0, n.f || 0, n.fb || 0, 1) : 1;
-    const barPct = (val) => `${Math.max(Math.round((val / maxVal) * 100), 3)}%`;
-
-    const nutrients = n && n.kcal > 0 ? [
-        { label: "חלבון",    val: n.p,  unit: "g", color: "#c8a832", track: "rgba(200,168,78,0.12)" },
-        { label: "פחמימות", val: n.c,  unit: "g", color: "#4caf82", track: "rgba(76,175,130,0.1)"  },
-        { label: "שומן",     val: n.f,  unit: "g", color: "#64b5f6", track: "rgba(100,181,246,0.1)" },
-        { label: "סיבים",   val: n.fb, unit: "g", color: "#a5d6a7", track: "rgba(165,214,167,0.1)" },
-    ] : [];
-
     const tags = (item.tags || []).map(t => TAG_MAP[t]).filter(Boolean);
 
-    // Swipe-to-dismiss
     const onTouchStart = (e) => { touchStartY.current = e.touches[0].clientY; };
     const onTouchEnd = (e) => {
         const delta = e.changedTouches[0].clientY - touchStartY.current;
@@ -48,75 +43,76 @@ export default function DetailSheet({ item, isAdded, onToggle, onClose }) {
                 {/* Drag handle */}
                 <div style={S.handle} />
 
-                {/* Hero — large centered icon + glow */}
-                <div style={S.heroWrap}>
-                    <div style={S.glowRing} />
-                    <div style={S.heroIcon}>{item.icon}</div>
-                    <div style={S.heroName}>{item.he}</div>
-                    {item.desc && <div style={S.heroDesc}>{item.desc}</div>}
+                {/* ── Hero row: icon left · info right ── */}
+                <div style={S.heroRow}>
 
-                    {/* Tags row */}
-                    {tags.length > 0 && (
-                        <div style={S.tagsRow}>
-                            {tags.map(t => (
-                                <span key={t.he} style={{ ...S.tagPill, color: t.color, background: t.bg, border: `1px solid ${t.color}40` }}>
-                                    {t.icon} {t.he}
-                                </span>
-                            ))}
-                            {item.price > 0 && (
-                                <span style={S.pricePill}>+₪{item.price}</span>
-                            )}
-                        </div>
-                    )}
-                    {item.price > 0 && tags.length === 0 && (
-                        <div style={{ marginTop: "8px" }}>
-                            <span style={S.pricePill}>+₪{item.price}</span>
-                        </div>
-                    )}
-                </div>
-
-                {/* Kcal hero pill */}
-                {n && n.kcal > 0 && (
-                    <div style={S.kcalRow}>
-                        <div style={S.kcalPill}>
-                            <span style={S.kcalNum}>{n.kcal}</span>
-                            <span style={S.kcalUnit}>קק״ל</span>
-                            <span style={S.kcalSub}>למנה</span>
+                    {/* Icon */}
+                    <div style={S.iconWrap}>
+                        <div style={S.glowBg} />
+                        <div style={S.iconBox}>
+                            {item.icon && item.icon.startsWith("/")
+                                ? <img src={item.icon} alt={item.he} style={{ width: "88px", height: "88px", objectFit: "contain", filter: "drop-shadow(0 8px 24px rgba(0,0,0,0.65)) drop-shadow(0 0 18px rgba(200,168,78,0.25))" }} />
+                                : <span style={{ fontSize: "88px", lineHeight: 1, filter: "drop-shadow(0 8px 24px rgba(0,0,0,0.65)) drop-shadow(0 0 18px rgba(200,168,78,0.25))" }}>{item.icon}</span>}
                         </div>
                     </div>
-                )}
 
-                {/* Nutrition bars */}
-                {nutrients.length > 0 && (
-                    <div style={S.nutriSection}>
-                        <div style={S.nutriTitle}>ערכים תזונתיים</div>
-                        {nutrients.map((row, i) => (
-                            <div key={row.label} style={S.nutriRow}>
-                                <span style={S.nutriLabel}>{row.label}</span>
-                                <div style={{ flex: 1, height: "5px", borderRadius: "3px", background: row.track, overflow: "hidden" }}>
-                                    <div style={{
-                                        width: barPct(row.val),
-                                        height: "100%",
-                                        borderRadius: "3px",
-                                        background: row.color,
-                                        animation: `barGrow 0.5s cubic-bezier(0.34,1.2,0.64,1) ${i * 60 + 80}ms both`,
-                                    }} />
-                                </div>
-                                <span style={S.nutriVal}>{row.val}g</span>
+                    {/* Info column */}
+                    <div style={S.infoCol}>
+                        {/* Name + kcal on same line */}
+                        <div style={S.nameKcalRow}>
+                            <span style={S.itemName}>{item.he}</span>
+                            {n && n.kcal > 0 && (
+                                <>
+                                    <span style={S.kcalDivider} />
+                                    <span style={S.kcalBadge}>
+                                        <span style={S.kcalNum}>{n.kcal}</span>
+                                        <span style={S.kcalUnit}>קק״ל</span>
+                                    </span>
+                                </>
+                            )}
+                        </div>
+                        {item.desc && <div style={S.itemDesc}>{item.desc}</div>}
+
+                        {/* Price */}
+                        {item.price > 0 && (
+                            <div style={{ marginTop: "4px" }}>
+                                <span style={S.pricePill}>+₪{item.price}</span>
                             </div>
+                        )}
+
+                        {/* Macros */}
+                        {n && n.kcal > 0 && (
+                            <>
+                                <div style={S.macroGrid}>
+                                    {MACROS.map(m => (
+                                        <div key={m.key} style={S.macroPill}>
+                                            <span style={{ ...S.macroVal, color: m.color }}>{n[m.key]}</span>
+                                            <span style={S.macroLabel}>{m.label}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
+
+                {/* Tags row */}
+                {tags.length > 0 && (
+                    <div style={S.tagsRow}>
+                        {tags.map(t => (
+                            <span key={t.he} style={{ ...S.tagPill, color: t.color, background: t.bg, border: `1px solid ${t.color}40` }}>
+                                {t.icon} {t.he}
+                            </span>
                         ))}
                     </div>
                 )}
 
                 {/* Fun fact */}
                 {n?.fact && (
-                    <>
-                        <div style={S.divider} />
-                        <div style={S.factBox}>
-                            <div style={S.factTitle}>💡 הידעת?</div>
-                            <div style={S.factText}>{n.fact}</div>
-                        </div>
-                    </>
+                    <div style={S.factBox}>
+                        <div style={S.factTitle}>💡 הידעת?</div>
+                        <div style={S.factText}>{n.fact}</div>
+                    </div>
                 )}
 
                 {/* CTAs */}
@@ -164,116 +160,106 @@ const S = {
         margin: "12px auto 0",
     },
 
-    // ── Hero ─────────────────────────────────────────────────
-    heroWrap: {
-        display: "flex", flexDirection: "column", alignItems: "center",
-        padding: "20px 20px 16px",
-        position: "relative",
-        textAlign: "center",
+    // ── Hero row ──────────────────────────────────────────────
+    heroRow: {
+        display: "flex", alignItems: "center", gap: "16px",
+        padding: "16px 16px 14px",
     },
-    glowRing: {
-        position: "absolute", top: "10px", left: "50%",
-        transform: "translateX(-50%)",
-        width: "140px", height: "140px", borderRadius: "50%",
-        background: "radial-gradient(circle, rgba(200,168,78,0.14) 0%, rgba(200,168,78,0.04) 50%, transparent 70%)",
+    iconWrap: {
+        position: "relative", flexShrink: 0,
+        width: "100px", height: "100px",
+        display: "flex", alignItems: "center", justifyContent: "center",
+    },
+    glowBg: {
+        position: "absolute", inset: 0, borderRadius: "20px",
+        background: "radial-gradient(circle, rgba(200,168,78,0.22) 0%, rgba(200,168,78,0.06) 55%, transparent 75%)",
         pointerEvents: "none",
+        animation: "glowPulse 3s ease-in-out infinite",
     },
-    heroIcon: {
-        fontSize: "76px", lineHeight: 1,
-        filter: "drop-shadow(0 6px 18px rgba(0,0,0,0.5))",
+    iconBox: {
         position: "relative", zIndex: 1,
-        animation: "iconPop 0.45s cubic-bezier(0.34,1.56,0.64,1) both",
-        marginBottom: "10px",
-    },
-    heroName: {
-        fontSize: "22px", fontWeight: 900, color: "#e8f5e9",
-        textShadow: "0 1px 6px rgba(0,0,0,0.5)",
-        position: "relative", zIndex: 1,
-        marginBottom: "4px",
-    },
-    heroDesc: {
-        fontSize: "12px", color: "rgba(255,255,255,0.48)",
-        fontWeight: 500, lineHeight: 1.5,
-        maxWidth: "280px",
-        position: "relative", zIndex: 1,
+        animation: "iconPop 0.45s cubic-bezier(0.34,1.56,0.64,1) both, iconFloat 3.5s ease-in-out 0.5s infinite",
+        display: "flex", alignItems: "center", justifyContent: "center",
     },
 
+    infoCol: {
+        flex: 1, minWidth: 0,
+        display: "flex", flexDirection: "column", gap: "2px",
+    },
+    nameKcalRow: {
+        display: "flex", alignItems: "center", gap: "8px",
+    },
+    itemName: {
+        fontSize: "19px", fontWeight: 900, color: "#e8f5e9",
+        textShadow: "0 1px 6px rgba(0,0,0,0.5)", lineHeight: 1.2,
+    },
+    kcalDivider: {
+        display: "inline-block",
+        width: "1px", height: "16px", borderRadius: "1px",
+        background: "rgba(255,255,255,0.15)",
+        flexShrink: 0,
+    },
+    kcalBadge: {
+        display: "inline-flex", alignItems: "baseline", gap: "2px",
+        flexShrink: 0,
+    },
+    itemDesc: {
+        fontSize: "11px", color: "rgba(255,255,255,0.42)",
+        fontWeight: 500, lineHeight: 1.4,
+    },
+    pricePill: {
+        fontSize: "11px", fontWeight: 800, color: "#edd87e",
+        background: "rgba(200,168,78,0.15)",
+        border: "1px solid rgba(200,168,78,0.35)",
+        padding: "2px 8px", borderRadius: "20px",
+    },
+    kcalNum: {
+        fontSize: "20px", fontWeight: 900, color: "#f0d060",
+        textShadow: "0 0 12px rgba(200,168,78,0.45)", lineHeight: 1,
+    },
+    kcalUnit: {
+        fontSize: "11px", fontWeight: 700, color: "rgba(200,168,78,0.6)",
+    },
+    macroGrid: {
+        display: "grid", gridTemplateColumns: "1fr 1fr",
+        gap: "4px", marginTop: "6px",
+    },
+    macroPill: {
+        display: "flex", flexDirection: "column", alignItems: "center",
+        padding: "4px 6px", borderRadius: "8px",
+        background: "rgba(255,255,255,0.04)",
+        border: "1px solid rgba(255,255,255,0.07)",
+    },
+    macroVal: {
+        fontSize: "14px", fontWeight: 900, lineHeight: 1,
+    },
+    macroLabel: {
+        fontSize: "9px", fontWeight: 600,
+        color: "rgba(255,255,255,0.35)",
+        marginTop: "1px",
+    },
+
+    // ── Tags ──────────────────────────────────────────────────
     tagsRow: {
-        display: "flex", flexWrap: "wrap", gap: "6px",
-        justifyContent: "center",
-        marginTop: "10px",
-        position: "relative", zIndex: 1,
+        display: "flex", flexWrap: "wrap", gap: "5px",
+        padding: "0 16px 12px",
     },
     tagPill: {
         fontSize: "11px", fontWeight: 700,
         padding: "3px 10px", borderRadius: "20px",
         display: "inline-flex", alignItems: "center", gap: "3px",
     },
-    pricePill: {
-        fontSize: "11px", fontWeight: 800, color: "#edd87e",
-        background: "rgba(200,168,78,0.15)",
-        border: "1px solid rgba(200,168,78,0.35)",
-        padding: "3px 10px", borderRadius: "20px",
-    },
-
-    // ── Kcal ─────────────────────────────────────────────────
-    kcalRow: {
-        padding: "0 20px 12px",
-        borderBottom: "1px solid rgba(255,255,255,0.05)",
-        display: "flex", justifyContent: "center",
-    },
-    kcalPill: {
-        display: "inline-flex", alignItems: "baseline", gap: "4px",
-        padding: "6px 18px", borderRadius: "14px",
-        background: "linear-gradient(135deg, rgba(200,168,78,0.15), rgba(200,168,78,0.06))",
-        border: "1px solid rgba(200,168,78,0.3)",
-    },
-    kcalNum: {
-        fontSize: "28px", fontWeight: 900, color: "#f0d060",
-        textShadow: "0 0 18px rgba(200,168,78,0.5)",
-    },
-    kcalUnit: { fontSize: "13px", fontWeight: 700, color: "rgba(200,168,78,0.7)" },
-    kcalSub: { fontSize: "10px", fontWeight: 500, color: "rgba(255,255,255,0.3)", marginRight: "4px" },
-
-    // ── Nutrition ────────────────────────────────────────────
-    nutriSection: { padding: "14px 20px 10px" },
-    nutriTitle: {
-        fontSize: "10px", fontWeight: 800,
-        color: "rgba(255,255,255,0.28)",
-        letterSpacing: "0.08em",
-        marginBottom: "10px",
-        textTransform: "uppercase",
-    },
-    nutriRow: {
-        display: "flex", alignItems: "center", gap: "10px",
-        marginBottom: "8px",
-    },
-    nutriLabel: {
-        fontSize: "11px", fontWeight: 700,
-        color: "rgba(255,255,255,0.5)",
-        width: "48px", textAlign: "right", flexShrink: 0,
-    },
-    nutriVal: {
-        fontSize: "11px", fontWeight: 700,
-        color: "rgba(255,255,255,0.45)",
-        width: "32px", flexShrink: 0, textAlign: "left",
-    },
-
-    divider: {
-        height: "1px", margin: "4px 20px 12px",
-        background: "linear-gradient(90deg, transparent, rgba(200,168,78,0.18), transparent)",
-    },
 
     // ── Fact ─────────────────────────────────────────────────
     factBox: {
-        margin: "0 16px", padding: "12px 14px", borderRadius: "14px",
+        margin: "0 16px 12px", padding: "11px 14px", borderRadius: "14px",
         background: "linear-gradient(135deg, rgba(200,168,78,0.07), rgba(200,168,78,0.02))",
         border: "1px solid rgba(200,168,78,0.13)",
     },
     factTitle: {
         fontSize: "10px", fontWeight: 800,
         color: "rgba(200,168,78,0.6)",
-        marginBottom: "5px", letterSpacing: "0.04em",
+        marginBottom: "4px", letterSpacing: "0.04em",
     },
     factText: {
         fontSize: "12px", color: "rgba(255,255,255,0.68)",
@@ -283,15 +269,13 @@ const S = {
     // ── CTAs ─────────────────────────────────────────────────
     ctaWrap: {
         display: "flex", flexDirection: "column", gap: "8px",
-        padding: "16px 16px 0",
+        padding: "4px 16px 0",
     },
     ctaAdd: {
         width: "100%", padding: "13px",
-        borderRadius: "14px",
-        border: "none",
+        borderRadius: "14px", border: "none",
         background: "linear-gradient(135deg, #c8a832, #f0d060)",
-        color: "#1a1000",
-        fontSize: "15px", fontWeight: 900,
+        color: "#1a1000", fontSize: "15px", fontWeight: 900,
         cursor: "pointer", fontFamily: "'Heebo',sans-serif",
         boxShadow: "0 4px 16px rgba(200,168,78,0.3)",
         animation: "fadeUp 0.3s ease 0.1s both",
@@ -321,6 +305,7 @@ const KF = `
 @keyframes overlayIn  { from{opacity:0} to{opacity:1} }
 @keyframes sheetUp    { from{transform:translateY(100%)} to{transform:translateY(0)} }
 @keyframes iconPop    { 0%{transform:scale(0.5);opacity:0} 60%{transform:scale(1.12)} 100%{transform:scale(1);opacity:1} }
-@keyframes barGrow    { from{width:0} }
+@keyframes iconFloat  { 0%,100%{transform:translateY(0) rotate(-1deg)} 50%{transform:translateY(-6px) rotate(1deg)} }
+@keyframes glowPulse  { 0%,100%{opacity:0.7} 50%{opacity:1.0} }
 @keyframes fadeUp     { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
 `;

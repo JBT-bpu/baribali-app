@@ -347,7 +347,11 @@ export default function OrderStatusPage({ params }: { params: { id: string } }) 
                     <div style={P.itemsTitle}>הסלט שלכם</div>
                     <div style={P.itemsRow}>
                         {order.items.map(it => (
-                            <span key={it.id} style={P.itemChip} title={it.he}>{it.icon}</span>
+                            <span key={it.id} style={P.itemChip} title={it.he}>
+                                {it.icon && it.icon.startsWith('/')
+                                    ? <img src={it.icon} alt={it.he} style={{ width: '24px', height: '24px', objectFit: 'contain' }} />
+                                    : it.icon}
+                            </span>
                         ))}
                     </div>
                     <div style={P.itemNames}>{order.items.map(i => i.he).join(' · ')}</div>

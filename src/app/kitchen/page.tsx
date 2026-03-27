@@ -95,6 +95,7 @@ export default function KitchenPage() {
             .select('*')
             .gte('created_at', since.toISOString())
             .neq('status', 'collected')
+            .eq('payment_status', 'paid')
             .order('pickup_time', { ascending: true });
         if (data) setOrders(data as Order[]);
         setLoading(false);
@@ -259,7 +260,11 @@ function OrderCard({ order, onUpdate }: { order: Order; onUpdate: (id: string, s
                             style={{ ...K.checkRow, ...(done ? K.checkRowDone : {}) }}
                             onClick={() => toggle(it.id)}
                         >
-                            <span style={K.checkEmoji}>{it.icon}</span>
+                            <span style={K.checkEmoji}>
+                                {it.icon && it.icon.startsWith('/')
+                                    ? <img src={it.icon} alt={it.he} style={{ width: '30px', height: '30px', objectFit: 'contain' }} />
+                                    : it.icon}
+                            </span>
                             <span style={{ ...K.checkName, ...(done ? K.checkNameDone : {}) }}>{it.he}</span>
                             <span style={{ ...K.checkMark, ...(done ? K.checkMarkDone : {}) }}>
                                 {done ? '✓' : '○'}

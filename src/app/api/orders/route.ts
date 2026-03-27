@@ -23,6 +23,7 @@ export async function POST(req: NextRequest) {
                 notes: notes ?? null,
                 size: size ?? null,
                 status: 'waiting',
+                payment_status: 'pending',
             })
             .select('id, order_num, created_at')
             .single();
