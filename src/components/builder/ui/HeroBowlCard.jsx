@@ -182,12 +182,12 @@ export default function HeroBowlCard({ all, onRemove, comboBadges, lastAdd, anim
                         <div style={{
                             position: "absolute", left: "50%", top: "50%",
                             transform: "translate(-50%, -50%)",
-                            zIndex: 10, pointerEvents: "none",
+                            zIndex: 30, pointerEvents: "none",
                         }}>
                             <span style={{
                                 fontSize: "22px", fontWeight: 900, lineHeight: 1,
                                 color: "#ffffff",
-                                textShadow: "0 1px 8px rgba(0,0,0,0.9)",
+                                textShadow: "0 0 8px rgba(0,0,0,1), 0 0 16px rgba(0,0,0,0.9), 0 2px 4px rgba(0,0,0,1)",
                             }}>
                                 {pctLabel}<span style={{ fontSize: "11px", fontWeight: 700, opacity: 0.65, marginLeft: "1px" }}>%</span>
                             </span>
