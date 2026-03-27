@@ -100,7 +100,7 @@ export const STEPS = [
                     { id: "soy_s", he: "סויה", icon: "/icons/soy_sauce.png", price: 3, tags: [], desc: "רוטב סויה סיני" },
                     { id: "caesar", he: "קיסר", icon: "/icons/dressing_caesar.png", price: 5, tags: [], desc: "רוטב קיסר קלאסי ₪5" },
                     { id: "pesto", he: "פסטו", icon: "/icons/pesto_basil.png", price: 4, tags: ["herb"], desc: "פסטו בזיליקום ₪4" },
-                    { id: "zhug", he: "סחוג", icon: "/icons/spices_mixed.png", price: 4, tags: ["spicy"], desc: "סחוג תימני חריף 🔥 ₪4" },
+                    { id: "zhug", he: "סחוג", icon: "/icons/jalapeno_sliced.png", price: 4, tags: ["spicy"], desc: "סחוג תימני חריף 🔥 ₪4" },
                 ]
             },
         ],
@@ -136,7 +136,7 @@ export const STEPS = [
                 { id: "egg_p", he: "ביצה", icon: "/icons/egg_boiled_slices.png", price: 5, tags: ["protein"], desc: "ביצה קשה נוספת" },
                 { id: "parmesan_p", he: "פרמז'ן", icon: "/icons/parmesan_shaved.png", price: 4, tags: ["flavor"], desc: "שבבי פרמז'ן" },
                 { id: "honey_p", he: "דבש", icon: "/icons/honey.png", price: 4, tags: ["sweet"], desc: "דבש טבעי" },
-                { id: "jala_p", he: "ג'עלה", icon: "/icons/jalapeno_sliced.png", price: 4, tags: ["crunch"], desc: "ג'עלה פריכה" },
+                { id: "jala_p", he: "ג'עלה", icon: "/icons/spices_mixed.png", price: 4, tags: ["crunch"], desc: "ג'עלה פריכה" },
                 { id: "bread_p", he: "לחם נוסף", icon: "/icons/baguette_sliced.png", price: 4, tags: [], desc: "פרוסת לחם נוספת" },
                 { id: "croutons_p", he: "קרוטונים", icon: "/icons/croutons.png", price: 3, tags: ["crunch"], desc: "מנת קרוטונים נוספת" },
             ]
@@ -222,7 +222,7 @@ export const TORTILLA_STEPS = [
                     { id: "t_garlic_s",   he: "רוטב שום",     icon: "/icons/garlic_aioli.png",     price: 3, tags: [] },
                     { id: "t_sweet_chili",he: "צ'ילי מתוק",   icon: "/icons/sriracha.png",          price: 3, tags: ["spicy"] },
                     { id: "t_caesar",     he: "קיסר",         icon: "/icons/dressing_caesar.png",  price: 5, tags: [] },
-                    { id: "t_zhug",       he: "סחוג",         icon: "/icons/spices_mixed.png",     price: 4, tags: ["spicy"] },
+                    { id: "t_zhug",       he: "סחוג",         icon: "/icons/jalapeno_sliced.png",   price: 4, tags: ["spicy"] },
                 ]
             },
         ],
