@@ -73,11 +73,12 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     };
 
     const layers = useMemo(() => {
-        const greens = all.filter(i => (i.tags || []).some(t => ["base", "green"].includes(t) && !["herb"].includes(t)));
-        const vegs = all.filter(i => (i.tags || []).some(t => ["fresh", "red", "orange", "yellow", "purple", "warm"].includes(t)));
-        const tops = all.filter(i => (i.tags || []).some(t => ["crunch", "herb", "fat", "sweet"].includes(t)));
-        const prots = all.filter(i => (i.tags || []).includes("protein"));
-        const rest = all.filter(i => !greens.includes(i) && !vegs.includes(i) && !tops.includes(i) && !prots.includes(i));
+        // Each item goes into exactly one layer — priority: prots > greens > vegs > tops > rest
+        const prots  = all.filter(i => i._meta?.stepId === "protein");
+        const greens = all.filter(i => !prots.includes(i) && (i.tags || []).some(t => ["base", "green"].includes(t) && t !== "herb"));
+        const vegs   = all.filter(i => !prots.includes(i) && !greens.includes(i) && (i.tags || []).some(t => ["fresh", "red", "orange", "yellow", "purple", "warm"].includes(t)));
+        const tops   = all.filter(i => !prots.includes(i) && !greens.includes(i) && !vegs.includes(i) && (i.tags || []).some(t => ["crunch", "herb", "fat", "sweet"].includes(t)));
+        const rest   = all.filter(i => !prots.includes(i) && !greens.includes(i) && !vegs.includes(i) && !tops.includes(i));
         return { greens, vegs, prots, tops, rest };
     }, [all]);
 
