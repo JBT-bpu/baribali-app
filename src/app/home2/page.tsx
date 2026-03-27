@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import ReviewsStrip from '@/components/ui/ReviewsStrip';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 const MAIN_CARDS = [
@@ -580,6 +581,9 @@ export default function HomeV2() {
                     </div>
                 )}
             </div>
+
+            {/* Reviews strip */}
+            <ReviewsStrip />
 
             {/* Bottom Nav */}
             <div style={{ position: 'relative', zIndex: 2, width: '100%', padding: '10px 18px 28px', animation: 'navIn 0.6s ease 0.2s both' }}>
