@@ -58,7 +58,11 @@ export default function MixingAnimation({ all, total, onComplete }) {
                                 fontSize: "28px",
                                 filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.5))",
                                 animation: `ingredientDrop 0.65s cubic-bezier(0.22,1,0.36,1) ${i * 0.1}s both`,
-                            }}>{item.icon}</div>
+                            }}>
+                                {item.icon && item.icon.startsWith("/")
+                                    ? <img src={item.icon} alt="" style={{ width: "28px", height: "28px", objectFit: "contain" }} />
+                                    : item.icon}
+                            </div>
                         );
                     })}
                 </div>

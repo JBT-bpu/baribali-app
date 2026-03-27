@@ -7,60 +7,60 @@ export const STEPS = [
         subgroups: [
             {
                 label: "עלים ובסיס", shortLabel: "עלים", layer: "base", items: [
-                    { id: "lettuce", he: "חסה", icon: "🥬", price: 0, tags: ["green", "base", "fiber"], desc: "חסה ירוקה פריכה" },
-                    { id: "baby_leaf", he: "עלה בייבי", icon: "🌿", price: 0, tags: ["green", "base"], desc: "תערובת עלים רכים" },
-                    { id: "cabbage_white", he: "כרוב לבן", icon: "🥬", price: 0, tags: ["white", "crunch", "fiber"], desc: "כרוב חתוך דק" },
-                    { id: "cabbage_purple", he: "כרוב סגול", icon: "🟣", price: 0, tags: ["purple", "crunch"], desc: "כרוב סגול פריך" },
-                    { id: "sprouts", he: "נבטים", icon: "🌱", price: 0, tags: ["green", "crunch"], desc: "נבטי חיטה טריים" },
+                    { id: "lettuce", he: "חסה", icon: "/icons/lettuce_romaine.png", price: 0, tags: ["green", "base", "fiber"], desc: "חסה ירוקה פריכה" },
+                    { id: "baby_leaf", he: "עלה בייבי", icon: "/icons/spinach_baby.png", price: 0, tags: ["green", "base"], desc: "תערובת עלים רכים" },
+                    { id: "cabbage_white", he: "כרוב לבן", icon: "/icons/cabbage_green.png", price: 0, tags: ["white", "crunch", "fiber"], desc: "כרוב חתוך דק" },
+                    { id: "cabbage_purple", he: "כרוב סגול", icon: "/icons/cabbage_purple.png", price: 0, tags: ["purple", "crunch"], desc: "כרוב סגול פריך" },
+                    { id: "sprouts", he: "נבטים", icon: "/icons/sprouts.png", price: 0, tags: ["green", "crunch"], desc: "נבטי חיטה טריים" },
                 ]
             },
             {
                 label: "ירקות טריים", shortLabel: "טריים", layer: "fill", items: [
-                    { id: "tomato", he: "עגבניות", icon: "🍅", price: 0, tags: ["red", "fresh"], desc: "עגבניות שרי חתוכות" },
-                    { id: "cucumber", he: "מלפפון", icon: "🥒", price: 0, tags: ["green", "fresh", "crunch"], desc: "מלפפון חתוך קוביות" },
-                    { id: "bell_pepper", he: "גמבה", icon: "🌶️", price: 0, tags: ["green", "crunch", "fresh"], desc: "פלפל צבעוני חתוך" },
-                    { id: "carrot", he: "גזר", icon: "🥕", price: 0, tags: ["orange", "crunch", "fiber"], desc: "גזר מגורד טרי" },
-                    { id: "red_onion", he: "בצל סגול", icon: "🧅", price: 0, tags: ["purple", "flavor"], desc: "טבעות בצל סגול" },
-                    { id: "green_onion", he: "בצל ירוק", icon: "🧅", price: 0, tags: ["green", "flavor"], desc: "בצל ירוק קצוץ" },
-                    { id: "radish", he: "צנון", icon: "🔴", price: 0, tags: ["red", "crunch", "spicy"], desc: "צנון חריף פרוס" },
-                    { id: "celery", he: "סלרי", icon: "🥬", price: 0, tags: ["green", "crunch"], desc: "סלרי פריך חתוך" },
-                    { id: "fresh_beet", he: "סלק טרי", icon: "🟤", price: 0, tags: ["red", "sweet"], desc: "סלק טרי מגורד" },
-                    { id: "mushrooms", he: "פטריות", icon: "🍄", price: 0, tags: ["brown", "protein"], desc: "פטריות שמפיניון" },
-                    { id: "corn", he: "תירס", icon: "🌽", price: 0, tags: ["yellow", "sweet"], desc: "גרגרי תירס מתוקים" },
-                    { id: "green_peas", he: "אפונה", icon: "🟢", price: 0, tags: ["green", "protein"], desc: "אפונה ירוקה" },
-                    { id: "hot_pepper", he: "חריף", icon: "🌶️", price: 0, tags: ["red", "spicy"], desc: "פלפל חריף טרי 🔥" },
+                    { id: "tomato", he: "עגבניות", icon: "/icons/tomato.png", price: 0, tags: ["red", "fresh"], desc: "עגבניות שרי חתוכות" },
+                    { id: "cucumber", he: "מלפפון", icon: "/icons/cucumber.png", price: 0, tags: ["green", "fresh", "crunch"], desc: "מלפפון חתוך קוביות" },
+                    { id: "bell_pepper", he: "גמבה", icon: "/icons/bell_pepper.png", price: 0, tags: ["green", "crunch", "fresh"], desc: "פלפל צבעוני חתוך" },
+                    { id: "carrot", he: "גזר", icon: "/icons/carrot_cuts.png", price: 0, tags: ["orange", "crunch", "fiber"], desc: "גזר מגורד טרי" },
+                    { id: "red_onion", he: "בצל סגול", icon: "/icons/red_onion.png", price: 0, tags: ["purple", "flavor"], desc: "טבעות בצל סגול" },
+                    { id: "green_onion", he: "בצל ירוק", icon: "/icons/onion_green.png", price: 0, tags: ["green", "flavor"], desc: "בצל ירוק קצוץ" },
+                    { id: "radish", he: "צנון", icon: "/icons/radish.png", price: 0, tags: ["red", "crunch", "spicy"], desc: "צנון חריף פרוס" },
+                    { id: "celery", he: "סלרי", icon: "/icons/celery.png", price: 0, tags: ["green", "crunch"], desc: "סלרי פריך חתוך" },
+                    { id: "fresh_beet", he: "סלק טרי", icon: "/icons/beet.png", price: 0, tags: ["red", "sweet"], desc: "סלק טרי מגורד" },
+                    { id: "mushrooms", he: "פטריות", icon: "/icons/mushroom.png", price: 0, tags: ["brown", "protein"], desc: "פטריות שמפיניון" },
+                    { id: "corn", he: "תירס", icon: "/icons/corn.png", price: 0, tags: ["yellow", "sweet"], desc: "גרגרי תירס מתוקים" },
+                    { id: "green_peas", he: "אפונה", icon: "/icons/peas.png", price: 0, tags: ["green", "protein"], desc: "אפונה ירוקה" },
+                    { id: "hot_pepper", he: "חריף", icon: "/icons/hot_pepper.png", price: 0, tags: ["red", "spicy"], desc: "פלפל חריף טרי 🔥" },
                 ]
             },
             {
                 label: "דגנים וקטניות", shortLabel: "דגנים", layer: "grain", items: [
-                    { id: "quinoa", he: "קינואה", icon: "🌾", price: 2, tags: ["grain", "protein", "fiber"], desc: "קינואה מבושלת +₪2" },
-                    { id: "brown_rice", he: "אורז מלא", icon: "🍚", price: 0, tags: ["grain", "fiber"], desc: "אורז מלא מבושל" },
-                    { id: "bulgur", he: "בורגול", icon: "🌾", price: 0, tags: ["grain", "fiber"], desc: "בורגול עדין" },
-                    { id: "black_lentils", he: "עדשים שחורות", icon: "⚫", price: 0, tags: ["protein", "fiber", "grain"], desc: "עדשים שחורות מבושלות" },
-                    { id: "green_lentils", he: "עדשים ירוקות", icon: "🟢", price: 0, tags: ["protein", "fiber", "grain"], desc: "עדשים ירוקות מבושלות" },
-                    { id: "chickpeas", he: "חומוס", icon: "🥜", price: 0, tags: ["protein", "fiber"], desc: "גרגירי חומוס שלמים" },
-                    { id: "fusilli_pasta", he: "פסטה", icon: "🍝", price: 0, tags: ["grain"], desc: "פסטה מסולסלת מבושלת" },
+                    { id: "quinoa", he: "קינואה", icon: "/icons/quinoa_white.png", price: 2, tags: ["grain", "protein", "fiber"], desc: "קינואה מבושלת +₪2" },
+                    { id: "brown_rice", he: "אורז מלא", icon: "/icons/rice_brown.png", price: 0, tags: ["grain", "fiber"], desc: "אורז מלא מבושל" },
+                    { id: "bulgur", he: "בורגול", icon: "/icons/couscous.png", price: 0, tags: ["grain", "fiber"], desc: "בורגול עדין" },
+                    { id: "black_lentils", he: "עדשים שחורות", icon: "/icons/beans_black.png", price: 0, tags: ["protein", "fiber", "grain"], desc: "עדשים שחורות מבושלות" },
+                    { id: "green_lentils", he: "עדשים ירוקות", icon: "/icons/lentils_green.png", price: 0, tags: ["protein", "fiber", "grain"], desc: "עדשים ירוקות מבושלות" },
+                    { id: "chickpeas", he: "חומוס", icon: "/icons/chickpeas.png", price: 0, tags: ["protein", "fiber"], desc: "גרגירי חומוס שלמים" },
+                    { id: "fusilli_pasta", he: "פסטה", icon: "/icons/pasta_fusilli.png", price: 0, tags: ["grain"], desc: "פסטה מסולסלת מבושלת" },
                 ]
             },
             {
                 label: "אפויים", shortLabel: "אפויים", layer: "warm", items: [
-                    { id: "roasted_eggplant", he: "חציל קלוי", icon: "🍆", price: 0, tags: ["warm", "flavor"], desc: "חציל קלוי בתנור" },
-                    { id: "baked_sweet_potato", he: "בטטה", icon: "🍠", price: 0, tags: ["orange", "warm", "sweet", "fiber"], desc: "בטטה אפויה מתוקה" },
-                    { id: "baked_potato", he: 'תפו"א אפוי', icon: "🥔", price: 0, tags: ["warm", "grain"], desc: "תפוח אדמה אפוי" },
+                    { id: "roasted_eggplant", he: "חציל קלוי", icon: "/icons/eggplant_grilled.png", price: 0, tags: ["warm", "flavor"], desc: "חציל קלוי בתנור" },
+                    { id: "baked_sweet_potato", he: "בטטה", icon: "/icons/sweet_potato_roasted.png", price: 0, tags: ["orange", "warm", "sweet", "fiber"], desc: "בטטה אפויה מתוקה" },
+                    { id: "baked_potato", he: 'תפו"א אפוי', icon: "/icons/potato_baked.png", price: 0, tags: ["warm", "grain"], desc: "תפוח אדמה אפוי" },
                 ]
             },
             {
                 label: "תוספים", shortLabel: "תוספים", layer: "topping", items: [
-                    { id: "cilantro", he: "כוסברה", icon: "🌿", price: 0, tags: ["green", "herb", "flavor"], desc: "כוסברה טרייה קצוצה" },
-                    { id: "parsley", he: "פטרוזיליה", icon: "🌿", price: 0, tags: ["green", "herb"], desc: "פטרוזיליה טרייה" },
-                    { id: "pickles", he: "חמוצים", icon: "🥒", price: 0, tags: ["crunch", "flavor"], desc: "מלפפון חמוץ חתוך" },
-                    { id: "cranberries", he: "חמוציות", icon: "🔴", price: 0, tags: ["red", "sweet"], desc: "חמוציות מיובשות" },
-                    { id: "black_olives", he: "זיתים שחורים", icon: "⚫", price: 0, tags: ["fat", "flavor"], desc: "זיתים שחורים פרוסים" },
-                    { id: "green_olives", he: "זיתים ירוקים", icon: "🍃", price: 0, tags: ["green", "fat", "flavor"], desc: "זיתים ירוקים" },
-                    { id: "sunflower_seeds", he: "גרעינים", icon: "🌻", price: 0, tags: ["crunch", "fat", "protein"], desc: "גרעיני חמנייה" },
-                    { id: "sesame", he: "שומשום", icon: "⚪", price: 0, tags: ["crunch", "fat"], desc: "שומשום גולמי" },
-                    { id: "chia", he: "צ'יה", icon: "⚫", price: 0, tags: ["fiber", "fat"], desc: "זרעי צ'יה" },
-                    { id: "zaatar", he: "זעתר", icon: "🌿", price: 0, tags: ["herb", "flavor"], desc: "תערובת זעתר" },
+                    { id: "cilantro", he: "כוסברה", icon: "/icons/cilantro.png", price: 0, tags: ["green", "herb", "flavor"], desc: "כוסברה טרייה קצוצה" },
+                    { id: "parsley", he: "פטרוזיליה", icon: "/icons/parsley.png", price: 0, tags: ["green", "herb"], desc: "פטרוזיליה טרייה" },
+                    { id: "pickles", he: "חמוצים", icon: "/icons/pickles.png", price: 0, tags: ["crunch", "flavor"], desc: "מלפפון חמוץ חתוך" },
+                    { id: "cranberries", he: "חמוציות", icon: "/icons/cranberries_dried.png", price: 0, tags: ["red", "sweet"], desc: "חמוציות מיובשות" },
+                    { id: "black_olives", he: "זיתים שחורים", icon: "/icons/olives_black.png", price: 0, tags: ["fat", "flavor"], desc: "זיתים שחורים פרוסים" },
+                    { id: "green_olives", he: "זיתים ירוקים", icon: "/icons/olives_green.png", price: 0, tags: ["green", "fat", "flavor"], desc: "זיתים ירוקים" },
+                    { id: "sunflower_seeds", he: "גרעינים", icon: "/icons/seeds_sunflower.png", price: 0, tags: ["crunch", "fat", "protein"], desc: "גרעיני חמנייה" },
+                    { id: "sesame", he: "שומשום", icon: "/icons/sesame_black.png", price: 0, tags: ["crunch", "fat"], desc: "שומשום גולמי" },
+                    { id: "chia", he: "צ'יה", icon: "/icons/seeds_chia.png", price: 0, tags: ["fiber", "fat"], desc: "זרעי צ'יה" },
+                    { id: "zaatar", he: "זעתר", icon: "/icons/seasoning_mixed.png", price: 0, tags: ["herb", "flavor"], desc: "תערובת זעתר" },
                 ]
             },
         ],
@@ -70,11 +70,11 @@ export const STEPS = [
         intro: "בחרו תוספת חלבון אחת — כלולה במחיר הסלט",
         subgroups: [{
             label: null, items: [
-                { id: "egg", he: "ביצה קשה", icon: "🥚", price: 0, tags: ["protein"], desc: "ביצה קשה חתוכה" },
-                { id: "tuna", he: "טונה", icon: "🐟", price: 0, tags: ["protein", "omega"], desc: "טונה בשמן" },
-                { id: "tofu_olive", he: "טופו שמן זית", icon: "🥦", price: 0, tags: ["protein", "vegan"], desc: "טופו מוקפץ בשמן זית, מלח ופלפל" },
-                { id: "feta5", he: "פטה 5%", icon: "🧀", price: 0, tags: ["protein", "dairy"], desc: "גבינת פטה 5% אחוז שומן" },
-                { id: "baby_mozzarella", he: "מוצרלה", icon: "🧈", price: 0, tags: ["protein", "dairy"], desc: "כדורי בייבי מוצרלה" },
+                { id: "egg", he: "ביצה קשה", icon: "/icons/egg_boiled_half.png", price: 0, tags: ["protein"], desc: "ביצה קשה חתוכה" },
+                { id: "tuna", he: "טונה", icon: "/icons/tuna_shredded.png", price: 0, tags: ["protein", "omega"], desc: "טונה בשמן" },
+                { id: "tofu_olive", he: "טופו שמן זית", icon: "/icons/tofu_cubes.png", price: 0, tags: ["protein", "vegan"], desc: "טופו מוקפץ בשמן זית, מלח ופלפל" },
+                { id: "feta5", he: "פטה 5%", icon: "/icons/cheese_feta.png", price: 0, tags: ["protein", "dairy"], desc: "גבינת פטה 5% אחוז שומן" },
+                { id: "baby_mozzarella", he: "מוצרלה", icon: "/icons/mozzarella_balls.png", price: 0, tags: ["protein", "dairy"], desc: "כדורי בייבי מוצרלה" },
             ]
         }],
     },
@@ -84,23 +84,23 @@ export const STEPS = [
         subgroups: [
             {
                 label: "קלאסיים", items: [
-                    { id: "olive_oil", he: "שמן זית", icon: "🌿", price: 3, tags: ["fat", "classic"], desc: "שמן זית כתית מעולה" },
-                    { id: "lemon", he: "לימון טרי", icon: "🍋", price: 3, tags: ["fresh", "classic"], desc: "מיץ לימון סחוט טרי" },
-                    { id: "tahini", he: "טחינה", icon: "🥣", price: 3, tags: ["fat", "classic"], desc: "טחינה גולמית" },
-                    { id: "balsamic", he: "בלסמי", icon: "🍷", price: 3, tags: ["sweet", "classic"], desc: "חומץ בלסמי" },
+                    { id: "olive_oil", he: "שמן זית", icon: "/icons/olive_oil.png", price: 3, tags: ["fat", "classic"], desc: "שמן זית כתית מעולה" },
+                    { id: "lemon", he: "לימון טרי", icon: "/icons/lemon_wedge.png", price: 3, tags: ["fresh", "classic"], desc: "מיץ לימון סחוט טרי" },
+                    { id: "tahini", he: "טחינה", icon: "/icons/sauce_tahini.png", price: 3, tags: ["fat", "classic"], desc: "טחינה גולמית" },
+                    { id: "balsamic", he: "בלסמי", icon: "/icons/balsamic_glaze.png", price: 3, tags: ["sweet", "classic"], desc: "חומץ בלסמי" },
                 ]
             },
             {
                 label: "מיוחדים", items: [
-                    { id: "thousand", he: "אלף האיים", icon: "🥫", price: 3, tags: [], desc: "רוטב אלף האיים קרמי" },
-                    { id: "garlic_s", he: "רוטב שום", icon: "🧄", price: 3, tags: ["flavor"], desc: "רוטב שום קרמי" },
-                    { id: "citrus_vin", he: "ויניגרט הדרים", icon: "🍊", price: 3, tags: ["fresh"], desc: "ויניגרט עם הדרים טריים" },
-                    { id: "sweet_chili", he: "צ'ילי מתוק", icon: "🌶️", price: 3, tags: ["spicy", "sweet"], desc: "רוטב צ'ילי מתוק תאילנדי" },
-                    { id: "teriyaki", he: "טריאקי", icon: "🍶", price: 3, tags: ["sweet"], desc: "רוטב טריאקי יפני" },
-                    { id: "soy_s", he: "סויה", icon: "🥢", price: 3, tags: [], desc: "רוטב סויה סיני" },
-                    { id: "caesar", he: "קיסר", icon: "🥗", price: 5, tags: [], desc: "רוטב קיסר קלאסי ₪5" },
-                    { id: "pesto", he: "פסטו", icon: "🌿", price: 4, tags: ["herb"], desc: "פסטו בזיליקום ₪4" },
-                    { id: "zhug", he: "סחוג", icon: "🔥", price: 4, tags: ["spicy"], desc: "סחוג תימני חריף 🔥 ₪4" },
+                    { id: "thousand", he: "אלף האיים", icon: "/icons/dressing_pink.png", price: 3, tags: [], desc: "רוטב אלף האיים קרמי" },
+                    { id: "garlic_s", he: "רוטב שום", icon: "/icons/garlic_aioli.png", price: 3, tags: ["flavor"], desc: "רוטב שום קרמי" },
+                    { id: "citrus_vin", he: "ויניגרט הדרים", icon: "/icons/vinaigrette_lemon.png", price: 3, tags: ["fresh"], desc: "ויניגרט עם הדרים טריים" },
+                    { id: "sweet_chili", he: "צ'ילי מתוק", icon: "/icons/sriracha.png", price: 3, tags: ["spicy", "sweet"], desc: "רוטב צ'ילי מתוק תאילנדי" },
+                    { id: "teriyaki", he: "טריאקי", icon: "/icons/sauce_dark.png", price: 3, tags: ["sweet"], desc: "רוטב טריאקי יפני" },
+                    { id: "soy_s", he: "סויה", icon: "/icons/soy_sauce.png", price: 3, tags: [], desc: "רוטב סויה סיני" },
+                    { id: "caesar", he: "קיסר", icon: "/icons/dressing_caesar.png", price: 5, tags: [], desc: "רוטב קיסר קלאסי ₪5" },
+                    { id: "pesto", he: "פסטו", icon: "/icons/pesto_basil.png", price: 4, tags: ["herb"], desc: "פסטו בזיליקום ₪4" },
+                    { id: "zhug", he: "סחוג", icon: "/icons/spices_mixed.png", price: 4, tags: ["spicy"], desc: "סחוג תימני חריף 🔥 ₪4" },
                 ]
             },
         ],
@@ -111,14 +111,14 @@ export const STEPS = [
         subgroups: [
             {
                 label: "ערבוב", items: [
-                    { id: "mix_no_sauce", he: "לערבב ללא רוטב", icon: "🔄", price: 0, tags: [], desc: "נערבב את הסלט, הרוטב בצד" },
-                    { id: "no_mix", he: "לא לערבב", icon: "✋", price: 0, tags: [], desc: "המרכיבים מסודרים בנפרד" },
+                    { id: "mix_no_sauce", he: "לערבב ללא רוטב", icon: "/icons/icon_toss_salad.png", price: 0, tags: [], desc: "נערבב את הסלט, הרוטב בצד" },
+                    { id: "no_mix", he: "לא לערבב", icon: "/icons/icon_no_dressing.png", price: 0, tags: [], desc: "המרכיבים מסודרים בנפרד" },
                 ]
             },
             {
                 label: "לצד הסלט", items: [
-                    { id: "bread", he: "עם לחם", icon: "🍞", price: 0, tags: [], desc: "פרוסת לחם טרי" },
-                    { id: "croutons_s", he: "קרוטונים", icon: "🥖", price: 0, tags: ["crunch"], desc: "קרוטונים פריכים" },
+                    { id: "bread", he: "עם לחם", icon: "/icons/baguette_sliced.png", price: 0, tags: [], desc: "פרוסת לחם טרי" },
+                    { id: "croutons_s", he: "קרוטונים", icon: "/icons/croutons.png", price: 0, tags: ["crunch"], desc: "קרוטונים פריכים" },
                     { id: "none_side", he: "ללא", icon: "🚫", price: 0, tags: [], desc: "בלי תוספת צד" },
                 ]
             },
@@ -129,16 +129,16 @@ export const STEPS = [
         intro: "אפשר לדלג — או לשדרג עם תוספות מיוחדות",
         subgroups: [{
             label: null, items: [
-                { id: "halloumi_p", he: "חלומי", icon: "🧀", price: 12, tags: ["protein"], pop: true, desc: "גבינת חלומי צלויה" },
-                { id: "tofu_teri_p", he: "טופו טריאקי", icon: "🥦", price: 10, tags: ["protein", "vegan"], desc: "טופו מוקפץ ברוטב טריאקי" },
-                { id: "tuna_p", he: "טונה", icon: "🐟", price: 7, tags: ["protein"], desc: "מנת טונה נוספת" },
-                { id: "feta_p", he: "פטה", icon: "🧀", price: 7, tags: ["protein"], desc: "גבינת פטה נוספת" },
-                { id: "egg_p", he: "ביצה", icon: "🥚", price: 5, tags: ["protein"], desc: "ביצה קשה נוספת" },
-                { id: "parmesan_p", he: "פרמז'ן", icon: "🧀", price: 4, tags: ["flavor"], desc: "שבבי פרמז'ן" },
-                { id: "honey_p", he: "דבש", icon: "🍯", price: 4, tags: ["sweet"], desc: "דבש טבעי" },
-                { id: "jala_p", he: "ג'עלה", icon: "🥜", price: 4, tags: ["crunch"], desc: "ג'עלה פריכה" },
-                { id: "bread_p", he: "לחם נוסף", icon: "🍞", price: 4, tags: [], desc: "פרוסת לחם נוספת" },
-                { id: "croutons_p", he: "קרוטונים", icon: "🥖", price: 3, tags: ["crunch"], desc: "מנת קרוטונים נוספת" },
+                { id: "halloumi_p", he: "חלומי", icon: "/icons/halloumi_grilled.png", price: 12, tags: ["protein"], pop: true, desc: "גבינת חלומי צלויה" },
+                { id: "tofu_teri_p", he: "טופו טריאקי", icon: "/icons/tofu_smoked.png", price: 10, tags: ["protein", "vegan"], desc: "טופו מוקפץ ברוטב טריאקי" },
+                { id: "tuna_p", he: "טונה", icon: "/icons/tuna_shredded.png", price: 7, tags: ["protein"], desc: "מנת טונה נוספת" },
+                { id: "feta_p", he: "פטה", icon: "/icons/cheese_feta.png", price: 7, tags: ["protein"], desc: "גבינת פטה נוספת" },
+                { id: "egg_p", he: "ביצה", icon: "/icons/egg_boiled_slices.png", price: 5, tags: ["protein"], desc: "ביצה קשה נוספת" },
+                { id: "parmesan_p", he: "פרמז'ן", icon: "/icons/parmesan_shaved.png", price: 4, tags: ["flavor"], desc: "שבבי פרמז'ן" },
+                { id: "honey_p", he: "דבש", icon: "/icons/honey.png", price: 4, tags: ["sweet"], desc: "דבש טבעי" },
+                { id: "jala_p", he: "ג'עלה", icon: "/icons/jalapeno_sliced.png", price: 4, tags: ["crunch"], desc: "ג'עלה פריכה" },
+                { id: "bread_p", he: "לחם נוסף", icon: "/icons/baguette_sliced.png", price: 4, tags: [], desc: "פרוסת לחם נוספת" },
+                { id: "croutons_p", he: "קרוטונים", icon: "/icons/croutons.png", price: 3, tags: ["crunch"], desc: "מנת קרוטונים נוספת" },
             ]
         }],
     },
@@ -156,11 +156,11 @@ export const TORTILLA_STEPS = [
         intro: "בחרו את סוג הטורטייה שלכם",
         subgroups: [{
             label: null, items: [
-                { id: "wrap_flour",  he: "קמח לבן",    icon: "🌯", price: 0, tags: ["wrap"],           desc: "טורטייה קמח לבן קלאסית" },
-                { id: "wrap_wheat",  he: "קמח מלא",    icon: "🌾", price: 0, tags: ["wrap", "fiber"],   desc: "טורטייה חיטה מלאה" },
-                { id: "wrap_spinach",he: "תרד",         icon: "🥬", price: 0, tags: ["wrap", "green"],   desc: "טורטייה תרד ירוקה" },
-                { id: "wrap_corn",   he: "תירס",        icon: "🌽", price: 0, tags: ["wrap"],            desc: "טורטייה קמח תירס" },
-                { id: "wrap_gf",     he: "ללא גלוטן",  icon: "⭐", price: 3, tags: ["wrap"],            desc: "טורטייה ללא גלוטן +₪3" },
+                { id: "wrap_flour",  he: "קמח לבן",    icon: "/icons/wrap_flour.png",   price: 0, tags: ["wrap"],           desc: "טורטייה קמח לבן קלאסית" },
+                { id: "wrap_wheat",  he: "קמח מלא",    icon: "/icons/wrap_wheat.png",   price: 0, tags: ["wrap", "fiber"],   desc: "טורטייה חיטה מלאה" },
+                { id: "wrap_spinach",he: "תרד",         icon: "/icons/wrap_spinach.png", price: 0, tags: ["wrap", "green"],   desc: "טורטייה תרד ירוקה" },
+                { id: "wrap_corn",   he: "תירס",        icon: "/icons/wrap_tomato.png",  price: 0, tags: ["wrap"],            desc: "טורטייה קמח תירס" },
+                { id: "wrap_gf",     he: "ללא גלוטן",  icon: "/icons/wrap_turmeric.png",price: 3, tags: ["wrap"],            desc: "טורטייה ללא גלוטן +₪3" },
             ]
         }],
     },
@@ -170,24 +170,24 @@ export const TORTILLA_STEPS = [
         subgroups: [
             {
                 label: "ירקות", shortLabel: "ירקות", items: [
-                    { id: "t_lettuce",     he: "חסה",       icon: "🥬", price: 0, tags: ["green"] },
-                    { id: "t_cab_purple",  he: "כרוב סגול", icon: "🟣", price: 0, tags: ["crunch"] },
-                    { id: "t_tomato",      he: "עגבניות",   icon: "🍅", price: 0, tags: ["fresh"] },
-                    { id: "t_cucumber",    he: "מלפפון",    icon: "🥒", price: 0, tags: ["crunch"] },
-                    { id: "t_bell_pepper", he: "גמבה",      icon: "🌶️", price: 0, tags: ["crunch"] },
-                    { id: "t_carrot",      he: "גזר",       icon: "🥕", price: 0, tags: ["crunch"] },
-                    { id: "t_red_onion",   he: "בצל סגול",  icon: "🧅", price: 0, tags: ["flavor"] },
-                    { id: "t_corn",        he: "תירס",      icon: "🌽", price: 0, tags: ["sweet"] },
-                    { id: "t_mushrooms",   he: "פטריות",    icon: "🍄", price: 0, tags: [] },
+                    { id: "t_lettuce",     he: "חסה",       icon: "/icons/lettuce_romaine.png", price: 0, tags: ["green"] },
+                    { id: "t_cab_purple",  he: "כרוב סגול", icon: "/icons/cabbage_purple.png",  price: 0, tags: ["crunch"] },
+                    { id: "t_tomato",      he: "עגבניות",   icon: "/icons/tomato.png",           price: 0, tags: ["fresh"] },
+                    { id: "t_cucumber",    he: "מלפפון",    icon: "/icons/cucumber.png",         price: 0, tags: ["crunch"] },
+                    { id: "t_bell_pepper", he: "גמבה",      icon: "/icons/bell_pepper.png",      price: 0, tags: ["crunch"] },
+                    { id: "t_carrot",      he: "גזר",       icon: "/icons/carrot_cuts.png",      price: 0, tags: ["crunch"] },
+                    { id: "t_red_onion",   he: "בצל סגול",  icon: "/icons/red_onion.png",        price: 0, tags: ["flavor"] },
+                    { id: "t_corn",        he: "תירס",      icon: "/icons/corn.png",             price: 0, tags: ["sweet"] },
+                    { id: "t_mushrooms",   he: "פטריות",    icon: "/icons/mushroom.png",         price: 0, tags: [] },
                 ]
             },
             {
                 label: "תוספים", shortLabel: "תוספים", items: [
-                    { id: "t_pickles",     he: "חמוצים",    icon: "🥒", price: 0, tags: ["crunch"] },
-                    { id: "t_cilantro",    he: "כוסברה",    icon: "🌿", price: 0, tags: ["herb"] },
-                    { id: "t_hot_pepper",  he: "חריף",      icon: "🌶️", price: 0, tags: ["spicy"] },
-                    { id: "t_olives",      he: "זיתים",     icon: "⚫", price: 0, tags: ["fat"] },
-                    { id: "t_sesame",      he: "שומשום",    icon: "⚪", price: 0, tags: ["crunch"] },
+                    { id: "t_pickles",     he: "חמוצים",    icon: "/icons/pickles.png",       price: 0, tags: ["crunch"] },
+                    { id: "t_cilantro",    he: "כוסברה",    icon: "/icons/cilantro.png",      price: 0, tags: ["herb"] },
+                    { id: "t_hot_pepper",  he: "חריף",      icon: "/icons/hot_pepper.png",    price: 0, tags: ["spicy"] },
+                    { id: "t_olives",      he: "זיתים",     icon: "/icons/olives_black.png",  price: 0, tags: ["fat"] },
+                    { id: "t_sesame",      he: "שומשום",    icon: "/icons/sesame_black.png",  price: 0, tags: ["crunch"] },
                 ]
             },
         ],
@@ -197,11 +197,11 @@ export const TORTILLA_STEPS = [
         intro: "בחרו תוספת חלבון אחת — כלולה במחיר",
         subgroups: [{
             label: null, items: [
-                { id: "t_egg",        he: "ביצה קשה",       icon: "🥚", price: 0, tags: ["protein"] },
-                { id: "t_tuna",       he: "טונה",            icon: "🐟", price: 0, tags: ["protein"] },
-                { id: "t_tofu_olive", he: "טופו שמן זית",   icon: "🥦", price: 0, tags: ["protein", "vegan"] },
-                { id: "t_feta5",      he: "פטה 5%",          icon: "🧀", price: 0, tags: ["protein"] },
-                { id: "t_mozz",       he: "מוצרלה",         icon: "🧈", price: 0, tags: ["protein"] },
+                { id: "t_egg",        he: "ביצה קשה",       icon: "/icons/egg_boiled_half.png",  price: 0, tags: ["protein"] },
+                { id: "t_tuna",       he: "טונה",            icon: "/icons/tuna_shredded.png",    price: 0, tags: ["protein"] },
+                { id: "t_tofu_olive", he: "טופו שמן זית",   icon: "/icons/tofu_cubes.png",       price: 0, tags: ["protein", "vegan"] },
+                { id: "t_feta5",      he: "פטה 5%",          icon: "/icons/cheese_feta.png",      price: 0, tags: ["protein"] },
+                { id: "t_mozz",       he: "מוצרלה",         icon: "/icons/mozzarella_balls.png", price: 0, tags: ["protein"] },
             ]
         }],
     },
@@ -211,18 +211,18 @@ export const TORTILLA_STEPS = [
         subgroups: [
             {
                 label: "קלאסיים", items: [
-                    { id: "t_olive_oil",  he: "שמן זית",      icon: "🌿", price: 3, tags: [] },
-                    { id: "t_lemon",      he: "לימון טרי",     icon: "🍋", price: 3, tags: [] },
-                    { id: "t_tahini",     he: "טחינה",         icon: "🥣", price: 3, tags: [] },
-                    { id: "t_balsamic",   he: "בלסמי",         icon: "🍷", price: 3, tags: [] },
+                    { id: "t_olive_oil",  he: "שמן זית",      icon: "/icons/olive_oil.png",        price: 3, tags: [] },
+                    { id: "t_lemon",      he: "לימון טרי",     icon: "/icons/lemon_wedge.png",      price: 3, tags: [] },
+                    { id: "t_tahini",     he: "טחינה",         icon: "/icons/sauce_tahini.png",     price: 3, tags: [] },
+                    { id: "t_balsamic",   he: "בלסמי",         icon: "/icons/balsamic_glaze.png",   price: 3, tags: [] },
                 ]
             },
             {
                 label: "מיוחדים", items: [
-                    { id: "t_garlic_s",   he: "רוטב שום",     icon: "🧄", price: 3, tags: [] },
-                    { id: "t_sweet_chili",he: "צ'ילי מתוק",   icon: "🌶️", price: 3, tags: ["spicy"] },
-                    { id: "t_caesar",     he: "קיסר",         icon: "🥗", price: 5, tags: [] },
-                    { id: "t_zhug",       he: "סחוג",         icon: "🔥", price: 4, tags: ["spicy"] },
+                    { id: "t_garlic_s",   he: "רוטב שום",     icon: "/icons/garlic_aioli.png",     price: 3, tags: [] },
+                    { id: "t_sweet_chili",he: "צ'ילי מתוק",   icon: "/icons/sriracha.png",          price: 3, tags: ["spicy"] },
+                    { id: "t_caesar",     he: "קיסר",         icon: "/icons/dressing_caesar.png",  price: 5, tags: [] },
+                    { id: "t_zhug",       he: "סחוג",         icon: "/icons/spices_mixed.png",     price: 4, tags: ["spicy"] },
                 ]
             },
         ],
@@ -232,11 +232,11 @@ export const TORTILLA_STEPS = [
         intro: "אפשר לדלג — או לשדרג",
         subgroups: [{
             label: null, items: [
-                { id: "t_halloumi_p",  he: "חלומי",    icon: "🧀", price: 12, tags: ["protein"], pop: true },
-                { id: "t_tuna_p",      he: "טונה",     icon: "🐟", price: 7,  tags: ["protein"] },
-                { id: "t_feta_p",      he: "פטה",      icon: "🧀", price: 7,  tags: ["protein"] },
-                { id: "t_egg_p",       he: "ביצה",     icon: "🥚", price: 5,  tags: ["protein"] },
-                { id: "t_parmesan_p",  he: "פרמז'ן",  icon: "🧀", price: 4,  tags: ["flavor"] },
+                { id: "t_halloumi_p",  he: "חלומי",    icon: "/icons/halloumi_grilled.png", price: 12, tags: ["protein"], pop: true },
+                { id: "t_tuna_p",      he: "טונה",     icon: "/icons/tuna_shredded.png",    price: 7,  tags: ["protein"] },
+                { id: "t_feta_p",      he: "פטה",      icon: "/icons/cheese_feta.png",      price: 7,  tags: ["protein"] },
+                { id: "t_egg_p",       he: "ביצה",     icon: "/icons/egg_boiled_slices.png",price: 5,  tags: ["protein"] },
+                { id: "t_parmesan_p",  he: "פרמז'ן",  icon: "/icons/parmesan_shaved.png",  price: 4,  tags: ["flavor"] },
             ]
         }],
     },

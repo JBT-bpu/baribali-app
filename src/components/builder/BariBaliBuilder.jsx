@@ -6,6 +6,17 @@ const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
 const headerImage = "/builder-assets/header-brand.png";
 const footerImage = "/builder-assets/footer-brand.png";
 
+const BOWL_MAX     = 14; // global cap for salad
+const TORTILLA_MAX =  8; // veggie/filling cap for tortilla (premiums still exempt)
+
+// Renders either a PNG icon path or an emoji string
+function Icon({ src, size = "1.4em", style = {} }) {
+  if (src && src.startsWith("/")) {
+    return <img src={src} alt="" style={{ width: size, height: size, objectFit: "contain", verticalAlign: "middle", ...style }} />;
+  }
+  return <span style={{ fontSize: size, lineHeight: 1, ...style }}>{src}</span>;
+}
+
 import { STEPS, BASE, COMBOS, PRESETS, getSuggestions, TORTILLA_STEPS, TORTILLA_BASE } from "../../data/salad-data.js";
 import DetailSheet from "./ui/DetailSheet.jsx";
 import SummaryView from "./SummaryView.jsx";
@@ -122,98 +133,31 @@ function getStepColor(stepId) {
 // ─── PRESET COLOR SYSTEM ─────────────────────────────────────
 
 const PRESET_COLORS = {
-  // fallback
-  balanced: {
-    bg: "linear-gradient(145deg, rgba(200,168,78,0.22), rgba(184,134,11,0.14))",
-    border: "rgba(200,168,78,0.5)",
-    glow: "0 0 18px rgba(200,168,78,0.25), 0 4px 20px rgba(0,0,0,0.35)",
-    text: "#edd87e",
-    dot: "rgba(200,168,78,0.7)"
-  },
-  signature: {
-    bg: "linear-gradient(145deg, rgba(240,190,60,0.26), rgba(180,130,10,0.16))",
-    border: "rgba(240,190,60,0.55)",
-    glow: "0 0 20px rgba(240,190,60,0.3), 0 4px 20px rgba(0,0,0,0.35)",
-    text: "#fad65a",
-    dot: "rgba(240,190,60,0.75)"
-  },
-  mediterranean: {
-    bg: "linear-gradient(145deg, rgba(77,182,172,0.24), rgba(38,166,154,0.14))",
-    border: "rgba(77,182,172,0.52)",
-    glow: "0 0 18px rgba(77,182,172,0.28), 0 4px 20px rgba(0,0,0,0.35)",
-    text: "#80cbc4",
-    dot: "rgba(77,182,172,0.72)"
-  },
-  asian_fusion: {
-    bg: "linear-gradient(145deg, rgba(149,117,205,0.26), rgba(103,58,183,0.16))",
-    border: "rgba(149,117,205,0.52)",
-    glow: "0 0 18px rgba(149,117,205,0.28), 0 4px 20px rgba(0,0,0,0.35)",
-    text: "#ce93d8",
-    dot: "rgba(149,117,205,0.72)"
-  },
-  protein_beast: {
-    bg: "linear-gradient(145deg, rgba(66,165,245,0.24), rgba(30,136,229,0.14))",
-    border: "rgba(66,165,245,0.52)",
-    glow: "0 0 18px rgba(66,165,245,0.28), 0 4px 20px rgba(0,0,0,0.35)",
-    text: "#64b5f6",
-    dot: "rgba(66,165,245,0.72)"
-  },
-  rainbow: {
-    bg: "linear-gradient(145deg, rgba(255,138,101,0.24), rgba(239,83,80,0.14))",
-    border: "rgba(255,138,101,0.52)",
-    glow: "0 0 18px rgba(255,138,101,0.28), 0 4px 20px rgba(0,0,0,0.35)",
-    text: "#ffab91",
-    dot: "rgba(255,138,101,0.72)"
-  },
-  fire_spice: {
-    bg: "linear-gradient(145deg, rgba(239,83,80,0.26), rgba(183,28,28,0.16))",
-    border: "rgba(239,83,80,0.55)",
-    glow: "0 0 20px rgba(239,83,80,0.32), 0 4px 20px rgba(0,0,0,0.35)",
-    text: "#ef9a9a",
-    dot: "rgba(239,83,80,0.75)"
-  },
-  warm_earth: {
-    bg: "linear-gradient(145deg, rgba(188,143,80,0.26), rgba(141,94,30,0.16))",
-    border: "rgba(188,143,80,0.52)",
-    glow: "0 0 18px rgba(188,143,80,0.28), 0 4px 20px rgba(0,0,0,0.35)",
-    text: "#d4a96a",
-    dot: "rgba(188,143,80,0.72)"
-  },
-  garden_fresh: {
-    bg: "linear-gradient(145deg, rgba(102,187,106,0.26), rgba(56,142,60,0.16))",
-    border: "rgba(102,187,106,0.55)",
-    glow: "0 0 18px rgba(102,187,106,0.3), 0 4px 20px rgba(0,0,0,0.35)",
-    text: "#a5d6a7",
-    dot: "rgba(102,187,106,0.72)"
-  },
-  pasta_garden: {
-    bg: "linear-gradient(145deg, rgba(255,167,38,0.22), rgba(230,81,0,0.14))",
-    border: "rgba(255,167,38,0.5)",
-    glow: "0 0 18px rgba(255,167,38,0.25), 0 4px 20px rgba(0,0,0,0.35)",
-    text: "#ffcc80",
-    dot: "rgba(255,167,38,0.7)"
-  },
-  detox_bowl: {
-    bg: "linear-gradient(145deg, rgba(38,198,218,0.22), rgba(0,172,193,0.14))",
-    border: "rgba(38,198,218,0.5)",
-    glow: "0 0 18px rgba(38,198,218,0.25), 0 4px 20px rgba(0,0,0,0.35)",
-    text: "#80deea",
-    dot: "rgba(38,198,218,0.7)"
-  },
-  crunchy_master: {
-    bg: "linear-gradient(145deg, rgba(212,200,160,0.2), rgba(175,165,125,0.12))",
-    border: "rgba(212,200,160,0.45)",
-    glow: "0 0 16px rgba(212,200,160,0.2), 0 4px 20px rgba(0,0,0,0.35)",
-    text: "#e8dfc0",
-    dot: "rgba(212,200,160,0.65)"
-  },
-  eastern_night: {
-    bg: "linear-gradient(145deg, rgba(92,107,192,0.24), rgba(57,73,171,0.15))",
-    border: "rgba(92,107,192,0.52)",
-    glow: "0 0 18px rgba(92,107,192,0.28), 0 4px 20px rgba(0,0,0,0.35)",
-    text: "#9fa8da",
-    dot: "rgba(92,107,192,0.72)"
-  },
+  // bright gold — hero/signature
+  balanced:     { bg: "linear-gradient(145deg, rgba(240,200,80,0.22), rgba(13,42,13,0.88))",  border: "rgba(240,200,80,0.45)",  glow: "0 0 18px rgba(240,200,80,0.28), 0 4px 20px rgba(0,0,0,0.35)",  text: "#ffe066", dot: "rgba(240,200,80,0.75)" },
+  signature:    { bg: "linear-gradient(145deg, rgba(240,200,80,0.25), rgba(13,42,13,0.88))",  border: "rgba(240,200,80,0.5)",   glow: "0 0 22px rgba(240,200,80,0.32), 0 4px 20px rgba(0,0,0,0.35)",  text: "#ffe066", dot: "rgba(240,200,80,0.8)"  },
+  // brand gold
+  mediterranean:{ bg: "linear-gradient(145deg, rgba(200,168,78,0.22), rgba(10,34,10,0.88))",  border: "rgba(200,168,78,0.45)",  glow: "0 0 16px rgba(200,168,78,0.24), 0 4px 20px rgba(0,0,0,0.35)",  text: "#f0d060", dot: "rgba(200,168,78,0.72)" },
+  // amber-gold
+  protein_beast:{ bg: "linear-gradient(145deg, rgba(210,155,45,0.24), rgba(12,36,10,0.88))",  border: "rgba(210,155,45,0.45)",  glow: "0 0 16px rgba(210,155,45,0.24), 0 4px 20px rgba(0,0,0,0.35)",  text: "#e8b840", dot: "rgba(210,155,45,0.72)" },
+  // olive-gold (yellow-green)
+  asian_fusion: { bg: "linear-gradient(145deg, rgba(175,185,55,0.22), rgba(10,30,8,0.9))",    border: "rgba(175,185,55,0.42)",  glow: "0 0 16px rgba(175,185,55,0.22), 0 4px 20px rgba(0,0,0,0.35)",  text: "#c8d44a", dot: "rgba(175,185,55,0.7)"  },
+  // fresh mid-green
+  rainbow:      { bg: "linear-gradient(145deg, rgba(102,187,106,0.24), rgba(8,28,8,0.9))",    border: "rgba(102,187,106,0.44)", glow: "0 0 16px rgba(102,187,106,0.24), 0 4px 20px rgba(0,0,0,0.35)", text: "#81c784", dot: "rgba(102,187,106,0.7)" },
+  // deep forest green
+  fire_spice:   { bg: "linear-gradient(145deg, rgba(56,142,60,0.28), rgba(6,20,6,0.92))",     border: "rgba(56,142,60,0.5)",    glow: "0 0 18px rgba(56,142,60,0.28), 0 4px 20px rgba(0,0,0,0.35)",   text: "#66bb6a", dot: "rgba(56,142,60,0.75)"  },
+  // lime / yellow-green
+  warm_earth:   { bg: "linear-gradient(145deg, rgba(148,196,60,0.22), rgba(10,28,6,0.9))",    border: "rgba(148,196,60,0.4)",   glow: "0 0 16px rgba(148,196,60,0.22), 0 4px 20px rgba(0,0,0,0.35)",  text: "#aed858", dot: "rgba(148,196,60,0.7)"  },
+  // pale sage green
+  garden_fresh: { bg: "linear-gradient(145deg, rgba(130,178,100,0.22), rgba(8,26,8,0.9))",    border: "rgba(130,178,100,0.4)",  glow: "0 0 16px rgba(130,178,100,0.2), 0 4px 20px rgba(0,0,0,0.35)",  text: "#a5cc82", dot: "rgba(130,178,100,0.68)"},
+  // deep olive
+  pasta_garden: { bg: "linear-gradient(145deg, rgba(160,170,50,0.22), rgba(10,28,6,0.9))",    border: "rgba(160,170,50,0.4)",   glow: "0 0 16px rgba(160,170,50,0.2), 0 4px 20px rgba(0,0,0,0.35)",   text: "#bcc84a", dot: "rgba(160,170,50,0.7)"  },
+  // mint-green
+  detox_bowl:   { bg: "linear-gradient(145deg, rgba(86,196,130,0.22), rgba(6,24,12,0.9))",    border: "rgba(86,196,130,0.4)",   glow: "0 0 16px rgba(86,196,130,0.22), 0 4px 20px rgba(0,0,0,0.35)",  text: "#6dcc9e", dot: "rgba(86,196,130,0.7)"  },
+  // dark amber
+  crunchy_master:{ bg: "linear-gradient(145deg, rgba(188,140,40,0.24), rgba(12,32,8,0.9))",   border: "rgba(188,140,40,0.44)",  glow: "0 0 16px rgba(188,140,40,0.22), 0 4px 20px rgba(0,0,0,0.35)",  text: "#d4a830", dot: "rgba(188,140,40,0.7)"  },
+  // warm spring green
+  eastern_night:{ bg: "linear-gradient(145deg, rgba(120,190,80,0.22), rgba(8,26,6,0.9))",     border: "rgba(120,190,80,0.4)",   glow: "0 0 16px rgba(120,190,80,0.2), 0 4px 20px rgba(0,0,0,0.35)",   text: "#8ed060", dot: "rgba(120,190,80,0.68)" },
 };
 
 // ─── SIZE CONFIG ─────────────────────────────────────────────
@@ -336,13 +280,15 @@ function BuilderParticles() {
 /** @param {{ sizeParam?: string | null, type?: string }} props */
 export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
   const isTortilla = type === "tortilla";
-  const steps = isTortilla ? TORTILLA_STEPS : STEPS;
+  const steps = isTortilla ? STEPS.filter(s => s.id !== "finish") : STEPS;
   const [splash, setSplash] = useState(() => {
     if (typeof sessionStorage === "undefined") return false;
     const seen = sessionStorage.getItem("bb-splash-seen");
     return !seen;
   });
   const [step, setStep] = useState(isTortilla ? 0 : -1);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const [selectedSize, setSelectedSize] = useState(() => parseSizeParam(sizeParam));
   const [sels, setSels] = useState({});
   const [lastAdd, setLastAdd] = useState(null);
@@ -464,6 +410,16 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
       // Add metadata to item
       const itemWithMeta = { ...item, _meta: { stepId: sid } };
 
+      // Global bowl cap — only for unlimited ingredient steps (no per-step maxPicks)
+      // Exempt: premium upgrades, finish (preferences not ingredients), steps with own maxPicks
+      const isPremium    = sid === "upgrade" || sid === "t_upgrade";
+      const isPreference = sid === "finish";
+      if (!isPremium && !isPreference && !max && !exists) {
+        const totalCount = Object.values(prev).flat().length;
+        const cap = isTortilla ? TORTILLA_MAX : BOWL_MAX;
+        if (totalCount >= cap) return prev;
+      }
+
       if (sid === "finish") {
         const st = steps.find(s => s.id === sid);
         let sgIds = [];
@@ -525,10 +481,10 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
       localStorage.removeItem("baribali-draft");
       setSels({});
       setNotes("");
-      setStep(-1);
+      setStep(isTortilla ? 0 : -1);
       haptic("remove");
     }
-  }, []);
+  }, [isTortilla]);
 
   // ─── Directional transitions ───
   const goTo = useCallback((target) => {
@@ -552,7 +508,8 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
   const back = () => {
     if (summary) setSummary(false);
     else if (step > 0) goTo(step - 1);
-    else if (step === 0) goTo(-1);
+    else if (step === 0 && !isTortilla) goTo(-1);
+    else window.location.href = "/";
   };
   const resetAll = () => {
     setSels({});
@@ -561,7 +518,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
     setShownBadges(new Set());
     setSummary(false);
     setSelectedSize(sizeParam ? parseSizeParam(sizeParam) : null);
-    setStep(-1);
+    setStep(isTortilla ? 0 : -1);
     localStorage.removeItem("baribali-draft");
     haptic("step");
   };
@@ -637,7 +594,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
               ))}
             </div>
           </div>
-          <style>{KF}</style>
+          {mounted && <style>{KF}</style>}
         </div>
       );
     }
@@ -649,23 +606,13 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
         <div style={S.bg} />
         <BuilderParticles />
         <div style={{
-          ...S.main, justifyContent: "space-between", padding: "0 0 90px",
+          ...S.main, justifyContent: "space-between", padding: "0 0 20px",
           opacity: anim === "enter" ? 0 : 1, transform: anim === "enter" ? "translateY(12px)" : "none", transition: "all 0.5s"
         }}>
           {/* Brand header banner */}
           <HeaderBanner />
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "24px", flex: 1, padding: "20px 16px 24px", overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
-
-            {/* Size badge + change */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "6px 14px", borderRadius: "12px", background: "linear-gradient(135deg, rgba(200,168,78,0.2), rgba(200,168,78,0.08))", border: "1.5px solid rgba(200,168,78,0.45)" }}>
-                <span style={{ fontSize: "16px" }}>🥗</span>
-                <span style={{ fontSize: "15px", fontWeight: 900, color: "#f0d060" }}>{sc.label}</span>
-                <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", fontWeight: 500 }}>{sc.desc}</span>
-              </div>
-              <button onClick={() => setSelectedSize(null)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "11px", color: "rgba(255,255,255,0.35)", fontFamily: "'Heebo',sans-serif", fontWeight: 600, padding: "4px 8px" }}>שנה גודל</button>
-            </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "16px", flex: 1, padding: "16px 16px 24px", overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
 
             {/* HERO - Start Empty Button (Glassy) */}
             <button
@@ -674,47 +621,70 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
               aria-label="התחל סלט ריק"
               tabIndex={0}
             >
-              {/* Bowl ring — same size/shape as HeroBowlCard, responsive via CSS class */}
-              <div className="hero-ring">
-                <svg viewBox="0 0 158 158" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", transform: "rotate(-90deg)" }}>
-                  <circle cx="79" cy="79" r="64" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="5" />
-                  <circle cx="79" cy="79" r="64" fill="none" stroke="rgba(200,168,78,0.3)" strokeWidth="5"
-                    strokeLinecap="round" strokeDasharray={2 * Math.PI * 64} strokeDashoffset={2 * Math.PI * 64} />
-                </svg>
-                <div className="hero-bowl" style={{ filter: "drop-shadow(0 4px 16px rgba(200,168,78,0.25))" }}>
-                  {bowlAnim
-                    ? <Lottie animationData={bowlAnim} loop autoplay style={{ width: "100%", height: "100%" }} />
-                    : <span style={{ fontSize: "52px", lineHeight: "108px", display: "block", textAlign: "center" }}>🥗</span>
-                  }
+              {/* Top row: bowl + text */}
+              <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "14px", padding: "10px 14px 10px" }}>
+
+                {/* Bowl ring */}
+                <div className="hero-ring">
+                  <svg viewBox="0 0 158 158" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", transform: "rotate(-90deg)" }}>
+                    <circle cx="79" cy="79" r="64" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="5" />
+                    <circle cx="79" cy="79" r="64" fill="none" stroke="rgba(200,168,78,0.3)" strokeWidth="5"
+                      strokeLinecap="round" strokeDasharray={2 * Math.PI * 64} strokeDashoffset={2 * Math.PI * 64} />
+                  </svg>
+                  <div className="hero-bowl" style={{ filter: "drop-shadow(0 4px 16px rgba(200,168,78,0.25))" }}>
+                    {bowlAnim
+                      ? <Lottie animationData={bowlAnim} loop autoplay style={{ width: "100%", height: "100%" }} />
+                      : <span style={{ fontSize: "52px", lineHeight: "108px", display: "block", textAlign: "center" }}>🥗</span>
+                    }
+                  </div>
+                </div>
+
+                {/* Text column */}
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "5px", textAlign: "right" }}>
+                  <div style={{ fontSize: "20px", fontWeight: 900, color: "#e8f5e9", textShadow: "0 2px 6px rgba(0,0,0,0.7)", letterSpacing: "0.02em", lineHeight: 1.2 }}>בנו את הסלט שלכם</div>
+                  <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.45)", fontWeight: 500 }}>5 שלבים פשוטים · בחירה חופשית</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "6px", padding: "5px 10px", borderRadius: "10px", background: "rgba(200,168,78,0.1)", border: "1px solid rgba(200,168,78,0.25)", width: "fit-content", alignSelf: "flex-end" }}>
+                    <span style={{ fontSize: "12px", fontWeight: 800, color: "#f0d060" }}>{sc.label}</span>
+                    <div style={{ width: "1px", height: "12px", background: "rgba(200,168,78,0.3)" }} />
+                    <span style={{ fontSize: "18px", fontWeight: 900, color: "#f0d060", lineHeight: 1 }}>₪{sc.price}</span>
+                  </div>
+                  <span
+                    onClick={(e) => { e.stopPropagation(); setSelectedSize(null); }}
+                    role="button" tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); setSelectedSize(null); }}}
+                    style={{ cursor: "pointer", fontSize: "10px", color: "rgba(255,255,255,0.3)", fontWeight: 600, alignSelf: "flex-end" }}
+                  >שנה גודל</span>
                 </div>
               </div>
 
-              {/* Text column */}
-              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "6px", textAlign: "right" }}>
-                <div style={{ fontSize: "20px", fontWeight: 900, color: "#e8f5e9", textShadow: "0 2px 6px rgba(0,0,0,0.7)", letterSpacing: "0.02em", lineHeight: 1.2 }}>בנו את הסלט שלכם</div>
-                <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.45)", fontWeight: 500 }}>5 שלבים פשוטים · בחירה חופשית</div>
-                <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "4px" }}>
-                  <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)", fontWeight: 600 }}>החל מ</span>
-                  <span style={{ fontSize: "22px", fontWeight: 900, color: "#f0d060", textShadow: "0 2px 6px rgba(200,168,78,0.4)", lineHeight: 1 }}>₪{sc.price}</span>
-                </div>
-                <div style={{ marginTop: "2px", fontSize: "11px", fontWeight: 700, color: "rgba(200,168,78,0.7)", letterSpacing: "0.04em" }}>התחל ←</div>
+              {/* Gold CTA strip */}
+              <div style={{
+                width: "100%", padding: "10px 18px",
+                backgroundImage: "linear-gradient(135deg, #c8a832 0%, #f0d060 40%, #ffe599 52%, #c8a832 100%)",
+                backgroundSize: "200% 100%",
+                animation: "shimmer 3s ease-in-out infinite",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+                borderTop: "1px solid rgba(255,220,80,0.3)",
+              }}>
+                <span style={{ fontSize: "14px", fontWeight: 900, color: "#0d2e0d", letterSpacing: "0.03em" }}>לחצו להתחיל לבנות</span>
+                <span style={{ fontSize: "17px", fontWeight: 900, color: "#0d2e0d" }}>←</span>
               </div>
             </button>
 
             {/* Presets - Secondary */}
             <div style={{ width: "100%" }}>
-              <div style={{
-                display: "flex", alignItems: "center", gap: "10px",
-                marginBottom: "12px"
-              }}>
-                <div style={{ flex: 1, height: "1px", background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.15))" }} />
-                <span style={{
-                  fontSize: "11px", fontWeight: 700,
-                  color: "rgba(255,255,255,0.5)",
-                  textTransform: "uppercase", letterSpacing: "0.08em",
-                  textShadow: "0 1px 2px rgba(0,0,0,0.5)"
-                }}>מתכוני שף</span>
-                <div style={{ flex: 1, height: "1px", background: "linear-gradient(90deg, rgba(255,255,255,0.15), transparent)" }} />
+              <div style={{ textAlign: "center", marginBottom: "14px" }}>
+                <div style={{ fontSize: "26px", marginBottom: "5px", filter: "drop-shadow(0 0 10px rgba(200,168,78,0.5))" }}>👨‍🍳</div>
+                <div style={{
+                  fontSize: "15px", fontWeight: 900, letterSpacing: "0.06em",
+                  backgroundImage: "linear-gradient(135deg, #c8a832 0%, #f0d060 45%, #ffe599 55%, #c8a832 100%)",
+                  backgroundSize: "200% auto",
+                  WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                  animation: "shimmer 4s ease-in-out infinite",
+                }}>מתכוני השף</div>
+                <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)", fontWeight: 500, marginTop: "3px" }}>
+                  בחרו מתכון מוכן או התחילו מאפס
+                </div>
               </div>
               {(() => {
                 const allIngredients = steps.flatMap(s => s.subgroups.flatMap(sg => sg.items));
@@ -733,7 +703,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
                             style={{
                               ...S.presetCard,
                               background: pc.bg,
-                              border: `1px solid ${isOpen ? pc.text : pc.border}`,
+                              borderWidth: "1px", borderStyle: "solid", borderColor: isOpen ? pc.text : pc.border,
                               boxShadow: isOpen ? `${pc.glow}, inset 0 0 0 1px ${pc.border}` : pc.glow,
                               opacity: expandedPreset && !isOpen ? 0.55 : 1,
                               transform: isOpen ? "scale(1.02)" : "scale(1)",
@@ -743,7 +713,12 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
                             aria-label={`מתכון ${p.he}`}
                             tabIndex={0}
                           >
-                            <span style={{ fontSize: "18px", flexShrink: 0, filter: `drop-shadow(0 1px 4px ${pc.dot})` }} aria-hidden="true">{p.icon}</span>
+                            {p.id === "signature" && (
+                              <div style={{ position: "absolute", top: 0, right: 0, background: "linear-gradient(135deg, #c8a832, #f0d060)", color: "#0d2e0d", fontSize: "7px", fontWeight: 900, padding: "2px 7px", borderRadius: "0 10px 0 8px", letterSpacing: "0.04em" }}>
+                                מומלץ ✦
+                              </div>
+                            )}
+                            <Icon src={p.icon} size="20px" style={{ flexShrink: 0, filter: `drop-shadow(0 1px 4px ${pc.dot})` }} />
                             <span style={{ flex: 1, fontSize: "11.5px", fontWeight: 800, color: pc.text, textAlign: "right", lineHeight: 1.2 }}>{p.he}</span>
                             <span style={{ fontSize: "9px", fontWeight: 700, color: isOpen ? pc.text : "rgba(255,255,255,0.28)", flexShrink: 0, transition: "transform 0.2s", transform: isOpen ? "rotate(180deg)" : "none" }}>▾</span>
                           </button>
@@ -764,7 +739,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
                       }}>
                         {/* Header */}
                         <div style={{ padding: "14px 14px 10px", display: "flex", alignItems: "center", gap: "10px", borderBottom: `1px solid ${epc.border}` }}>
-                          <span style={{ fontSize: "26px", filter: `drop-shadow(0 2px 8px ${epc.dot})`, flexShrink: 0 }}>{ep.icon}</span>
+                          <Icon src={ep.icon} size="28px" style={{ filter: `drop-shadow(0 2px 8px ${epc.dot})`, flexShrink: 0 }} />
                           <span style={{ flex: 1, fontSize: "15px", fontWeight: 900, color: epc.text, textAlign: "right" }}>{ep.he}</span>
                           <button
                             onClick={() => setExpandedPreset(null)}
@@ -791,7 +766,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
                                 color: "rgba(255,255,255,0.6)",
                                 border: `1px solid ${epc.border}`,
                                 whiteSpace: "nowrap",
-                              }}>{item.icon} {item.he}</span>
+                              }}><Icon src={item.icon} size="14px" /> {item.he}</span>
                             );
                           })}
                         </div>
@@ -821,16 +796,16 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
             </div>
           </div>
 
-          {/* Clear Draft Button - Fixed at bottom center */}
+          {/* Clear Draft Button - inline at bottom of scroll */}
           {hasDraft && (
-            <div style={{ position: "fixed", bottom: "20px", left: "50%", transform: "translateX(-50%)", zIndex: 10 }}>
+            <div style={{ display: "flex", justifyContent: "center", paddingBottom: "8px" }}>
               <button onClick={clearDraft} style={S.clearDraftBtn} aria-label="מחק טיוטה">
                 🗑️ מחק טיוטה
               </button>
             </div>
           )}
         </div>
-        <style>{KF}</style>
+        {mounted && <style>{KF}</style>}
       </div>
     );
   }
@@ -872,47 +847,28 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
             zIndex: 0,
             pointerEvents: "none"
           }} />
-          <div style={S.headerTop}>
-            <button style={S.backBtn} onClick={back} aria-label="חזור לשלב הקודם" tabIndex={0}>←</button>
-            <div style={{ flex: 1 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-                <span style={{ fontSize: "17px" }}>{cur.emoji}</span>
-                <div style={{
-                  position: "relative",
-                  display: "inline-block",
-                  padding: "10px 20px",
-                  borderRadius: "18px",
-                  background: "linear-gradient(145deg, rgba(8,22,8,0.97), rgba(13,40,13,0.95))",
-                  backdropFilter: "blur(8px)",
-                  WebkitBackdropFilter: "blur(8px)",
-                  border: "1px solid rgba(200,168,78,0.25)",
-                  zIndex: 1
-                }}>
-                  <span style={{
-                    fontSize: "17px",
-                    fontWeight: 900,
-                    color: "#ffffff",
-                    textShadow: "0 2px 6px rgba(0,0,0,0.6)"
-                  }}>{cur.title}</span>
-                </div>
-                <span style={{ fontSize: "11px", color: "rgba(200,168,78,0.85)", fontWeight: 600 }}>{cur.subtitle}</span>
-              </div>
-              {/* Layer pills */}
-              <div style={{ display: "flex", gap: "4px", marginTop: "4px", flexWrap: "wrap" }}>
-                {[{ k: "base", l: "בסיס", i: "🌿" }, { k: "protein", l: "חלבון", i: "💪" }, { k: "grain", l: "דגנים", i: "🌾" }, { k: "flavor", l: "טעם", i: "✨" }].map(lyr => {
-                  const done = lyr.k === "protein" ? (sels.protein || []).length > 0 : allTags.includes(lyr.k) || (lyr.k === "flavor" && allTags.includes("herb"));
-                  return <div key={lyr.k} style={{ ...S.layerPill, background: done ? "rgba(200,168,78,0.15)" : "rgba(255,255,255,0.04)", borderColor: done ? "rgba(200,168,78,0.35)" : "rgba(255,255,255,0.06)" }}>
-                    <span style={{ fontSize: "9px" }}>{lyr.i}</span>
-                    <span style={{ fontSize: "8px", fontWeight: 700, color: done ? "#d4b84a" : "rgba(255,255,255,0.2)" }}>{lyr.l}</span>
-                    {done && <span style={{ fontSize: "7px", color: "#f0d060" }}>✓</span>}
-                  </div>;
-                })}
+          {/* Single compact header row: [→ ↺] · title (abs centered) · [←] */}
+          <div style={{ position: "relative", display: "flex", alignItems: "center", padding: "7px 10px 4px" }}>
+            {/* Back + reset cluster — left */}
+            <div style={{ display: "flex", gap: "5px", flexShrink: 0, zIndex: 1 }}>
+              <button onClick={back} aria-label="חזור" style={S.navBtn}>→</button>
+              <button onClick={clearDraft} aria-label="נקה הכל" style={{ ...S.resetBtn, opacity: all.length > 0 ? 1 : 0.2, pointerEvents: all.length > 0 ? "auto" : "none" }}>↺</button>
+            </div>
+            {/* Step title — truly centered over the full row, single line */}
+            <div style={{ position: "absolute", left: 0, right: 0, textAlign: "center", pointerEvents: "none" }}>
+              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: "5px", whiteSpace: "nowrap" }}>
+                <span style={{ fontSize: "clamp(15px, 4.5vw, 22px)" }}>{cur.emoji}</span>
+                <span style={{ fontSize: "clamp(15px, 4.5vw, 22px)", fontWeight: 900, color: "#ffffff", textShadow: "0 2px 6px rgba(0,0,0,0.6)" }}>{cur.title}</span>
+                {cur.subtitle && <>
+                  <span style={{ fontSize: "clamp(11px, 3vw, 14px)", color: "rgba(255,255,255,0.3)", fontWeight: 400 }}>·</span>
+                  <span style={{ fontSize: "clamp(11px, 3vw, 14px)", fontWeight: 700, color: "rgba(255,255,255,0.65)" }}>{cur.subtitle}</span>
+                </>}
               </div>
             </div>
-            {/* Animated price */}
-            <div style={{ ...S.pricePill, transform: priceFlash ? "scale(1.08)" : "scale(1)", boxShadow: priceFlash === "up" ? "0 0 12px rgba(200,168,78,0.5)" : priceFlash === "down" ? "0 0 12px rgba(102,187,106,0.5)" : "0 2px 8px rgba(200,168,78,0.12)", transition: "all 0.2s cubic-bezier(0.34,1.56,0.64,1)" }}>
-              <span style={S.priceS}>₪</span><span style={S.priceV}>{total}</span>
-            </div>
+            {/* Spacer */}
+            <div style={{ flex: 1 }} />
+            {/* Next — right */}
+            <button onClick={next} aria-label="המשך" style={{ ...S.navBtnNext, flexShrink: 0, zIndex: 1 }}>←</button>
           </div>
 
           {/* Tappable progress segments */}
@@ -924,18 +880,39 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
                 disabled={i > step + 1}
                 aria-label={`${s.title}${i < step ? " - הושלם" : i === step ? " - נוכחי" : i === step + 1 ? " - הבא" : " - לא זמין"}`}
                 style={{
-                  height: "20px", flex: 1, border: "none", padding: "8px 0",
+                  flex: 1, border: "none", padding: "2px 1px",
                   cursor: i <= step + 1 ? "pointer" : "default",
-                  background: "transparent", display: "flex", alignItems: "center",
+                  background: "transparent", display: "flex", alignItems: "stretch",
                 }}
               >
                 <div style={{
-                  height: "5px", width: "100%", borderRadius: "3px",
-                  background: i < step ? "linear-gradient(90deg, #d4b84a, #f0d060)" : i === step ? "linear-gradient(90deg, #f0d060, #ffe066)" : "rgba(255,255,255,0.08)",
+                  height: "26px", width: "100%", borderRadius: "6px",
+                  background: i < step
+                    ? "linear-gradient(90deg, rgba(40,120,40,0.7), rgba(60,150,60,0.6))"
+                    : i === step
+                      ? "linear-gradient(90deg, #f0d060, #ffe066)"
+                      : "rgba(255,255,255,0.07)",
+                  border: i === step
+                    ? "1px solid rgba(255,220,80,0.6)"
+                    : i < step
+                      ? "1px solid rgba(60,160,60,0.5)"
+                      : "1px solid rgba(255,255,255,0.12)",
                   transition: "all 0.4s cubic-bezier(0.34,1.56,0.64,1)",
-                  boxShadow: i <= step ? "0 0 6px rgba(200,168,78,0.4)" : "none",
-                  opacity: i > step + 1 ? 0.4 : 1,
-                }} />
+                  boxShadow: i === step ? "0 0 10px rgba(240,208,80,0.5)" : "none",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  overflow: "hidden", gap: "2px",
+                }}>
+                  <span style={{ fontSize: "10px", lineHeight: 1 }}>
+                    {i < step ? "✓" : s.emoji}
+                  </span>
+                  <span style={{
+                    fontSize: "8px", fontWeight: i === step ? 800 : 700,
+                    color: i === step ? "#3a2800" : i < step ? "#ffffff" : "rgba(255,255,255,0.55)",
+                    letterSpacing: "0.01em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                    maxWidth: "calc(100% - 16px)",
+                    transition: "color 0.3s ease",
+                  }}>{s.title}</span>
+                </div>
               </button>
             ))}
           </div>
@@ -950,6 +927,8 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
           lastRemove={lastRemove}
           animFile={isTortilla ? "/mexican-burrito.json" : "/cat-salad-bowl.json"}
           freePlay={isTortilla}
+          bowlTop={isTortilla ? "44%" : "24%"}
+          max={isTortilla ? TORTILLA_MAX : BOWL_MAX}
         />
 
         {/* Suggestions */}
@@ -1024,7 +1003,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
                         {on && <div style={S.check} aria-hidden="true">✓</div>}
                         {item.pop && <div style={S.popTag} aria-hidden="true">פופולרי</div>}
                         <div style={{ position: "absolute", bottom: "4px", right: "5px", fontSize: "8px", color: "rgba(255,255,255,0.18)", lineHeight: 1, pointerEvents: "none" }} aria-hidden="true">ℹ</div>
-                        <span style={{ ...S.chipEmoji, transform: lastAdd === item.id ? "scale(1.4) rotate(-10deg)" : "scale(1)", transition: "transform 0.25s cubic-bezier(0.34,1.56,0.64,1)" }} aria-hidden="true">{item.icon}</span>
+                        <Icon src={item.icon} size="38px" style={{ ...S.chipEmoji, transform: lastAdd === item.id ? "scale(1.4) rotate(-10deg)" : "scale(1)", transition: "transform 0.25s cubic-bezier(0.34,1.56,0.64,1)" }} />
                         <span style={S.chipName}>{item.he}</span>
                         {item.price > 0 && <span style={S.chipCost}>+₪{item.price}</span>}
                       </button>
@@ -1150,8 +1129,11 @@ const S = {
   main: { position: "relative", zIndex: 2, display: "flex", flexDirection: "column", height: "100vh" },
 
   header: { padding: "8px 12px 6px", background: `linear-gradient(to bottom, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.28) 100%), url(${headerImage}) center / cover no-repeat`, borderBottom: "2px solid rgba(200,168,78,0.4)", boxShadow: "0 4px 20px rgba(0,0,0,0.5), 0 0 30px rgba(200,168,78,0.08)", position: "relative" },
-  headerTop: { display: "flex", alignItems: "flex-start", gap: "8px", marginBottom: "5px" },
-  backBtn: { width: "34px", height: "34px", borderRadius: "10px", cursor: "pointer", background: "rgba(200,168,78,0.08)", border: "1px solid rgba(200,168,78,0.25)", color: "#d4b84a", fontSize: "16px", fontWeight: 700, marginTop: "2px", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Heebo',sans-serif" },
+  headerTop: { display: "flex", alignItems: "center" },
+  backBtn: { width: "34px", height: "34px", borderRadius: "10px", cursor: "pointer", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", color: "#ffffff", fontSize: "16px", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Heebo',sans-serif" },
+  navBtn: { width: "34px", height: "34px", borderRadius: "10px", cursor: "pointer", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", color: "#ffffff", fontSize: "16px", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Heebo',sans-serif" },
+  navBtnNext: { width: "34px", height: "34px", borderRadius: "10px", cursor: "pointer", background: "linear-gradient(135deg, rgba(200,168,78,0.35), rgba(240,208,96,0.25))", border: "1.5px solid rgba(200,168,78,0.55)", color: "#f0d060", fontSize: "16px", fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Heebo',sans-serif", boxShadow: "0 0 10px rgba(200,168,78,0.25)" },
+  resetBtn: { width: "34px", height: "34px", borderRadius: "10px", cursor: "pointer", background: "rgba(239,83,80,0.18)", border: "1.5px solid rgba(239,83,80,0.5)", color: "#ff7575", fontSize: "17px", fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Heebo',sans-serif", boxShadow: "0 0 8px rgba(239,83,80,0.2)" },
   layerPill: { display: "flex", alignItems: "center", gap: "3px", padding: "2px 6px", borderRadius: "7px", border: "1px solid", transition: "all 0.3s" },
   pricePill: { display: "flex", alignItems: "baseline", gap: "2px", background: "linear-gradient(135deg, rgba(200,168,78,0.15), rgba(180,140,40,0.08))", border: "1px solid rgba(200,168,78,0.4)", padding: "4px 12px", borderRadius: "12px", transition: "all 0.2s cubic-bezier(0.34,1.56,0.64,1)" },
   priceS: { fontSize: "11px", color: "#d4b84a", fontWeight: 700 },
@@ -1184,11 +1166,11 @@ const S = {
   grid: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "7px" },
 
   chip: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "10px 3px 7px", borderRadius: "16px", cursor: "pointer", position: "relative", minHeight: "74px", background: "linear-gradient(155deg, rgba(50,115,50,0.9), rgba(30,75,30,0.85))", border: "2px solid rgba(200,168,78,0.55)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", boxShadow: "0 3px 12px rgba(0,0,0,0.5), 0 0 8px rgba(200,168,78,0.08), inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.25)", color: "#ffffff", transition: "all 0.2s cubic-bezier(0.34,1.56,0.64,1)", animation: "chipIn 0.25s ease both", outline: "none" },
-  chipOn: { background: "linear-gradient(155deg, rgba(55,125,55,0.9), rgba(35,90,35,0.85))", border: "2.5px solid rgba(240,208,96,0.85)", boxShadow: "0 6px 20px rgba(200,168,78,0.5), 0 0 20px rgba(200,168,78,0.3), inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -1px 0 rgba(0,0,0,0.15)", transform: "translateY(-2px)" },
+  chipOn: { background: "linear-gradient(155deg, rgba(60,140,60,0.95), rgba(40,100,40,0.9))", border: "2.5px solid rgba(240,208,96,0.95)", boxShadow: "0 0 0 1px rgba(240,208,96,0.25), 0 6px 22px rgba(200,168,78,0.55), 0 0 28px rgba(200,168,78,0.35), inset 0 1px 0 rgba(255,255,255,0.25), inset 0 -1px 0 rgba(0,0,0,0.15)", transform: "translateY(-3px)" },
   chipOff: { opacity: 0.2, cursor: "not-allowed", filter: "grayscale(0.5)" },
   check: { position: "absolute", top: "3px", left: "3px", width: "16px", height: "16px", borderRadius: "50%", background: "linear-gradient(135deg, #ffe066, #d4b84a)", color: "#0d2e0d", fontSize: "8px", fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 6px rgba(200,168,78,0.5)" },
   popTag: { position: "absolute", top: "-1px", right: "-1px", background: "linear-gradient(135deg, #d4b84a, #f0d060)", color: "#0d2e0d", fontSize: "7px", fontWeight: 900, padding: "2px 6px", borderRadius: "16px 0 8px 0", boxShadow: "0 2px 4px rgba(0,0,0,0.35)" },
-  chipEmoji: { fontSize: "25px", marginBottom: "2px", filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.4))" },
+  chipEmoji: { marginBottom: "2px", filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.4))" },
   chipName: { fontSize: "10.5px", fontWeight: 700, textAlign: "center", lineHeight: 1.15, color: "#ffffff", textShadow: "0 1px 3px rgba(0,0,0,0.6)" },
   chipCost: { fontSize: "8px", fontWeight: 800, color: "#f0d060", background: "linear-gradient(135deg, rgba(200,168,78,0.2), rgba(200,168,78,0.08))", border: "1px solid rgba(200,168,78,0.35)", padding: "1px 5px", borderRadius: "5px", marginTop: "2px", boxShadow: "0 1px 2px rgba(0,0,0,0.3)" },
 
@@ -1202,8 +1184,8 @@ const S = {
   ctaGhost: { backgroundImage: "none", backgroundColor: "rgba(255,255,255,0.04)", backgroundSize: "100% 100%", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.25)", boxShadow: "none", animation: "none", textShadow: "none" },
 
   heroBtn: {
-    display: "flex", flexDirection: "row", alignItems: "center", gap: "14px",
-    padding: "10px 14px", borderRadius: "16px", cursor: "pointer",
+    display: "flex", flexDirection: "column", alignItems: "stretch", gap: 0,
+    padding: 0, borderRadius: "16px", cursor: "pointer",
     background: "linear-gradient(145deg, rgba(6,18,6,0.17), rgba(10,28,10,0.17)), url(/builder-assets/salad-card-bg.webp) center top / 102% auto no-repeat",
     border: "2px solid rgba(200,168,78,0.55)",
     boxShadow: "0 0 0 1px rgba(200,168,78,0.12), 0 8px 30px rgba(0,0,0,0.5), 0 0 40px rgba(200,168,78,0.08)",
@@ -1217,7 +1199,8 @@ const S = {
     background: "linear-gradient(135deg, rgba(13,40,13,0.95), rgba(8,24,8,0.9))",
     backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
     boxShadow: "0 0 0 1px rgba(200,168,78,0.07), 0 2px 10px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)",
-    transition: "all 0.2s cubic-bezier(0.34,1.56,0.64,1)", outline: "none"
+    transition: "all 0.2s cubic-bezier(0.34,1.56,0.64,1)", outline: "none",
+    position: "relative", overflow: "hidden",
   },
   clearDraftBtn: { marginTop: "10px", padding: "6px 12px", borderRadius: "8px", cursor: "pointer", background: "rgba(239,83,80,0.1)", border: "1px solid rgba(239,83,80,0.25)", color: "#ef5350", fontSize: "11px", fontWeight: 600, fontFamily: "'Heebo',sans-serif", transition: "all 0.15s" },
   sizeCard: { display: "flex", alignItems: "center", width: "100%", padding: "18px 20px", borderRadius: "18px", cursor: "pointer", background: "linear-gradient(155deg, rgba(13,46,13,0.97), rgba(8,28,8,0.93))", border: "2px solid rgba(200,168,78,0.4)", boxShadow: "0 0 0 1px rgba(200,168,78,0.08), 0 8px 30px rgba(0,0,0,0.5), 0 0 20px rgba(200,168,78,0.06), inset 0 1px 0 rgba(255,255,255,0.06)", transition: "all 0.2s cubic-bezier(0.34,1.56,0.64,1)", outline: "none", fontFamily: "'Heebo',sans-serif" },

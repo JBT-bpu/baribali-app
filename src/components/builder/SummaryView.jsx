@@ -3,6 +3,13 @@ import { useMemo, useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
 
+function Icon({ src, size = "1.2em", style = {} }) {
+    if (src && src.startsWith("/")) {
+        return <img src={src} alt="" style={{ width: size, height: size, objectFit: "contain", verticalAlign: "middle", ...style }} />;
+    }
+    return <span style={{ fontSize: size, lineHeight: 1, ...style }}>{src}</span>;
+}
+
 // ─── Pickup slot generator ─────────────────────────────────────
 function generatePickupSlots() {
     const now = new Date();
@@ -113,14 +120,13 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                     <div style={S.sumBowlWrap}>
                         <div style={S.sumBowlGlow} />
                         <div style={S.sumBowl}>
-                            <div style={S.bowlLayer}>{[...layers.tops, ...layers.prots].map((it, i) => <span key={it.id} onClick={() => highlightStep(it)} style={{ fontSize: "20px", cursor: "pointer", animation: `popBounce 0.3s ease ${i * 35 + 250}ms both`, filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.35))" }}>{it.icon}</span>)}</div>
-                            <div style={S.bowlLayer}>{layers.vegs.map((it, i) => <span key={it.id} onClick={() => highlightStep(it)} style={{ fontSize: "23px", cursor: "pointer", animation: `popBounce 0.3s ease ${i * 35 + 120}ms both`, filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.25))" }}>{it.icon}</span>)}</div>
-                            <div style={S.bowlLayer}>{[...layers.greens, ...layers.rest].map((it, i) => <span key={it.id} onClick={() => highlightStep(it)} style={{ fontSize: "26px", cursor: "pointer", animation: `popBounce 0.3s ease ${i * 35}ms both`, filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.2))" }}>{it.icon}</span>)}</div>
+                            <div style={S.bowlLayer}>{[...layers.tops, ...layers.prots].map((it, i) => <span key={it.id} onClick={() => highlightStep(it)} style={{ cursor: "pointer", animation: `popBounce 0.3s ease ${i * 35 + 250}ms both`, filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.35))" }}><Icon src={it.icon} size="20px" /></span>)}</div>
+                            <div style={S.bowlLayer}>{layers.vegs.map((it, i) => <span key={it.id} onClick={() => highlightStep(it)} style={{ cursor: "pointer", animation: `popBounce 0.3s ease ${i * 35 + 120}ms both`, filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.25))" }}><Icon src={it.icon} size="23px" /></span>)}</div>
+                            <div style={S.bowlLayer}>{[...layers.greens, ...layers.rest].map((it, i) => <span key={it.id} onClick={() => highlightStep(it)} style={{ cursor: "pointer", animation: `popBounce 0.3s ease ${i * 35}ms both`, filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.2))" }}><Icon src={it.icon} size="26px" /></span>)}</div>
                         </div>
-                        <NutriRing all={all} />
+                        <NutriStats all={all} />
                         <div style={S.sumBowlMeta}>
                             <span>{all.length} מרכיבים</span>
-                            {(() => { const total = all.reduce((s, i) => s + ((NUTRI[i.id]?.kcal) || 0), 0); return total > 0 ? <><span style={{ color: "rgba(200,168,78,0.4)" }}>·</span><span>~{total} קק״ל</span></> : null; })()}
                         </div>
                     </div>
 
@@ -138,28 +144,77 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                         </div>
                     )}
 
-                    {grouped.map(({ s, items }) => (
-                        <div key={s.id} style={{ ...S.groupCard, ...(highlightedStep === s.id ? S.groupCardHighlight : {}) }}>
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "5px 0" }}>
-                                <div style={{ fontSize: "11px", fontWeight: 700, color: "rgba(200,168,78,0.7)" }}>{s.emoji} {s.title} <span style={{ fontWeight: 500, color: "rgba(255,255,255,0.3)", fontSize: "10px" }}>· {items.length}</span></div>
-                                {onEdit && (
-                                    <button onClick={() => onEdit(STEPS.findIndex(st => st.id === s.id))} style={S.editBtn} aria-label={`ערוך ${s.title}`}>
-                                        ✏️ ערוך
-                                    </button>
-                                )}
+                    {/* ── RPG Inventory ── */}
+                    <div style={{ margin: "0 12px 8px" }}>
+                        {grouped.map(({ s, items }, gi) => (
+                            <div key={s.id} style={{
+                                marginBottom: "14px",
+                                opacity: highlightedStep && highlightedStep !== s.id ? 0.45 : 1,
+                                transition: "opacity 0.3s ease",
+                            }}>
+                                {/* Shelf label */}
+                                <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
+                                    <span style={{ fontSize: "13px" }}>{s.emoji}</span>
+                                    <span style={{ fontSize: "10px", fontWeight: 800, color: "rgba(200,168,78,0.75)", letterSpacing: "0.06em", textTransform: "uppercase" }}>{s.title}</span>
+                                    <div style={{ flex: 1, height: "1px", background: "linear-gradient(90deg, rgba(200,168,78,0.2), transparent)" }} />
+                                    <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.2)", fontWeight: 600 }}>{items.length}</span>
+                                </div>
+                                {/* Slot grid */}
+                                <div style={{ display: "flex", flexWrap: "wrap", gap: "5px", alignItems: "flex-start" }}>
+                                    {items.map((item, i) => (
+                                        <div key={item.id} style={{
+                                            width: "56px",
+                                            background: "linear-gradient(145deg, rgba(12,36,12,0.85), rgba(6,18,6,0.92))",
+                                            border: `1px solid ${item.price > 0 ? "rgba(200,168,78,0.45)" : "rgba(255,255,255,0.1)"}`,
+                                            borderRadius: "9px",
+                                            display: "flex", flexDirection: "column",
+                                            alignItems: "center", justifyContent: "flex-start",
+                                            padding: "6px 3px 5px",
+                                            gap: "3px",
+                                            position: "relative",
+                                            boxShadow: item.price > 0
+                                                ? "0 0 8px rgba(200,168,78,0.15), 0 2px 6px rgba(0,0,0,0.4)"
+                                                : "0 2px 6px rgba(0,0,0,0.4)",
+                                            animation: `popBounce 0.3s ease ${gi * 60 + i * 40}ms both`,
+                                        }}>
+                                            {item.price > 0 && (
+                                                <div style={{
+                                                    position: "absolute", top: "-3px", right: "-3px",
+                                                    background: "linear-gradient(135deg, #c8a832, #f0d060)",
+                                                    color: "#0d2e0d", fontSize: "6px", fontWeight: 900,
+                                                    padding: "1px 4px", borderRadius: "5px",
+                                                    boxShadow: "0 1px 3px rgba(0,0,0,0.4)",
+                                                }}>+₪{item.price}</div>
+                                            )}
+                                            <Icon src={item.icon} size="30px" style={{ filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.5))" }} />
+                                            <span style={{
+                                                fontSize: "7.5px", fontWeight: 700,
+                                                color: "rgba(255,255,255,0.55)",
+                                                textAlign: "center", lineHeight: 1.15,
+                                                maxWidth: "52px", overflow: "hidden",
+                                                textOverflow: "ellipsis", whiteSpace: "nowrap",
+                                            }}>{item.he}</span>
+                                        </div>
+                                    ))}
+                                    {onEdit && (
+                                        <button onClick={() => onEdit(STEPS.findIndex(st => st.id === s.id))}
+                                            style={{
+                                                width: "56px", height: "68px",
+                                                background: "rgba(255,255,255,0.02)",
+                                                border: "1px dashed rgba(200,168,78,0.18)",
+                                                borderRadius: "9px",
+                                                display: "flex", flexDirection: "column",
+                                                alignItems: "center", justifyContent: "center",
+                                                cursor: "pointer", gap: "3px",
+                                            }}>
+                                            <span style={{ fontSize: "14px", opacity: 0.5 }}>✏️</span>
+                                            <span style={{ fontSize: "7px", fontWeight: 700, color: "rgba(200,168,78,0.45)" }}>ערוך</span>
+                                        </button>
+                                    )}
+                                </div>
                             </div>
-                            {items.map(item => {
-                                return (
-                                    <div key={item.id} style={S.sumRow}>
-                                        <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                                            {item.icon} {item.he}
-                                        </span>
-                                        {item.price > 0 && <span style={{ color: "#dfc06e", fontWeight: 700, fontSize: "12px" }}>+₪{item.price}</span>}
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    ))}
+                        ))}
+                    </div>
 
                     {/* Notes — collapsed by default */}
                     <div style={S.notesBox}>
@@ -281,68 +336,67 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     );
 }
 
-// ─── Nutritional arc ring ─────────────────────────────────────
-function NutriRing({ all }) {
+// ─── Nutritional stats ─────────────────────────────────────
+function NutriStats({ all }) {
     const totals = all.reduce((acc, item) => {
         const n = NUTRI[item.id];
         if (!n) return acc;
-        acc.p += n.p || 0;
-        acc.f += n.f || 0;
-        acc.c += n.c || 0;
+        acc.kcal += n.kcal || 0;
+        acc.p    += n.p    || 0;
+        acc.f    += n.f    || 0;
+        acc.c    += n.c    || 0;
+        acc.fb   += n.fb   || 0;
         return acc;
-    }, { p: 0, f: 0, c: 0 });
+    }, { kcal: 0, p: 0, f: 0, c: 0, fb: 0 });
 
-    const sum = totals.p + totals.f + totals.c;
-    if (sum < 1) return null;
+    if (totals.kcal < 1) return null;
 
-    const R = 28, cx = 36, cy = 36, stroke = 7;
-    const circ = 2 * Math.PI * R;
-    const pct = { p: totals.p / sum, f: totals.f / sum, c: totals.c / sum };
-
-    // Build arc segments: protein (gold), fat (green), carbs (teal)
-    const segments = [
-        { key: "p", color: "#c8a832", label: "חלבון", pct: pct.p },
-        { key: "f", color: "#5a9e5a", label: "שומן", pct: pct.f },
-        { key: "c", color: "#3a8a8a", label: "פחמימות", pct: pct.c },
+    const stats = [
+        { key:"p",  label:"חלבון",  val: Math.round(totals.p),  color:"#c8a832", bg:"rgba(200,168,50,0.14)",  border:"rgba(200,168,50,0.35)",  badge: totals.p  >= 20 ? "💪" : null },
+        { key:"c",  label:"פחמ׳",   val: Math.round(totals.c),  color:"#3ab8b8", bg:"rgba(58,184,184,0.12)",  border:"rgba(58,184,184,0.28)",  badge: null },
+        { key:"f",  label:"שומן",   val: Math.round(totals.f),  color:"#6abf69", bg:"rgba(106,191,105,0.12)", border:"rgba(106,191,105,0.28)", badge: null },
+        { key:"fb", label:"סיבים",  val: Math.round(totals.fb), color:"#a080e0", bg:"rgba(160,128,224,0.1)",  border:"rgba(160,128,224,0.22)", badge: totals.fb >= 8  ? "⭐" : null },
     ];
 
-    let offset = 0;
-    const arcs = segments.map(seg => {
-        const dash = seg.pct * circ;
-        const gap = circ - dash;
-        const rotation = -90 + (offset / circ) * 360;
-        offset += dash;
-        return { ...seg, dash, gap, rotation };
-    });
+    let msg = null;
+    if      (totals.p >= 25)                   msg = { text: "עשיר בחלבון! 💪",             color: "#c8a832" };
+    else if (totals.fb >= 10)                  msg = { text: "עשיר בסיבים תזונתיים! 🌿",    color: "#a080e0" };
+    else if (totals.p >= 15 && totals.fb >= 6) msg = { text: "ארוחה מאוזנת ✨",             color: "#6abf69" };
 
     return (
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: "6px", animation: "pFadeIn 0.6s ease 0.4s both" }}>
-            <svg width={72} height={72} viewBox="0 0 72 72">
-                {/* track */}
-                <circle cx={cx} cy={cy} r={R} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={stroke} />
-                {arcs.map(arc => (
-                    <circle
-                        key={arc.key}
-                        cx={cx} cy={cy} r={R}
-                        fill="none"
-                        stroke={arc.color}
-                        strokeWidth={stroke}
-                        strokeDasharray={`${arc.dash} ${arc.gap}`}
-                        strokeDashoffset={0}
-                        strokeLinecap="butt"
-                        transform={`rotate(${arc.rotation} ${cx} ${cy})`}
-                        opacity={0.85}
-                    />
-                ))}
-            </svg>
-            <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
-                {segments.map(seg => (
-                    <div key={seg.key} style={{ display: "flex", alignItems: "center", gap: "3px" }}>
-                        <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: seg.color, opacity: 0.8 }} />
-                        <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", fontWeight: 600 }}>{seg.label}</span>
+        <div style={{ width: "100%", marginTop: "10px", animation: "pFadeIn 0.5s ease 0.35s both" }}>
+            {/* Kcal total */}
+            <div style={{ textAlign: "center", marginBottom: "8px" }}>
+                <span style={{ fontSize: "26px", fontWeight: 900, color: "#ffffff", letterSpacing: "-0.5px" }}>
+                    ~{Math.round(totals.kcal)}
+                </span>
+                <span style={{ fontSize: "12px", fontWeight: 700, color: "rgba(255,255,255,0.38)", marginRight: "4px" }}> קק״ל</span>
+            </div>
+            {/* Macro pills */}
+            <div style={{ display: "flex", gap: "5px" }}>
+                {stats.map(s => (
+                    <div key={s.key} style={{
+                        flex: 1, background: s.bg, border: `1px solid ${s.border}`,
+                        borderRadius: "10px", padding: "9px 2px 7px",
+                        display: "flex", flexDirection: "column",
+                        alignItems: "center", gap: "2px", position: "relative",
+                    }}>
+                        {s.badge && (
+                            <div style={{ position: "absolute", top: "-7px", left: "50%", transform: "translateX(-50%)", fontSize: "12px", lineHeight: 1 }}>
+                                {s.badge}
+                            </div>
+                        )}
+                        <span style={{ fontSize: "20px", fontWeight: 900, color: s.color, lineHeight: 1 }}>{s.val}</span>
+                        <span style={{ fontSize: "8px", fontWeight: 800, color: s.color, opacity: 0.7, letterSpacing: "0.05em" }}>g</span>
+                        <span style={{ fontSize: "8px", fontWeight: 700, color: "rgba(255,255,255,0.38)", lineHeight: 1.1 }}>{s.label}</span>
                     </div>
                 ))}
             </div>
+            {msg && (
+                <div style={{ textAlign: "center", marginTop: "7px", fontSize: "10px", fontWeight: 800, color: msg.color, opacity: 0.9, letterSpacing: "0.02em" }}>
+                    {msg.text}
+                </div>
+            )}
         </div>
     );
 }
@@ -359,8 +413,6 @@ function ConfettiCanvas({ all }) {
         c.height = window.innerHeight;
 
         const colors = ['#f0d060', '#ffe08a', '#c8a832', '#ffffff', '#a5d6a7', '#edd87e'];
-        const icons = all.slice(0, 6).map(i => i.icon);
-
         const particles = Array.from({ length: 68 }, (_, i) => ({
             x: c.width / 2 + (Math.random() - 0.5) * 60,
             y: c.height * 0.42,
@@ -373,7 +425,6 @@ function ConfettiCanvas({ all }) {
             rot: Math.random() * Math.PI * 2,
             rotV: (Math.random() - 0.5) * 0.25,
             shape: i % 5 === 0 ? 'circle' : i % 5 === 1 ? 'rect' : 'dot',
-            emoji: icons.length && i % 7 === 0 ? icons[i % icons.length] : null,
         }));
 
         let raf;
@@ -393,12 +444,7 @@ function ConfettiCanvas({ all }) {
                 ctx.globalAlpha = Math.max(0, p.alpha);
                 ctx.translate(p.x, p.y);
                 ctx.rotate(p.rot);
-                if (p.emoji) {
-                    ctx.font = `${p.r * 4}px serif`;
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText(p.emoji, 0, 0);
-                } else if (p.shape === 'circle') {
+                if (p.shape === 'circle') {
                     ctx.beginPath();
                     ctx.arc(0, 0, p.r, 0, Math.PI * 2);
                     ctx.fillStyle = p.color;
