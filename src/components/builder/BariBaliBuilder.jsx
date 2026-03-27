@@ -1043,23 +1043,21 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
               <div style={{ width: "1px", height: "14px", background: "rgba(200,168,78,0.25)" }} />
               <span style={{ fontSize: "17px", fontWeight: 900, color: "#f0d060", textShadow: "0 2px 6px rgba(200,168,78,0.4)" }}>₪{total}</span>
             </div>
-            {/* Right: CTA label + arrow */}
-            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <span style={{
-                fontSize: "14px", fontWeight: 900, color: "#f0d060",
-                textShadow: "0 1px 4px rgba(200,168,78,0.5)",
-              }}>
+            {/* Right: single combined CTA pill */}
+            <div style={{
+              display: "flex", alignItems: "center", gap: "6px",
+              padding: "7px 14px", borderRadius: "10px",
+              backgroundImage: "linear-gradient(135deg, #c8a832 0%, #f0d060 40%, #ffe599 52%, #c8a832 100%)",
+              backgroundSize: "200% 100%",
+              color: "#0d2e0d", fontWeight: 900,
+              boxShadow: "0 2px 10px rgba(200,168,78,0.5)",
+              animation: "shimmer 3s ease-in-out infinite",
+              whiteSpace: "nowrap",
+            }}>
+              <span style={{ fontSize: "14px" }}>
                 {step === steps.length - 1 ? (curSel.length > 0 ? "לסיכום" : "דלגו") : "המשך"}
               </span>
-              <div style={{
-                width: "60px", height: "30px", borderRadius: "10px",
-                backgroundImage: "linear-gradient(135deg, #c8a832 0%, #f0d060 40%, #ffe599 52%, #c8a832 100%)",
-                backgroundSize: "200% 100%",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: "16px", color: "#0d2e0d", fontWeight: 900,
-                boxShadow: "0 2px 10px rgba(200,168,78,0.5)",
-                animation: "shimmer 3s ease-in-out infinite",
-              }}>←</div>
+              <span style={{ fontSize: "16px" }}>←</span>
             </div>
           </button>
         </div>
