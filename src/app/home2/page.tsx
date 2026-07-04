@@ -4,8 +4,20 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Tilt from 'react-parallax-tilt';
+import { House, Search, Star, ClipboardList, User } from 'lucide-react';
 import ReviewsStrip from '@/components/ui/ReviewsStrip';
 import CatPopup from '@/components/ui/CatPopup';
+
+// Bottom nav — vector icons instead of emoji for consistent UI chrome
+// (the illustrated ingredient/card art elsewhere stays as-is, this is
+// just navigation iconography).
+const NAV_ITEMS = [
+    { Icon: House, label: 'בית', active: true },
+    { Icon: Search, label: 'חיפוש', active: false },
+    { Icon: Star, label: 'מועדפים', active: false },
+    { Icon: ClipboardList, label: 'הזמנות', active: false },
+    { Icon: User, label: 'פרופיל', active: false },
+];
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 const MAIN_CARDS = [
@@ -235,6 +247,7 @@ function SizePicker({ onSelect, onBack }: { onSelect: (s: string) => void; onBac
                                 glarePosition="all"
                                 glareBorderRadius="16px"
                                 transitionSpeed={400}
+                                onEnter={() => navigator.vibrate?.(8)}
                                 style={{
                                 width: '100%', height: '100%',
                                 borderRadius: '16px',
@@ -528,6 +541,7 @@ export default function HomeV2() {
                                     glarePosition="all"
                                     glareBorderRadius="18px"
                                     transitionSpeed={400}
+                                    onEnter={() => navigator.vibrate?.(8)}
                                     style={{
                                         width: '100%', height: '100%',
                                         borderRadius: '18px',
@@ -630,13 +644,7 @@ export default function HomeV2() {
                     <Image src="/homepage-assets/nav-bg.png" alt="" width={1290} height={300}
                         style={{ width: '100%', height: '58px', objectFit: 'cover', objectPosition: 'center', display: 'block', opacity: 0.45 }} />
                     <div style={{ position: 'absolute', inset: 0, display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '0 8px' }}>
-                        {[
-                            { icon: '🏠', label: 'בית',      active: true  },
-                            { icon: '🔍', label: 'חיפוש',    active: false },
-                            { icon: '⭐', label: 'מועדפים',  active: false },
-                            { icon: '📋', label: 'הזמנות',   active: false },
-                            { icon: '👤', label: 'פרופיל',   active: false },
-                        ].map(item => (
+                        {NAV_ITEMS.map(item => (
                             <div
                                 key={item.label}
                                 onClick={() => {
@@ -663,11 +671,15 @@ export default function HomeV2() {
                                         pointerEvents: 'none',
                                     }} />
                                 )}
-                                <span style={{
-                                    fontSize: item.active ? '24px' : '19px',
-                                    filter: item.active ? 'drop-shadow(0 0 10px #f0c832)' : 'none',
-                                    transition: 'font-size 0.25s ease, filter 0.25s ease',
-                                }}>{item.icon}</span>
+                                <item.Icon
+                                    size={item.active ? 24 : 19}
+                                    color={item.active ? '#f0c832' : '#fff'}
+                                    strokeWidth={2.3}
+                                    style={{
+                                        filter: item.active ? 'drop-shadow(0 0 10px #f0c832)' : 'none',
+                                        transition: 'width 0.25s ease, height 0.25s ease, filter 0.25s ease',
+                                    }}
+                                />
                                 <span style={{
                                     fontSize: '11px', fontWeight: 700,
                                     color: item.active ? '#f0c832' : '#fff',

@@ -130,6 +130,7 @@ export default function HeroBowlCard({ all, onRemove, comboBadges, lastAdd, anim
             glareBorderRadius="16px"
             transitionSpeed={400}
             scale={1.015}
+            onEnter={() => navigator.vibrate?.(8)}
             style={{
                 margin: "6px 12px",
                 background: "linear-gradient(145deg, rgba(6,18,6,0.17), rgba(10,28,10,0.17)), url(/builder-assets/salad-card-bg.webp) center top / 100% 100% no-repeat",
