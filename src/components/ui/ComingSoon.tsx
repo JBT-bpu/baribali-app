@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import ParticleCanvas from './ParticleCanvas';
 
 interface ComingSoonProps {
@@ -124,7 +125,7 @@ export default function ComingSoon({ icon, title }: ComingSoonProps) {
                 </div>
 
                 {/* Back to Home Button */}
-                <a
+                <Link
                     href="/"
                     style={{
                         animation: 'fadeUp 0.8s ease-out 0.8s forwards',
@@ -151,7 +152,7 @@ export default function ComingSoon({ icon, title }: ComingSoonProps) {
                     }}
                 >
                     חזור לדף הבית
-                </a>
+                </Link>
             </div>
         </>
     );

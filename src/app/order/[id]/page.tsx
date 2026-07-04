@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
+import Link from 'next/link';
 import ParticleCanvas from '@/components/ui/ParticleCanvas';
 
 type OrderStatus = 'waiting' | 'preparing' | 'ready' | 'collected';
@@ -399,13 +400,13 @@ function NotFound() {
         <div style={{ ...P.root, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px' }}>
             <div style={{ fontSize: '48px' }}>🤔</div>
             <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '16px', fontFamily: "'Heebo',sans-serif" }}>ההזמנה לא נמצאה</div>
-            <a href="/" style={{
+            <Link href="/" style={{
                 marginTop: '8px', padding: '12px 32px', borderRadius: '50px', textDecoration: 'none',
                 background: 'linear-gradient(135deg,#c8a832 0%,#f0d060 45%,#ffe066 55%,#c8a832 100%)',
                 color: '#0d2e0d', fontSize: '15px', fontWeight: 900,
                 fontFamily: "'Heebo',sans-serif",
                 boxShadow: '0 4px 20px rgba(200,168,78,0.4)',
-            }}>חזרה לדף הבית</a>
+            }}>חזרה לדף הבית</Link>
         </div>
     );
 }
