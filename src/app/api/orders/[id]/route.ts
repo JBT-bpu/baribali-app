@@ -4,11 +4,12 @@ import { supabaseAdmin } from '@/lib/supabase';
 // Customer order-status lookup. The order's UUID id acts as the sole
 // capability token (unguessable) — no extra secret needed, consistent with
 // the anon-RLS-read policy this route replaces.
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    const { id } = await params;
     const { data, error } = await supabaseAdmin
         .from('orders')
         .select('id, order_num, items, total, pickup_time, notes, status, created_at')
-        .eq('id', params.id)
+        .eq('id', id)
         .single();
 
     if (error || !data) {

@@ -4,11 +4,12 @@ import { isKitchenAuthorized } from '@/lib/kitchenAuth';
 
 const VALID_STATUSES = ['waiting', 'preparing', 'ready', 'collected'];
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     if (!isKitchenAuthorized(req)) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     try {
+        const { id } = await params;
         const { status } = await req.json();
 
         if (!VALID_STATUSES.includes(status)) {
@@ -18,7 +19,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         const { error } = await supabaseAdmin
             .from('orders')
             .update({ status })
-            .eq('id', params.id);
+            .eq('id', id);
 
         if (error) throw error;
 
