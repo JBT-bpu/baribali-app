@@ -158,7 +158,7 @@ const S = {
         background: "linear-gradient(160deg, #020802 0%, #061206 40%, #091809 70%, #061206 100%)",
         display: "flex", alignItems: "center", justifyContent: "center",
         animation: "pFadeIn 0.3s ease",
-        fontFamily: "'Heebo', sans-serif", direction: "rtl",
+        fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: "rtl",
     },
     bloomFlash: {
         position: "absolute", inset: 0, pointerEvents: "none", zIndex: 0,

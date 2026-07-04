@@ -46,7 +46,7 @@ export default function ComingSoon({ icon, title }: ComingSoonProps) {
                 style={{
                     minHeight: '100vh',
                     background: 'url(/homepage-assets/bg-bokeh.webp) center top / cover no-repeat, linear-gradient(155deg, #030a03 0%, #071a07 30%, #0a200a 60%, #071a07 100%)',
-                    fontFamily: "'Heebo', sans-serif",
+                    fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
                     direction: 'rtl',
                     display: 'flex',
                     flexDirection: 'column',
@@ -138,7 +138,7 @@ export default function ComingSoon({ icon, title }: ComingSoonProps) {
                         fontSize: '16px',
                         fontWeight: 600,
                         textDecoration: 'none',
-                        fontFamily: "'Heebo', sans-serif",
+                        fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
                         transition: 'all 0.3s ease',
                         background: 'transparent',
                     }}

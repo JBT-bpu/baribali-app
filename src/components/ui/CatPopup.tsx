@@ -51,7 +51,7 @@ export default function CatPopup({ onClose }: Props) {
                     boxShadow: '0 24px 80px rgba(0,0,0,0.8), 0 0 60px rgba(240,200,50,0.08)',
                     transform: visible ? 'translateY(0) scale(1)' : 'translateY(40px) scale(0.95)',
                     transition: 'transform 0.4s cubic-bezier(0.34,1.4,0.64,1)',
-                    fontFamily: "'Heebo', sans-serif",
+                    fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
                     direction: 'rtl',
                 }}
             >
@@ -97,7 +97,7 @@ export default function CatPopup({ onClose }: Props) {
                             background: 'linear-gradient(135deg,#c8a832 0%,#f0d060 45%,#ffe066 55%,#c8a832 100%)',
                             border: 'none', cursor: 'pointer',
                             fontSize: '15px', fontWeight: 900, color: '#1a0e00',
-                            fontFamily: "'Heebo', sans-serif",
+                            fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
                             boxShadow: '0 4px 20px rgba(240,200,50,0.35)',
                         }}
                     >

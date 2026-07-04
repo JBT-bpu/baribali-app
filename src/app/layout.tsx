@@ -1,5 +1,24 @@
 import type { Metadata, Viewport } from 'next';
+import { Heebo, Secular_One } from 'next/font/google';
 import './globals.css';
+
+// Self-hosted via next/font — zero external request, zero layout shift.
+// Exposed as CSS variables (not the literal "Heebo" family name next/font
+// generates internally) so both new Tailwind-based components and the
+// existing inline-style components can reference the same font.
+const heebo = Heebo({
+    subsets: ['hebrew', 'latin'],
+    weight: ['400', '600', '700', '800', '900'],
+    variable: '--font-heebo',
+    display: 'swap',
+});
+
+const secularOne = Secular_One({
+    subsets: ['hebrew', 'latin'],
+    weight: '400',
+    variable: '--font-display',
+    display: 'swap',
+});
 
 export const metadata: Metadata = {
     title: 'BariBali - בנה סלט כפר',
@@ -19,23 +38,7 @@ export default function RootLayout({
     children: React.ReactNode;
 }) {
     return (
-        <html lang="he" dir="rtl">
-            <head>
-                <link rel="preconnect" href="https://fonts.googleapis.com" />
-                <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-                {/*
-                  eslint-disable-next-line @next/next/no-page-custom-font --
-                  Intentional: dozens of components across the app hardcode
-                  fontFamily: "'Heebo', sans-serif" as an inline style, so a
-                  next/font/google migration (which generates an internal,
-                  non-"Heebo" family name) needs every one of those inline
-                  styles rewritten to a CSS variable first. Tracked as part of
-                  the Phase E typography pass. Until then, this global link is
-                  what makes Heebo actually load on every page instead of only
-                  /kitchen.
-                */}
-                <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
-            </head>
+        <html lang="he" dir="rtl" className={`${heebo.variable} ${secularOne.variable}`}>
             <body>{children}</body>
         </html>
     );

@@ -1,19 +1,54 @@
 @import 'tailwindcss';
 
+/*
+  Design tokens — extracted from the actual colors/radii already in use
+  across the app's inline style objects (not aspirational placeholders).
+  Available both as Tailwind utilities (bg-gold, shadow-gold-glow, ...)
+  and as CSS custom properties (var(--color-gold)) for the existing
+  inline-style components.
+*/
 @theme {
-  --color-green-primary: #4caf50;
-  --color-green-dark: #2e7d32;
-  --color-green-darker: #1b5e20;
+  /* Brand gold — CTAs, prices, glows. Gradient order matches the existing
+     "gold-deep -> gold-light -> gold-bright -> gold-deep" button pattern. */
+  --color-gold: #c8a84e;
+  --color-gold-deep: #c8a832;
+  --color-gold-light: #f0d060;
+  --color-gold-bright: #ffe066;
+
+  /* Brand green — backgrounds and text-on-gold ink */
+  --color-green-ink: #0d2e0d;
+  --color-green-darkest: #020a02;
+  --color-green-dark: #071a07;
+  --color-green-deep: #0a200a;
   --color-green-light: #e8f5e9;
-  --color-green-lighter: #c8e6c9;
+  --color-green-accent: #4caf50;
+  --color-green-accent-light: #66bb6a;
 
-  --color-gold-primary: #c8a84e;
-  --color-gold-light: #fff3c1;
-  --color-gold-dark: #6a4b00;
+  /* Status */
+  --color-danger: #ef5350;
+  --color-danger-light: #ff7575;
 
-  --color-selection: #5ac568;
-  --color-background: #fafcf8;
+  /* Radii scale — matches the app's existing, already-consistent values */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-full: 999px;
+
+  /* Glow shadows — the app's signature gold-glow treatment, consolidated */
+  --shadow-soft-glow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  --shadow-gold-glow: 0 4px 20px rgba(200, 168, 78, 0.4);
+  --shadow-gold-glow-lg: 0 6px 28px rgba(200, 168, 78, 0.5), 0 0 0 1px rgba(200, 168, 78, 0.3);
+  --shadow-card-glow: 0 20px 60px rgba(0, 0, 0, 0.9), 0 4px 20px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
+
+/*
+  --font-heebo and --font-display are set on <html> by next/font (see
+  layout.tsx). Referenced directly as var(--font-heebo) / var(--font-display)
+  rather than re-declared here, to avoid Tailwind's @theme colliding with
+  next/font's own custom-property names.
+*/
 
 /*
   The default border color has changed to `currentcolor` in Tailwind CSS v4,
@@ -48,7 +83,7 @@ body {
 }
 
 body {
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: var(--font-heebo), 'Heebo', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background-color: #000;
     color: #fff;
     -webkit-font-smoothing: antialiased;

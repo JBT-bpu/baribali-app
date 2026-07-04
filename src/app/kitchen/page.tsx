@@ -303,7 +303,7 @@ function OrderCard({ order, onUpdate }: { order: Order; onUpdate: (id: string, s
 const K: Record<string, React.CSSProperties> = {
     root: {
         minHeight: '100vh', background: '#0a0a0a',
-        fontFamily: "'Heebo', sans-serif", direction: 'rtl',
+        fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: 'rtl',
         color: '#fff', padding: '0 0 40px',
     },
     header: {
@@ -366,7 +366,7 @@ const K: Record<string, React.CSSProperties> = {
         border: '1.5px solid rgba(255,255,255,0.08)',
         background: 'rgba(255,255,255,0.04)',
         minHeight: '60px', width: '100%', textAlign: 'right' as const,
-        fontFamily: "'Heebo', sans-serif", transition: 'background 0.15s, border-color 0.15s',
+        fontFamily: "var(--font-heebo), 'Heebo', sans-serif", transition: 'background 0.15s, border-color 0.15s',
     },
     checkRowDone: { background: 'rgba(76,175,80,0.12)', border: '1.5px solid rgba(76,175,80,0.35)' },
     checkEmoji: { fontSize: '30px', lineHeight: 1, flexShrink: 0 },
@@ -384,7 +384,7 @@ const K: Record<string, React.CSSProperties> = {
     actionBtn: {
         width: '100%', padding: '12px', borderRadius: '10px',
         border: 'none', fontSize: '15px', fontWeight: 900,
-        fontFamily: "'Heebo', sans-serif", cursor: 'pointer',
+        fontFamily: "var(--font-heebo), 'Heebo', sans-serif", cursor: 'pointer',
         marginTop: '4px', transition: 'opacity 0.15s',
     },
     cardTotal: {
