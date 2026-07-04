@@ -1,6 +1,37 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+@theme {
+  --color-green-primary: #4caf50;
+  --color-green-dark: #2e7d32;
+  --color-green-darker: #1b5e20;
+  --color-green-light: #e8f5e9;
+  --color-green-lighter: #c8e6c9;
+
+  --color-gold-primary: #c8a84e;
+  --color-gold-light: #fff3c1;
+  --color-gold-dark: #6a4b00;
+
+  --color-selection: #5ac568;
+  --color-background: #fafcf8;
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
 
 /* Global Styles */
 * {
@@ -22,72 +53,6 @@ body {
     color: #fff;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-}
-
-/* Glow Pulse Animation */
-@keyframes glowPulse {
-
-    0%,
-    100% {
-        opacity: 1;
-        transform: scale(1);
-    }
-
-    50% {
-        opacity: 0.8;
-        transform: scale(1.02);
-    }
-}
-
-.glow-overlay.animate {
-    animation: glowPulse 2s ease-in-out infinite;
-}
-
-/* Parallax Border Animations */
-@keyframes driftInward {
-
-    0%,
-    100% {
-        transform: translate(0, 0);
-    }
-
-    50% {
-        transform: translate(10px, 10px);
-    }
-}
-
-@keyframes scatterOutward {
-    0% {
-        transform: translate(0, 0) scale(1);
-        opacity: 0.85;
-    }
-
-    100% {
-        transform: translate(100px, 100px) scale(0.5);
-        opacity: 0;
-    }
-}
-
-@keyframes ambientFloat {
-
-    0%,
-    100% {
-        transform: translateY(0);
-    }
-
-    50% {
-        transform: translateY(-5px);
-    }
-}
-
-@keyframes accelerateToCard {
-    0% {
-        transform: scale(1);
-    }
-
-    100% {
-        transform: scale(1.2);
-    }
 }
 
 /* RTL Support */
