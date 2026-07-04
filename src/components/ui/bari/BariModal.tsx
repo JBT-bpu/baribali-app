@@ -46,7 +46,9 @@ export default function BariModal({ open, onClose, title, children, variant = 's
                     {title
                         ? <Drawer.Title className="px-5 pt-3 text-base font-black text-white">{title}</Drawer.Title>
                         : <Drawer.Title className="sr-only">תפריט</Drawer.Title>}
-                    <div className="overflow-y-auto px-5 pb-[max(24px,env(safe-area-inset-bottom))]">
+                    {/* No horizontal padding here — content controls its own, since
+                        different sheets have different layout needs. */}
+                    <div className="overflow-y-auto pb-[max(24px,env(safe-area-inset-bottom))]">
                         {children}
                     </div>
                 </Drawer.Content>

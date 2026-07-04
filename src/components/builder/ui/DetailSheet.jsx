@@ -1,5 +1,5 @@
-import { useRef } from "react";
 import { NUTRI } from "../../../data/salad-data.js";
+import BariModal from "../../ui/bari/BariModal";
 
 const TAG_MAP = {
     protein:  { he: "חלבון",   icon: "💪", color: "#c8a832", bg: "rgba(200,168,78,0.15)"  },
@@ -21,28 +21,11 @@ const MACROS = [
 
 export default function DetailSheet({ item, isAdded, onToggle, onClose }) {
     const n = NUTRI[item.id];
-    const sheetRef = useRef(null);
-    const touchStartY = useRef(0);
     const tags = (item.tags || []).map(t => TAG_MAP[t]).filter(Boolean);
 
-    const onTouchStart = (e) => { touchStartY.current = e.touches[0].clientY; };
-    const onTouchEnd = (e) => {
-        const delta = e.changedTouches[0].clientY - touchStartY.current;
-        if (delta > 80) onClose();
-    };
-
     return (
-        <div style={S.overlay} onClick={onClose}>
-            <div
-                ref={sheetRef}
-                style={S.sheet}
-                onClick={e => e.stopPropagation()}
-                onTouchStart={onTouchStart}
-                onTouchEnd={onTouchEnd}
-            >
-                {/* Drag handle */}
-                <div style={S.handle} />
-
+        <BariModal open onClose={onClose} variant="sheet">
+            <div style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: "rtl" }}>
                 {/* ── Hero row: icon left · info right ── */}
                 <div style={S.heroRow}>
 
@@ -126,40 +109,11 @@ export default function DetailSheet({ item, isAdded, onToggle, onClose }) {
                 </div>
             </div>
             <style>{KF}</style>
-        </div>
+        </BariModal>
     );
 }
 
 const S = {
-    overlay: {
-        position: "fixed", inset: 0, zIndex: 300,
-        background: "rgba(0,0,0,0.65)",
-        display: "flex", alignItems: "flex-end", justifyContent: "center",
-        backdropFilter: "blur(5px)", WebkitBackdropFilter: "blur(5px)",
-        animation: "overlayIn 0.22s ease",
-    },
-    sheet: {
-        width: "100%", maxWidth: "430px",
-        padding: "0 0 max(24px, env(safe-area-inset-bottom))",
-        borderRadius: "24px 24px 0 0",
-        background: "linear-gradient(175deg, rgba(14,42,14,0.99) 0%, rgba(8,26,8,0.99) 100%)",
-        border: "1px solid rgba(200,168,78,0.18)",
-        borderBottom: "none",
-        boxShadow: "0 -12px 48px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.03)",
-        animation: "sheetUp 0.28s cubic-bezier(0.34,1.2,0.64,1)",
-        fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
-        direction: "rtl",
-        overflow: "hidden",
-        maxHeight: "90vh",
-        overflowY: "auto",
-    },
-
-    handle: {
-        width: "40px", height: "4px", borderRadius: "2px",
-        background: "rgba(255,255,255,0.18)",
-        margin: "12px auto 0",
-    },
-
     // ── Hero row ──────────────────────────────────────────────
     heroRow: {
         display: "flex", alignItems: "center", gap: "16px",
@@ -302,8 +256,6 @@ const S = {
 };
 
 const KF = `
-@keyframes overlayIn  { from{opacity:0} to{opacity:1} }
-@keyframes sheetUp    { from{transform:translateY(100%)} to{transform:translateY(0)} }
 @keyframes iconPop    { 0%{transform:scale(0.5);opacity:0} 60%{transform:scale(1.12)} 100%{transform:scale(1);opacity:1} }
 @keyframes iconFloat  { 0%,100%{transform:translateY(0) rotate(-1deg)} 50%{transform:translateY(-6px) rotate(1deg)} }
 @keyframes glowPulse  { 0%,100%{opacity:0.7} 50%{opacity:1.0} }
