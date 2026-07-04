@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import ParticleCanvas from '@/components/ui/ParticleCanvas';
+import { fireGoldConfetti } from '@/lib/confetti';
 
 type OrderStatus = 'waiting' | 'preparing' | 'ready' | 'collected';
 
@@ -23,90 +24,6 @@ const STATUS_STEPS: { key: OrderStatus; label: string; icon: string }[] = [
     { key: 'ready',     label: 'מוכן!',   icon: '✅' },
     { key: 'collected', label: 'נאסף',    icon: '🎉' },
 ];
-
-/* ── Confetti System ── */
-interface Particle {
-    x: number; y: number;
-    vx: number; vy: number;
-    w: number; h: number;
-    color: string;
-    shape: 'rect' | 'circle';
-    life: number;
-    rotation: number;
-    rotationSpeed: number;
-}
-
-function fireConfetti(canvas: HTMLCanvasElement) {
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-
-    const colors = ['#f0d060', '#c8a84e', '#4caf50', '#66bb6a'];
-    const particles: Particle[] = [];
-    const count = 80 + Math.floor(Math.random() * 21); // 80–100
-
-    for (let i = 0; i < count; i++) {
-        particles.push({
-            x: canvas.width / 2 + (Math.random() - 0.5) * 120,
-            y: canvas.height * 0.35,
-            vx: (Math.random() - 0.5) * 12,
-            vy: -Math.random() * 14 - 4,
-            w: Math.random() * 6 + 3,
-            h: Math.random() * 6 + 3,
-            color: colors[Math.floor(Math.random() * colors.length)],
-            shape: Math.random() > 0.5 ? 'rect' : 'circle',
-            life: 1,
-            rotation: Math.random() * Math.PI * 2,
-            rotationSpeed: (Math.random() - 0.5) * 0.2,
-        });
-    }
-
-    const gravity = 0.35;
-    const wind = 0.15;
-    const duration = 3000;
-    const start = performance.now();
-    let rafId: number;
-
-    function frame(now: number) {
-        const elapsed = now - start;
-        if (elapsed > duration) {
-            ctx!.clearRect(0, 0, canvas.width, canvas.height);
-            cancelAnimationFrame(rafId);
-            return;
-        }
-
-        ctx!.clearRect(0, 0, canvas.width, canvas.height);
-
-        for (const p of particles) {
-            p.vy += gravity;
-            p.vx += wind * (Math.random() - 0.45);
-            p.x += p.vx;
-            p.y += p.vy;
-            p.rotation += p.rotationSpeed;
-            p.life = Math.max(0, 1 - elapsed / duration);
-
-            ctx!.save();
-            ctx!.translate(p.x, p.y);
-            ctx!.rotate(p.rotation);
-            ctx!.globalAlpha = p.life;
-            ctx!.fillStyle = p.color;
-
-            if (p.shape === 'rect') {
-                ctx!.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
-            } else {
-                ctx!.beginPath();
-                ctx!.arc(0, 0, p.w / 2, 0, Math.PI * 2);
-                ctx!.fill();
-            }
-            ctx!.restore();
-        }
-
-        rafId = requestAnimationFrame(frame);
-    }
-
-    rafId = requestAnimationFrame(frame);
-}
 
 /* ── Celebration Sound (Web Audio API) ── */
 function playCelebrationChime() {
@@ -192,7 +109,6 @@ export default function OrderStatusView({ id }: { id: string }) {
     const [order, setOrder] = useState<Order | null>(null);
     const [notFound, setNotFound] = useState(false);
     const prevStatusRef = useRef<OrderStatus | null>(null);
-    const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const [ringScale, setRingScale] = useState(false);
     const [labelSlide, setLabelSlide] = useState(false);
 
@@ -200,7 +116,7 @@ export default function OrderStatusView({ id }: { id: string }) {
 
     // Celebration trigger
     const triggerCelebration = useCallback(() => {
-        if (canvasRef.current) fireConfetti(canvasRef.current);
+        fireGoldConfetti();
         fireHaptic();
         playCelebrationChime();
     }, []);
@@ -281,9 +197,6 @@ export default function OrderStatusView({ id }: { id: string }) {
         <div style={P.root}>
             <div style={P.bg} />
             <ParticleCanvas intensity="medium" />
-
-            {/* Confetti canvas overlay */}
-            <canvas ref={canvasRef} style={P.confettiCanvas} />
 
             <div style={P.content}>
                 {/* Header */}
@@ -417,8 +330,6 @@ const P: Record<string, React.CSSProperties> = {
     root: { minHeight: '100vh', background: 'url(/homepage-assets/bg-bokeh.webp) center top / cover no-repeat, linear-gradient(155deg, #030a03 0%, #071a07 30%, #0a200a 60%, #071a07 100%)', fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: 'rtl', color: '#fff' },
     bg: { position: 'fixed', inset: 0, background: 'radial-gradient(ellipse 80% 50% at 50% 30%, rgba(200,168,78,0.06) 0%, transparent 70%)', pointerEvents: 'none' },
     content: { position: 'relative', zIndex: 1, maxWidth: '420px', margin: '0 auto', padding: '32px 20px 60px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' },
-
-    confettiCanvas: { position: 'fixed', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 9999 },
 
     logo: { fontSize: '18px', fontWeight: 900, color: '#f0d060', letterSpacing: '0.04em', animation: 'fadeUp 0.4s ease both' },
     orderNum: { fontSize: '13px', color: 'rgba(255,255,255,0.55)', fontWeight: 700, letterSpacing: '0.08em', animation: 'fadeUp 0.4s ease 0.05s both' },

@@ -1,6 +1,7 @@
 'use client';
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect } from "react";
 import dynamic from "next/dynamic";
+import { fireGoldConfetti } from "../../lib/confetti";
 const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
 
 function Icon({ src, size = "1.2em", style = {} }) {
@@ -410,72 +411,9 @@ function NutriStats({ all }) {
 const SHOP_WA = process.env.NEXT_PUBLIC_SHOP_WA_NUMBER || '972501234567';
 
 // ─── Post-order confirmation screen ─────────────────────────
-function ConfettiCanvas({ all }) {
-    const ref = useRef(null);
-    useEffect(() => {
-        const c = ref.current; if (!c) return;
-        const ctx = c.getContext('2d');
-        c.width = window.innerWidth;
-        c.height = window.innerHeight;
-
-        const colors = ['#f0d060', '#ffe08a', '#c8a832', '#ffffff', '#a5d6a7', '#edd87e'];
-        const particles = Array.from({ length: 68 }, (_, i) => ({
-            x: c.width / 2 + (Math.random() - 0.5) * 60,
-            y: c.height * 0.42,
-            vx: (Math.random() - 0.5) * 14,
-            vy: -(Math.random() * 12 + 6),
-            gravity: 0.38,
-            alpha: 1,
-            color: colors[i % colors.length],
-            r: Math.random() * 5 + 2,
-            rot: Math.random() * Math.PI * 2,
-            rotV: (Math.random() - 0.5) * 0.25,
-            shape: i % 5 === 0 ? 'circle' : i % 5 === 1 ? 'rect' : 'dot',
-        }));
-
-        let raf;
-        const draw = () => {
-            ctx.clearRect(0, 0, c.width, c.height);
-            let alive = 0;
-            for (const p of particles) {
-                p.x += p.vx;
-                p.y += p.vy;
-                p.vy += p.gravity;
-                p.vx *= 0.99;
-                p.rot += p.rotV;
-                p.alpha -= 0.012;
-                if (p.alpha <= 0) continue;
-                alive++;
-                ctx.save();
-                ctx.globalAlpha = Math.max(0, p.alpha);
-                ctx.translate(p.x, p.y);
-                ctx.rotate(p.rot);
-                if (p.shape === 'circle') {
-                    ctx.beginPath();
-                    ctx.arc(0, 0, p.r, 0, Math.PI * 2);
-                    ctx.fillStyle = p.color;
-                    ctx.fill();
-                } else if (p.shape === 'rect') {
-                    ctx.fillStyle = p.color;
-                    ctx.fillRect(-p.r, -p.r / 2, p.r * 2, p.r);
-                } else {
-                    ctx.beginPath();
-                    ctx.arc(0, 0, p.r / 2, 0, Math.PI * 2);
-                    ctx.fillStyle = p.color;
-                    ctx.fill();
-                }
-                ctx.restore();
-            }
-            if (alive > 0) raf = requestAnimationFrame(draw);
-        };
-        raf = requestAnimationFrame(draw);
-        return () => cancelAnimationFrame(raf);
-    }, [all]);
-    return <canvas ref={ref} style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 501 }} />;
-}
-
 function OrderedScreen({ total, all, pickupTime, notes, orderNum: propOrderNum, orderId, onNewOrder }) {
     const fallbackNum = useMemo(() => `BB-${((Date.now() % 9000) + 1000)}`, []);
+    useEffect(() => { fireGoldConfetti(); }, []);
     const orderNum = propOrderNum || fallbackNum;
     const [animData, setAnimData] = useState(null);
     useEffect(() => { fetch("/cat-salad-final.json").then(r => r.json()).then(setAnimData).catch(() => {}); }, []);
@@ -490,7 +428,6 @@ function OrderedScreen({ total, all, pickupTime, notes, orderNum: propOrderNum, 
 
     return (
         <>
-            <ConfettiCanvas all={all} />
             <div style={OS.root}>
                 <div style={OS.bg} />
                 <div style={OS.content}>
