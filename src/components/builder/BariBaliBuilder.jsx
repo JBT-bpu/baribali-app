@@ -22,6 +22,8 @@ import DetailSheet from "./ui/DetailSheet.jsx";
 import SummaryView from "./SummaryView.jsx";
 import SplashScreen from "./ui/SplashScreen.jsx";
 import HeroBowlCard from "./ui/HeroBowlCard.jsx";
+import BariModal from "../ui/bari/BariModal";
+import BariButton from "../ui/bari/BariButton";
 
 /*
   BariBali Builder — COMPLETE v3
@@ -213,18 +215,15 @@ function HeaderBanner() {
   );
 }
 
-function ClearConfirmModal({ onConfirm, onCancel }) {
+function ClearConfirmModal({ open, onConfirm, onCancel }) {
   return (
-    <div style={S.confirmOverlay} onClick={onCancel}>
-      <div style={S.confirmCard} onClick={e => e.stopPropagation()}>
-        <div style={S.confirmTitle}>למחוק את הטיוטה הנוכחית?</div>
-        <div style={S.confirmSub}>כל הבחירות שלך יימחקו ולא ניתן יהיה לשחזר אותן.</div>
-        <div style={S.confirmButtons}>
-          <button onClick={onCancel} style={S.confirmCancelBtn}>ביטול</button>
-          <button onClick={onConfirm} style={S.confirmDeleteBtn}>מחק</button>
-        </div>
+    <BariModal open={open} onClose={onCancel} variant="dialog" title="למחוק את הטיוטה הנוכחית?">
+      <div className="mt-2 text-xs leading-relaxed text-white/50">כל הבחירות שלך יימחקו ולא ניתן יהיה לשחזר אותן.</div>
+      <div className="mt-5 flex gap-2.5">
+        <BariButton variant="secondary" size="sm" fullWidth onClick={onCancel}>ביטול</BariButton>
+        <BariButton variant="danger" size="sm" fullWidth onClick={onConfirm}>מחק</BariButton>
       </div>
-    </div>
+    </BariModal>
   );
 }
 
@@ -815,7 +814,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
             </div>
           )}
         </div>
-        {showClearConfirm && <ClearConfirmModal onConfirm={confirmClearDraft} onCancel={() => setShowClearConfirm(false)} />}
+        <ClearConfirmModal open={showClearConfirm} onConfirm={confirmClearDraft} onCancel={() => setShowClearConfirm(false)} />
         {mounted && <style>{KF}</style>}
       </div>
     );
@@ -842,7 +841,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
         />
       )}
 
-      {showClearConfirm && <ClearConfirmModal onConfirm={confirmClearDraft} onCancel={() => setShowClearConfirm(false)} />}
+      <ClearConfirmModal open={showClearConfirm} onConfirm={confirmClearDraft} onCancel={() => setShowClearConfirm(false)} />
 
       <div style={{ ...S.main, opacity: anim === "enter" ? 0 : 1, transition: "opacity 0.4s" }}>
 
@@ -1084,7 +1083,6 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
 
 const KF = `
 @keyframes chipIn { 0%{opacity:0;transform:translateY(10px) scale(0.92)} 100%{opacity:1;transform:none} }
-@keyframes overlayIn { 0%{opacity:0} 100%{opacity:1} }
 @keyframes expandIn { 0%{opacity:0;transform:translateY(-6px) scaleY(0.94);transform-origin:top} 100%{opacity:1;transform:none} }
 @keyframes popBounce { 0%{transform:scale(0.3);opacity:0} 60%{transform:scale(1.15)} 100%{transform:scale(1);opacity:1} }
 @keyframes popOut { 0%{transform:scale(1);opacity:1} 100%{transform:scale(0.3);opacity:0} }
@@ -1203,13 +1201,5 @@ const S = {
   },
   clearDraftBtn: { marginTop: "10px", padding: "6px 12px", borderRadius: "8px", cursor: "pointer", background: "rgba(239,83,80,0.1)", border: "1px solid rgba(239,83,80,0.25)", color: "#ef5350", fontSize: "11px", fontWeight: 600, fontFamily: "var(--font-heebo), 'Heebo', sans-serif", transition: "all 0.15s" },
 
-  // ─── Clear-draft confirm modal ───
-  confirmOverlay: { position: "fixed", inset: 0, zIndex: 400, background: "rgba(0,0,0,0.65)", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(5px)", WebkitBackdropFilter: "blur(5px)", animation: "overlayIn 0.22s ease", padding: "0 24px" },
-  confirmCard: { width: "100%", maxWidth: "340px", padding: "22px 20px", borderRadius: "18px", background: "linear-gradient(175deg, rgba(14,42,14,0.99) 0%, rgba(8,26,8,0.99) 100%)", border: "1px solid rgba(200,168,78,0.2)", boxShadow: "0 -12px 48px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.03)", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: "rtl", textAlign: "center", animation: "popBounce 0.28s cubic-bezier(0.34,1.56,0.64,1)" },
-  confirmTitle: { fontSize: "16px", fontWeight: 900, color: "#fff" },
-  confirmSub: { fontSize: "12px", color: "rgba(255,255,255,0.5)", marginTop: "8px", lineHeight: 1.5 },
-  confirmButtons: { display: "flex", gap: "10px", marginTop: "20px" },
-  confirmCancelBtn: { flex: 1, minHeight: "44px", padding: "10px 0", borderRadius: "10px", cursor: "pointer", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)", color: "#e8f5e9", fontSize: "13px", fontWeight: 700, fontFamily: "var(--font-heebo), 'Heebo', sans-serif" },
-  confirmDeleteBtn: { flex: 1, minHeight: "44px", padding: "10px 0", borderRadius: "10px", cursor: "pointer", background: "rgba(239,83,80,0.16)", border: "1px solid rgba(239,83,80,0.5)", color: "#ff6b66", fontSize: "13px", fontWeight: 800, fontFamily: "var(--font-heebo), 'Heebo', sans-serif" },
   sizeCard: { display: "flex", alignItems: "center", width: "100%", padding: "18px 20px", borderRadius: "18px", cursor: "pointer", background: "linear-gradient(155deg, rgba(13,46,13,0.97), rgba(8,28,8,0.93))", border: "2px solid rgba(200,168,78,0.4)", boxShadow: "0 0 0 1px rgba(200,168,78,0.08), 0 8px 30px rgba(0,0,0,0.5), 0 0 20px rgba(200,168,78,0.06), inset 0 1px 0 rgba(255,255,255,0.06)", transition: "all 0.2s cubic-bezier(0.34,1.56,0.64,1)", outline: "none", fontFamily: "var(--font-heebo), 'Heebo', sans-serif" },
 };
