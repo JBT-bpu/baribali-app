@@ -134,7 +134,7 @@ function SparkStar({ sz, t, l, r, d, dur, op, isTransforming }) {
 const KEYFRAMES = `
 @keyframes vegFloat {
     0%, 100% { transform: translate(0, 0) rotate(var(--rot, 0deg)); }
-    50% { transform: translate(var(--dx, 0px) var(--dy, 0px) rotate(var(--rot, 0deg)); }
+    50% { transform: translate(var(--dx, 0px), var(--dy, 0px)) rotate(var(--rot, 0deg)); }
 }
 @keyframes vegScale {
     0%, 100% { transform: scale(1); }

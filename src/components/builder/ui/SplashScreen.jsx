@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from "react";
 
-const logoImage = "/builder-assets/logo-alpha.png";
+const logoImage = "/builder-assets/logo-alpha.webp";
 
 export default function SplashScreen({ onDone }) {
     const [phase, setPhase] = useState("in"); // in → hold → out

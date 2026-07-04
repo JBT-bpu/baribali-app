@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import ReviewsStrip from '@/components/ui/ReviewsStrip';
+import CatPopup from '@/components/ui/CatPopup';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 const MAIN_CARDS = [
@@ -336,6 +337,19 @@ export default function HomeV2() {
         }
     }, []);
 
+    // ── Cat welcome popup — only show on first visit ──
+    const [showCatPopup, setShowCatPopup] = useState(false);
+    useEffect(() => {
+        if (!localStorage.getItem('bb-cat-popup-seen')) {
+            const t = setTimeout(() => setShowCatPopup(true), 900);
+            return () => clearTimeout(t);
+        }
+    }, []);
+    const dismissCatPopup = useCallback(() => {
+        localStorage.setItem('bb-cat-popup-seen', '1');
+        setShowCatPopup(false);
+    }, []);
+
     // ── Salad two-tap ──
     const { tapped: saladTapped, tap: saladTap, reset: saladReset } = useTwoTap(() => setSizePicker(true));
 
@@ -438,7 +452,7 @@ export default function HomeV2() {
 
             {/* Logo */}
             <div style={{ position: 'relative', zIndex: 2, padding: '44px 20px 0', animation: 'logoIn 0.6s cubic-bezier(0.34,1.3,0.64,1) both' }}>
-                <Image src="/homepage-assets/logo.png" alt="BariBali" width={220} height={140}
+                <Image src="/homepage-assets/logo.webp" alt="BariBali" width={220} height={140}
                     style={{ width: '180px', height: 'auto', filter: 'drop-shadow(0 0 32px rgba(240,200,50,0.5)) drop-shadow(0 4px 14px rgba(0,0,0,0.65))' }} priority />
             </div>
 
@@ -657,7 +671,9 @@ export default function HomeV2() {
                 </div>
             )}
 
-            {/* Cat popup */}
+            {/* Cat popup — first-visit welcome */}
+            {showCatPopup && <CatPopup onClose={dismissCatPopup} />}
+
             {/* Size picker overlay */}
             {sizePicker && <SizePicker onSelect={handleSizeSelect} onBack={() => { setSizePicker(false); saladReset(); }} />}
 

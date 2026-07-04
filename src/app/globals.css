@@ -116,3 +116,18 @@ textarea {
     -webkit-user-select: text;
     user-select: text;
 }
+
+/* Respect OS-level reduced-motion preference. !important is required here to
+   override inline style="animation:/transition:" attributes used throughout
+   the app's component styles. */
+@media (prefers-reduced-motion: reduce) {
+
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}

@@ -17,7 +17,7 @@ function Icon({ src, size = "1.4em", style = {} }) {
   return <span style={{ fontSize: size, lineHeight: 1, ...style }}>{src}</span>;
 }
 
-import { STEPS, BASE, COMBOS, PRESETS, getSuggestions, TORTILLA_STEPS, TORTILLA_BASE } from "../../data/salad-data.js";
+import { STEPS, BASE, COMBOS, PRESETS, getSuggestions, TORTILLA_STEPS, TORTILLA_BASE, SIZE_CONFIG } from "../../data/salad-data.js";
 import DetailSheet from "./ui/DetailSheet.jsx";
 import SummaryView from "./SummaryView.jsx";
 import SplashScreen from "./ui/SplashScreen.jsx";
@@ -160,12 +160,6 @@ const PRESET_COLORS = {
   eastern_night:{ bg: "linear-gradient(145deg, rgba(120,190,80,0.22), rgba(8,26,6,0.9))",     border: "rgba(120,190,80,0.4)",   glow: "0 0 16px rgba(120,190,80,0.2), 0 4px 20px rgba(0,0,0,0.35)",   text: "#8ed060", dot: "rgba(120,190,80,0.68)" },
 };
 
-// ─── SIZE CONFIG ─────────────────────────────────────────────
-const SIZE_CONFIG = {
-  750:  { ml: 750,  label: '750 מ"ל',  price: 54, desc: "סלט אישי" },
-  1000: { ml: 1000, label: '1000 מ"ל', price: 59, desc: "סלט רגיל" },
-  1500: { ml: 1500, label: '1500 מ"ל', price: 72, desc: "סלט גדול" },
-};
 function parseSizeParam(raw) {
   try {
     if (!raw) return null;
@@ -216,6 +210,21 @@ function HeaderBanner() {
         </svg>
       </div>
     </>
+  );
+}
+
+function ClearConfirmModal({ onConfirm, onCancel }) {
+  return (
+    <div style={S.confirmOverlay} onClick={onCancel}>
+      <div style={S.confirmCard} onClick={e => e.stopPropagation()}>
+        <div style={S.confirmTitle}>למחוק את הטיוטה הנוכחית?</div>
+        <div style={S.confirmSub}>כל הבחירות שלך יימחקו ולא ניתן יהיה לשחזר אותן.</div>
+        <div style={S.confirmButtons}>
+          <button onClick={onCancel} style={S.confirmCancelBtn}>ביטול</button>
+          <button onClick={onConfirm} style={S.confirmDeleteBtn}>מחק</button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -280,7 +289,7 @@ function BuilderParticles() {
 /** @param {{ sizeParam?: string | null, type?: string }} props */
 export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
   const isTortilla = type === "tortilla";
-  const steps = isTortilla ? STEPS.filter(s => s.id !== "finish") : STEPS;
+  const steps = useMemo(() => isTortilla ? STEPS.filter(s => s.id !== "finish") : STEPS, [isTortilla]);
   const [splash, setSplash] = useState(() => {
     if (typeof sessionStorage === "undefined") return false;
     const seen = sessionStorage.getItem("bb-splash-seen");
@@ -300,6 +309,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
   const [badgeFlash, setBadgeFlash] = useState(null);
   const [shownBadges, setShownBadges] = useState(new Set());
   const [detailCtx, setDetailCtx] = useState(null); // { item, stepId, maxPicks }
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [showLongPressHint, setShowLongPressHint] = useState(true);
   useEffect(() => {
     const t = setTimeout(() => setShowLongPressHint(false), 15000);
@@ -436,7 +446,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
       setLastAdd(item.id); setTimeout(() => setLastAdd(null), 350);
       return { ...prev, [sid]: [...cur, itemWithMeta] };
     });
-  }, []);
+  }, [isTortilla, steps]);
 
   // ─── Remove from bowl strip ───
   const removeFromBowl = useCallback((itemId) => {
@@ -473,17 +483,17 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
     setTimeout(() => setIsTransforming(false), 500);
 
     setStep(0);
-  }, []);
+  }, [steps]);
 
   // ─── Clear draft ───
-  const clearDraft = useCallback(() => {
-    if (window.confirm("למחוק את הטיוטה הנוכחית?")) {
-      localStorage.removeItem("baribali-draft");
-      setSels({});
-      setNotes("");
-      setStep(isTortilla ? 0 : -1);
-      haptic("remove");
-    }
+  const requestClearDraft = useCallback(() => setShowClearConfirm(true), []);
+  const confirmClearDraft = useCallback(() => {
+    localStorage.removeItem("baribali-draft");
+    setSels({});
+    setNotes("");
+    setStep(isTortilla ? 0 : -1);
+    haptic("remove");
+    setShowClearConfirm(false);
   }, [isTortilla]);
 
   // ─── Directional transitions ───
@@ -504,13 +514,13 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
     }, 200);
   }, [step]);
 
-  const next = () => step < steps.length - 1 ? goTo(step + 1) : setSummary(true);
-  const back = () => {
+  const next = useCallback(() => step < steps.length - 1 ? goTo(step + 1) : setSummary(true), [step, steps, goTo]);
+  const back = useCallback(() => {
     if (summary) setSummary(false);
     else if (step > 0) goTo(step - 1);
     else if (step === 0 && !isTortilla) goTo(-1);
     else window.location.href = "/";
-  };
+  }, [summary, step, goTo, isTortilla]);
   const resetAll = () => {
     setSels({});
     setNotes("");
@@ -539,7 +549,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
     // RTL: swipe right = next, swipe left = back
     if (dx > 0) next();
     else back();
-  }, [step, summary]);
+  }, [next, back]);
 
   // ─── Long-press for detail ───
   const onChipTouchStart = (item) => {
@@ -799,12 +809,13 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
           {/* Clear Draft Button - inline at bottom of scroll */}
           {hasDraft && (
             <div style={{ display: "flex", justifyContent: "center", paddingBottom: "8px" }}>
-              <button onClick={clearDraft} style={S.clearDraftBtn} aria-label="מחק טיוטה">
+              <button onClick={requestClearDraft} style={S.clearDraftBtn} aria-label="מחק טיוטה">
                 🗑️ מחק טיוטה
               </button>
             </div>
           )}
         </div>
+        {showClearConfirm && <ClearConfirmModal onConfirm={confirmClearDraft} onCancel={() => setShowClearConfirm(false)} />}
         {mounted && <style>{KF}</style>}
       </div>
     );
@@ -831,6 +842,8 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
         />
       )}
 
+      {showClearConfirm && <ClearConfirmModal onConfirm={confirmClearDraft} onCancel={() => setShowClearConfirm(false)} />}
+
       <div style={{ ...S.main, opacity: anim === "enter" ? 0 : 1, transition: "opacity 0.4s" }}>
 
         {/* ── HEADER ── */}
@@ -852,7 +865,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
             {/* Back + reset cluster — left */}
             <div style={{ display: "flex", gap: "5px", flexShrink: 0, zIndex: 1 }}>
               <button onClick={back} aria-label="חזור" style={S.navBtn}>→</button>
-              <button onClick={clearDraft} aria-label="נקה הכל" style={{ ...S.resetBtn, opacity: all.length > 0 ? 1 : 0.2, pointerEvents: all.length > 0 ? "auto" : "none" }}>↺</button>
+              <button onClick={requestClearDraft} aria-label="נקה הכל" style={{ ...S.resetBtn, opacity: all.length > 0 ? 1 : 0.2, pointerEvents: all.length > 0 ? "auto" : "none" }}>↺</button>
             </div>
             {/* Step title — truly centered over the full row, single line */}
             <div style={{ position: "absolute", left: 0, right: 0, textAlign: "center", pointerEvents: "none" }}>
@@ -995,7 +1008,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
                         onMouseDown={() => onChipTouchStart(item)} onMouseUp={onChipTouchEnd} onMouseLeave={onChipTouchEnd}
                         onKeyDown={(e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); toggle(cur.id, item, cur.maxPicks); } }}
                         aria-label={`${item.he}${item.price > 0 ? `, תוספת ${item.price} שקלים` : ""}${on ? ", נבחר" : ""}${item.desc ? `, ${item.desc}` : ""}`}
-                        aria-pressed={on}
+                        aria-checked={on}
                         aria-disabled={full}
                         role="checkbox"
                         tabIndex={0}
@@ -1071,6 +1084,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
 
 const KF = `
 @keyframes chipIn { 0%{opacity:0;transform:translateY(10px) scale(0.92)} 100%{opacity:1;transform:none} }
+@keyframes overlayIn { 0%{opacity:0} 100%{opacity:1} }
 @keyframes expandIn { 0%{opacity:0;transform:translateY(-6px) scaleY(0.94);transform-origin:top} 100%{opacity:1;transform:none} }
 @keyframes popBounce { 0%{transform:scale(0.3);opacity:0} 60%{transform:scale(1.15)} 100%{transform:scale(1);opacity:1} }
 @keyframes popOut { 0%{transform:scale(1);opacity:1} 100%{transform:scale(0.3);opacity:0} }
@@ -1132,15 +1146,10 @@ const S = {
   navBtn: { width: "34px", height: "34px", borderRadius: "10px", cursor: "pointer", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", color: "#ffffff", fontSize: "16px", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Heebo',sans-serif" },
   navBtnNext: { width: "34px", height: "34px", borderRadius: "10px", cursor: "pointer", background: "linear-gradient(135deg, rgba(200,168,78,0.35), rgba(240,208,96,0.25))", border: "1.5px solid rgba(200,168,78,0.55)", color: "#f0d060", fontSize: "16px", fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Heebo',sans-serif", boxShadow: "0 0 10px rgba(200,168,78,0.25)" },
   resetBtn: { width: "34px", height: "34px", borderRadius: "10px", cursor: "pointer", background: "rgba(239,83,80,0.18)", border: "1.5px solid rgba(239,83,80,0.5)", color: "#ff7575", fontSize: "17px", fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Heebo',sans-serif", boxShadow: "0 0 8px rgba(239,83,80,0.2)" },
-  layerPill: { display: "flex", alignItems: "center", gap: "3px", padding: "2px 6px", borderRadius: "7px", border: "1px solid", transition: "all 0.3s" },
   pricePill: { display: "flex", alignItems: "baseline", gap: "2px", background: "linear-gradient(135deg, rgba(200,168,78,0.15), rgba(180,140,40,0.08))", border: "1px solid rgba(200,168,78,0.4)", padding: "4px 12px", borderRadius: "12px", transition: "all 0.2s cubic-bezier(0.34,1.56,0.64,1)" },
   priceS: { fontSize: "11px", color: "#d4b84a", fontWeight: 700 },
   priceV: { fontSize: "22px", color: "#ffffff", fontWeight: 900, textShadow: "0 2px 8px rgba(200,168,78,0.5)" },
   progressRow: { display: "flex", gap: "3px" },
-
-  bowlArea: { padding: "6px 12px 4px", background: "rgba(0,0,0,0.4)", borderBottom: "1px solid rgba(200,168,78,0.25)" },
-  bowlScroll: { display: "flex", gap: "4px", overflowX: "auto", scrollbarWidth: "none" },
-  bowlPiece: { width: "31px", height: "31px", borderRadius: "9px", flexShrink: 0, background: "linear-gradient(145deg, rgba(13,46,13,0.92), rgba(8,28,8,0.88))", border: "2px solid rgba(200,168,78,0.3)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 8px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05)", cursor: "pointer", position: "relative", transition: "all 0.15s" },
 
   badgePill: { display: "flex", alignItems: "center", gap: "4px", padding: "2px 8px", borderRadius: "8px", background: "rgba(200,168,78,0.25)", border: "1px solid rgba(200,168,78,0.45)" },
   badgePillTxt: { fontSize: "10px", fontWeight: 800, color: "#f0d060", textShadow: "0 1px 2px rgba(0,0,0,0.5)" },
@@ -1173,14 +1182,6 @@ const S = {
   chipCost: { fontSize: "8px", fontWeight: 800, color: "#f0d060", background: "linear-gradient(135deg, rgba(200,168,78,0.2), rgba(200,168,78,0.08))", border: "1px solid rgba(200,168,78,0.35)", padding: "1px 5px", borderRadius: "5px", marginTop: "2px", boxShadow: "0 1px 2px rgba(0,0,0,0.3)" },
 
   bar: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 20px max(14px, env(safe-area-inset-bottom))", background: `linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.25) 100%), url(${footerImage}) center top / cover no-repeat`, borderTop: "2px solid rgba(200,168,78,0.4)", boxShadow: "0 -4px 20px rgba(0,0,0,0.5), 0 0 30px rgba(200,168,78,0.08)" },
-  barInfo: { display: "flex", alignItems: "baseline", gap: "5px" },
-  barCount: { fontSize: "18px", fontWeight: 900, color: "#ffffff", textShadow: "0 2px 4px rgba(0,0,0,0.5)" },
-  barLabel: { fontSize: "11px", color: "rgba(255,255,255,0.35)", fontWeight: 600 },
-  barDiv: { width: "1px", height: "14px", background: "rgba(200,168,78,0.3)", display: "inline-block", margin: "0 4px" },
-  barTotal: { fontSize: "18px", fontWeight: 900, color: "#f0d060", textShadow: "0 2px 6px rgba(200,168,78,0.4)" },
-  cta: { padding: "10px 24px", borderRadius: "14px", cursor: "pointer", backgroundImage: "linear-gradient(135deg, #c8a832 0%, #f0d060 45%, #ffe066 55%, #c8a832 100%)", backgroundSize: "200% 100%", border: "1px solid rgba(255,224,100,0.5)", color: "#0d2e0d", fontSize: "14px", fontWeight: 900, fontFamily: "'Heebo',sans-serif", boxShadow: "0 4px 18px rgba(200,168,78,0.5), 0 0 0 1px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.4), inset 0 -1px 0 rgba(0,0,0,0.15)", display: "flex", alignItems: "center", animation: "shimmer 4s ease-in-out infinite", textShadow: "0 1px 2px rgba(0,0,0,0.15)" },
-  ctaGhost: { backgroundImage: "none", backgroundColor: "rgba(255,255,255,0.04)", backgroundSize: "100% 100%", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.25)", boxShadow: "none", animation: "none", textShadow: "none" },
-
   heroBtn: {
     display: "flex", flexDirection: "column", alignItems: "stretch", gap: 0,
     padding: 0, borderRadius: "16px", cursor: "pointer",
@@ -1201,5 +1202,14 @@ const S = {
     position: "relative", overflow: "hidden",
   },
   clearDraftBtn: { marginTop: "10px", padding: "6px 12px", borderRadius: "8px", cursor: "pointer", background: "rgba(239,83,80,0.1)", border: "1px solid rgba(239,83,80,0.25)", color: "#ef5350", fontSize: "11px", fontWeight: 600, fontFamily: "'Heebo',sans-serif", transition: "all 0.15s" },
+
+  // ─── Clear-draft confirm modal ───
+  confirmOverlay: { position: "fixed", inset: 0, zIndex: 400, background: "rgba(0,0,0,0.65)", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(5px)", WebkitBackdropFilter: "blur(5px)", animation: "overlayIn 0.22s ease", padding: "0 24px" },
+  confirmCard: { width: "100%", maxWidth: "340px", padding: "22px 20px", borderRadius: "18px", background: "linear-gradient(175deg, rgba(14,42,14,0.99) 0%, rgba(8,26,8,0.99) 100%)", border: "1px solid rgba(200,168,78,0.2)", boxShadow: "0 -12px 48px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.03)", fontFamily: "'Heebo',sans-serif", direction: "rtl", textAlign: "center", animation: "popBounce 0.28s cubic-bezier(0.34,1.56,0.64,1)" },
+  confirmTitle: { fontSize: "16px", fontWeight: 900, color: "#fff" },
+  confirmSub: { fontSize: "12px", color: "rgba(255,255,255,0.5)", marginTop: "8px", lineHeight: 1.5 },
+  confirmButtons: { display: "flex", gap: "10px", marginTop: "20px" },
+  confirmCancelBtn: { flex: 1, minHeight: "44px", padding: "10px 0", borderRadius: "10px", cursor: "pointer", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)", color: "#e8f5e9", fontSize: "13px", fontWeight: 700, fontFamily: "'Heebo',sans-serif" },
+  confirmDeleteBtn: { flex: 1, minHeight: "44px", padding: "10px 0", borderRadius: "10px", cursor: "pointer", background: "rgba(239,83,80,0.16)", border: "1px solid rgba(239,83,80,0.5)", color: "#ff6b66", fontSize: "13px", fontWeight: 800, fontFamily: "'Heebo',sans-serif" },
   sizeCard: { display: "flex", alignItems: "center", width: "100%", padding: "18px 20px", borderRadius: "18px", cursor: "pointer", background: "linear-gradient(155deg, rgba(13,46,13,0.97), rgba(8,28,8,0.93))", border: "2px solid rgba(200,168,78,0.4)", boxShadow: "0 0 0 1px rgba(200,168,78,0.08), 0 8px 30px rgba(0,0,0,0.5), 0 0 20px rgba(200,168,78,0.06), inset 0 1px 0 rgba(255,255,255,0.06)", transition: "all 0.2s cubic-bezier(0.34,1.56,0.64,1)", outline: "none", fontFamily: "'Heebo',sans-serif" },
 };
