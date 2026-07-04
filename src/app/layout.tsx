@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { Heebo, Secular_One } from 'next/font/google';
+import PageTransition from '@/components/PageTransition';
 import './globals.css';
 
 // Self-hosted via next/font — zero external request, zero layout shift.
@@ -39,7 +40,9 @@ export default function RootLayout({
 }) {
     return (
         <html lang="he" dir="rtl" className={`${heebo.variable} ${secularOne.variable}`}>
-            <body>{children}</body>
+            <body>
+                <PageTransition>{children}</PageTransition>
+            </body>
         </html>
     );
 }
