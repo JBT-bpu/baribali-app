@@ -515,37 +515,53 @@ export default function HomeV2() {
                                     zIndex: zIdx,
                                     cursor: 'pointer',
                                     transition: tr,
-                                    borderRadius: '18px',
-                                    overflow: 'hidden',
-                                    border: isActive
-                                        ? (isSaladActive ? '1.5px solid rgba(90,220,40,0.6)' : '1.5px solid rgba(240,200,50,0.55)')
-                                        : '1px solid rgba(255,255,255,0.22)',
-                                    boxShadow: isActive
-                                        ? '0 20px 60px rgba(0,0,0,0.9), 0 4px 20px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.12)' + glowShadow
-                                        : '0 6px 20px rgba(0,0,0,0.5)',
-                                    animation: isActive
-                                        ? (isSaladActive ? 'greenGlow 1.4s ease-in-out infinite' : 'glowPulse 2.4s ease-in-out infinite')
-                                        : undefined,
                                 }}
                             >
-                                <Image
-                                    src={mc.img} alt={mc.label} width={M_W} height={M_H}
-                                    style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none', display: 'block' }}
-                                />
+                                {/* Tilt/glare wrapper — kept on a separate node from the coverflow
+                                    transform above so the two don't fight over the same style. */}
+                                <Tilt
+                                    tiltMaxAngleX={8}
+                                    tiltMaxAngleY={8}
+                                    glareEnable
+                                    glareMaxOpacity={0.18}
+                                    glareColor={isSaladActive ? '#5adc28' : '#f0c832'}
+                                    glarePosition="all"
+                                    glareBorderRadius="18px"
+                                    transitionSpeed={400}
+                                    style={{
+                                        width: '100%', height: '100%',
+                                        borderRadius: '18px',
+                                        overflow: 'hidden',
+                                        border: isActive
+                                            ? (isSaladActive ? '1.5px solid rgba(90,220,40,0.6)' : '1.5px solid rgba(240,200,50,0.55)')
+                                            : '1px solid rgba(255,255,255,0.22)',
+                                        boxShadow: isActive
+                                            ? '0 20px 60px rgba(0,0,0,0.9), 0 4px 20px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.12)' + glowShadow
+                                            : '0 6px 20px rgba(0,0,0,0.5)',
+                                        animation: isActive
+                                            ? (isSaladActive ? 'greenGlow 1.4s ease-in-out infinite' : 'glowPulse 2.4s ease-in-out infinite')
+                                            : undefined,
+                                        position: 'relative',
+                                    }}
+                                >
+                                    <Image
+                                        src={mc.img} alt={mc.label} width={M_W} height={M_H}
+                                        style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none', display: 'block' }}
+                                    />
 
-                                {/* Two-tap hint on salad */}
-                                {isSaladActive && (
-                                    <div style={{
-                                        position: 'absolute', bottom: '18px', left: '50%', transform: 'translateX(-50%)',
-                                        fontSize: '11px', fontWeight: 800, color: '#fff',
-                                        background: 'rgba(0,0,0,0.78)', padding: '5px 14px', borderRadius: '20px',
-                                        whiteSpace: 'nowrap', animation: 'hint 0.85s ease-in-out infinite',
-                                        backdropFilter: 'blur(6px)', border: '1px solid rgba(90,220,40,0.5)', zIndex: 10,
-                                    }}>
-                                        ← הקש שוב לאישור
-                                    </div>
-                                )}
-
+                                    {/* Two-tap hint on salad */}
+                                    {isSaladActive && (
+                                        <div style={{
+                                            position: 'absolute', bottom: '18px', left: '50%', transform: 'translateX(-50%)',
+                                            fontSize: '11px', fontWeight: 800, color: '#fff',
+                                            background: 'rgba(0,0,0,0.78)', padding: '5px 14px', borderRadius: '20px',
+                                            whiteSpace: 'nowrap', animation: 'hint 0.85s ease-in-out infinite',
+                                            backdropFilter: 'blur(6px)', border: '1px solid rgba(90,220,40,0.5)', zIndex: 10,
+                                        }}>
+                                            ← הקש שוב לאישור
+                                        </div>
+                                    )}
+                                </Tilt>
                             </div>
                         );
                     })}
@@ -553,7 +569,7 @@ export default function HomeV2() {
 
                 {/* Dynamic card label — re-animates on each idx change */}
                 <div key={`label-${activeIdx}`} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', marginTop: '10px', animation: 'labelIn 0.28s ease both' }}>
-                    <div style={{ fontSize: '20px', fontWeight: 900, color: '#fff', letterSpacing: '0.01em', textShadow: '0 2px 14px rgba(0,0,0,0.9)' }}>
+                    <div style={{ fontFamily: "var(--font-display), 'Secular One', sans-serif", fontSize: '22px', fontWeight: 400, color: '#fff', letterSpacing: '0.01em', textShadow: '0 2px 14px rgba(0,0,0,0.9)' }}>
                         {card.label}
                     </div>
                     <div style={{ fontSize: '12px', fontWeight: 600, color: 'rgba(255,255,255,0.65)', letterSpacing: '0.04em' }}>

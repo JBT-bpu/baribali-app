@@ -870,7 +870,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
             <div style={{ position: "absolute", left: 0, right: 0, textAlign: "center", pointerEvents: "none" }}>
               <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: "5px", whiteSpace: "nowrap" }}>
                 <span style={{ fontSize: "clamp(15px, 4.5vw, 22px)" }}>{cur.emoji}</span>
-                <span style={{ fontSize: "clamp(15px, 4.5vw, 22px)", fontWeight: 900, color: "#ffffff", textShadow: "0 2px 6px rgba(0,0,0,0.6)" }}>{cur.title}</span>
+                <span style={{ fontFamily: "var(--font-display), 'Secular One', sans-serif", fontSize: "clamp(16px, 4.8vw, 23px)", color: "#ffffff", textShadow: "0 2px 6px rgba(0,0,0,0.6)" }}>{cur.title}</span>
                 {cur.subtitle && <>
                   <span style={{ fontSize: "clamp(11px, 3vw, 14px)", color: "rgba(255,255,255,0.3)", fontWeight: 400 }}>·</span>
                   <span style={{ fontSize: "clamp(11px, 3vw, 14px)", fontWeight: 700, color: "rgba(255,255,255,0.65)" }}>{cur.subtitle}</span>

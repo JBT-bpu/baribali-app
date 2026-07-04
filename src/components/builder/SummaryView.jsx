@@ -41,6 +41,8 @@ import { STEPS, NUTRI, BASE } from "../../data/salad-data.js"; // NUTRI used in 
 const headerImage = "/builder-assets/header-brand.png";
 import MagicBackground from "./background/MagicBackground.jsx";
 import MixingAnimation from "./ui/MixingAnimation.jsx";
+import BariPanel from "../ui/bari/BariPanel";
+import BariButton from "../ui/bari/BariButton";
 
 export default function SummaryView({ sels, total, all, comboBadges, notes, setNotes, onBack, onEdit, onNewOrder, base = BASE, sizeLabel = null }) {
     const [showMixing, setShowMixing] = useState(false);
@@ -107,7 +109,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                         <button style={S.backBtn} onClick={onBack}>←</button>
                         <div style={{ flex: 1, display: "flex", alignItems: "center", gap: "5px" }}>
                             <span style={{ fontSize: "17px" }}>📋</span>
-                            <span style={{ fontSize: "16px", fontWeight: 800, color: "#e8f5e9" }}>הסלט שלכם</span>
+                            <span style={{ fontFamily: "var(--font-display), 'Secular One', sans-serif", fontSize: "17px", color: "#e8f5e9" }}>הסלט שלכם</span>
                         </div>
                         <div style={S.pricePill}>
                             <span style={S.priceS}>₪</span>
@@ -148,10 +150,10 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                     {/* ── RPG Inventory ── */}
                     <div style={{ margin: "0 12px 8px" }}>
                         {grouped.map(({ s, items }, gi) => (
-                            <div key={s.id} style={{
-                                marginBottom: "14px",
+                            <BariPanel key={s.id} className="p-2.5" style={{
+                                marginBottom: "10px",
                                 opacity: highlightedStep && highlightedStep !== s.id ? 0.45 : 1,
-                                transition: "opacity 0.3s ease",
+                                transition: "opacity 0.3s ease, border-color 0.2s, box-shadow 0.2s",
                             }}>
                                 {/* Shelf label */}
                                 <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
@@ -213,7 +215,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                                         </button>
                                     )}
                                 </div>
-                            </div>
+                            </BariPanel>
                         ))}
                     </div>
 
@@ -269,7 +271,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                         ))}
                         <div style={S.sumTotal}>
                             <span style={{ fontSize: "16px", fontWeight: 700, color: "rgba(255,255,255,0.55)" }}>סה"כ</span>
-                            <span>₪{total}</span>
+                            <span style={{ fontFamily: "var(--font-display), 'Secular One', sans-serif" }}>₪{total}</span>
                         </div>
                     </div>
                     <div style={S.trustCopy}>
@@ -294,7 +296,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                         </div>
                     </div>
                     {/* CTA */}
-                    <button style={S.orderBtn} onClick={() => {
+                    <BariButton variant="primary" fullWidth style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }} onClick={() => {
                         if (navigator.vibrate) navigator.vibrate([15, 40, 30]);
                         setShowMixing(true);
                         // Fire API in parallel — animation gives it ~5s to complete
@@ -329,7 +331,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                     }}>
                         <span>שלח הזמנה</span>
                         <span style={S.orderBtnPrice}>₪{total}</span>
-                    </button>
+                    </BariButton>
                 </div>
             </div>
             <style>{KF}</style>
@@ -633,16 +635,6 @@ const S = {
     },
     metaPillIcon: { fontSize: "16px", lineHeight: 1 },
     metaPillText: { fontSize: "13px", fontWeight: 700, color: "rgba(255,255,255,0.7)", fontFamily: "var(--font-heebo), 'Heebo', sans-serif" },
-    orderBtn: {
-        display: "flex", alignItems: "center", justifyContent: "center", gap: "12px",
-        width: "100%", padding: "16px 22px", borderRadius: "16px", cursor: "pointer",
-        backgroundImage: "linear-gradient(135deg, #c8a832 0%, #f0d060 45%, #ffe066 55%, #c8a832 100%)",
-        backgroundSize: "200% 100%",
-        border: "none", color: "#0d2e0d", fontSize: "17px", fontWeight: 900,
-        fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
-        boxShadow: "0 6px 28px rgba(200,168,78,0.5), 0 0 0 1px rgba(200,168,78,0.3), inset 0 1px 0 rgba(255,255,255,0.35)",
-        transition: "transform 0.15s, box-shadow 0.15s",
-    },
     orderBtnPrice: {
         fontSize: "15px", fontWeight: 900,
         background: "rgba(0,0,0,0.18)", padding: "3px 10px", borderRadius: "8px",
