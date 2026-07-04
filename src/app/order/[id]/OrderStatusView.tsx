@@ -399,12 +399,12 @@ function NotFound() {
     return (
         <div style={{ ...P.root, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px' }}>
             <div style={{ fontSize: '48px' }}>🤔</div>
-            <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '16px', fontFamily: "var(--font-heebo), var(--font-heebo), 'Heebo', sans-serif" }}>ההזמנה לא נמצאה</div>
+            <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '16px', fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }}>ההזמנה לא נמצאה</div>
             <Link href="/" style={{
                 marginTop: '8px', padding: '12px 32px', borderRadius: '50px', textDecoration: 'none',
                 background: 'linear-gradient(135deg,#c8a832 0%,#f0d060 45%,#ffe066 55%,#c8a832 100%)',
                 color: '#0d2e0d', fontSize: '15px', fontWeight: 900,
-                fontFamily: "var(--font-heebo), var(--font-heebo), 'Heebo', sans-serif",
+                fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
                 boxShadow: '0 4px 20px rgba(200,168,78,0.4)',
             }}>חזרה לדף הבית</Link>
         </div>
@@ -414,7 +414,7 @@ function NotFound() {
 const shimmerGradient = 'linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.04) 75%)';
 
 const P: Record<string, React.CSSProperties> = {
-    root: { minHeight: '100vh', background: 'url(/homepage-assets/bg-bokeh.webp) center top / cover no-repeat, linear-gradient(155deg, #030a03 0%, #071a07 30%, #0a200a 60%, #071a07 100%)', fontFamily: "var(--font-heebo), var(--font-heebo), 'Heebo', sans-serif", direction: 'rtl', color: '#fff' },
+    root: { minHeight: '100vh', background: 'url(/homepage-assets/bg-bokeh.webp) center top / cover no-repeat, linear-gradient(155deg, #030a03 0%, #071a07 30%, #0a200a 60%, #071a07 100%)', fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: 'rtl', color: '#fff' },
     bg: { position: 'fixed', inset: 0, background: 'radial-gradient(ellipse 80% 50% at 50% 30%, rgba(200,168,78,0.06) 0%, transparent 70%)', pointerEvents: 'none' },
     content: { position: 'relative', zIndex: 1, maxWidth: '420px', margin: '0 auto', padding: '32px 20px 60px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' },
 

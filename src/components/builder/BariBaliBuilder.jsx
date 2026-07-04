@@ -790,7 +790,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
                               border: "none", cursor: "pointer",
                               background: `linear-gradient(135deg, ${epc.dot}, ${epc.border})`,
                               color: "#0a1a0a", fontSize: "14px", fontWeight: 900,
-                              fontFamily: "var(--font-heebo), var(--font-heebo), 'Heebo', sans-serif",
+                              fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
                               boxShadow: `0 4px 18px ${epc.dot}`,
                               letterSpacing: "0.02em",
                             }}
@@ -1040,7 +1040,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
               border: "1px solid rgba(200,168,78,0.35)",
               background: "linear-gradient(145deg, rgba(8,22,8,0.97), rgba(13,40,13,0.95))",
               cursor: "pointer",
-              fontFamily: "var(--font-heebo), var(--font-heebo), 'Heebo', sans-serif",
+              fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
               boxShadow: "0 4px 18px rgba(0,0,0,0.4), 0 0 0 1px rgba(200,168,78,0.08)",
               animation: "goldPulse 3s ease-in-out infinite",
               ...(cur.id === "upgrade" && curSel.length === 0 ? { opacity: 0.5, animation: "none" } : {}),
@@ -1135,17 +1135,17 @@ button:active:not(:disabled) {
 // ─── STYLES ─────────────────────────────────────────────────
 
 const S = {
-  root: { position: "relative", width: "100%", maxWidth: "430px", minHeight: "100vh", margin: "0 auto", overflow: "hidden", fontFamily: "var(--font-heebo), var(--font-heebo), 'Heebo', sans-serif", direction: "rtl", color: "#ffffff" },
+  root: { position: "relative", width: "100%", maxWidth: "430px", minHeight: "100vh", margin: "0 auto", overflow: "hidden", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: "rtl", color: "#ffffff" },
   bg: { position: "fixed", inset: 0, zIndex: 0, background: "url(/homepage-assets/BG_8K.webp) center center / cover no-repeat, #020a02", filter: "brightness(0.45)" },
   bgRay: {},
   main: { position: "relative", zIndex: 2, display: "flex", flexDirection: "column", height: "100vh" },
 
   header: { padding: "8px 12px 6px", background: `linear-gradient(to bottom, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.28) 100%), url(${headerImage}) center / cover no-repeat`, borderBottom: "2px solid rgba(200,168,78,0.4)", boxShadow: "0 4px 20px rgba(0,0,0,0.5), 0 0 30px rgba(200,168,78,0.08)", position: "relative" },
   headerTop: { display: "flex", alignItems: "center" },
-  backBtn: { width: "34px", height: "34px", borderRadius: "10px", cursor: "pointer", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", color: "#ffffff", fontSize: "16px", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-heebo), var(--font-heebo), 'Heebo', sans-serif" },
-  navBtn: { width: "34px", height: "34px", borderRadius: "10px", cursor: "pointer", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", color: "#ffffff", fontSize: "16px", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-heebo), var(--font-heebo), 'Heebo', sans-serif" },
-  navBtnNext: { width: "34px", height: "34px", borderRadius: "10px", cursor: "pointer", background: "linear-gradient(135deg, rgba(200,168,78,0.35), rgba(240,208,96,0.25))", border: "1.5px solid rgba(200,168,78,0.55)", color: "#f0d060", fontSize: "16px", fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-heebo), var(--font-heebo), 'Heebo', sans-serif", boxShadow: "0 0 10px rgba(200,168,78,0.25)" },
-  resetBtn: { width: "34px", height: "34px", borderRadius: "10px", cursor: "pointer", background: "rgba(239,83,80,0.18)", border: "1.5px solid rgba(239,83,80,0.5)", color: "#ff7575", fontSize: "17px", fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-heebo), var(--font-heebo), 'Heebo', sans-serif", boxShadow: "0 0 8px rgba(239,83,80,0.2)" },
+  backBtn: { width: "34px", height: "34px", borderRadius: "10px", cursor: "pointer", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", color: "#ffffff", fontSize: "16px", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-heebo), 'Heebo', sans-serif" },
+  navBtn: { width: "34px", height: "34px", borderRadius: "10px", cursor: "pointer", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", color: "#ffffff", fontSize: "16px", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-heebo), 'Heebo', sans-serif" },
+  navBtnNext: { width: "34px", height: "34px", borderRadius: "10px", cursor: "pointer", background: "linear-gradient(135deg, rgba(200,168,78,0.35), rgba(240,208,96,0.25))", border: "1.5px solid rgba(200,168,78,0.55)", color: "#f0d060", fontSize: "16px", fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", boxShadow: "0 0 10px rgba(200,168,78,0.25)" },
+  resetBtn: { width: "34px", height: "34px", borderRadius: "10px", cursor: "pointer", background: "rgba(239,83,80,0.18)", border: "1.5px solid rgba(239,83,80,0.5)", color: "#ff7575", fontSize: "17px", fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", boxShadow: "0 0 8px rgba(239,83,80,0.2)" },
   pricePill: { display: "flex", alignItems: "baseline", gap: "2px", background: "linear-gradient(135deg, rgba(200,168,78,0.15), rgba(180,140,40,0.08))", border: "1px solid rgba(200,168,78,0.4)", padding: "4px 12px", borderRadius: "12px", transition: "all 0.2s cubic-bezier(0.34,1.56,0.64,1)" },
   priceS: { fontSize: "11px", color: "#d4b84a", fontWeight: 700 },
   priceV: { fontSize: "22px", color: "#ffffff", fontWeight: 900, textShadow: "0 2px 8px rgba(200,168,78,0.5)" },
@@ -1160,7 +1160,7 @@ const S = {
   sugPill: { display: "flex", alignItems: "center", gap: "4px", padding: "3px 9px", borderRadius: "9px", background: "rgba(200,168,78,0.22)", border: "1px solid rgba(200,168,78,0.4)" },
 
   anchorRow: { display: "flex", gap: "5px", padding: "6px 10px", overflowX: "auto", scrollbarWidth: "none", borderBottom: "1px solid rgba(200,168,78,0.3)", background: "rgba(0,0,0,0.55)", boxShadow: "inset 0 -1px 0 rgba(200,168,78,0.12)" },
-  anchorTab: { padding: "5px 12px", borderRadius: "8px", border: "1px solid rgba(200,168,78,0.4)", background: "linear-gradient(145deg, rgba(18,52,18,0.95), rgba(12,36,12,0.92))", color: "rgba(255,255,255,0.8)", fontSize: "11px", fontWeight: 700, cursor: "pointer", flexShrink: 0, transition: "all 0.15s", fontFamily: "var(--font-heebo), var(--font-heebo), 'Heebo', sans-serif", textShadow: "0 1px 2px rgba(0,0,0,0.5)" },
+  anchorTab: { padding: "5px 12px", borderRadius: "8px", border: "1px solid rgba(200,168,78,0.4)", background: "linear-gradient(145deg, rgba(18,52,18,0.95), rgba(12,36,12,0.92))", color: "rgba(255,255,255,0.8)", fontSize: "11px", fontWeight: 700, cursor: "pointer", flexShrink: 0, transition: "all 0.15s", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", textShadow: "0 1px 2px rgba(0,0,0,0.5)" },
   anchorActive: { background: "linear-gradient(145deg, rgba(200,168,78,0.18), rgba(180,140,40,0.1))", borderColor: "rgba(200,168,78,0.45)", color: "#f0d060" },
 
   content: { flex: 1, overflowY: "auto", overflowX: "hidden", padding: "4px 10px", scrollbarWidth: "none" },
@@ -1189,7 +1189,7 @@ const S = {
     border: "2px solid rgba(200,168,78,0.55)",
     boxShadow: "0 0 0 1px rgba(200,168,78,0.12), 0 8px 30px rgba(0,0,0,0.5), 0 0 40px rgba(200,168,78,0.08)",
     transition: "all 0.35s cubic-bezier(0.34,1.56,0.64,1)",
-    outline: "none", fontFamily: "var(--font-heebo), var(--font-heebo), 'Heebo', sans-serif", width: "100%",
+    outline: "none", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", width: "100%",
     animation: "heroPulse 3s ease-in-out infinite", overflow: "hidden",
   },
   presetCard: {
@@ -1201,15 +1201,15 @@ const S = {
     transition: "all 0.2s cubic-bezier(0.34,1.56,0.64,1)", outline: "none",
     position: "relative", overflow: "hidden",
   },
-  clearDraftBtn: { marginTop: "10px", padding: "6px 12px", borderRadius: "8px", cursor: "pointer", background: "rgba(239,83,80,0.1)", border: "1px solid rgba(239,83,80,0.25)", color: "#ef5350", fontSize: "11px", fontWeight: 600, fontFamily: "var(--font-heebo), var(--font-heebo), 'Heebo', sans-serif", transition: "all 0.15s" },
+  clearDraftBtn: { marginTop: "10px", padding: "6px 12px", borderRadius: "8px", cursor: "pointer", background: "rgba(239,83,80,0.1)", border: "1px solid rgba(239,83,80,0.25)", color: "#ef5350", fontSize: "11px", fontWeight: 600, fontFamily: "var(--font-heebo), 'Heebo', sans-serif", transition: "all 0.15s" },
 
   // ─── Clear-draft confirm modal ───
   confirmOverlay: { position: "fixed", inset: 0, zIndex: 400, background: "rgba(0,0,0,0.65)", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(5px)", WebkitBackdropFilter: "blur(5px)", animation: "overlayIn 0.22s ease", padding: "0 24px" },
-  confirmCard: { width: "100%", maxWidth: "340px", padding: "22px 20px", borderRadius: "18px", background: "linear-gradient(175deg, rgba(14,42,14,0.99) 0%, rgba(8,26,8,0.99) 100%)", border: "1px solid rgba(200,168,78,0.2)", boxShadow: "0 -12px 48px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.03)", fontFamily: "var(--font-heebo), var(--font-heebo), 'Heebo', sans-serif", direction: "rtl", textAlign: "center", animation: "popBounce 0.28s cubic-bezier(0.34,1.56,0.64,1)" },
+  confirmCard: { width: "100%", maxWidth: "340px", padding: "22px 20px", borderRadius: "18px", background: "linear-gradient(175deg, rgba(14,42,14,0.99) 0%, rgba(8,26,8,0.99) 100%)", border: "1px solid rgba(200,168,78,0.2)", boxShadow: "0 -12px 48px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.03)", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: "rtl", textAlign: "center", animation: "popBounce 0.28s cubic-bezier(0.34,1.56,0.64,1)" },
   confirmTitle: { fontSize: "16px", fontWeight: 900, color: "#fff" },
   confirmSub: { fontSize: "12px", color: "rgba(255,255,255,0.5)", marginTop: "8px", lineHeight: 1.5 },
   confirmButtons: { display: "flex", gap: "10px", marginTop: "20px" },
-  confirmCancelBtn: { flex: 1, minHeight: "44px", padding: "10px 0", borderRadius: "10px", cursor: "pointer", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)", color: "#e8f5e9", fontSize: "13px", fontWeight: 700, fontFamily: "var(--font-heebo), var(--font-heebo), 'Heebo', sans-serif" },
-  confirmDeleteBtn: { flex: 1, minHeight: "44px", padding: "10px 0", borderRadius: "10px", cursor: "pointer", background: "rgba(239,83,80,0.16)", border: "1px solid rgba(239,83,80,0.5)", color: "#ff6b66", fontSize: "13px", fontWeight: 800, fontFamily: "var(--font-heebo), var(--font-heebo), 'Heebo', sans-serif" },
-  sizeCard: { display: "flex", alignItems: "center", width: "100%", padding: "18px 20px", borderRadius: "18px", cursor: "pointer", background: "linear-gradient(155deg, rgba(13,46,13,0.97), rgba(8,28,8,0.93))", border: "2px solid rgba(200,168,78,0.4)", boxShadow: "0 0 0 1px rgba(200,168,78,0.08), 0 8px 30px rgba(0,0,0,0.5), 0 0 20px rgba(200,168,78,0.06), inset 0 1px 0 rgba(255,255,255,0.06)", transition: "all 0.2s cubic-bezier(0.34,1.56,0.64,1)", outline: "none", fontFamily: "var(--font-heebo), var(--font-heebo), 'Heebo', sans-serif" },
+  confirmCancelBtn: { flex: 1, minHeight: "44px", padding: "10px 0", borderRadius: "10px", cursor: "pointer", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)", color: "#e8f5e9", fontSize: "13px", fontWeight: 700, fontFamily: "var(--font-heebo), 'Heebo', sans-serif" },
+  confirmDeleteBtn: { flex: 1, minHeight: "44px", padding: "10px 0", borderRadius: "10px", cursor: "pointer", background: "rgba(239,83,80,0.16)", border: "1px solid rgba(239,83,80,0.5)", color: "#ff6b66", fontSize: "13px", fontWeight: 800, fontFamily: "var(--font-heebo), 'Heebo', sans-serif" },
+  sizeCard: { display: "flex", alignItems: "center", width: "100%", padding: "18px 20px", borderRadius: "18px", cursor: "pointer", background: "linear-gradient(155deg, rgba(13,46,13,0.97), rgba(8,28,8,0.93))", border: "2px solid rgba(200,168,78,0.4)", boxShadow: "0 0 0 1px rgba(200,168,78,0.08), 0 8px 30px rgba(0,0,0,0.5), 0 0 20px rgba(200,168,78,0.06), inset 0 1px 0 rgba(255,255,255,0.06)", transition: "all 0.2s cubic-bezier(0.34,1.56,0.64,1)", outline: "none", fontFamily: "var(--font-heebo), 'Heebo', sans-serif" },
 };

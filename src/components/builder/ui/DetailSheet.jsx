@@ -147,7 +147,7 @@ const S = {
         borderBottom: "none",
         boxShadow: "0 -12px 48px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.03)",
         animation: "sheetUp 0.28s cubic-bezier(0.34,1.2,0.64,1)",
-        fontFamily: "var(--font-heebo), var(--font-heebo), 'Heebo', sans-serif",
+        fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
         direction: "rtl",
         overflow: "hidden",
         maxHeight: "90vh",
@@ -276,7 +276,7 @@ const S = {
         borderRadius: "14px", border: "none",
         background: "linear-gradient(135deg, #c8a832, #f0d060)",
         color: "#1a1000", fontSize: "15px", fontWeight: 900,
-        cursor: "pointer", fontFamily: "var(--font-heebo), var(--font-heebo), 'Heebo', sans-serif",
+        cursor: "pointer", fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
         boxShadow: "0 4px 16px rgba(200,168,78,0.3)",
         animation: "fadeUp 0.3s ease 0.1s both",
     },
@@ -287,7 +287,7 @@ const S = {
         background: "rgba(239,83,80,0.08)",
         color: "rgba(239,83,80,0.85)",
         fontSize: "15px", fontWeight: 700,
-        cursor: "pointer", fontFamily: "var(--font-heebo), var(--font-heebo), 'Heebo', sans-serif",
+        cursor: "pointer", fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
         animation: "fadeUp 0.3s ease 0.1s both",
     },
     closeBtn: {
@@ -297,7 +297,7 @@ const S = {
         background: "rgba(255,255,255,0.03)",
         color: "rgba(255,255,255,0.35)",
         fontSize: "13px", fontWeight: 700,
-        cursor: "pointer", fontFamily: "var(--font-heebo), var(--font-heebo), 'Heebo', sans-serif",
+        cursor: "pointer", fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
     },
 };
 

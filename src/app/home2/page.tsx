@@ -167,7 +167,7 @@ function SizePicker({ onSelect, onBack }: { onSelect: (s: string) => void; onBac
             backdropFilter: 'blur(28px) saturate(1.3)',
             display: 'flex', flexDirection: 'column', alignItems: 'center',
             justifyContent: 'center', gap: 'min(12px, 2vh)', direction: 'rtl',
-            fontFamily: "var(--font-heebo), var(--font-heebo), 'Heebo', sans-serif",
+            fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
             paddingTop: 'max(16px, env(safe-area-inset-top))',
             paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
             overflowY: 'auto',
@@ -285,7 +285,7 @@ function SizePicker({ onSelect, onBack }: { onSelect: (s: string) => void; onBac
                 marginTop: '4px',
                 padding: '14px 52px', borderRadius: '50px', border: 'none', cursor: 'pointer',
                 background: 'linear-gradient(135deg,#c8a832 0%,#f0d060 45%,#ffe066 55%,#c8a832 100%)',
-                color: '#0d2e0d', fontSize: '17px', fontWeight: 900, fontFamily: "var(--font-heebo), var(--font-heebo), 'Heebo', sans-serif",
+                color: '#0d2e0d', fontSize: '17px', fontWeight: 900, fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
                 boxShadow: '0 0 40px rgba(240,200,50,0.5),0 4px 20px rgba(0,0,0,0.4)',
                 opacity: out ? 0 : 1, transition: 'opacity 0.2s',
             }}>
@@ -295,7 +295,7 @@ function SizePicker({ onSelect, onBack }: { onSelect: (s: string) => void; onBac
             <button type="button" onClick={onBack} style={{
                 background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.55)',
                 fontSize: '13px', fontWeight: 600, cursor: 'pointer', padding: '6px 14px', borderRadius: '20px',
-                fontFamily: "var(--font-heebo), var(--font-heebo), 'Heebo', sans-serif", marginTop: '-4px',
+                fontFamily: "var(--font-heebo), 'Heebo', sans-serif", marginTop: '-4px',
             }}>
                 ← חזרה
             </button>
@@ -416,7 +416,7 @@ export default function HomeV2() {
     return (
         <div style={{
             minHeight: '100vh', width: '100%', position: 'relative',
-            fontFamily: "var(--font-heebo), var(--font-heebo), 'Heebo', sans-serif", direction: 'rtl',
+            fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: 'rtl',
             display: 'flex', flexDirection: 'column', alignItems: 'center',
             justifyContent: 'space-between', overflow: 'hidden', userSelect: 'none',
             background: 'url(/homepage-assets/BG_8K.webp) center center / cover no-repeat, #020a02',
@@ -693,11 +693,11 @@ export default function HomeV2() {
                         <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.28)', textAlign: 'center', lineHeight: 1.7, maxWidth: '250px', fontWeight: 600 }}>
                             שמור סלטים · ראה היסטוריה · קבל המלצות אישיות
                         </div>
-                        <button type="button" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '13px 28px', borderRadius: '50px', background: '#fff', border: 'none', cursor: 'pointer', fontSize: '15px', fontWeight: 800, color: '#1a1a1a', fontFamily: "var(--font-heebo), var(--font-heebo), 'Heebo', sans-serif", boxShadow: '0 4px 20px rgba(0,0,0,0.35)' }}>
+                        <button type="button" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '13px 28px', borderRadius: '50px', background: '#fff', border: 'none', cursor: 'pointer', fontSize: '15px', fontWeight: 800, color: '#1a1a1a', fontFamily: "var(--font-heebo), 'Heebo', sans-serif", boxShadow: '0 4px 20px rgba(0,0,0,0.35)' }}>
                             <span style={{ fontSize: '17px', fontWeight: 900, color: '#4285F4' }}>G</span>
                             המשך עם Google
                         </button>
-                        <button type="button" onClick={() => setLoginSheet(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.18)', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: "var(--font-heebo), var(--font-heebo), 'Heebo', sans-serif" }}>ביטול</button>
+                        <button type="button" onClick={() => setLoginSheet(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.18)', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }}>ביטול</button>
                     </div>
                 </div>
             )}
