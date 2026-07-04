@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
+import { isKitchenAuthorized } from '@/lib/kitchenAuth';
 
 const VALID_STATUSES = ['waiting', 'preparing', 'ready', 'collected'];
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+    if (!isKitchenAuthorized(req)) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     try {
         const { status } = await req.json();
 

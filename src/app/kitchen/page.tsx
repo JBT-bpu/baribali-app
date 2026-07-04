@@ -1,7 +1,12 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
+
+const KITCHEN_SECRET = process.env.NEXT_PUBLIC_KITCHEN_API_SECRET;
+const kitchenHeaders = (extra?: Record<string, string>) => ({
+    ...(KITCHEN_SECRET ? { 'x-kitchen-secret': KITCHEN_SECRET } : {}),
+    ...extra,
+});
 
 // ─── Types ──────────────────────────────────────────────────────
 type OrderStatus = 'waiting' | 'preparing' | 'ready' | 'collected';
@@ -88,31 +93,25 @@ export default function KitchenPage() {
             setLoading(false);
             return;
         }
-        const since = new Date();
-        since.setHours(0, 0, 0, 0); // today only
-        const { data } = await supabase
-            .from('orders')
-            .select('*')
-            .gte('created_at', since.toISOString())
-            .neq('status', 'collected')
-            .eq('payment_status', 'paid')
-            .order('pickup_time', { ascending: true });
-        if (data) setOrders(data as Order[]);
+        const res = await fetch('/api/kitchen/orders', { headers: kitchenHeaders() });
+        if (res.ok) {
+            const data = await res.json();
+            // Keyed by order.id in the render below, so React reconciles in place
+            // rather than remounting cards — no visual "jump" on each poll.
+            setOrders(data as Order[]);
+        }
         setLoading(false);
     }, [isDemo]);
 
     useEffect(() => { loadOrders(); }, [loadOrders]);
 
-    // Realtime subscription (live mode only)
+    // Poll for updates (live mode only) — replaces the old Realtime subscription,
+    // since anon-client Realtime access relied on the RLS policies that are now
+    // locked down. Phase F can upgrade this to an animated diff via `motion`.
     useEffect(() => {
         if (isDemo) return;
-        const channel = supabase
-            .channel('kitchen-orders')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
-                loadOrders();
-            })
-            .subscribe();
-        return () => { supabase.removeChannel(channel); };
+        const id = setInterval(loadOrders, 4000);
+        return () => clearInterval(id);
     }, [loadOrders, isDemo]);
 
     // Update order status
@@ -122,7 +121,7 @@ export default function KitchenPage() {
         if (isDemo) return; // skip API in demo mode
         await fetch(`/api/orders/${id}/status`, {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
+            headers: kitchenHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify({ status }),
         });
     }, [isDemo]);
@@ -138,8 +137,6 @@ export default function KitchenPage() {
 
     return (
         <div style={K.root}>
-            <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
-
             {/* Header */}
             <div style={K.header}>
                 <div style={K.headerTitle}>🥗 מטבח BariBali</div>

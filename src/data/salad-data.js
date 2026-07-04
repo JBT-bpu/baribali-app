@@ -146,6 +146,13 @@ export const STEPS = [
 
 export const BASE = 54;
 
+// ─── SIZE CONFIG ─────────────────────────────────────────────
+export const SIZE_CONFIG = {
+    750:  { ml: 750,  label: '750 מ"ל',  price: 54, desc: "סלט אישי" },
+    1000: { ml: 1000, label: '1000 מ"ל', price: 59, desc: "סלט רגיל" },
+    1500: { ml: 1500, label: '1500 מ"ל', price: 72, desc: "סלט גדול" },
+};
+
 // ─── TORTILLA BUILDER ───────────────────────────────────────
 
 export const TORTILLA_BASE = 42;

@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
 import ParticleCanvas from '@/components/ui/ParticleCanvas';
 
 type OrderStatus = 'waiting' | 'preparing' | 'ready' | 'collected';
@@ -214,35 +213,33 @@ export default function OrderStatusPage({ params }: { params: { id: string } }) 
     }, []);
 
     useEffect(() => {
-        // Initial load
-        supabase
-            .from('orders')
-            .select('*')
-            .eq('id', params.id)
-            .single()
-            .then(({ data, error }) => {
-                if (error || !data) setNotFound(true);
-                else {
+        // Polling replaces the old Realtime subscription, since anon-client
+        // Realtime access relied on the RLS policies that are now locked down.
+        // The order's UUID id acts as the capability token — no extra secret
+        // needed to read it via /api/orders/[id].
+        let cancelled = false;
+        let initial = true;
+
+        const load = () => {
+            fetch(`/api/orders/${params.id}`)
+                .then(r => r.ok ? r.json() : null)
+                .then(data => {
+                    if (cancelled) return;
+                    if (!data) {
+                        if (initial) setNotFound(true);
+                        return;
+                    }
                     const d = data as Order;
                     setOrder(d);
-                    prevStatusRef.current = d.status;
-                }
-            });
+                    if (prevStatusRef.current === null) prevStatusRef.current = d.status;
+                })
+                .catch(() => { if (!cancelled && initial) setNotFound(true); })
+                .finally(() => { initial = false; });
+        };
 
-        // Realtime subscription
-        const channel = supabase
-            .channel(`order-${params.id}`)
-            .on('postgres_changes', {
-                event: 'UPDATE',
-                schema: 'public',
-                table: 'orders',
-                filter: `id=eq.${params.id}`,
-            }, payload => {
-                setOrder(prev => prev ? { ...prev, ...(payload.new as Partial<Order>) } : null);
-            })
-            .subscribe();
-
-        return () => { supabase.removeChannel(channel); };
+        load();
+        const id = setInterval(load, 4000);
+        return () => { cancelled = true; clearInterval(id); };
     }, [params.id]);
 
     // Track status changes and fire effects

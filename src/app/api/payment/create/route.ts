@@ -75,8 +75,25 @@ function buildHypUrl(orderId: string, orderNum: string, total: number, successUr
 
 export async function POST(req: NextRequest) {
     try {
-        const { orderId, orderNum, total } = await req.json();
-        if (!orderId || !total) return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
+        const { orderId } = await req.json();
+        if (!orderId) return NextResponse.json({ error: 'Missing orderId' }, { status: 400 });
+
+        // Never trust a client-submitted total/orderNum — look up the server-computed
+        // values that were stored when the order was created.
+        const { data: order, error } = await supabaseAdmin
+            .from('orders')
+            .select('id, order_num, total, payment_status')
+            .eq('id', orderId)
+            .single();
+
+        if (error || !order) {
+            return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+        }
+        if (order.payment_status === 'paid' || order.payment_status === 'paid_unverified') {
+            return NextResponse.json({ error: 'Order already paid' }, { status: 409 });
+        }
+
+        const { order_num: orderNum, total } = order;
 
         const origin = req.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001';
         const successUrl = `${origin}/order/${orderId}?payment=success`;

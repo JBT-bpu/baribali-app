@@ -318,7 +318,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                                     const payRes = await fetch('/api/payment/create', {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ orderId: data.id, orderNum: data.orderNum, total }),
+                                        body: JSON.stringify({ orderId: data.id }),
                                     }).then(r => r.ok ? r.json() : null).catch(() => null);
                                     if (payRes?.paymentUrl) {
                                         window.location.href = payRes.paymentUrl;
@@ -589,7 +589,7 @@ const S = {
     main: { position: "relative", zIndex: 2, display: "flex", flexDirection: "column", height: "100vh" },
     header: { background: `linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.5)), url(/builder-assets/header-brand.png) center / cover no-repeat`, borderBottom: "2px solid rgba(200,168,78,0.4)" },
     headerTop: { display: "flex", alignItems: "center", gap: "8px", padding: "8px 12px 10px" },
-    backBtn: { width: "34px", height: "34px", borderRadius: "10px", cursor: "pointer", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)", color: "#a5d6a7", fontSize: "16px", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Heebo',sans-serif", flexShrink: 0 },
+    backBtn: { width: "44px", height: "44px", borderRadius: "10px", cursor: "pointer", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)", color: "#a5d6a7", fontSize: "16px", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Heebo',sans-serif", flexShrink: 0 },
     pricePill: { display: "flex", alignItems: "baseline", gap: "1px", background: "linear-gradient(135deg, rgba(200,168,78,0.22), rgba(184,134,11,0.1))", border: "1px solid rgba(200,168,78,0.4)", padding: "4px 11px", borderRadius: "12px" },
     priceS: { fontSize: "10px", color: "#d4b84a", fontWeight: 600 },
     priceV: { fontSize: "20px", color: "#ffffff", fontWeight: 900, textShadow: "0 2px 8px rgba(200,168,78,0.5)" },
@@ -603,9 +603,6 @@ const S = {
     comboBannerTitle: { fontSize: "10px", fontWeight: 800, color: "rgba(200,168,78,0.6)", letterSpacing: "0.06em", marginBottom: "8px" },
     comboBannerRow: { display: "flex", gap: "8px", flexWrap: "wrap" },
     badgePill: { display: "flex", alignItems: "center", gap: "6px", padding: "5px 10px", borderRadius: "10px", background: "rgba(200,168,78,0.12)", border: "1px solid rgba(200,168,78,0.3)" },
-    groupCard: { marginBottom: "10px", padding: "5px 12px", borderRadius: "12px", background: "rgba(15,45,15,0.55)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", border: "1px solid rgba(200,168,78,0.28)", transition: "border-color 0.2s, box-shadow 0.2s" },
-    groupCardHighlight: { border: "1px solid rgba(200,168,78,0.7)", boxShadow: "0 0 18px rgba(200,168,78,0.25), inset 0 0 12px rgba(200,168,78,0.06)" },
-    sumRow: { display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "13px", color: "rgba(255,255,255,0.75)", padding: "5px 8px", background: "rgba(255,255,255,0.03)", borderRadius: "8px", marginBottom: "2px" },
     notesBox: { margin: "12px 0", padding: "10px", borderRadius: "12px", background: "rgba(15,45,15,0.6)", backdropFilter: "blur(8px)", border: "1px solid rgba(200,168,78,0.15)" },
     notesToggle: { width: "100%", display: "flex", alignItems: "center", gap: "8px", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "'Heebo',sans-serif", fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.45)", direction: "rtl", textAlign: "right" },
     notesInput: { width: "100%", padding: "8px 10px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.04)", color: "#e8f5e9", fontSize: "12px", fontFamily: "'Heebo',sans-serif", outline: "none", direction: "rtl", resize: "vertical", minHeight: "60px" },
@@ -651,8 +648,6 @@ const S = {
         background: "rgba(0,0,0,0.18)", padding: "3px 10px", borderRadius: "8px",
     },
     trustCopy: { display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", marginTop: "16px", fontSize: "11px", fontWeight: 500, color: "rgba(255,255,255,0.45)", letterSpacing: "0.03em", animation: "pFadeIn 0.5s ease 0.8s both" },
-    trustLine: { display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", fontSize: "11px", fontWeight: 600, color: "rgba(255,255,255,0.3)", marginBottom: "8px", letterSpacing: "0.02em" },
-    editBtn: { padding: "10px 16px", minHeight: "44px", borderRadius: "8px", cursor: "pointer", background: "rgba(200,168,78,0.16)", border: "1px solid rgba(200,168,78,0.45)", color: "#dfc06e", fontSize: "13px", fontWeight: 700, fontFamily: "'Heebo',sans-serif", display: "flex", alignItems: "center", gap: "3px" },
 };
 
 // ─── Pickup time picker ────────────────────────────────────────

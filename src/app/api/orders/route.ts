@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
+import { computeOrderTotal } from '@/lib/pricing';
 
 export async function POST(req: NextRequest) {
     try {
@@ -10,6 +11,16 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
 
+        // Recompute the true total server-side — never trust the client-submitted value.
+        const computed = computeOrderTotal(items, size);
+        if (!computed.valid) {
+            return NextResponse.json({ error: 'Invalid order items or size' }, { status: 400 });
+        }
+        if (computed.total !== total) {
+            console.error('[POST /api/orders] Price mismatch: client sent', total, 'server computed', computed.total);
+            return NextResponse.json({ error: 'Price mismatch' }, { status: 400 });
+        }
+
         // Generate order number: BB-XXXX (4-digit, time-seeded)
         const orderNum = `BB-${((Date.now() % 9000) + 1000)}`;
 
@@ -18,7 +29,7 @@ export async function POST(req: NextRequest) {
             .insert({
                 order_num: orderNum,
                 items,
-                total,
+                total: computed.total,
                 pickup_time: pickupTime ?? null,
                 notes: notes ?? null,
                 size: size ?? null,
@@ -29,16 +40,13 @@ export async function POST(req: NextRequest) {
             .single();
 
         if (error) {
-            // DB not configured yet — return generated order num so frontend still works
-            console.warn('[POST /api/orders] DB error (Supabase not configured?):', error.message);
-            return NextResponse.json({ id: null, orderNum, createdAt: new Date().toISOString(), demo: true });
+            console.error('[POST /api/orders] DB error:', error.message);
+            return NextResponse.json({ error: 'Failed to create order' }, { status: 500 });
         }
 
         return NextResponse.json({ id: data.id, orderNum: data.order_num, createdAt: data.created_at });
     } catch (err) {
         console.error('[POST /api/orders]', err);
-        // Still return a usable order number — never show 500 to the customer
-        const fallback = `BB-${((Date.now() % 9000) + 1000)}`;
-        return NextResponse.json({ id: null, orderNum: fallback, createdAt: new Date().toISOString(), demo: true });
+        return NextResponse.json({ error: 'Failed to create order' }, { status: 500 });
     }
 }

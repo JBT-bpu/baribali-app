@@ -30,7 +30,10 @@ create table orders (
   status         text not null default 'waiting',
     -- waiting | preparing | ready | collected
   payment_status text not null default 'pending',
-    -- pending | paid | failed | pay_at_pickup
+    -- pending | paid | paid_unverified | failed | pay_at_pickup
+    -- paid_unverified = webhook reported success but has no cryptographic
+    -- verification (no Tranzila signing secret configured) — kitchen must
+    -- confirm payment at pickup, same as pay_at_pickup.
   created_at     timestamptz default now()
 );
 
