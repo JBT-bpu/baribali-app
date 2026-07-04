@@ -30,6 +30,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# personal/working files not meant for version control
+/Local TECH/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

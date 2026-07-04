@@ -1,128 +1,65 @@
-# BariBali V3 - Video Homepage System
+# BariBali — Salad & Tortilla Builder
 
 ## Project Overview
 
-BariBali is a mobile-first salad builder app featuring a cinematic video homepage with seamless transitions, parallax border effects, and interactive hotspots.
+BariBali is a mobile-first, Hebrew (RTL) salad and tortilla builder for a real restaurant. Customers pick a size, build their bowl/wrap ingredient-by-ingredient, submit an order with a pickup time, and pay online (or at pickup). A kitchen-facing board shows live orders for staff to prepare and mark ready.
 
 ## Tech Stack
 
-- **Framework**: Next.js 15 (App Router)
-- **Language**: TypeScript
-- **Styling**: Tailwind CSS + Custom CSS animations
-- **Video**: HTML5 Video with Canvas Bridge for seamless transitions
+- **Framework**: Next.js 14 (App Router)
+- **Language**: TypeScript + JSX
+- **Styling**: Inline style objects (component-local `S = {...}` pattern) + CSS keyframe strings. Tailwind is configured but not yet in active use outside tooling.
+- **Backend**: Supabase (Postgres + service-role API routes)
+- **Payments**: Tranzila (default), with YaadPay/Hyp as alternate providers
 
-## Current Architecture
+## User Flow
 
-### Video Queue System
-
-The video system uses a simplified queue-based architecture:
-
-```typescript
-const VIDEO_QUEUE: QueueEntry[] = [
-  { id: 'menu-intro',    src: '/video/intro.mp4',        loop: false, waitFor: null },
-  { id: 'menu-loop',     src: '/video/loop1.mp4',        loop: true,  waitFor: 'card-pick' },
-  { id: 'build-intro',   src: '/video/intro_build.mp4',  loop: false, waitFor: null },
-  { id: 'build-loop',    src: '/video/build_loop1.mp4',  loop: true,  waitFor: 'size-pick' },
-  { id: 'build-outro',   src: '/video/build_outro.mp4',  loop: false, waitFor: null },
-];
+```
+/  →  /home2  (redirect)
 ```
 
-### Video Flow
+1. **`/home2`** — landing page: swipeable card carousel (tortilla / salad / login), background particles, Google reviews strip.
+2. Tapping **"בנה סלט"** (build salad) opens an in-page size picker (S/M/L), then navigates to:
+3. **`/build?size=<ml>&type=salad|tortilla`** — renders `BariBaliBuilder`, a step-by-step ingredient picker (veggies → protein → sauces → finish → premium upgrades), with combo badges, presets, and a live-updating price.
+4. The builder's summary screen (`SummaryView`) shows the assembled bowl, lets the customer pick a pickup time slot, add notes, and submit.
+5. Submitting calls `/api/orders` (creates the order, price re-verified server-side) then `/api/payment/create` (builds a hosted payment-page redirect using the server-stored total).
+6. After payment, the customer lands on **`/order/[id]`** — a live order-status page (polls the API for status updates).
+7. **`/kitchen`** — an internal board showing today's active orders, grouped by pickup urgency, with a per-ingredient checklist and status-advance buttons.
 
-1. **intro.mp4** → auto-advance
-2. **loop1.mp4** → wait for card pick (two-tap confirmation)
-3. **intro_build.mp4** → auto-advance
-4. **build_loop1.mp4** → wait for size pick (two-tap confirmation)
-5. **build_outro.mp4** → show builder UI
+## Directory Structure
 
-### Components
-
-#### Video Queue Engine
-- **[`VideoQueue.tsx`](src/components/video-menu/VideoQueue.tsx)**
-  - Single video element with built-in canvas bridge
-  - Linear queue-based video flow
-  - Seamless transitions with frame capture and fade
-  - ~180 lines
-
-#### Video Menu Wrapper
-- **[`VideoMenuQueue.tsx`](src/components/video-menu/VideoMenuQueue.tsx)**
-  - Manages queue state and user interactions
-  - Two-tap confirmation pattern for cards
-  - Debug mode support (press 'D' to toggle)
-  - Integrates with hotspots and glows
-
-#### Parallax Border
-- **[`ParallaxBorder.tsx`](src/components/video-menu/ParallaxBorder.tsx)**
-  - 3-layer floating vegetable system
-  - Gyroscope support for mobile
-  - Mouse fallback for desktop
-  - Phase-reactive animations
-  - 12 border assets (emoji fallback until PNGs exist)
-
-#### Glow Overlay
-- **[`GlowOverlay.tsx`](src/components/video-menu/GlowOverlay.tsx)**
-  - CSS gradient-based glow effects
-  - Shows on card preview/confirm
-  - Smooth opacity transitions
-
-#### Hotspot Layer
-- **[`HotspotLayer.tsx`](src/components/video-menu/HotspotLayer.tsx)**
-  - Invisible clickable areas
-  - Debug mode visualization
-  - Background tap handling
-
-## Video Files
-
-All videos are 1176x1764 resolution for seamless canvas bridge transitions.
-
-| File | Purpose |
-|-------|----------|
-| intro.mp4 | Menu intro |
-| loop1.mp4 | Menu loop |
-| loop2.mp4 | Alternative menu loop |
-| intro_build.mp4 | Build intro transition |
-| build_loop1.mp4 | Build loop |
-| build_outro.mp4 | Build outro |
-
-## Two-Tap Confirmation Pattern
-
-1. **First Tap**: Preview the card (shows glow overlay)
-2. **Second Tap**: Confirm selection (advances video queue)
-
-## Parallax Border System
-
-### Layers
-
-| Layer | Assets | Blur | Opacity | Movement | Z-Index |
-|--------|---------|-------|----------|-----------|----------|
-| Deep | 3 large veggies | 8px | 0.5 | 8px | 0 |
-| Mid | 3 medium veggies | 2px | 0.7 | 15px | 1 |
-| Front | 3 small + bokeh | 0px | 0.85 | 25px | 3 |
-
-### Phase-Reactive Behaviors
-
-1. **Intro Phase**: All assets drift inward slowly
-2. **Loop/Preview Phase**: Gentle ambient floating, assets near hovered card glow brighter
-3. **Navigating Phase**: Assets accelerate toward selected card, others scatter outward
-
-## CSS Animations
-
-- `glowPulse` - Glow pulse effect (2s)
-- `driftInward` - Parallax drift (3s)
-- `scatterOutward` - Scatter effect (1s)
-- `ambientFloat` - Gentle float (4s)
-- `accelerateToCard` - Scale up effect (0.5s)
-
-## Installation
-
-```bash
-npm install
-npm run dev
 ```
+src/
+├── app/
+│   ├── home2/page.tsx          # Landing page
+│   ├── build/page.tsx          # Builder entry (wraps BariBaliBuilder)
+│   ├── order/[id]/page.tsx     # Customer order-status page
+│   ├── kitchen/page.tsx        # Kitchen board
+│   ├── login/, profile/        # Stubs — no auth system exists yet
+│   ├── fresh/, top/, recommended/, favorites/  # "Coming soon" placeholders
+│   └── api/
+│       ├── orders/                    # Create order, fetch by id, update status
+│       ├── payment/create, webhook     # Payment provider integration
+│       ├── slots/                      # Pickup time-slot availability (Israel-local hours)
+│       └── kitchen/orders/             # Kitchen board data feed
+├── components/
+│   ├── builder/                # BariBaliBuilder, SummaryView, MixingAnimation, DetailSheet, HeroBowlCard
+│   └── ui/                     # ReviewsStrip, ParticleCanvas, ComingSoon, CatPopup
+├── data/salad-data.js          # Ingredient catalog, prices, nutrition, combo rules, presets
+└── lib/
+    ├── supabase.ts             # Anon + service-role Supabase clients, schema reference
+    ├── pricing.ts              # Server-side canonical price computation
+    └── kitchenAuth.ts          # Lightweight shared-secret gate for kitchen endpoints
+```
+
+## Environment Variables
+
+See `.env.example` for the full list. At minimum you need a Supabase project (URL + anon key + service-role key) for anything beyond the frontend UI to work.
 
 ## Development
 
 ```bash
+npm install
 npm run dev
 ```
 
@@ -135,56 +72,19 @@ npm run build
 npm start
 ```
 
-## Project Structure
+## Known Gaps (as of this writing)
 
-```
-d:/BariBaliV3VIDEOAPP/
-├── src/
-│   ├── app/
-│   │   ├── globals.css          # Global styles and animations
-│   │   ├── layout.tsx         # Root layout
-│   │   ├── page.tsx           # Homepage (VideoMenuQueue)
-│   │   ├── build/page.tsx     # Builder page
-│   │   └── calibrator/        # Hotspot calibrator tool
-│   ├── components/video-menu/
-│   │   ├── VideoQueue.tsx         # Video queue engine
-│   │   ├── VideoMenuQueue.tsx     # Menu wrapper
-│   │   ├── ParallaxBorder.tsx     # Parallax effects
-│   │   ├── GlowOverlay.tsx        # Glow effects
-│   │   ├── HotspotLayer.tsx       # Clickable areas
-│   │   └── hotspot-config.ts      # Configuration
-│   ├── lib/
-│   │   └── utils.ts             # Utility functions
-│   └── types/
-│       └── video-menu.ts        # TypeScript types
-├── public/
-│   ├── video/                   # Video files
-│   └── glows/mobile/          # Glow overlay images
-├── next.config.js
-├── tailwind.config.ts
-├── tsconfig.json
-└── package.json
-```
-
-## Debug Mode
-
-Press 'D' key to toggle debug mode overlay showing:
-- FPS counter
-- Current queue index
-- Waiting state
-- Preview state
-- Hovered hotspot
+- No real authentication system — `/login` and `/profile` are stubs.
+- Payment webhook has no cryptographic signature verification (no Tranzila verification credential configured yet); webhook-confirmed payments are marked `paid_unverified` and require a human check at pickup.
+- `/kitchen`'s shared-secret gate (`NEXT_PUBLIC_KITCHEN_API_SECRET`) is a deterrent against opportunistic bots, not real access control.
 
 ## RTL Support
 
-The app supports right-to-left (RTL) layout for Hebrew text.
+The entire app is Hebrew-first with RTL layout throughout.
 
 ## Mobile-Only Design
 
-Optimized for mobile devices with:
-- Touch-friendly hotspots
-- Gyroscope-based parallax
-- Responsive sizing (420px max width, 9:16 aspect ratio)
+Optimized for mobile devices — responsive sizing, touch-friendly targets, safe-area insets for notches/home indicators.
 
 ## License
 
