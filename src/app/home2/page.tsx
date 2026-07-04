@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import Tilt from 'react-parallax-tilt';
 import ReviewsStrip from '@/components/ui/ReviewsStrip';
 import CatPopup from '@/components/ui/CatPopup';
 
@@ -224,8 +225,17 @@ function SizePicker({ onSelect, onBack }: { onSelect: (s: string) => void; onBac
                                 transition: tr,
                             }}
                         >
-                            {/* Inner: entrance animation + visual styling */}
-                            <div style={{
+                            {/* Inner: entrance animation + visual styling + tilt/glare */}
+                            <Tilt
+                                tiltMaxAngleX={6}
+                                tiltMaxAngleY={6}
+                                glareEnable
+                                glareMaxOpacity={0.16}
+                                glareColor="#f0c832"
+                                glarePosition="all"
+                                glareBorderRadius="16px"
+                                transitionSpeed={400}
+                                style={{
                                 width: '100%', height: '100%',
                                 borderRadius: '16px',
                                 overflow: 'hidden',
@@ -233,7 +243,6 @@ function SizePicker({ onSelect, onBack }: { onSelect: (s: string) => void; onBac
                                 boxShadow: isActive
                                     ? '0 24px 64px rgba(0,0,0,0.92), 0 0 44px rgba(240,200,50,0.38), inset 0 1px 0 rgba(255,255,255,0.14)' + glowShadow
                                     : '0 6px 20px rgba(0,0,0,0.5)',
-                                transition: 'border-color 0.3s, box-shadow 0.5s',
                                 animation: `cardCascade 0.45s cubic-bezier(0.22,1.2,0.36,1) ${i * 75}ms both`,
                                 position: 'relative',
                             }}>
@@ -263,7 +272,7 @@ function SizePicker({ onSelect, onBack }: { onSelect: (s: string) => void; onBac
                                         </div>
                                     </div>
                                 )}
-                            </div>
+                            </Tilt>
                         </div>
                     );
                 })}

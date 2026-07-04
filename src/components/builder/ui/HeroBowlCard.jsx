@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
+import Tilt from "react-parallax-tilt";
 const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
 
 const MAX          = 14;
@@ -119,13 +120,24 @@ export default function HeroBowlCard({ all, onRemove, comboBadges, lastAdd, anim
     }, [all]); // eslint-disable-line react-hooks/exhaustive-deps
 
     return (
-        <div style={{
-            margin: "6px 12px",
-            background: "linear-gradient(145deg, rgba(6,18,6,0.17), rgba(10,28,10,0.17)), url(/builder-assets/salad-card-bg.webp) center top / 100% 100% no-repeat",
-            border: "1px solid rgba(200,168,78,0.18)",
-            borderRadius: "16px",
-            boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
-        }}>
+        <Tilt
+            tiltMaxAngleX={6}
+            tiltMaxAngleY={6}
+            glareEnable
+            glareMaxOpacity={0.18}
+            glareColor="#f0d060"
+            glarePosition="all"
+            glareBorderRadius="16px"
+            transitionSpeed={400}
+            scale={1.015}
+            style={{
+                margin: "6px 12px",
+                background: "linear-gradient(145deg, rgba(6,18,6,0.17), rgba(10,28,10,0.17)), url(/builder-assets/salad-card-bg.webp) center top / 100% 100% no-repeat",
+                border: "1px solid rgba(200,168,78,0.18)",
+                borderRadius: "16px",
+                boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
+            }}
+        >
             {mounted && <style>{KF}{`
 .hbc-ring { position:relative; width:158px; height:158px; flex-shrink:0; overflow:visible }
 .hbc-bowl { position:absolute; left:50%; top:${bowlTop}; transform:translate(-50%,-50%); width:172px; height:172px; pointer-events:none }
@@ -254,6 +266,6 @@ export default function HeroBowlCard({ all, onRemove, comboBadges, lastAdd, anim
                 </div>
             </div>
 
-        </div>
+        </Tilt>
     );
 }
