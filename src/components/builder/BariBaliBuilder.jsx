@@ -154,19 +154,24 @@ function chipVisual(stepId, isOn) {
     return isOn ? {
       backgroundImage: "linear-gradient(120deg, rgba(96,70,16,0.95) 0%, rgba(220,180,90,0.45) 45%, rgba(96,70,16,0.95) 100%)",
       backgroundSize: "200% 100%",
-      animation: "shimmer 2.5s ease-in-out infinite",
+      animationName: "shimmer",
+      animationDuration: "2.5s",
+      animationTimingFunction: "ease-in-out",
+      animationIterationCount: "infinite",
       border: "2.5px solid rgba(255,224,102,0.95)",
       boxShadow: "0 0 0 1px rgba(255,224,102,0.3), 0 6px 22px rgba(200,168,78,0.55), 0 0 30px rgba(255,224,102,0.4), inset 0 1px 0 rgba(255,255,255,0.25)",
       transform: "translateY(-3px)",
     } : {
-      background: "linear-gradient(155deg, rgba(58,44,16,0.92), rgba(32,24,8,0.88))",
+      backgroundImage: "linear-gradient(155deg, rgba(58,44,16,0.92), rgba(32,24,8,0.88))",
       border: "2px solid rgba(200,168,78,0.65)",
       boxShadow: "0 3px 14px rgba(0,0,0,0.5), 0 0 12px rgba(200,168,78,0.2), inset 0 1px 0 rgba(255,255,255,0.12)",
     };
   }
   const sc = getStepColor(stepId);
   return isOn ? {
-    background: "linear-gradient(155deg, rgba(60,140,60,0.95), rgba(40,100,40,0.9))",
+    // backgroundImage (not the `background` shorthand) so it can't conflict
+    // with S.chip's own `background` key when the two style objects merge.
+    backgroundImage: "linear-gradient(155deg, rgba(60,140,60,0.95), rgba(40,100,40,0.9))",
     border: `2.5px solid ${sc.onBorder}`,
     boxShadow: `0 0 0 1px ${sc.onGlow}, 0 6px 22px ${sc.onGlow}, 0 0 28px ${sc.onGlow}, inset 0 1px 0 rgba(255,255,255,0.25)`,
     transform: "translateY(-3px)",
@@ -1157,7 +1162,11 @@ const S = {
   sgLabel: { fontSize: "11px", fontWeight: 800, color: "rgba(200,168,78,0.85)", padding: "10px 4px 6px", textShadow: "0 1px 3px rgba(0,0,0,0.7), 0 0 8px rgba(0,0,0,0.3)" },
   grid: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "7px" },
 
-  chip: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "10px 3px 7px", borderRadius: "16px", cursor: "pointer", position: "relative", minHeight: "74px", background: "linear-gradient(155deg, rgba(50,115,50,0.9), rgba(30,75,30,0.85))", border: "2px solid rgba(200,168,78,0.55)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", boxShadow: "0 3px 12px rgba(0,0,0,0.5), 0 0 8px rgba(200,168,78,0.08), inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.25)", color: "#ffffff", transition: "all 0.2s cubic-bezier(0.34,1.56,0.64,1)", animation: "chipIn 0.25s ease both", outline: "none" },
+  // animationName/Duration/TimingFunction/FillMode used instead of the
+  // `animation` shorthand so it can coexist with the per-chip `animationDelay`
+  // set at the call site — mixing shorthand + animationDelay longhand on the
+  // same element trips React's "conflicting property" dev warning.
+  chip: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "10px 3px 7px", borderRadius: "16px", cursor: "pointer", position: "relative", minHeight: "74px", backgroundImage: "linear-gradient(155deg, rgba(50,115,50,0.9), rgba(30,75,30,0.85))", border: "2px solid rgba(200,168,78,0.55)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", boxShadow: "0 3px 12px rgba(0,0,0,0.5), 0 0 8px rgba(200,168,78,0.08), inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.25)", color: "#ffffff", transition: "all 0.2s cubic-bezier(0.34,1.56,0.64,1)", animationName: "chipIn", animationDuration: "0.25s", animationTimingFunction: "ease", animationFillMode: "both", outline: "none" },
   chipOff: { opacity: 0.2, cursor: "not-allowed", filter: "grayscale(0.5)" },
   check: { position: "absolute", top: "3px", left: "3px", width: "16px", height: "16px", borderRadius: "50%", background: "linear-gradient(135deg, #ffe066, #d4b84a)", color: "#0d2e0d", fontSize: "8px", fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 6px rgba(200,168,78,0.5)" },
   popTag: { position: "absolute", top: "-1px", right: "-1px", background: "linear-gradient(135deg, #d4b84a, #f0d060)", color: "#0d2e0d", fontSize: "7px", fontWeight: 900, padding: "2px 6px", borderRadius: "16px 0 8px 0", boxShadow: "0 2px 4px rgba(0,0,0,0.35)" },

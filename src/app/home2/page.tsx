@@ -457,7 +457,11 @@ export default function HomeV2() {
         if (navigator.vibrate) navigator.vibrate([20, 40, 30]);
         setTimeout(() => {
             if ('startViewTransition' in document) {
-                (document as unknown as { startViewTransition: (cb: () => void) => void }).startViewTransition(() => router.push(`/build?size=${size}`));
+                const transition = (document as unknown as { startViewTransition: (cb: () => void) => { ready: Promise<void> } }).startViewTransition(() => router.push(`/build?size=${size}`));
+                // "Transition was skipped" AbortErrors are expected/benign here
+                // (e.g. rapid navigation) — nothing to handle, just don't let
+                // them surface as unhandled rejections in the console.
+                transition.ready.catch(() => {});
             } else {
                 router.push(`/build?size=${size}`);
             }
