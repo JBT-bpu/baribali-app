@@ -28,10 +28,14 @@ const MAIN_CARDS = [
 ];
 
 const SIZE_CARDS = [
-    { id: 'S', img: '/homepage-assets/size-s.png', sub: '₪54 · 1-2 מנות' },
-    { id: 'M', img: '/homepage-assets/size-m.png', sub: '₪59 · 2-3 מנות' },
-    { id: 'L', img: '/homepage-assets/size-l.png', sub: '₪72 · 3-4 מנות' },
+    { id: 'S', img: '/homepage-assets/size-s.png', tag: 'לתיאבון קליל', sub: '₪54 · 1-2 מנות' },
+    { id: 'M', img: '/homepage-assets/size-m.png', tag: 'המאוזן המושלם', sub: '₪59 · 2-3 מנות' },
+    { id: 'L', img: '/homepage-assets/size-l.png', tag: 'לרעבים אמיתיים', sub: '₪72 · 3-4 מנות' },
 ];
+
+// Relative visual heights for the size-comparison scale below the title —
+// not to scale with real ml, just enough of a size cue to read at a glance.
+const SIZE_SCALE_HEIGHTS = [26, 38, 52];
 
 // Main carousel — card dimensions
 const M_W = 192;   // card width px
@@ -203,6 +207,28 @@ function SizePicker({ onSelect, onBack }: { onSelect: (s: string) => void; onBac
 
             <div style={{ fontSize: '24px', fontWeight: 900, color: '#fff' }}>כמה אתם רעבים?</div>
 
+            {/* Size-comparison scale — relative visual cue between S/M/L, tap to jump */}
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '20px', marginTop: '2px', marginBottom: '2px' }}>
+                {SIZE_CARDS.map((c, i) => {
+                    const isOn = i === activeIdx;
+                    return (
+                        <div key={c.id} onClick={() => snapTo(i)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                            <div style={{
+                                width: '30px', height: `${SIZE_SCALE_HEIGHTS[i]}px`,
+                                borderRadius: '45% 45% 14% 14%',
+                                background: isOn
+                                    ? 'linear-gradient(180deg, var(--color-gold-bright), var(--color-gold-deep))'
+                                    : 'rgba(255,255,255,0.12)',
+                                border: isOn ? '1px solid var(--color-gold-light)' : '1px solid rgba(255,255,255,0.2)',
+                                boxShadow: isOn ? '0 0 16px rgba(240,200,50,0.55)' : 'none',
+                                transition: 'all 0.35s cubic-bezier(0.34,1.4,0.64,1)',
+                            }} />
+                            <span style={{ fontSize: '11px', fontWeight: 800, color: isOn ? 'var(--color-gold-deep)' : 'rgba(255,255,255,0.4)', transition: 'color 0.3s ease' }}>{c.id}</span>
+                        </div>
+                    );
+                })}
+            </div>
+
             {/* Stage */}
             <div
                 style={{ position: 'relative', width: '100%', height: 'clamp(210px, 40vh, 310px)', cursor: 'grab', touchAction: 'none', overflow: 'visible' }}
@@ -258,7 +284,7 @@ function SizePicker({ onSelect, onBack }: { onSelect: (s: string) => void; onBac
                                 overflow: 'hidden',
                                 border: isActive ? '1.5px solid rgba(240,200,50,0.65)' : '1px solid rgba(255,255,255,0.22)',
                                 boxShadow: isActive
-                                    ? '0 24px 64px rgba(0,0,0,0.92), 0 0 48px rgba(240,200,50,0.42), inset 0 1px 0 rgba(255,255,255,0.14)' + glowShadow
+                                    ? 'var(--shadow-card-glow), var(--shadow-gold-glow-lg)' + glowShadow
                                     : '0 6px 20px rgba(0,0,0,0.5)',
                                 animation: `cardCascade 0.45s cubic-bezier(0.22,1.2,0.36,1) ${i * 75}ms both`,
                                 position: 'relative',
@@ -277,15 +303,15 @@ function SizePicker({ onSelect, onBack }: { onSelect: (s: string) => void; onBac
                                         animation: 'priceBadge 0.32s cubic-bezier(0.34,1.4,0.64,1) both',
                                     }}>
                                         <div style={{
-                                            padding: '5px 18px', borderRadius: '20px',
+                                            padding: '6px 18px', borderRadius: '20px',
                                             background: 'linear-gradient(135deg,rgba(20,8,0,0.92),rgba(8,4,0,0.96))',
                                             border: '1px solid rgba(240,200,50,0.45)',
                                             backdropFilter: 'blur(8px)',
-                                            fontSize: '12px', fontWeight: 800, color: 'var(--color-gold-deep)',
-                                            whiteSpace: 'nowrap',
+                                            whiteSpace: 'nowrap', textAlign: 'center',
                                             boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
                                         }}>
-                                            {card.sub}
+                                            <div style={{ fontSize: '10px', fontWeight: 900, color: 'var(--color-gold-bright)', marginBottom: '1px' }}>{card.tag}</div>
+                                            <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--color-gold-deep)' }}>{card.sub}</div>
                                         </div>
                                     </div>
                                 )}
