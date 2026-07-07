@@ -24,6 +24,7 @@ import SplashScreen from "./ui/SplashScreen.jsx";
 import HeroBowlCard from "./ui/HeroBowlCard.jsx";
 import BariModal from "../ui/bari/BariModal";
 import BariButton from "../ui/bari/BariButton";
+import MagicBackground from "./background/MagicBackground";
 
 /*
   BariBali Builder — COMPLETE v3
@@ -100,36 +101,76 @@ const STEP_COLORS = {
     bg: "linear-gradient(145deg, rgba(56,142,60,0.18), rgba(46,125,50,0.12))",
     border: "rgba(76,175,80,0.45)",
     text: "#81c784",
-    glow: "rgba(76,175,80,0.35)"
+    glow: "rgba(76,175,80,0.35)",
+    // Stronger variants for the selected-chip glow — gives each step its
+    // own accent color instead of every step glowing the same gold.
+    onBorder: "rgba(129,199,132,0.95)",
+    onGlow: "rgba(76,175,80,0.55)"
   },
   protein: {
     bg: "linear-gradient(145deg, rgba(66,165,245,0.18), rgba(30,136,229,0.12))",
     border: "rgba(66,165,245,0.45)",
     text: "#64b5f6",
-    glow: "rgba(66,165,245,0.35)"
+    glow: "rgba(66,165,245,0.35)",
+    onBorder: "rgba(100,181,246,0.95)",
+    onGlow: "rgba(66,165,245,0.55)"
   },
   sauces: {
     bg: "linear-gradient(145deg, rgba(255,167,38,0.18), rgba(251,140,0,0.12))",
     border: "rgba(255,167,38,0.45)",
     text: "#ffb74d",
-    glow: "rgba(255,167,38,0.35)"
+    glow: "rgba(255,167,38,0.35)",
+    onBorder: "rgba(255,183,77,0.95)",
+    onGlow: "rgba(255,167,38,0.55)"
   },
   finish: {
     bg: "linear-gradient(145deg, rgba(171,71,188,0.18), rgba(142,36,170,0.12))",
     border: "rgba(171,71,188,0.45)",
     text: "#ba68c8",
-    glow: "rgba(171,71,188,0.35)"
+    glow: "rgba(171,71,188,0.35)",
+    onBorder: "rgba(186,104,200,0.95)",
+    onGlow: "rgba(171,71,188,0.55)"
   },
   upgrade: {
     bg: "linear-gradient(145deg, rgba(236,64,122,0.18), rgba(216,27,96,0.12))",
     border: "rgba(236,64,122,0.45)",
     text: "#f06292",
-    glow: "rgba(236,64,122,0.35)"
+    glow: "rgba(236,64,122,0.35)",
+    onBorder: "rgba(240,98,146,0.95)",
+    onGlow: "rgba(236,64,122,0.55)"
   }
 };
 
 function getStepColor(stepId) {
   return STEP_COLORS[stepId] || STEP_COLORS.veggies;
+}
+
+// ─── Ingredient chip visual — step-tinted glow when selected, plus a
+// distinct richer "premium" look for the upgrade step (real premium items,
+// not just a bigger price tag) ──
+function chipVisual(stepId, isOn) {
+  const isPremiumStep = stepId === "upgrade" || stepId === "t_upgrade";
+  if (isPremiumStep) {
+    return isOn ? {
+      backgroundImage: "linear-gradient(120deg, rgba(96,70,16,0.95) 0%, rgba(220,180,90,0.45) 45%, rgba(96,70,16,0.95) 100%)",
+      backgroundSize: "200% 100%",
+      animation: "shimmer 2.5s ease-in-out infinite",
+      border: "2.5px solid rgba(255,224,102,0.95)",
+      boxShadow: "0 0 0 1px rgba(255,224,102,0.3), 0 6px 22px rgba(200,168,78,0.55), 0 0 30px rgba(255,224,102,0.4), inset 0 1px 0 rgba(255,255,255,0.25)",
+      transform: "translateY(-3px)",
+    } : {
+      background: "linear-gradient(155deg, rgba(58,44,16,0.92), rgba(32,24,8,0.88))",
+      border: "2px solid rgba(200,168,78,0.65)",
+      boxShadow: "0 3px 14px rgba(0,0,0,0.5), 0 0 12px rgba(200,168,78,0.2), inset 0 1px 0 rgba(255,255,255,0.12)",
+    };
+  }
+  const sc = getStepColor(stepId);
+  return isOn ? {
+    background: "linear-gradient(155deg, rgba(60,140,60,0.95), rgba(40,100,40,0.9))",
+    border: `2.5px solid ${sc.onBorder}`,
+    boxShadow: `0 0 0 1px ${sc.onGlow}, 0 6px 22px ${sc.onGlow}, 0 0 28px ${sc.onGlow}, inset 0 1px 0 rgba(255,255,255,0.25)`,
+    transform: "translateY(-3px)",
+  } : {};
 }
 
 // ─── PRESET COLOR SYSTEM ─────────────────────────────────────
@@ -225,62 +266,6 @@ function ClearConfirmModal({ open, onConfirm, onCancel }) {
       </div>
     </BariModal>
   );
-}
-
-function BuilderParticles() {
-  const ref = useRef(null);
-  useEffect(() => {
-    const c = ref.current; if (!c) return;
-    const ctx = c.getContext('2d');
-    const resize = () => { c.width = c.offsetWidth; c.height = c.offsetHeight; };
-    resize();
-    window.addEventListener('resize', resize);
-
-    const sparkCols = ['#f0c832','#ffe066','#f0a820','#c8d830','#fffacc'];
-    const bokehCols = ['#c8a832','#f0d060','#ffe066','#d4a820'];
-
-    const sparks = Array.from({ length: 70 }, () => ({
-      x: Math.random() * c.width, y: Math.random() * c.height,
-      r: Math.random() * 2.5 + 0.4, s: Math.random() * 0.45 + 0.1,
-      o: Math.random() * 0.3 + 0.06, col: sparkCols[Math.floor(Math.random() * sparkCols.length)],
-      d: (Math.random() - 0.5) * 0.22, ph: Math.random() * Math.PI * 2,
-    }));
-    const bokeh = Array.from({ length: 18 }, () => ({
-      x: Math.random() * c.width, y: Math.random() * c.height,
-      r: Math.random() * 52 + 16, s: Math.random() * 0.07 + 0.02,
-      o: Math.random() * 0.05 + 0.015, col: bokehCols[Math.floor(Math.random() * bokehCols.length)],
-      ph: Math.random() * Math.PI * 2,
-    }));
-
-    let raf, t = 0;
-    const draw = () => {
-      t += 0.012; ctx.clearRect(0, 0, c.width, c.height);
-      for (const b of bokeh) {
-        b.y -= b.s; b.x += Math.sin(t * 0.4 + b.ph) * 0.16;
-        b.o = 0.015 + Math.sin(t * 0.5 + b.ph) * 0.035 + 0.02;
-        if (b.y < -b.r * 2) { b.y = c.height + b.r; b.x = Math.random() * c.width; }
-        const g = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r);
-        g.addColorStop(0, b.col); g.addColorStop(1, 'transparent');
-        ctx.save(); ctx.globalAlpha = Math.min(0.1, Math.max(0, b.o));
-        ctx.fillStyle = g; ctx.beginPath();
-        ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill(); ctx.restore();
-      }
-      for (const p of sparks) {
-        p.y -= p.s; p.x += p.d + Math.sin(t + p.ph) * 0.11;
-        p.o = 0.05 + Math.sin(t * 0.9 + p.ph) * 0.2 + 0.08;
-        if (p.y < -6) { p.y = c.height + 6; p.x = Math.random() * c.width; }
-        if (p.x < 0) p.x = c.width; if (p.x > c.width) p.x = 0;
-        ctx.save(); ctx.globalAlpha = Math.min(0.6, Math.max(0, p.o));
-        ctx.shadowBlur = p.r * 6; ctx.shadowColor = p.col;
-        ctx.fillStyle = p.col; ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill(); ctx.restore();
-      }
-      raf = requestAnimationFrame(draw);
-    };
-    draw();
-    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', resize); };
-  }, []);
-  return <canvas ref={ref} style={{ position: 'fixed', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 2 }} />;
 }
 
 // ─── MAIN ───────────────────────────────────────────────────
@@ -575,7 +560,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
         <div style={S.root}>
           {splash && <SplashScreen onDone={() => { sessionStorage.setItem("bb-splash-seen", "1"); setSplash(false); }} />}
           <div style={S.bg} />
-          <BuilderParticles />
+          <MagicBackground isTransforming={isTransforming} />
           <div style={{ ...S.main, padding: "0 0 40px", opacity: anim === "enter" ? 0 : 1, transition: "all 0.5s" }}>
             <HeaderBanner />
             <div style={{ display: "flex", flexDirection: "column", gap: "12px", flex: 1, padding: "24px 16px 0" }}>
@@ -613,7 +598,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
       <div style={S.root}>
         {splash && <SplashScreen onDone={() => { sessionStorage.setItem("bb-splash-seen", "1"); setSplash(false); }} />}
         <div style={S.bg} />
-        <BuilderParticles />
+        <MagicBackground isTransforming={isTransforming} />
         <div style={{
           ...S.main, justifyContent: "space-between", padding: "0 0 20px",
           opacity: anim === "enter" ? 0 : 1, transform: anim === "enter" ? "translateY(12px)" : "none", transition: "all 0.5s"
@@ -902,7 +887,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
                   background: i < step
                     ? "linear-gradient(90deg, rgba(40,120,40,0.7), rgba(60,150,60,0.6))"
                     : i === step
-                      ? "linear-gradient(90deg, #f0d060, #ffe066)"
+                      ? "linear-gradient(90deg, var(--color-gold-light), var(--color-gold-bright))"
                       : "rgba(255,255,255,0.07)",
                   border: i === step
                     ? "1px solid rgba(255,220,80,0.6)"
@@ -974,7 +959,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
         )}
 
         {/* ── CONTENT (directional slide) ── */}
-        <div style={{ ...S.content, opacity: anim === "out" ? 0 : 1, transform: anim === "out" ? `translateX(${slideX})` : "translateX(0)", transition: "opacity 0.22s ease, transform 0.28s cubic-bezier(0.25,0.46,0.45,0.94)" }} ref={scrollRef} role="main" aria-label={`${cur.title} - בחרו מרכיבים`}>
+        <div style={{ ...S.content, opacity: anim === "out" ? 0 : 1, transform: anim === "out" ? `translateX(${slideX})` : "translateX(0)", filter: anim === "out" ? "blur(3px)" : "blur(0px)", transition: "opacity 0.22s ease, transform 0.28s cubic-bezier(0.25,0.46,0.45,0.94), filter 0.22s ease" }} ref={scrollRef} role="main" aria-label={`${cur.title} - בחרו מרכיבים`}>
 
           {/* Long-press discovery hint — shows once on load, fades out */}
           {showLongPressHint && (
@@ -1000,6 +985,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
                   {sg.items.map((item, idx) => {
                     const on = curSel.some(s => s.id === item.id);
                     const full = !on && cur.maxPicks && cur.maxPicks > 1 && curSel.length >= cur.maxPicks;
+                    const isPremiumStep = cur.id === "upgrade" || cur.id === "t_upgrade";
                     return (
                       <button key={item.id} disabled={full}
                         onClick={() => toggle(cur.id, item, cur.maxPicks)}
@@ -1011,8 +997,9 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
                         aria-disabled={full}
                         role="checkbox"
                         tabIndex={0}
-                        style={{ ...S.chip, ...(on ? S.chipOn : {}), ...(full ? S.chipOff : {}), animationDelay: `${(si * 5 + idx) * 20}ms` }}>
+                        style={{ ...S.chip, ...chipVisual(cur.id, on), ...(full ? S.chipOff : {}), animationDelay: `${(si * 5 + idx) * 20}ms` }}>
                         {on && <div style={S.check} aria-hidden="true">✓</div>}
+                        {isPremiumStep && <div style={{ position: "absolute", top: "-2px", left: "-2px", fontSize: "12px", filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.6))" }} aria-hidden="true">👑</div>}
                         {item.pop && <div style={S.popTag} aria-hidden="true">פופולרי</div>}
                         <div style={{ position: "absolute", bottom: "4px", right: "5px", fontSize: "8px", color: "rgba(255,255,255,0.18)", lineHeight: 1, pointerEvents: "none" }} aria-hidden="true">ℹ</div>
                         <Icon src={item.icon} size="38px" style={{ ...S.chipEmoji, transform: lastAdd === item.id ? "scale(1.4) rotate(-10deg)" : "scale(1)", transition: "transform 0.25s cubic-bezier(0.34,1.56,0.64,1)" }} />
@@ -1171,7 +1158,6 @@ const S = {
   grid: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "7px" },
 
   chip: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "10px 3px 7px", borderRadius: "16px", cursor: "pointer", position: "relative", minHeight: "74px", background: "linear-gradient(155deg, rgba(50,115,50,0.9), rgba(30,75,30,0.85))", border: "2px solid rgba(200,168,78,0.55)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", boxShadow: "0 3px 12px rgba(0,0,0,0.5), 0 0 8px rgba(200,168,78,0.08), inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.25)", color: "#ffffff", transition: "all 0.2s cubic-bezier(0.34,1.56,0.64,1)", animation: "chipIn 0.25s ease both", outline: "none" },
-  chipOn: { background: "linear-gradient(155deg, rgba(60,140,60,0.95), rgba(40,100,40,0.9))", border: "2.5px solid rgba(240,208,96,0.95)", boxShadow: "0 0 0 1px rgba(240,208,96,0.25), 0 6px 22px rgba(200,168,78,0.55), 0 0 28px rgba(200,168,78,0.35), inset 0 1px 0 rgba(255,255,255,0.25), inset 0 -1px 0 rgba(0,0,0,0.15)", transform: "translateY(-3px)" },
   chipOff: { opacity: 0.2, cursor: "not-allowed", filter: "grayscale(0.5)" },
   check: { position: "absolute", top: "3px", left: "3px", width: "16px", height: "16px", borderRadius: "50%", background: "linear-gradient(135deg, #ffe066, #d4b84a)", color: "#0d2e0d", fontSize: "8px", fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 6px rgba(200,168,78,0.5)" },
   popTag: { position: "absolute", top: "-1px", right: "-1px", background: "linear-gradient(135deg, #d4b84a, #f0d060)", color: "#0d2e0d", fontSize: "7px", fontWeight: 900, padding: "2px 6px", borderRadius: "16px 0 8px 0", boxShadow: "0 2px 4px rgba(0,0,0,0.35)" },
