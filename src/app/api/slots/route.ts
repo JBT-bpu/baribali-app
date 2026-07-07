@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { supabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
+import { listDemoOrders } from '@/lib/demoStore';
 
 const SLOT_CAPACITY = 5;      // max orders per slot
 const SLOT_MINUTES = 5;       // slot size in minutes
@@ -77,16 +78,24 @@ export async function GET(_req: NextRequest) {
     // Count existing orders per pickup_time slot for today (Israel-local "today").
     const today = getIsraelMidnightUTC(now);
 
-    const { data: existing } = await supabaseAdmin
-        .from('orders')
-        .select('pickup_time')
-        .gte('created_at', today.toISOString())
-        .neq('status', 'collected')
-        .in('pickup_time', slotTimes);
+    let existing: { pickup_time: string | null }[] = [];
+    if (!isSupabaseConfigured()) {
+        existing = listDemoOrders()
+            .filter(o => o.status !== 'collected' && o.created_at >= today.toISOString() && o.pickup_time && slotTimes.includes(o.pickup_time))
+            .map(o => ({ pickup_time: o.pickup_time }));
+    } else {
+        const { data } = await supabaseAdmin
+            .from('orders')
+            .select('pickup_time')
+            .gte('created_at', today.toISOString())
+            .neq('status', 'collected')
+            .in('pickup_time', slotTimes);
+        existing = data ?? [];
+    }
 
     // Count per slot
     const counts: Record<string, number> = {};
-    (existing ?? []).forEach(o => {
+    existing.forEach(o => {
         if (o.pickup_time) counts[o.pickup_time] = (counts[o.pickup_time] || 0) + 1;
     });
 

@@ -143,7 +143,19 @@ export default function KitchenPage() {
                 <div style={K.headerTitle}>🥗 מטבח BariBali</div>
                 <div style={K.headerMeta}>
                     {isDemo && (
-                        <span style={K.demoBadge}>DEMO — חבר Supabase להזמנות אמיתיות</span>
+                        <>
+                            <span style={K.demoBadge}>DEMO — חבר Supabase להזמנות אמיתיות</span>
+                            <button
+                                type="button"
+                                style={K.resetBtn}
+                                onClick={async () => {
+                                    await fetch('/api/demo/reset', { method: 'POST' });
+                                    loadOrders();
+                                }}
+                            >
+                                🔄 אפס נתוני דמו
+                            </button>
+                        </>
                     )}
                     <span style={K.clock}>{now.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}</span>
                     <span style={K.activeCount}>{totalActive} הזמנות פעילות</span>
@@ -323,6 +335,7 @@ const K: Record<string, React.CSSProperties> = {
     clock: { fontSize: '22px', fontWeight: 800, color: '#fff', letterSpacing: '0.04em' },
     activeCount: { fontSize: '13px', color: 'rgba(255,255,255,0.4)', fontWeight: 600 },
     demoBadge: { fontSize: '11px', fontWeight: 700, color: '#ff9800', background: 'rgba(255,152,0,0.12)', border: '1px solid rgba(255,152,0,0.3)', padding: '4px 10px', borderRadius: '8px' },
+    resetBtn: { fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.5)', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', padding: '4px 10px', borderRadius: '8px', cursor: 'pointer', fontFamily: "var(--font-heebo), 'Heebo', sans-serif" },
 
     loadingMsg: { padding: '60px', textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: '16px' },
     emptyMsg: { padding: '80px', textAlign: 'center', color: 'var(--color-green-accent)', fontSize: '18px', fontWeight: 700 },

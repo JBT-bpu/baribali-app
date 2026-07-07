@@ -26,15 +26,19 @@ export async function POST(req: NextRequest) {
             // Demo mode: no real gateway to redirect to, so the client already
             // resolved a payment choice up front — bake it straight into the
             // order instead of going through payment/create + a webhook.
+            const paymentStatus =
+                paymentChoice === 'now' ? 'paid' :
+                paymentChoice === 'fail' ? 'failed' :
+                'pay_at_pickup';
             const order = createDemoOrder({
                 items,
                 total: computed.total,
                 pickupTime,
                 notes,
                 size,
-                paymentStatus: paymentChoice === 'now' ? 'paid' : 'pay_at_pickup',
+                paymentStatus,
             });
-            return NextResponse.json({ id: order.id, orderNum: order.order_num, createdAt: order.created_at, demo: true });
+            return NextResponse.json({ id: order.id, orderNum: order.order_num, createdAt: order.created_at, demo: true, paymentFailed: paymentStatus === 'failed' });
         }
 
         // Generate order number: BB-XXXX (4-digit, time-seeded)

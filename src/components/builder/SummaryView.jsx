@@ -61,6 +61,8 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     const [paymentChoice, setPaymentChoice] = useState("pickup"); // 'now' | 'pickup' — demo mode only
     const [realOrderNum, setRealOrderNum] = useState(null);
     const [realOrderId, setRealOrderId] = useState(null);
+    const [paymentFailed, setPaymentFailed] = useState(false);
+    const [failedOrderNum, setFailedOrderNum] = useState(null);
 
     const highlightStep = (item) => {
         const step = STEPS.find(s => (sels[s.id] || []).some(i => i.id === item.id));
@@ -92,6 +94,49 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
         return { greens, vegs, prots, tops, rest };
     }, [all]);
 
+    const submitOrder = (choiceOverride) => {
+        const choice = choiceOverride ?? paymentChoice;
+        const isFailureTest = choice === "fail";
+        if (navigator.vibrate) navigator.vibrate(isFailureTest ? [30, 40, 30] : [15, 40, 30]);
+        if (!isFailureTest) setShowMixing(true);
+        fetch('/api/orders', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                items: all.map(i => ({ id: i.id, he: i.he, icon: i.icon, price: i.price || 0 })),
+                total,
+                pickupTime,
+                notes,
+                size: base,
+                ...(DEMO_MODE ? { paymentChoice: choice } : {}),
+            }),
+        })
+            .then(r => r.ok ? r.json() : null)
+            .then(async data => {
+                if (data?.paymentFailed) {
+                    setShowMixing(false);
+                    setFailedOrderNum(data.orderNum ?? null);
+                    setPaymentFailed(true);
+                    return;
+                }
+                if (data?.orderNum) setRealOrderNum(data.orderNum);
+                if (data?.id) setRealOrderId(data.id);
+                // If payment is enabled, redirect to payment page
+                if (data?.id && !data?.demo) {
+                    const payRes = await fetch('/api/payment/create', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ orderId: data.id }),
+                    }).then(r => r.ok ? r.json() : null).catch(() => null);
+                    if (payRes?.paymentUrl) {
+                        window.location.href = payRes.paymentUrl;
+                    }
+                }
+            })
+            .catch(() => {}); // silent fallback
+    };
+
+    if (paymentFailed) return <PaymentFailedScreen orderNum={failedOrderNum} onRetry={() => setPaymentFailed(false)} />;
     if (ordered) return <OrderedScreen total={total} all={all} pickupTime={pickupTime} notes={notes} orderNum={realOrderNum} orderId={realOrderId} onNewOrder={onNewOrder || onBack} />;
 
     return (
@@ -299,6 +344,11 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                                     <span>שלם באיסוף</span>
                                 </button>
                             </div>
+                            {/* Testing-only affordance, not a real customer choice — simulates
+                                a declined card so the failure path can actually be exercised. */}
+                            <button onClick={() => submitOrder("fail")} style={PAY.failTest}>
+                                🧪 דמה כשל תשלום (לבדיקה)
+                            </button>
                         </div>
                     )}
 
@@ -324,40 +374,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                         </div>
                     </div>
                     {/* CTA */}
-                    <BariButton variant="primary" fullWidth style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }} onClick={() => {
-                        if (navigator.vibrate) navigator.vibrate([15, 40, 30]);
-                        setShowMixing(true);
-                        // Fire API in parallel — animation gives it ~5s to complete
-                        fetch('/api/orders', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                items: all.map(i => ({ id: i.id, he: i.he, icon: i.icon, price: i.price || 0 })),
-                                total,
-                                pickupTime,
-                                notes,
-                                size: base,
-                                ...(DEMO_MODE ? { paymentChoice } : {}),
-                            }),
-                        })
-                            .then(r => r.ok ? r.json() : null)
-                            .then(async data => {
-                                if (data?.orderNum) setRealOrderNum(data.orderNum);
-                                if (data?.id) setRealOrderId(data.id);
-                                // If payment is enabled, redirect to payment page
-                                if (data?.id && !data?.demo) {
-                                    const payRes = await fetch('/api/payment/create', {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ orderId: data.id }),
-                                    }).then(r => r.ok ? r.json() : null).catch(() => null);
-                                    if (payRes?.paymentUrl) {
-                                        window.location.href = payRes.paymentUrl;
-                                    }
-                                }
-                            })
-                            .catch(() => {}); // silent fallback
-                    }}>
+                    <BariButton variant="primary" fullWidth style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }} onClick={() => submitOrder()}>
                         <span>שלח הזמנה</span>
                         <span style={S.orderBtnPrice}>₪{total}</span>
                     </BariButton>
@@ -495,6 +512,33 @@ function OrderedScreen({ total, all, pickupTime, notes, orderNum: propOrderNum, 
     );
 }
 
+// ─── Simulated payment-failure screen (demo mode only) ──────────
+function PaymentFailedScreen({ orderNum, onRetry }) {
+    return (
+        <div style={OS.root}>
+            <div style={OS.bg} />
+            <div style={OS.content}>
+                <div style={{ fontSize: "64px", animation: "ringPop 0.6s cubic-bezier(0.34,1.56,0.64,1) both" }}>❌</div>
+                <div style={{ ...OS.title, color: "#ef5350" }}>התשלום נכשל</div>
+                <div style={OS.subtitle}>לא הצלחנו לחייב את הכרטיס (מצב הדגמה)</div>
+                {orderNum && (
+                    <div style={{ marginTop: "14px", animation: "fadeUp 0.5s ease 0.35s both" }}>
+                        <BariBadge>הזמנה {orderNum}</BariBadge>
+                    </div>
+                )}
+                <div style={OS.divider} />
+                <BariButton variant="primary" fullWidth style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }} onClick={onRetry}>
+                    נסה שוב ←
+                </BariButton>
+            </div>
+            <style>{`
+                @keyframes ringPop { 0%{transform:scale(0.4);opacity:0} 55%{transform:scale(1.12)} 100%{transform:scale(1);opacity:1} }
+                @keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+                @keyframes screenIn { from{opacity:0} to{opacity:1} }
+            `}</style>
+        </div>
+    );
+}
 
 const OS = {
     root: { position: "fixed", inset: 0, zIndex: 500, background: "linear-gradient(155deg, #030a03 0%, #071a07 30%, #0a200a 60%, #071a07 100%)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: "rtl", animation: "screenIn 0.55s ease both" },
@@ -663,6 +707,7 @@ const PAY = {
     row: { display: "flex", gap: "8px" },
     opt: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", padding: "10px 8px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.12)", background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.6)", fontSize: "12px", fontWeight: 700, fontFamily: "var(--font-heebo), 'Heebo', sans-serif", cursor: "pointer", transition: "all 0.15s" },
     optActive: { background: "linear-gradient(135deg, rgba(200,168,78,0.28), rgba(200,168,78,0.12))", border: "1px solid var(--color-gold-deep)", color: "var(--color-gold-light)", boxShadow: "var(--shadow-gold-glow)" },
+    failTest: { width: "100%", marginTop: "8px", padding: "6px", background: "none", border: "none", borderTop: "1px dashed rgba(255,255,255,0.1)", color: "rgba(239,83,80,0.6)", fontSize: "10px", fontWeight: 600, fontFamily: "var(--font-heebo), 'Heebo', sans-serif", cursor: "pointer" },
 };
 
 const PT = {
