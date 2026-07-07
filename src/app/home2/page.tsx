@@ -7,6 +7,7 @@ import Tilt from 'react-parallax-tilt';
 import { House, Search, Star, ClipboardList, User } from 'lucide-react';
 import ReviewsStrip from '@/components/ui/ReviewsStrip';
 import CatPopup from '@/components/ui/CatPopup';
+import { BariButton, BariModal, BariGlowBackground } from '@/components/ui/bari';
 
 // Bottom nav — vector icons instead of emoji for consistent UI chrome
 // (the illustrated ingredient/card art elsewhere stays as-is, this is
@@ -76,8 +77,11 @@ function Particles() {
         const resize = () => { c.width = c.offsetWidth; c.height = c.offsetHeight; };
         resize();
         window.addEventListener('resize', resize);
-        const sparkCols = ['#f0c832', '#ffe066', '#f0a820', '#c8d830', '#fffacc'];
-        const bokehCols = ['#c8a832', '#f0d060', '#ffe066', '#d4a820'];
+        // Palette matches the design tokens in globals.css (gold-deep/light/
+        // bright, cream) — literal hex here since canvas fillStyle can't
+        // resolve CSS custom properties.
+        const sparkCols = ['#c8a832', '#f0d060', '#ffe066', '#c8a84e', '#fffacc'];
+        const bokehCols = ['#c8a832', '#f0d060', '#ffe066', '#c8a84e'];
         type Spark = { x: number; y: number; r: number; s: number; o: number; col: string; d: number; ph: number };
         type Bokeh = { x: number; y: number; r: number; s: number; o: number; col: string; ph: number };
         const sparks: Spark[] = Array.from({ length: 120 }, () => ({
@@ -191,7 +195,7 @@ function SizePicker({ onSelect, onBack }: { onSelect: (s: string) => void; onBac
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '-4px' }}>
                 <span style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.06em' }}>בנה סלט</span>
                 <span style={{ fontSize: '10px', color: 'rgba(240,200,50,0.45)' }}>←</span>
-                <span style={{ fontSize: '11px', fontWeight: 800, color: '#f0c832', letterSpacing: '0.06em', animation: 'stepGlow 2.2s ease-in-out infinite' }}>בחר גודל</span>
+                <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-gold-deep)', letterSpacing: '0.06em', animation: 'stepGlow 2.2s ease-in-out infinite' }}>בחר גודל</span>
             </div>
 
             {/* Thin gold divider */}
@@ -243,7 +247,7 @@ function SizePicker({ onSelect, onBack }: { onSelect: (s: string) => void; onBac
                                 tiltMaxAngleY={6}
                                 glareEnable
                                 glareMaxOpacity={0.16}
-                                glareColor="#f0c832"
+                                glareColor="var(--color-gold-deep)"
                                 glarePosition="all"
                                 glareBorderRadius="16px"
                                 transitionSpeed={400}
@@ -254,7 +258,7 @@ function SizePicker({ onSelect, onBack }: { onSelect: (s: string) => void; onBac
                                 overflow: 'hidden',
                                 border: isActive ? '1.5px solid rgba(240,200,50,0.65)' : '1px solid rgba(255,255,255,0.22)',
                                 boxShadow: isActive
-                                    ? '0 24px 64px rgba(0,0,0,0.92), 0 0 44px rgba(240,200,50,0.38), inset 0 1px 0 rgba(255,255,255,0.14)' + glowShadow
+                                    ? '0 24px 64px rgba(0,0,0,0.92), 0 0 48px rgba(240,200,50,0.42), inset 0 1px 0 rgba(255,255,255,0.14)' + glowShadow
                                     : '0 6px 20px rgba(0,0,0,0.5)',
                                 animation: `cardCascade 0.45s cubic-bezier(0.22,1.2,0.36,1) ${i * 75}ms both`,
                                 position: 'relative',
@@ -277,7 +281,7 @@ function SizePicker({ onSelect, onBack }: { onSelect: (s: string) => void; onBac
                                             background: 'linear-gradient(135deg,rgba(20,8,0,0.92),rgba(8,4,0,0.96))',
                                             border: '1px solid rgba(240,200,50,0.45)',
                                             backdropFilter: 'blur(8px)',
-                                            fontSize: '12px', fontWeight: 800, color: '#f0c832',
+                                            fontSize: '12px', fontWeight: 800, color: 'var(--color-gold-deep)',
                                             whiteSpace: 'nowrap',
                                             boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
                                         }}>
@@ -296,31 +300,34 @@ function SizePicker({ onSelect, onBack }: { onSelect: (s: string) => void; onBac
                 {SIZE_CARDS.map((_, i) => (
                     <div key={i} onClick={() => snapTo(i)} style={{
                         width: i === activeIdx ? '22px' : '7px', height: '7px', borderRadius: '4px',
-                        background: i === activeIdx ? '#f0c832' : 'rgba(255,255,255,0.45)',
+                        background: i === activeIdx ? 'var(--color-gold-deep)' : 'rgba(255,255,255,0.45)',
                         transition: 'all 0.3s cubic-bezier(0.34,1.4,0.64,1)',
                         boxShadow: i === activeIdx ? '0 0 10px rgba(240,200,50,0.6)' : 'none', cursor: 'pointer',
                     }} />
                 ))}
             </div>
 
-            <button type="button" onClick={doConfirm} style={{
-                marginTop: '4px',
-                padding: '14px 52px', borderRadius: '50px', border: 'none', cursor: 'pointer',
-                background: 'linear-gradient(135deg,#c8a832 0%,#f0d060 45%,#ffe066 55%,#c8a832 100%)',
-                color: '#0d2e0d', fontSize: '17px', fontWeight: 900, fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
-                boxShadow: '0 0 40px rgba(240,200,50,0.5),0 4px 20px rgba(0,0,0,0.4)',
-                opacity: out ? 0 : 1, transition: 'opacity 0.2s',
-            }}>
+            <BariButton
+                variant="primary"
+                onClick={doConfirm}
+                style={{
+                    marginTop: '4px',
+                    fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
+                    opacity: out ? 0 : 1,
+                    transition: 'opacity 0.2s',
+                }}
+            >
                 בנה סלט ←
-            </button>
+            </BariButton>
 
-            <button type="button" onClick={onBack} style={{
-                background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.55)',
-                fontSize: '13px', fontWeight: 600, cursor: 'pointer', padding: '6px 14px', borderRadius: '20px',
-                fontFamily: "var(--font-heebo), 'Heebo', sans-serif", marginTop: '-4px',
-            }}>
+            <BariButton
+                variant="ghost"
+                size="sm"
+                onClick={onBack}
+                style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif", marginTop: '-4px', borderRadius: '20px' }}
+            >
                 ← חזרה
-            </button>
+            </BariButton>
         </div>
     );
 }
@@ -451,7 +458,6 @@ export default function HomeV2() {
                 @keyframes navIn    { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:none} }
                 @keyframes burst    { from{transform:scale(0)} to{transform:scale(55)} }
                 @keyframes hint     { 0%,100%{opacity:1} 50%{opacity:0.45} }
-                @keyframes sheetUp  { from{opacity:0;transform:translateY(40px)} to{opacity:1;transform:none} }
                 @keyframes swipeHint{ 0%,100%{transform:translateX(0);opacity:0.55} 40%{transform:translateX(-7px);opacity:0.9} 65%{transform:translateX(7px);opacity:0.9} }
                 @keyframes swipeHintFade{ 0%,80%{opacity:1} 100%{opacity:0} }
                 @keyframes glowPulse{ 0%,100%{filter:drop-shadow(0 0 22px rgba(240,200,50,.7)) drop-shadow(0 0 55px rgba(240,200,50,.3))} 50%{filter:drop-shadow(0 0 40px rgba(240,200,50,1)) drop-shadow(0 0 90px rgba(240,200,50,.55))} }
@@ -537,7 +543,7 @@ export default function HomeV2() {
                                     tiltMaxAngleY={8}
                                     glareEnable
                                     glareMaxOpacity={0.18}
-                                    glareColor={isSaladActive ? '#5adc28' : '#f0c832'}
+                                    glareColor={isSaladActive ? 'var(--color-lime)' : 'var(--color-gold-deep)'}
                                     glarePosition="all"
                                     glareBorderRadius="18px"
                                     transitionSpeed={400}
@@ -550,7 +556,7 @@ export default function HomeV2() {
                                             ? (isSaladActive ? '1.5px solid rgba(90,220,40,0.6)' : '1.5px solid rgba(240,200,50,0.55)')
                                             : '1px solid rgba(255,255,255,0.22)',
                                         boxShadow: isActive
-                                            ? '0 20px 60px rgba(0,0,0,0.9), 0 4px 20px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.12)' + glowShadow
+                                            ? 'var(--shadow-card-glow)' + glowShadow
                                             : '0 6px 20px rgba(0,0,0,0.5)',
                                         animation: isActive
                                             ? (isSaladActive ? 'greenGlow 1.4s ease-in-out infinite' : 'glowPulse 2.4s ease-in-out infinite')
@@ -583,7 +589,7 @@ export default function HomeV2() {
 
                 {/* Dynamic card label — re-animates on each idx change */}
                 <div key={`label-${activeIdx}`} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', marginTop: '10px', animation: 'labelIn 0.28s ease both' }}>
-                    <div style={{ fontFamily: "var(--font-display), 'Secular One', sans-serif", fontSize: '22px', fontWeight: 400, color: '#fff', letterSpacing: '0.01em', textShadow: '0 2px 14px rgba(0,0,0,0.9)' }}>
+                    <div style={{ fontFamily: "var(--font-display), 'Secular One', sans-serif", fontSize: '27px', fontWeight: 400, color: '#fff', letterSpacing: '0.01em', textShadow: '0 2px 14px rgba(0,0,0,0.9), 0 0 26px rgba(200,168,78,0.4)' }}>
                         {card.label}
                     </div>
                     <div style={{ fontSize: '12px', fontWeight: 600, color: 'rgba(255,255,255,0.65)', letterSpacing: '0.04em' }}>
@@ -596,7 +602,7 @@ export default function HomeV2() {
                     {MAIN_CARDS.map((_, i) => (
                         <div key={i} onClick={() => snapTo(i)} style={{
                             width: i === activeIdx ? '22px' : '7px', height: '7px', borderRadius: '4px',
-                            background: i === activeIdx ? '#f0c832' : 'rgba(255,255,255,0.45)',
+                            background: i === activeIdx ? 'var(--color-gold-deep)' : 'rgba(255,255,255,0.45)',
                             transition: 'all 0.3s cubic-bezier(0.34,1.4,0.64,1)',
                             boxShadow: i === activeIdx ? '0 0 10px rgba(240,200,50,0.6)' : 'none',
                             cursor: 'pointer',
@@ -613,20 +619,20 @@ export default function HomeV2() {
                     }}>
                         <span style={{
                             fontSize: '16px',
-                            background: 'linear-gradient(135deg,#f0c832,#ffe066,#f0a820)',
+                            background: 'linear-gradient(135deg, var(--color-gold-deep), var(--color-gold-bright), var(--color-gold-light))',
                             WebkitBackgroundClip: 'text',
                             WebkitTextFillColor: 'transparent',
                             fontWeight: 900,
                         }}>{'◂'}</span>
                         <span style={{
                             fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em',
-                            background: 'linear-gradient(135deg,#f0c832,#ffe066)',
+                            background: 'linear-gradient(135deg, var(--color-gold-deep), var(--color-gold-bright))',
                             WebkitBackgroundClip: 'text',
                             WebkitTextFillColor: 'transparent',
                         }}>גרור לסיבוב</span>
                         <span style={{
                             fontSize: '16px',
-                            background: 'linear-gradient(135deg,#f0a820,#ffe066,#f0c832)',
+                            background: 'linear-gradient(135deg, var(--color-gold-light), var(--color-gold-bright), var(--color-gold-deep))',
                             WebkitBackgroundClip: 'text',
                             WebkitTextFillColor: 'transparent',
                             fontWeight: 900,
@@ -642,7 +648,7 @@ export default function HomeV2() {
             <div style={{ position: 'relative', zIndex: 2, width: '100%', padding: '10px 18px 28px', animation: 'navIn 0.6s ease 0.2s both' }}>
                 <div style={{ position: 'relative', borderRadius: '50px', overflow: 'hidden', boxShadow: '0 4px 24px rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,255,255,0.06)' }}>
                     <Image src="/homepage-assets/nav-bg.png" alt="" width={1290} height={300}
-                        style={{ width: '100%', height: '58px', objectFit: 'cover', objectPosition: 'center', display: 'block', opacity: 0.45 }} />
+                        style={{ width: '100%', height: '58px', objectFit: 'cover', objectPosition: 'center', display: 'block', opacity: 0.6 }} />
                     <div style={{ position: 'absolute', inset: 0, display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '0 8px' }}>
                         {NAV_ITEMS.map(item => (
                             <div
@@ -654,7 +660,7 @@ export default function HomeV2() {
                                 style={{
                                     position: 'relative',
                                     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
-                                    opacity: item.active ? 1 : 0.5,
+                                    opacity: item.active ? 1 : 0.7,
                                     cursor: 'pointer', padding: '4px 12px',
                                     transition: 'opacity 0.25s ease',
                                 }}
@@ -673,16 +679,16 @@ export default function HomeV2() {
                                 )}
                                 <item.Icon
                                     size={item.active ? 24 : 19}
-                                    color={item.active ? '#f0c832' : '#fff'}
+                                    color={item.active ? 'var(--color-gold-deep)' : '#fff'}
                                     strokeWidth={2.3}
                                     style={{
-                                        filter: item.active ? 'drop-shadow(0 0 10px #f0c832)' : 'none',
+                                        filter: item.active ? 'drop-shadow(0 0 10px var(--color-gold-deep))' : 'drop-shadow(0 1px 3px rgba(0,0,0,0.5))',
                                         transition: 'width 0.25s ease, height 0.25s ease, filter 0.25s ease',
                                     }}
                                 />
                                 <span style={{
                                     fontSize: '11px', fontWeight: 700,
-                                    color: item.active ? '#f0c832' : '#fff',
+                                    color: item.active ? 'var(--color-gold-deep)' : '#fff',
                                     letterSpacing: '0.04em',
                                     textShadow: '0 1px 4px rgba(0,0,0,0.8)',
                                 }}>{item.label}</span>
@@ -690,7 +696,7 @@ export default function HomeV2() {
                                 {item.active && (
                                     <div style={{
                                         width: '20px', height: '3px', borderRadius: '2px',
-                                        background: 'linear-gradient(90deg,#f0c832,#ffe066)',
+                                        background: 'linear-gradient(90deg, var(--color-gold-deep), var(--color-gold-bright))',
                                         marginTop: '1px',
                                         boxShadow: '0 0 8px rgba(240,200,50,0.5)',
                                     }} />
@@ -715,29 +721,31 @@ export default function HomeV2() {
             {sizePicker && <SizePicker onSelect={handleSizeSelect} onBack={() => { setSizePicker(false); saladReset(); }} />}
 
             {/* Login bottom sheet */}
-            {loginSheet && (
-                <div onClick={() => setLoginSheet(false)} style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(0,0,0,0.42)', backdropFilter: 'blur(4px)' }}>
-                    <div onClick={e => e.stopPropagation()} style={{
-                        position: 'absolute', bottom: 0, left: 0, right: 0,
-                        background: 'rgba(3,12,3,0.97)', backdropFilter: 'blur(22px)',
-                        borderRadius: '24px 24px 0 0', border: '1px solid rgba(240,200,50,0.12)',
-                        padding: '24px 24px max(44px, env(safe-area-inset-bottom))',
-                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px',
-                        animation: 'sheetUp 0.35s cubic-bezier(0.34,1.4,0.64,1) both',
-                    }}>
-                        <div style={{ width: '38px', height: '4px', borderRadius: '4px', background: 'rgba(255,255,255,0.1)' }} />
-                        <Image src="/homepage-assets/card-login.png" alt="" width={160} height={200} style={{ width: '110px', height: 'auto' }} />
-                        <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.28)', textAlign: 'center', lineHeight: 1.7, maxWidth: '250px', fontWeight: 600 }}>
-                            שמור סלטים · ראה היסטוריה · קבל המלצות אישיות
-                        </div>
-                        <button type="button" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '13px 28px', borderRadius: '50px', background: '#fff', border: 'none', cursor: 'pointer', fontSize: '15px', fontWeight: 800, color: '#1a1a1a', fontFamily: "var(--font-heebo), 'Heebo', sans-serif", boxShadow: '0 4px 20px rgba(0,0,0,0.35)' }}>
-                            <span style={{ fontSize: '17px', fontWeight: 900, color: '#4285F4' }}>G</span>
-                            המשך עם Google
-                        </button>
-                        <button type="button" onClick={() => setLoginSheet(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.18)', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }}>ביטול</button>
+            <BariModal open={loginSheet} onClose={() => setLoginSheet(false)} variant="sheet">
+                <div style={{
+                    position: 'relative',
+                    padding: '8px 24px max(28px, env(safe-area-inset-bottom))',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px',
+                }}>
+                    <BariGlowBackground />
+                    <Image src="/homepage-assets/card-login.png" alt="" width={160} height={200} style={{ width: '110px', height: 'auto', position: 'relative' }} />
+                    <div style={{ position: 'relative', fontSize: '13px', color: 'rgba(255,255,255,0.5)', textAlign: 'center', lineHeight: 1.7, maxWidth: '250px', fontWeight: 600 }}>
+                        שמור סלטים · ראה היסטוריה · קבל המלצות אישיות
                     </div>
+                    <button type="button" style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '10px', padding: '13px 28px', borderRadius: '50px', background: '#fff', border: 'none', cursor: 'pointer', fontSize: '15px', fontWeight: 800, color: '#1a1a1a', fontFamily: "var(--font-heebo), 'Heebo', sans-serif", boxShadow: '0 4px 20px rgba(0,0,0,0.35)' }}>
+                        <span style={{ fontSize: '17px', fontWeight: 900, color: '#4285F4' }}>G</span>
+                        המשך עם Google
+                    </button>
+                    <BariButton
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setLoginSheet(false)}
+                        style={{ position: 'relative', border: 'none', color: 'rgba(255,255,255,0.4)', fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }}
+                    >
+                        ביטול
+                    </BariButton>
                 </div>
-            )}
+            </BariModal>
         </div>
     );
 }

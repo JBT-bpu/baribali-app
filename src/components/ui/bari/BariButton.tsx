@@ -21,7 +21,9 @@ const VARIANT_CLASSES: Record<Variant, string> = {
 };
 
 const SIZE_CLASSES: Record<Size, string> = {
-    md: 'px-7 py-3.5 text-base rounded-2xl gap-3',
+    // Full pill — matches the shape every hand-rolled primary CTA in the
+    // app already uses (home2, size picker, order-status, etc.).
+    md: 'px-7 py-3.5 text-base rounded-full gap-3',
     sm: 'px-4 py-2 text-sm rounded-lg gap-1.5',
 };
 

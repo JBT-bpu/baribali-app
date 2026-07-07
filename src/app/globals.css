@@ -24,6 +24,13 @@
   --color-green-accent: #4caf50;
   --color-green-accent-light: #66bb6a;
 
+  /* Lime — the vivid "fresh/salad" accent glow already used ad hoc
+     (home2's salad-card glare/glow); cream — the pale sparkle highlight
+     used in the particle system. Both are real, already-in-use brand
+     colors that just hadn't been promoted to tokens yet. */
+  --color-lime: #5adc28;
+  --color-cream: #fffacc;
+
   /* Status */
   --color-danger: #ef5350;
   --color-danger-light: #ff7575;
