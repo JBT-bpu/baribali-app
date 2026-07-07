@@ -24,6 +24,10 @@ const secularOne = Secular_One({
 export const metadata: Metadata = {
     title: 'BariBali - בנה סלט כפר',
     description: 'BariBali - Hebrew salad-building mobile app',
+    // manifest.ts + icon.png/apple-icon.png (all auto-detected by Next's
+    // file-based metadata convention — no manual <link> tags needed) make
+    // this installable to a home screen. Deliberately no service worker/
+    // offline caching in this pass.
 };
 
 export const viewport: Viewport = {
@@ -31,6 +35,7 @@ export const viewport: Viewport = {
     initialScale: 1,
     maximumScale: 1,
     userScalable: false,
+    themeColor: '#020a02',
 };
 
 export default function RootLayout({

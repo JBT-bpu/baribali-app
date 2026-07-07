@@ -509,7 +509,7 @@ export default function HomeV2() {
             <Particles />
 
             {/* Logo */}
-            <div style={{ position: 'relative', zIndex: 2, padding: '44px 20px 0', animation: 'logoIn 0.6s cubic-bezier(0.34,1.3,0.64,1) both' }}>
+            <div style={{ position: 'relative', zIndex: 2, padding: '44px 20px 0', paddingTop: 'max(44px, env(safe-area-inset-top))', animation: 'logoIn 0.6s cubic-bezier(0.34,1.3,0.64,1) both' }}>
                 <Image src="/homepage-assets/logo.webp" alt="BariBali" width={220} height={140}
                     style={{ width: '180px', height: 'auto', filter: 'drop-shadow(0 0 32px rgba(240,200,50,0.5)) drop-shadow(0 4px 14px rgba(0,0,0,0.65))' }} priority />
             </div>

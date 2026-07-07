@@ -341,7 +341,7 @@ const shimmerGradient = 'linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba
 
 const P: Record<string, React.CSSProperties> = {
     root: { position: 'relative', minHeight: '100vh', background: 'url(/homepage-assets/bg-bokeh.webp) center top / cover no-repeat, linear-gradient(155deg, #030a03 0%, #071a07 30%, #0a200a 60%, #071a07 100%)', fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: 'rtl', color: '#fff' },
-    content: { position: 'relative', zIndex: 1, maxWidth: '420px', margin: '0 auto', padding: '32px 20px 60px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' },
+    content: { position: 'relative', zIndex: 1, maxWidth: '420px', margin: '0 auto', padding: '32px 20px 60px', paddingTop: 'max(32px, env(safe-area-inset-top))', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' },
 
     logo: { fontSize: '18px', fontWeight: 900, color: '#f0d060', letterSpacing: '0.04em', animation: 'fadeUp 0.4s ease both' },
 

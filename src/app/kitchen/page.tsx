@@ -326,6 +326,7 @@ const K: Record<string, React.CSSProperties> = {
     header: {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '16px 24px',
+        paddingTop: 'max(16px, env(safe-area-inset-top))',
         background: 'rgba(255,255,255,0.04)',
         borderBottom: '1px solid rgba(255,255,255,0.08)',
         position: 'sticky', top: 0, zIndex: 10,
