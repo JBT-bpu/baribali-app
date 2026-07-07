@@ -2,8 +2,13 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import ParticleCanvas from '@/components/ui/ParticleCanvas';
+import BariBadge from '@/components/ui/bari/BariBadge';
+import BariGlowBackground from '@/components/ui/bari/BariGlowBackground';
 import { fireGoldConfetti } from '@/lib/confetti';
+
+const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
 
 type OrderStatus = 'waiting' | 'preparing' | 'ready' | 'collected';
 
@@ -111,6 +116,10 @@ export default function OrderStatusView({ id }: { id: string }) {
     const prevStatusRef = useRef<OrderStatus | null>(null);
     const [ringScale, setRingScale] = useState(false);
     const [labelSlide, setLabelSlide] = useState(false);
+    // Same celebratory cat used in the order-confirmation screen — reused
+    // here rather than inventing a second animation for the "ready" moment.
+    const [readyAnim, setReadyAnim] = useState<object | null>(null);
+    useEffect(() => { fetch('/cat-salad-final.json').then(r => r.json()).then(setReadyAnim).catch(() => {}); }, []);
 
     const countdown = useCountdown(order?.pickup_time ?? null);
 
@@ -195,17 +204,21 @@ export default function OrderStatusView({ id }: { id: string }) {
 
     return (
         <div style={P.root}>
-            <div style={P.bg} />
+            <BariGlowBackground />
             <ParticleCanvas intensity="medium" />
 
             <div style={P.content}>
                 {/* Header */}
                 <div style={P.logo}>🥗 BariBali</div>
-                <div style={P.orderNum}>{order.order_num}</div>
+                <div style={{ animation: 'fadeUp 0.4s ease 0.05s both' }}>
+                    <BariBadge>{order.order_num}</BariBadge>
+                </div>
 
-                {/* Status ring */}
+                {/* Status ring — swaps in the celebratory cat animation once ready */}
                 <div style={ringStyle}>
-                    <div style={P.ringIcon}>{STATUS_STEPS[currentStep]?.icon ?? '📋'}</div>
+                    {isReady && readyAnim
+                        ? <Lottie animationData={readyAnim} loop autoplay style={{ width: '84px', height: '84px' }} />
+                        : <div style={P.ringIcon}>{STATUS_STEPS[currentStep]?.icon ?? '📋'}</div>}
                 </div>
 
                 <div style={labelStyle}>
@@ -215,7 +228,7 @@ export default function OrderStatusView({ id }: { id: string }) {
                 {/* Countdown */}
                 {order.pickup_time && countdown && (
                     <div style={{
-                        ...P.pickupTime,
+                        ...P.pickupTimeCard,
                         ...(countdown.arrived ? P.countdownArrived : {}),
                         ...(countdown.urgent && !countdown.arrived ? P.countdownUrgent : {}),
                     }}>
@@ -229,14 +242,14 @@ export default function OrderStatusView({ id }: { id: string }) {
 
                 {/* Static pickup time when no countdown active */}
                 {order.pickup_time && !countdown && (
-                    <div style={P.pickupTime}>
+                    <div style={P.pickupTimeCard}>
                         ⏰ זמן איסוף: <strong>{order.pickup_time}</strong>
                     </div>
                 )}
 
-                {/* Progress bar */}
+                {/* Progress bar — all 4 states, including "collected" */}
                 <div style={P.stepsRow}>
-                    {STATUS_STEPS.slice(0, 3).map((step, i) => (
+                    {STATUS_STEPS.map((step, i) => (
                         <div key={step.key} style={P.stepWrap}>
                             <div style={{
                                 ...P.stepDot,
@@ -248,7 +261,7 @@ export default function OrderStatusView({ id }: { id: string }) {
                             <div style={{ ...P.stepLabel, ...(i === currentStep ? { color: '#fff', fontWeight: 800 } : {}) }}>
                                 {step.label}
                             </div>
-                            {i < 2 && <div style={{ ...P.stepLine, ...(i < currentStep ? P.stepLineDone : {}) }} />}
+                            {i < STATUS_STEPS.length - 1 && <div style={{ ...P.stepLine, ...(i < currentStep ? P.stepLineDone : {}) }} />}
                         </div>
                     ))}
                 </div>
@@ -327,19 +340,17 @@ function NotFound() {
 const shimmerGradient = 'linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.04) 75%)';
 
 const P: Record<string, React.CSSProperties> = {
-    root: { minHeight: '100vh', background: 'url(/homepage-assets/bg-bokeh.webp) center top / cover no-repeat, linear-gradient(155deg, #030a03 0%, #071a07 30%, #0a200a 60%, #071a07 100%)', fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: 'rtl', color: '#fff' },
-    bg: { position: 'fixed', inset: 0, background: 'radial-gradient(ellipse 80% 50% at 50% 30%, rgba(200,168,78,0.06) 0%, transparent 70%)', pointerEvents: 'none' },
+    root: { position: 'relative', minHeight: '100vh', background: 'url(/homepage-assets/bg-bokeh.webp) center top / cover no-repeat, linear-gradient(155deg, #030a03 0%, #071a07 30%, #0a200a 60%, #071a07 100%)', fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: 'rtl', color: '#fff' },
     content: { position: 'relative', zIndex: 1, maxWidth: '420px', margin: '0 auto', padding: '32px 20px 60px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' },
 
     logo: { fontSize: '18px', fontWeight: 900, color: '#f0d060', letterSpacing: '0.04em', animation: 'fadeUp 0.4s ease both' },
-    orderNum: { fontSize: '13px', color: 'rgba(255,255,255,0.55)', fontWeight: 700, letterSpacing: '0.08em', animation: 'fadeUp 0.4s ease 0.05s both' },
 
     ring: { width: '100px', height: '100px', borderRadius: '50%', border: '3px solid rgba(200,168,78,0.5)', background: 'rgba(200,168,78,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: '8px', transition: 'all 0.4s ease', animation: 'fadeUp 0.4s ease 0.1s both' },
     ringReady: { border: '3px solid #4caf50', background: 'rgba(76,175,80,0.12)', animation: 'fadeUp 0.4s ease 0.1s both, pulse 1.5s ease-in-out 0.5s 3' },
     ringIcon: { fontSize: '42px', lineHeight: 1 },
 
     statusLabel: { fontSize: '22px', fontWeight: 900, color: '#fff', animation: 'fadeUp 0.4s ease 0.15s both' },
-    pickupTime: { fontSize: '14px', color: 'rgba(255,255,255,0.45)', fontWeight: 600, animation: 'fadeUp 0.4s ease 0.2s both' },
+    pickupTimeCard: { fontSize: '14px', color: 'rgba(255,255,255,0.6)', fontWeight: 600, animation: 'fadeUp 0.4s ease 0.2s both', padding: '8px 18px', borderRadius: '999px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' },
 
     countdownUrgent: { color: '#f0d060', fontWeight: 800, fontSize: '16px', animation: 'countdownPulse 1s ease-in-out infinite' },
     countdownArrived: { color: '#4caf50', fontWeight: 900, fontSize: '18px', animation: 'countdownGlow 1.5s ease-in-out infinite' },
