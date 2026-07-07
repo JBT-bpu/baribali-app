@@ -44,14 +44,21 @@ import MagicBackground from "./background/MagicBackground.jsx";
 import MixingAnimation from "./ui/MixingAnimation.jsx";
 import BariPanel from "../ui/bari/BariPanel";
 import BariButton from "../ui/bari/BariButton";
+import BariBadge from "../ui/bari/BariBadge";
+import BariModal from "../ui/bari/BariModal";
+import { isSupabaseConfigured } from "../../lib/supabase";
+
+const DEMO_MODE = !isSupabaseConfigured();
 
 export default function SummaryView({ sels, total, all, comboBadges, notes, setNotes, onBack, onEdit, onNewOrder, base = BASE, sizeLabel = null }) {
     const [showMixing, setShowMixing] = useState(false);
     const [ordered, setOrdered] = useState(false);
     const [notesError, setNotesError] = useState("");
     const [notesOpen, setNotesOpen] = useState(false);
+    const [notesFocused, setNotesFocused] = useState(false);
     const [highlightedStep, setHighlightedStep] = useState(null);
     const [pickupTime, setPickupTime] = useState(() => generatePickupSlots()?.[0]?.id ?? null);
+    const [paymentChoice, setPaymentChoice] = useState("pickup"); // 'now' | 'pickup' — demo mode only
     const [realOrderNum, setRealOrderNum] = useState(null);
     const [realOrderId, setRealOrderId] = useState(null);
 
@@ -139,10 +146,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                             <div style={S.comboBannerTitle}>🏆 שילובים שנבחרו</div>
                             <div style={S.comboBannerRow}>
                                 {comboBadges.map(b => (
-                                    <div key={b.id} style={S.badgePill}>
-                                        <span style={{ fontSize: "16px" }}>{b.icon}</span>
-                                        <span style={{ fontSize: "11px", fontWeight: 700, color: "#edd87e" }}>{b.he}</span>
-                                    </div>
+                                    <BariBadge key={b.id} icon={<span style={{ fontSize: "16px" }}>{b.icon}</span>}>{b.he}</BariBadge>
                                 ))}
                             </div>
                         </div>
@@ -220,46 +224,48 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                         ))}
                     </div>
 
-                    {/* Notes — collapsed by default */}
-                    <div style={S.notesBox}>
-                        <button
-                            style={S.notesToggle}
-                            onClick={() => setNotesOpen(o => !o)}
-                            aria-expanded={notesOpen}
-                        >
-                            <span>📝 הערה לבשלן</span>
-                            {notes.length > 0 && !notesOpen && (
-                                <span style={{ fontSize: "10px", color: "rgba(200,168,78,0.7)", fontWeight: 600 }}>✓ נוספה</span>
-                            )}
-                            <span style={{ marginRight: "auto", fontSize: "12px", color: "rgba(255,255,255,0.3)", transition: "transform 0.2s", transform: notesOpen ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
-                        </button>
-                        {notesOpen && (
-                            <div style={{ marginTop: "8px" }}>
-                                <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "4px" }}>
-                                    <span style={{ fontSize: "9px", color: notes.length > MAX_NOTES_LENGTH * 0.8 ? "#e57373" : "rgba(255,255,255,0.3)" }}>
-                                        {MAX_NOTES_LENGTH - notes.length} תווים נותרו
-                                    </span>
-                                </div>
-                                <textarea
-                                    value={notes}
-                                    onChange={handleNotesChange}
-                                    placeholder="לדוגמה: בלי גרעינים, לחתוך קטן..."
-                                    rows={3}
-                                    maxLength={MAX_NOTES_LENGTH}
-                                    aria-label="הערות מיוחדות להזמנה"
-                                    style={{ ...S.notesInput }}
-                                    autoFocus
-                                />
-                                {notesError && <div style={{ fontSize: "10px", color: "#ef5350", marginTop: "4px" }}>⚠️ {notesError}</div>}
-                            </div>
+                    {/* Notes — opens in a sheet instead of an inline collapse */}
+                    <button style={S.notesToggle} onClick={() => setNotesOpen(true)} aria-haspopup="dialog">
+                        <span>📝 הערה לבשלן</span>
+                        {notes.length > 0 && (
+                            <BariBadge className="mr-auto">✓ נוספה</BariBadge>
                         )}
-                    </div>
+                        {notes.length === 0 && <span style={{ marginRight: "auto", fontSize: "12px", color: "rgba(255,255,255,0.3)" }}>▾</span>}
+                    </button>
+                    <BariModal open={notesOpen} onClose={() => setNotesOpen(false)} variant="sheet" title="📝 הערה לבשלן">
+                        <div style={{ padding: "0 16px 16px" }}>
+                            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "6px" }}>
+                                <span style={{ fontSize: "10px", color: notes.length > MAX_NOTES_LENGTH * 0.8 ? "#e57373" : "rgba(255,255,255,0.35)" }}>
+                                    {MAX_NOTES_LENGTH - notes.length} תווים נותרו
+                                </span>
+                            </div>
+                            <textarea
+                                value={notes}
+                                onChange={handleNotesChange}
+                                onFocus={() => setNotesFocused(true)}
+                                onBlur={() => setNotesFocused(false)}
+                                placeholder="לדוגמה: בלי גרעינים, לחתוך קטן..."
+                                rows={4}
+                                maxLength={MAX_NOTES_LENGTH}
+                                aria-label="הערות מיוחדות להזמנה"
+                                style={{
+                                    ...S.notesInput,
+                                    border: notesFocused ? "1px solid var(--color-gold-deep)" : "1px solid rgba(255,255,255,0.08)",
+                                    boxShadow: notesFocused ? "0 0 0 3px rgba(200,168,78,0.15), 0 0 16px rgba(200,168,78,0.25)" : "none",
+                                    transition: "border-color 0.2s ease, box-shadow 0.2s ease",
+                                }}
+                                autoFocus
+                            />
+                            {notesError && <div style={{ fontSize: "10px", color: "#ef5350", marginTop: "4px" }}>⚠️ {notesError}</div>}
+                            <BariButton variant="primary" fullWidth style={{ marginTop: "14px" }} onClick={() => setNotesOpen(false)}>סיימתי</BariButton>
+                        </div>
+                    </BariModal>
 
                     {/* Pickup time picker */}
                     <PickupTimePicker value={pickupTime} onChange={setPickupTime} />
 
                     {/* Price breakdown */}
-                    <div style={S.sumPriceCard}>
+                    <BariPanel style={{ marginTop: "14px", padding: "14px 16px" }}>
                         <div style={S.sumPriceLine}>
                             <span>סלט בסיס{sizeLabel ? <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)", fontWeight: 500 }}> · {sizeLabel}</span> : null}</span>
                             <span style={{ fontWeight: 700 }}>₪{base}</span>
@@ -274,7 +280,28 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                             <span style={{ fontSize: "16px", fontWeight: 700, color: "rgba(255,255,255,0.55)" }}>סה"כ</span>
                             <span style={{ fontFamily: "var(--font-display), 'Secular One', sans-serif" }}>₪{total}</span>
                         </div>
-                    </div>
+                    </BariPanel>
+
+                    {/* Payment choice — demo mode only (no real gateway configured yet) */}
+                    {DEMO_MODE && (
+                        <div style={PAY.box}>
+                            <div style={PAY.title}>
+                                💳 איך תרצו לשלם?
+                                <BariBadge className="mr-2">מצב הדגמה</BariBadge>
+                            </div>
+                            <div style={PAY.row}>
+                                <button onClick={() => setPaymentChoice("now")} style={{ ...PAY.opt, ...(paymentChoice === "now" ? PAY.optActive : {}) }}>
+                                    <span style={{ fontSize: "20px" }}>💳</span>
+                                    <span>שלם עכשיו</span>
+                                </button>
+                                <button onClick={() => setPaymentChoice("pickup")} style={{ ...PAY.opt, ...(paymentChoice === "pickup" ? PAY.optActive : {}) }}>
+                                    <span style={{ fontSize: "20px" }}>🏪</span>
+                                    <span>שלם באיסוף</span>
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
                     <div style={S.trustCopy}>
                         <span style={{ opacity: 0.75 }}>🌿</span>
                         <span>אנחנו משתמשים בחומרי גלם טריים בלבד</span>
@@ -310,6 +337,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                                 pickupTime,
                                 notes,
                                 size: base,
+                                ...(DEMO_MODE ? { paymentChoice } : {}),
                             }),
                         })
                             .then(r => r.ok ? r.json() : null)
@@ -436,7 +464,9 @@ function OrderedScreen({ total, all, pickupTime, notes, orderNum: propOrderNum, 
                     </div>
                     <div style={OS.title}>בהכנה!</div>
                     <div style={OS.subtitle}>מכינים את הסלט שלכם עכשיו 🐱</div>
-                    <div style={OS.orderNumBadge}>הזמנה {orderNum}</div>
+                    <div style={{ marginTop: "14px", animation: "fadeUp 0.5s ease 0.35s both" }}>
+                        <BariBadge>הזמנה {orderNum}</BariBadge>
+                    </div>
                     <div style={OS.price}>₪{total}</div>
                     <div style={OS.meta}>{all.length} מרכיבים{pickupTime ? ` · איסוף: ${pickupTime}` : ' · מוכן בכ-8 דקות'}</div>
                     <div style={OS.divider} />
@@ -449,9 +479,9 @@ function OrderedScreen({ total, all, pickupTime, notes, orderNum: propOrderNum, 
                             🔍 עקוב אחר ההזמנה
                         </a>
                     )}
-                    <button style={OS.newOrderBtn} onClick={onNewOrder}>
+                    <BariButton variant="ghost" fullWidth onClick={onNewOrder} style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif", animation: "fadeUp 0.5s ease 0.75s both" }}>
                         הזמנה חדשה ←
-                    </button>
+                    </BariButton>
                 </div>
                 <style>{`
                     @keyframes ringPop { 0%{transform:scale(0.4);opacity:0} 55%{transform:scale(1.12)} 100%{transform:scale(1);opacity:1} }
@@ -486,13 +516,6 @@ const OS = {
         textShadow: "none",
     },
     meta: { fontSize: "12px", color: "rgba(255,255,255,0.3)", marginTop: "8px", fontWeight: 600, animation: "fadeUp 0.5s ease 0.6s both" },
-    orderNumBadge: {
-        display: "inline-block", marginTop: "14px",
-        padding: "4px 14px", borderRadius: "20px",
-        background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
-        fontSize: "12px", fontWeight: 700, color: "rgba(255,255,255,0.35)",
-        letterSpacing: "0.08em", animation: "fadeUp 0.5s ease 0.35s both",
-    },
     divider: { width: "60px", height: "1px", background: "linear-gradient(90deg, transparent, rgba(200,168,78,0.4), transparent)", margin: "24px auto" },
     waBtn: {
         display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
@@ -510,14 +533,6 @@ const OS = {
         color: "rgba(200,168,78,0.7)", fontSize: "13px", fontWeight: 700,
         fontFamily: "var(--font-heebo), 'Heebo', sans-serif", textDecoration: "none", textAlign: "center",
         animation: "fadeUp 0.5s ease 0.7s both", marginBottom: "10px",
-    },
-    newOrderBtn: {
-        display: "block", width: "100%",
-        padding: "13px 22px", borderRadius: "14px", cursor: "pointer",
-        background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
-        color: "rgba(255,255,255,0.45)", fontSize: "14px", fontWeight: 700,
-        fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
-        animation: "fadeUp 0.5s ease 0.75s both",
     },
 };
 
@@ -541,9 +556,7 @@ const S = {
     comboBanner: { marginBottom: "14px", padding: "12px 14px", borderRadius: "14px", background: "linear-gradient(135deg, rgba(200,168,78,0.14) 0%, rgba(180,140,40,0.08) 100%)", border: "1.5px solid rgba(200,168,78,0.4)", boxShadow: "0 0 24px rgba(200,168,78,0.12), inset 0 1px 0 rgba(255,255,255,0.06)", animation: "pFadeIn 0.5s ease both" },
     comboBannerTitle: { fontSize: "10px", fontWeight: 800, color: "rgba(200,168,78,0.6)", letterSpacing: "0.06em", marginBottom: "8px" },
     comboBannerRow: { display: "flex", gap: "8px", flexWrap: "wrap" },
-    badgePill: { display: "flex", alignItems: "center", gap: "6px", padding: "5px 10px", borderRadius: "10px", background: "rgba(200,168,78,0.12)", border: "1px solid rgba(200,168,78,0.3)" },
-    notesBox: { margin: "12px 0", padding: "10px", borderRadius: "12px", background: "rgba(15,45,15,0.6)", backdropFilter: "blur(8px)", border: "1px solid rgba(200,168,78,0.15)" },
-    notesToggle: { width: "100%", display: "flex", alignItems: "center", gap: "8px", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "var(--font-heebo), 'Heebo', sans-serif", fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.45)", direction: "rtl", textAlign: "right" },
+    notesToggle: { width: "100%", margin: "12px 0", padding: "10px 12px", borderRadius: "12px", display: "flex", alignItems: "center", gap: "8px", background: "rgba(15,45,15,0.6)", backdropFilter: "blur(8px)", border: "1px solid rgba(200,168,78,0.15)", cursor: "pointer", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.45)", direction: "rtl", textAlign: "right" },
     notesInput: { width: "100%", padding: "8px 10px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.04)", color: "#e8f5e9", fontSize: "12px", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", outline: "none", direction: "rtl", resize: "vertical", minHeight: "60px" },
     sumPriceCard: { marginTop: "14px", padding: "14px 16px", borderRadius: "14px", background: "linear-gradient(145deg, rgba(15,45,15,0.9), rgba(20,55,20,0.85))", border: "1px solid rgba(200,168,78,0.25)", boxShadow: "0 4px 16px rgba(0,0,0,0.3)" },
     sumPriceLine: { display: "flex", justifyContent: "space-between", fontSize: "13px", color: "rgba(255,255,255,0.5)", padding: "3px 0" },
@@ -644,6 +657,14 @@ function PickupTimePicker({ value, onChange }) {
     );
 }
 
+const PAY = {
+    box: { margin: "12px 0", padding: "12px 14px", borderRadius: "12px", background: "rgba(15,45,15,0.6)", backdropFilter: "blur(8px)", border: "1px solid rgba(200,168,78,0.15)" },
+    title: { display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.45)", marginBottom: "10px" },
+    row: { display: "flex", gap: "8px" },
+    opt: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", padding: "10px 8px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.12)", background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.6)", fontSize: "12px", fontWeight: 700, fontFamily: "var(--font-heebo), 'Heebo', sans-serif", cursor: "pointer", transition: "all 0.15s" },
+    optActive: { background: "linear-gradient(135deg, rgba(200,168,78,0.28), rgba(200,168,78,0.12))", border: "1px solid var(--color-gold-deep)", color: "var(--color-gold-light)", boxShadow: "var(--shadow-gold-glow)" },
+};
+
 const PT = {
     box: { margin: "12px 0", padding: "12px 14px", borderRadius: "12px", background: "rgba(15,45,15,0.6)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", border: "1px solid rgba(200,168,78,0.15)" },
     header: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" },
@@ -651,7 +672,7 @@ const PT = {
     selectedLabel: { fontSize: "14px", fontWeight: 900, color: "#f0d060", letterSpacing: "0.04em" },
     row: { display: "flex", gap: "8px", overflowX: "auto", paddingBottom: "2px", scrollbarWidth: "none", WebkitOverflowScrolling: "touch" },
     chip: { flexShrink: 0, padding: "8px 16px", borderRadius: "10px", border: "1px solid rgba(200,168,78,0.22)", background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.5)", fontSize: "13px", fontWeight: 700, fontFamily: "var(--font-heebo), 'Heebo', sans-serif", cursor: "pointer", transition: "all 0.15s" },
-    chipActive: { background: "linear-gradient(135deg, rgba(200,168,78,0.28), rgba(200,168,78,0.12))", border: "1px solid rgba(200,168,78,0.7)", color: "#f0d060", boxShadow: "0 0 12px rgba(200,168,78,0.2)" },
+    chipActive: { background: "linear-gradient(135deg, rgba(200,168,78,0.28), rgba(200,168,78,0.12))", border: "1px solid var(--color-gold-deep)", color: "var(--color-gold-light)", boxShadow: "var(--shadow-gold-glow)" },
     closedMsg: { fontSize: "12px", color: "rgba(255,255,255,0.35)", fontWeight: 600 },
     peakDot: { display: "inline-block", width: "5px", height: "5px", borderRadius: "50%", background: "#e57373", marginRight: "4px", verticalAlign: "middle", flexShrink: 0 },
     chipFull: { opacity: 0.3, cursor: "not-allowed", border: "1px solid rgba(255,255,255,0.06)" },

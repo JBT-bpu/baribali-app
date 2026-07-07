@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { supabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 import { computeOrderTotal } from '@/lib/pricing';
+import { createDemoOrder } from '@/lib/demoStore';
 
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const { items, total, pickupTime, notes, size } = body;
+        const { items, total, pickupTime, notes, size, paymentChoice } = body;
 
         if (!items || !Array.isArray(items) || total == null) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -19,6 +20,21 @@ export async function POST(req: NextRequest) {
         if (computed.total !== total) {
             console.error('[POST /api/orders] Price mismatch: client sent', total, 'server computed', computed.total);
             return NextResponse.json({ error: 'Price mismatch' }, { status: 400 });
+        }
+
+        if (!isSupabaseConfigured()) {
+            // Demo mode: no real gateway to redirect to, so the client already
+            // resolved a payment choice up front — bake it straight into the
+            // order instead of going through payment/create + a webhook.
+            const order = createDemoOrder({
+                items,
+                total: computed.total,
+                pickupTime,
+                notes,
+                size,
+                paymentStatus: paymentChoice === 'now' ? 'paid' : 'pay_at_pickup',
+            });
+            return NextResponse.json({ id: order.id, orderNum: order.order_num, createdAt: order.created_at, demo: true });
         }
 
         // Generate order number: BB-XXXX (4-digit, time-seeded)

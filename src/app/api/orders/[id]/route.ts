@@ -1,11 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { supabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
+import { getDemoOrder } from '@/lib/demoStore';
 
 // Customer order-status lookup. The order's UUID id acts as the sole
 // capability token (unguessable) — no extra secret needed, consistent with
 // the anon-RLS-read policy this route replaces.
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
+
+    if (!isSupabaseConfigured()) {
+        const order = getDemoOrder(id);
+        if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+        return NextResponse.json(order);
+    }
+
     const { data, error } = await supabaseAdmin
         .from('orders')
         .select('id, order_num, items, total, pickup_time, notes, status, created_at')
