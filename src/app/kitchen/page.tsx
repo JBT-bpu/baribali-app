@@ -1,6 +1,9 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { CircleCheck, Circle } from 'lucide-react';
+import { isSupabaseConfigured } from '@/lib/supabase';
+import BariButton from '@/components/ui/bari/BariButton';
 
 const KITCHEN_SECRET = process.env.NEXT_PUBLIC_KITCHEN_API_SECRET;
 const kitchenHeaders = (extra?: Record<string, string>) => ({
@@ -34,7 +37,7 @@ interface Order {
 const STATUS_CONFIG: Record<OrderStatus, { label: string; color: string; bg: string; border: string; next: OrderStatus | null; nextLabel: string | null }> = {
     waiting:    { label: 'ממתין',   color: '#aaa',    bg: 'rgba(255,255,255,0.05)', border: 'rgba(255,255,255,0.12)', next: 'preparing', nextLabel: 'התחל הכנה' },
     preparing:  { label: 'בהכנה',   color: '#ff9800', bg: 'rgba(255,152,0,0.1)',    border: 'rgba(255,152,0,0.35)',   next: 'ready',     nextLabel: 'מוכן ✓' },
-    ready:      { label: 'מוכן',    color: '#4caf50', bg: 'rgba(76,175,80,0.12)',   border: 'rgba(76,175,80,0.4)',    next: 'collected', nextLabel: 'נאסף ✓' },
+    ready:      { label: 'מוכן',    color: 'var(--color-green-accent)', bg: 'rgba(76,175,80,0.12)',   border: 'rgba(76,175,80,0.4)',    next: 'collected', nextLabel: 'נאסף ✓' },
     collected:  { label: 'נאסף',    color: '#555',    bg: 'rgba(255,255,255,0.02)', border: 'rgba(255,255,255,0.06)', next: null,        nextLabel: null },
 };
 
@@ -56,29 +59,13 @@ function getColumn(order: Order): 'now' | 'soon' | 'later' | 'done' {
     return 'later';
 }
 
-const SUPABASE_CONFIGURED =
-    process.env.NEXT_PUBLIC_SUPABASE_URL &&
-    !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project');
-
-// Demo orders shown when Supabase isn't connected yet
-function makeDemoOrders(): Order[] {
-    const now = new Date();
-    const fmt = (d: Date) => `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-    const add = (mins: number) => { const d = new Date(now); d.setMinutes(d.getMinutes() + mins); return d; };
-    return [
-        { id: '1', order_num: 'BB-1234', items: [{ id:'a', he:'חסה', icon:'🥬', price:0 },{ id:'b', he:'עגבניה', icon:'🍅', price:0 },{ id:'c', he:'פטה', icon:'🧀', price:5 }], total: 64, pickup_time: fmt(add(3)),  notes: 'בלי גרעינים', size: 'M', status: 'preparing', created_at: new Date().toISOString() },
-        { id: '2', order_num: 'BB-2571', items: [{ id:'d', he:'רוקט', icon:'🌿', price:0 },{ id:'e', he:'אבוקדו', icon:'🥑', price:8 },{ id:'f', he:'טחינה', icon:'🫙', price:0 }], total: 72, pickup_time: fmt(add(12)), notes: null,            size: 'L', status: 'waiting',   created_at: new Date().toISOString() },
-        { id: '3', order_num: 'BB-9032', items: [{ id:'g', he:'תירס', icon:'🌽', price:0 },{ id:'h', he:'גזר', icon:'🥕', price:0 }], total: 54, pickup_time: fmt(add(22)), notes: null,            size: 'S', status: 'waiting',   created_at: new Date().toISOString() },
-        { id: '4', order_num: 'BB-4418', items: [{ id:'i', he:'קינואה', icon:'🌾', price:6 },{ id:'j', he:'ביצה', icon:'🥚', price:5 }], total: 79, pickup_time: fmt(add(0)),  notes: 'ללא גלוטן',   size: 'M', status: 'ready',     created_at: new Date().toISOString() },
-    ];
-}
-
 // ─── Main component ──────────────────────────────────────────────
 export default function KitchenPage() {
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
     const [now, setNow] = useState(new Date());
-    const isDemo = !SUPABASE_CONFIGURED;
+    const [scrolled, setScrolled] = useState(false);
+    const isDemo = !isSupabaseConfigured();
 
     // Refresh clock every minute to re-bucket orders
     useEffect(() => {
@@ -86,13 +73,17 @@ export default function KitchenPage() {
         return () => clearInterval(t);
     }, []);
 
-    // Initial load
+    // Header elevation once the page scrolls
+    useEffect(() => {
+        const onScroll = () => setScrolled(window.scrollY > 4);
+        window.addEventListener('scroll', onScroll);
+        return () => window.removeEventListener('scroll', onScroll);
+    }, []);
+
+    // Initial load — the API route itself falls back to the shared demo
+    // store when Supabase isn't configured, so the client doesn't need its
+    // own separate demo-fixture logic; this always hits the real endpoint.
     const loadOrders = useCallback(async () => {
-        if (isDemo) {
-            setOrders(makeDemoOrders());
-            setLoading(false);
-            return;
-        }
         const res = await fetch('/api/kitchen/orders', { headers: kitchenHeaders() });
         if (res.ok) {
             const data = await res.json();
@@ -101,30 +92,28 @@ export default function KitchenPage() {
             setOrders(data as Order[]);
         }
         setLoading(false);
-    }, [isDemo]);
+    }, []);
 
     useEffect(() => { loadOrders(); }, [loadOrders]);
 
-    // Poll for updates (live mode only) — replaces the old Realtime subscription,
-    // since anon-client Realtime access relied on the RLS policies that are now
-    // locked down. Phase F can upgrade this to an animated diff via `motion`.
+    // Poll for updates — replaces the old Realtime subscription, since
+    // anon-client Realtime access relied on the RLS policies that are now
+    // locked down. Also picks up new demo orders created elsewhere in the app.
     useEffect(() => {
-        if (isDemo) return;
         const id = setInterval(loadOrders, 4000);
         return () => clearInterval(id);
-    }, [loadOrders, isDemo]);
+    }, [loadOrders]);
 
-    // Update order status
+    // Update order status — same endpoint in demo and live mode, the route
+    // itself decides whether to write to Supabase or the demo store.
     const updateStatus = useCallback(async (id: string, status: OrderStatus) => {
-        // Optimistic update always
-        setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o));
-        if (isDemo) return; // skip API in demo mode
+        setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o)); // optimistic
         await fetch(`/api/orders/${id}/status`, {
             method: 'PATCH',
             headers: kitchenHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify({ status }),
         });
-    }, [isDemo]);
+    }, []);
 
     // Bucket orders into columns
     const columns = {
@@ -137,8 +126,20 @@ export default function KitchenPage() {
 
     return (
         <div style={K.root}>
+            <style>{`
+                @keyframes checkPop { 0%{transform:scale(0.4)} 60%{transform:scale(1.15)} 100%{transform:scale(1)} }
+                @media (max-width: 900px) {
+                    .kitchen-columns { grid-template-columns: 1fr 1fr !important; }
+                    .kitchen-columns > :last-child { grid-column: 1 / -1; }
+                }
+                @media (max-width: 620px) {
+                    .kitchen-columns { grid-template-columns: 1fr !important; }
+                    .kitchen-columns > :last-child { grid-column: auto; }
+                }
+            `}</style>
+
             {/* Header */}
-            <div style={K.header}>
+            <div style={{ ...K.header, boxShadow: scrolled ? '0 4px 16px rgba(0,0,0,0.45)' : 'none' }}>
                 <div style={K.headerTitle}>🥗 מטבח BariBali</div>
                 <div style={K.headerMeta}>
                     {isDemo && (
@@ -156,7 +157,7 @@ export default function KitchenPage() {
 
             {/* Columns */}
             {!loading && (
-                <div style={K.columns}>
+                <div className="kitchen-columns" style={K.columns}>
                     <Column title="עכשיו" accent="#e53935" orders={columns.now} onUpdate={updateStatus} />
                     <Column title="עוד 10–15 דק׳" accent="#ff9800" orders={columns.soon} onUpdate={updateStatus} />
                     <Column title="מאוחר יותר" accent="#555" orders={columns.later} onUpdate={updateStatus} />
@@ -264,7 +265,9 @@ function OrderCard({ order, onUpdate }: { order: Order; onUpdate: (id: string, s
                             </span>
                             <span style={{ ...K.checkName, ...(done ? K.checkNameDone : {}) }}>{it.he}</span>
                             <span style={{ ...K.checkMark, ...(done ? K.checkMarkDone : {}) }}>
-                                {done ? '✓' : '○'}
+                                {done
+                                    ? <CircleCheck size={22} strokeWidth={2.3} style={{ animation: 'checkPop 0.25s cubic-bezier(0.34,1.56,0.64,1) both' }} />
+                                    : <Circle size={22} strokeWidth={2} />}
                             </span>
                         </button>
                     );
@@ -278,14 +281,16 @@ function OrderCard({ order, onUpdate }: { order: Order; onUpdate: (id: string, s
 
             {/* Action button */}
             {nextStatus && (
-                <button
-                    type="button"
+                <BariButton
+                    variant="secondary"
+                    size="lg"
+                    fullWidth
                     style={{
-                        ...K.actionBtn,
                         background: allChecked ? cfg.color : 'rgba(255,255,255,0.08)',
                         color: allChecked ? (order.status === 'waiting' ? '#fff' : '#000') : 'rgba(255,255,255,0.3)',
                         border: allChecked ? 'none' : '1.5px solid rgba(255,255,255,0.1)',
-                        fontSize: '18px',
+                        fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
+                        marginTop: '4px',
                     }}
                     onClick={() => {
                         if (navigator.vibrate) navigator.vibrate([20, 50, 30]);
@@ -293,7 +298,7 @@ function OrderCard({ order, onUpdate }: { order: Order; onUpdate: (id: string, s
                     }}
                 >
                     {allChecked ? cfg.nextLabel : `${cfg.nextLabel} (${order.items.length - checked.size} נותרו)`}
-                </button>
+                </BariButton>
             )}
         </div>
     );
@@ -313,14 +318,14 @@ const K: Record<string, React.CSSProperties> = {
         borderBottom: '1px solid rgba(255,255,255,0.08)',
         position: 'sticky', top: 0, zIndex: 10,
     },
-    headerTitle: { fontSize: '20px', fontWeight: 900, color: '#f0d060' },
+    headerTitle: { fontSize: '20px', fontWeight: 900, color: 'var(--color-gold-light)' },
     headerMeta: { display: 'flex', alignItems: 'center', gap: '16px' },
     clock: { fontSize: '22px', fontWeight: 800, color: '#fff', letterSpacing: '0.04em' },
     activeCount: { fontSize: '13px', color: 'rgba(255,255,255,0.4)', fontWeight: 600 },
     demoBadge: { fontSize: '11px', fontWeight: 700, color: '#ff9800', background: 'rgba(255,152,0,0.12)', border: '1px solid rgba(255,152,0,0.3)', padding: '4px 10px', borderRadius: '8px' },
 
     loadingMsg: { padding: '60px', textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: '16px' },
-    emptyMsg: { padding: '80px', textAlign: 'center', color: '#4caf50', fontSize: '18px', fontWeight: 700 },
+    emptyMsg: { padding: '80px', textAlign: 'center', color: 'var(--color-green-accent)', fontSize: '18px', fontWeight: 700 },
 
     columns: {
         display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
@@ -351,13 +356,13 @@ const K: Record<string, React.CSSProperties> = {
     cardTime: { fontSize: '12px', fontWeight: 700 },
 
     cardMeta: { display: 'flex', alignItems: 'center', gap: '8px', marginTop: '-2px' },
-    sizePill: { fontSize: '11px', fontWeight: 800, color: '#f0d060', background: 'rgba(240,208,96,0.12)', border: '1px solid rgba(240,208,96,0.25)', padding: '2px 8px', borderRadius: '8px' },
+    sizePill: { fontSize: '11px', fontWeight: 800, color: 'var(--color-gold-light)', background: 'rgba(240,208,96,0.12)', border: '1px solid rgba(240,208,96,0.25)', padding: '2px 8px', borderRadius: '8px' },
     metaTotal: { fontSize: '15px', fontWeight: 900, color: 'rgba(255,255,255,0.5)', marginRight: 'auto' },
 
     checkProgress: { display: 'flex', alignItems: 'center', gap: '10px', marginTop: '4px' },
     checkProgressText: { fontSize: '12px', fontWeight: 700, color: 'rgba(255,255,255,0.4)', whiteSpace: 'nowrap' as const, minWidth: '70px' },
     checkBar: { flex: 1, height: '4px', borderRadius: '4px', background: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
-    checkBarFill: { height: '100%', borderRadius: '4px', background: '#4caf50', transition: 'width 0.2s ease' },
+    checkBarFill: { height: '100%', borderRadius: '4px', background: 'var(--color-green-accent)', transition: 'width 0.2s ease' },
 
     checklist: { display: 'flex', flexDirection: 'column' as const, gap: '4px', marginTop: '2px' },
     checkRow: {
@@ -373,7 +378,7 @@ const K: Record<string, React.CSSProperties> = {
     checkName: { fontSize: '18px', fontWeight: 700, color: '#fff', flex: 1 },
     checkNameDone: { textDecoration: 'line-through', color: 'rgba(255,255,255,0.4)' },
     checkMark: { fontSize: '20px', fontWeight: 900, color: 'rgba(255,255,255,0.2)', flexShrink: 0, minWidth: '28px', textAlign: 'center' as const },
-    checkMarkDone: { color: '#4caf50' },
+    checkMarkDone: { color: 'var(--color-green-accent)' },
 
     cardNotes: {
         fontSize: '12px', color: 'rgba(255,200,100,0.8)', fontWeight: 600,
@@ -381,14 +386,4 @@ const K: Record<string, React.CSSProperties> = {
         background: 'rgba(255,200,100,0.08)', border: '1px solid rgba(255,200,100,0.15)',
     },
 
-    actionBtn: {
-        width: '100%', padding: '12px', borderRadius: '10px',
-        border: 'none', fontSize: '15px', fontWeight: 900,
-        fontFamily: "var(--font-heebo), 'Heebo', sans-serif", cursor: 'pointer',
-        marginTop: '4px', transition: 'opacity 0.15s',
-    },
-    cardTotal: {
-        fontSize: '13px', fontWeight: 700, color: 'rgba(255,255,255,0.3)',
-        textAlign: 'left' as const,
-    },
 };

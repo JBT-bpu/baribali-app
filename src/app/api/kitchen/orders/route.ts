@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { supabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 import { isKitchenAuthorized } from '@/lib/kitchenAuth';
+import { listDemoOrders } from '@/lib/demoStore';
 
 export async function GET(req: NextRequest) {
     if (!isKitchenAuthorized(req)) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (!isSupabaseConfigured()) {
+        const demoStatuses = new Set(['paid', 'pay_at_pickup', 'paid_unverified']);
+        const orders = listDemoOrders()
+            .filter(o => o.status !== 'collected' && demoStatuses.has(o.payment_status))
+            .sort((a, b) => (a.pickup_time ?? '').localeCompare(b.pickup_time ?? ''));
+        return NextResponse.json(orders);
     }
 
     const since = new Date();

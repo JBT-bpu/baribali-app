@@ -3,7 +3,7 @@
 import { forwardRef, type ButtonHTMLAttributes } from 'react';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
-type Size = 'md' | 'sm';
+type Size = 'lg' | 'md' | 'sm';
 
 export interface BariButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
     variant?: Variant;
@@ -23,6 +23,8 @@ const VARIANT_CLASSES: Record<Variant, string> = {
 const SIZE_CLASSES: Record<Size, string> = {
     // Full pill — matches the shape every hand-rolled primary CTA in the
     // app already uses (home2, size picker, order-status, etc.).
+    // lg: bigger touch target for staff-facing/tablet use (kitchen board).
+    lg: 'px-8 py-4 text-lg rounded-full gap-3',
     md: 'px-7 py-3.5 text-base rounded-full gap-3',
     sm: 'px-4 py-2 text-sm rounded-lg gap-1.5',
 };
