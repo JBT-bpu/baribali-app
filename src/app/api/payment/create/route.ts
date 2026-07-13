@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
+import { createHypPaymentUrl } from '@/lib/hypPay';
 
 /*
 ──────────────────────────────────────────────────────────────
@@ -7,10 +8,17 @@ import { supabaseAdmin } from '@/lib/supabase';
 
   PAYMENT_PROVIDER=tranzila   → Tranzila hosted page (most common in IL)
   PAYMENT_PROVIDER=yaadpay    → YaadPay
-  PAYMENT_PROVIDER=hyp        → Hyp online clearing (ask Hyp support for API key)
+  PAYMENT_PROVIDER=hyp        → Hyp Pay (formerly YaadPay) — see src/lib/hypPay.ts
 
-  Each provider redirects the customer to their hosted payment page.
-  After payment, they redirect back to /order/:id?payment=success|fail
+  Tranzila/YaadPay redirect the customer to their hosted payment page and
+  pass success_url/fail_url per-request; after payment they redirect back to
+  /order/:id?payment=success|fail.
+
+  Hyp Pay is different: the success/error page URLs are configured ONCE in
+  the Hyp Pay portal (Settings -> "Payment Page and API" -> "Post-transaction
+  address"), not passed per-request. Point that setting at
+  /api/payment/hyp/return, which verifies the transaction server-side before
+  redirecting the customer on to /order/:id.
 ──────────────────────────────────────────────────────────────
 */
 
@@ -61,16 +69,12 @@ function buildYaadPayUrl(orderId: string, orderNum: string, total: number, succe
     return `https://icom.yaad.net/p/?${params}`;
 }
 
-// ─── Hyp Online ──────────────────────────────────────────────────
-// Ask Hyp support for your online API key — same account as physical terminal
-// Credentials: HYP_API_KEY, HYP_TERMINAL_ID
-function buildHypUrl(orderId: string, orderNum: string, total: number, successUrl: string, failUrl: string): string {
-    const apiKey = process.env.HYP_API_KEY;
-    const terminalId = process.env.HYP_TERMINAL_ID;
-    if (!apiKey || !terminalId) throw new Error('HYP_API_KEY / HYP_TERMINAL_ID not set');
-    // Hyp uses a server-side API call to get a payment token, then redirect
-    // TODO: implement when Hyp credentials are available
-    throw new Error('Hyp online payment not yet implemented — contact Hyp support for API credentials');
+// ─── Hyp Pay ─────────────────────────────────────────────────────
+// Docs: https://developers.hyp.co.il/pay/getting-started/creating-a-payment-page.md
+// Credentials: HYP_MASOF, HYP_KEY, HYP_PASSP (from the Hyp Pay portal —
+// Settings -> "Payment Page and API" -> "Verification" section)
+async function buildHypUrl(orderNum: string, total: number): Promise<string> {
+    return createHypPaymentUrl({ amount: total, orderNum, info: `BariBali ${orderNum}` });
 }
 
 export async function POST(req: NextRequest) {
@@ -102,7 +106,7 @@ export async function POST(req: NextRequest) {
         let paymentUrl: string;
         switch (PROVIDER) {
             case 'yaadpay': paymentUrl = buildYaadPayUrl(orderId, orderNum, total, successUrl, failUrl); break;
-            case 'hyp':     paymentUrl = buildHypUrl(orderId, orderNum, total, successUrl, failUrl); break;
+            case 'hyp':     paymentUrl = await buildHypUrl(orderNum, total); break;
             default:        paymentUrl = buildTranzilaUrl(orderId, orderNum, total, successUrl, failUrl);
         }
 
