@@ -47,6 +47,7 @@ import BariButton from "../ui/bari/BariButton";
 import BariBadge from "../ui/bari/BariBadge";
 import BariModal from "../ui/bari/BariModal";
 import { isSupabaseConfigured } from "../../lib/supabase";
+import { getAccessToken } from "../../lib/auth";
 
 const DEMO_MODE = !isSupabaseConfigured();
 
@@ -94,14 +95,20 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
         return { greens, vegs, prots, tops, rest };
     }, [all]);
 
-    const submitOrder = (choiceOverride) => {
+    const submitOrder = async (choiceOverride) => {
         const choice = choiceOverride ?? paymentChoice;
         const isFailureTest = choice === "fail";
         if (navigator.vibrate) navigator.vibrate(isFailureTest ? [30, 40, 30] : [15, 40, 30]);
         if (!isFailureTest) setShowMixing(true);
+        // Signed-in customers get the order linked to their account (order
+        // history on /profile); guests order exactly the same without it.
+        const token = await getAccessToken().catch(() => null);
         fetch('/api/orders', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
             body: JSON.stringify({
                 items: all.map(i => ({ id: i.id, he: i.he, icon: i.icon, price: i.price || 0 })),
                 total,

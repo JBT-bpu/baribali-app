@@ -3,6 +3,19 @@ import { supabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 import { computeOrderTotal } from '@/lib/pricing';
 import { createDemoOrder } from '@/lib/demoStore';
 
+/**
+ * If the request carries a valid Supabase access token, returns the
+ * authenticated user's id — otherwise null (guest order). The token is
+ * verified server-side; a client can't just claim a user_id.
+ */
+async function verifiedUserId(req: NextRequest): Promise<string | null> {
+    const auth = req.headers.get('authorization');
+    if (!auth?.startsWith('Bearer ')) return null;
+    const { data, error } = await supabaseAdmin.auth.getUser(auth.slice(7));
+    if (error || !data.user) return null;
+    return data.user.id;
+}
+
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
@@ -44,6 +57,10 @@ export async function POST(req: NextRequest) {
         // Generate order number: BB-XXXX (4-digit, time-seeded)
         const orderNum = `BB-${((Date.now() % 9000) + 1000)}`;
 
+        // Guest-first: user_id is simply null for guests, set only when a
+        // verified session token accompanies the request.
+        const userId = await verifiedUserId(req);
+
         const { data, error } = await supabaseAdmin
             .from('orders')
             .insert({
@@ -55,6 +72,7 @@ export async function POST(req: NextRequest) {
                 size: size ?? null,
                 status: 'waiting',
                 payment_status: 'pending',
+                user_id: userId,
             })
             .select('id, order_num, created_at')
             .single();
