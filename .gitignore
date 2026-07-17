@@ -32,6 +32,7 @@ yarn-error.log*
 
 # personal/working files not meant for version control
 /Local TECH/
+pass.txt
 
 # typescript
 *.tsbuildinfo

@@ -49,16 +49,18 @@ create table orders (
 -- Enable Row Level Security
 alter table orders enable row level security;
 
--- Allow anyone to insert (customers)
+-- Allow anyone to insert (customers submitting an order) — the row's total
+-- is re-validated server-side in /api/orders before this ever runs, this
+-- policy just lets the insert itself through.
 create policy "insert orders" on orders for insert with check (true);
 
--- Allow anyone to read (kitchen display)
-create policy "read orders" on orders for select using (true);
-
--- Allow anyone to update status (kitchen display)
-create policy "update status" on orders for update using (true);
-
--- Enable Realtime on this table
--- Go to Supabase Dashboard → Database → Replication → enable "orders" table
+-- Deliberately NO public "read"/"update" policies. All reads (customer
+-- order-status lookup, kitchen board) and writes (status updates) go through
+-- API routes using supabaseAdmin (service-role, bypasses RLS) instead —
+-- see src/app/api/orders/[id]/route.ts, src/app/api/kitchen/orders/route.ts,
+-- src/app/api/orders/[id]/status/route.ts. The anon key can insert and
+-- nothing else.
+-- (Realtime isn't used either — the app polls the API routes instead, since
+-- anon-client Realtime would need the same open read policy this avoids.)
 
 */
