@@ -45,33 +45,6 @@ const M_H = 268;   // card height px
 const S_W = 210;
 const S_H = 272;
 
-// ─── useTwoTap ────────────────────────────────────────────────────────────────
-function useTwoTap(onConfirm: () => void) {
-    const [tapped, setTapped] = useState(false);
-    const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-    const tap = useCallback(() => {
-        if (tapped) {
-            if (timer.current) clearTimeout(timer.current);
-            setTapped(false);
-            onConfirm();
-            if (navigator.vibrate) navigator.vibrate([20, 40, 60]);
-        } else {
-            setTapped(true);
-            if (navigator.vibrate) navigator.vibrate(18);
-            timer.current = setTimeout(() => setTapped(false), 3500);
-        }
-    }, [tapped, onConfirm]);
-
-    const reset = useCallback(() => {
-        if (timer.current) clearTimeout(timer.current);
-        setTapped(false);
-    }, []);
-
-    useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
-    return { tapped, tap, reset };
-}
-
 // ─── Particles ────────────────────────────────────────────────────────────────
 function Particles() {
     const ref = useRef<HTMLCanvasElement>(null);
@@ -321,18 +294,8 @@ function SizePicker({ onSelect, onBack }: { onSelect: (s: string) => void; onBac
                 })}
             </div>
 
-            {/* Dots */}
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '-8px' }}>
-                {SIZE_CARDS.map((_, i) => (
-                    <div key={i} onClick={() => snapTo(i)} style={{
-                        width: i === activeIdx ? '22px' : '7px', height: '7px', borderRadius: '4px',
-                        background: i === activeIdx ? 'var(--color-gold-deep)' : 'rgba(255,255,255,0.45)',
-                        transition: 'all 0.3s cubic-bezier(0.34,1.4,0.64,1)',
-                        boxShadow: i === activeIdx ? '0 0 10px rgba(240,200,50,0.6)' : 'none', cursor: 'pointer',
-                    }} />
-                ))}
-            </div>
-
+            {/* No dots row here — the size cups above and the carousel itself
+                already show the active size; a third indicator was redundant. */}
             <BariButton
                 variant="primary"
                 onClick={doConfirm}
@@ -405,9 +368,6 @@ export default function HomeV2() {
         setShowCatPopup(false);
     }, []);
 
-    // ── Salad two-tap ──
-    const { tapped: saladTapped, tap: saladTap, reset: saladReset } = useTwoTap(() => setSizePicker(true));
-
     useEffect(() => { setReady(true); router.prefetch('/build'); }, [router]);
 
     const snapTo = useCallback((idx: number) => {
@@ -416,8 +376,7 @@ export default function HomeV2() {
         setActiveIdx(idx);
         setGlowCard(idx);
         setTimeout(() => setGlowCard(null), 600);
-        if (idx !== 1) saladReset();
-    }, [saladReset]);
+    }, []);
 
     const onDown = (e: React.PointerEvent) => {
         dragging.current = true; dragged.current = false;
@@ -444,10 +403,13 @@ export default function HomeV2() {
     const handleCardTap = (idx: number) => {
         if (dragged.current) return;
         if (idx !== activeIdx) { snapTo(idx); return; }
-        // Active card — trigger its action
+        // Active card — trigger its action. Single tap for all three cards —
+        // the size picker itself is salad's confirmation step, so no
+        // tap-again-to-confirm needed (tortilla navigates directly since it
+        // has no size choice).
         if (navigator.vibrate) navigator.vibrate(18);
         if (idx === 0) { router.push('/build?type=tortilla'); }
-        else if (idx === 1) saladTap();
+        else if (idx === 1) setSizePicker(true);
         else if (idx === 2) setLoginSheet(true);
     };
 
@@ -487,11 +449,9 @@ export default function HomeV2() {
                 @keyframes labelIn  { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
                 @keyframes navIn    { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:none} }
                 @keyframes burst    { from{transform:scale(0)} to{transform:scale(55)} }
-                @keyframes hint     { 0%,100%{opacity:1} 50%{opacity:0.45} }
                 @keyframes swipeHint{ 0%,100%{transform:translateX(0);opacity:0.55} 40%{transform:translateX(-7px);opacity:0.9} 65%{transform:translateX(7px);opacity:0.9} }
                 @keyframes swipeHintFade{ 0%,80%{opacity:1} 100%{opacity:0} }
                 @keyframes glowPulse{ 0%,100%{filter:drop-shadow(0 0 22px rgba(240,200,50,.7)) drop-shadow(0 0 55px rgba(240,200,50,.3))} 50%{filter:drop-shadow(0 0 40px rgba(240,200,50,1)) drop-shadow(0 0 90px rgba(240,200,50,.55))} }
-                @keyframes greenGlow{ 0%,100%{filter:drop-shadow(0 0 22px rgba(90,220,40,.7)) drop-shadow(0 0 55px rgba(90,220,40,.3))} 50%{filter:drop-shadow(0 0 42px rgba(90,220,40,1)) drop-shadow(0 0 95px rgba(90,220,40,.6))} }
                 @keyframes navRipple{ 0%{transform:scale(0);opacity:0.5} 100%{transform:scale(1);opacity:0} }
                 @keyframes snapGlow      { 0%{box-shadow:0 0 30px rgba(240,200,50,0.4)} 100%{box-shadow:0 0 0px rgba(240,200,50,0)} }
                 @keyframes sizePickerIn  { from{opacity:0;transform:scale(0.93) translateY(24px)} to{opacity:1;transform:none} }
@@ -534,7 +494,6 @@ export default function HomeV2() {
                         const eff = (i - activeIdx) + dragX / 152;
                         const absEff = Math.abs(eff);
                         const isActive = i === activeIdx && !dragging.current;
-                        const isSaladActive = i === 1 && saladTapped;
 
                         // Transform components — perspective() is per-element so no shared vanishing point issues
                         const tx   = eff * 138;                                  // px left/right
@@ -573,7 +532,7 @@ export default function HomeV2() {
                                     tiltMaxAngleY={8}
                                     glareEnable
                                     glareMaxOpacity={0.18}
-                                    glareColor={isSaladActive ? 'var(--color-lime)' : 'var(--color-gold-deep)'}
+                                    glareColor="var(--color-gold-deep)"
                                     glarePosition="all"
                                     glareBorderRadius="18px"
                                     transitionSpeed={400}
@@ -583,14 +542,12 @@ export default function HomeV2() {
                                         borderRadius: '18px',
                                         overflow: 'hidden',
                                         border: isActive
-                                            ? (isSaladActive ? '1.5px solid rgba(90,220,40,0.6)' : '1.5px solid rgba(240,200,50,0.55)')
+                                            ? '1.5px solid rgba(240,200,50,0.55)'
                                             : '1px solid rgba(255,255,255,0.22)',
                                         boxShadow: isActive
                                             ? 'var(--shadow-card-glow)' + glowShadow
                                             : '0 6px 20px rgba(0,0,0,0.5)',
-                                        animation: isActive
-                                            ? (isSaladActive ? 'greenGlow 1.4s ease-in-out infinite' : 'glowPulse 2.4s ease-in-out infinite')
-                                            : undefined,
+                                        animation: isActive ? 'glowPulse 2.4s ease-in-out infinite' : undefined,
                                         position: 'relative',
                                     }}
                                 >
@@ -598,19 +555,6 @@ export default function HomeV2() {
                                         src={mc.img} alt={mc.label} width={M_W} height={M_H}
                                         style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none', display: 'block' }}
                                     />
-
-                                    {/* Two-tap hint on salad */}
-                                    {isSaladActive && (
-                                        <div style={{
-                                            position: 'absolute', bottom: '18px', left: '50%', transform: 'translateX(-50%)',
-                                            fontSize: '11px', fontWeight: 800, color: '#fff',
-                                            background: 'rgba(0,0,0,0.78)', padding: '5px 14px', borderRadius: '20px',
-                                            whiteSpace: 'nowrap', animation: 'hint 0.85s ease-in-out infinite',
-                                            backdropFilter: 'blur(6px)', border: '1px solid rgba(90,220,40,0.5)', zIndex: 10,
-                                        }}>
-                                            ← הקש שוב לאישור
-                                        </div>
-                                    )}
                                 </Tilt>
                             </div>
                         );
@@ -748,7 +692,7 @@ export default function HomeV2() {
             {showCatPopup && <CatPopup onClose={dismissCatPopup} />}
 
             {/* Size picker overlay */}
-            {sizePicker && <SizePicker onSelect={handleSizeSelect} onBack={() => { setSizePicker(false); saladReset(); }} />}
+            {sizePicker && <SizePicker onSelect={handleSizeSelect} onBack={() => setSizePicker(false)} />}
 
             {/* Login bottom sheet */}
             <BariModal open={loginSheet} onClose={() => setLoginSheet(false)} variant="sheet">
