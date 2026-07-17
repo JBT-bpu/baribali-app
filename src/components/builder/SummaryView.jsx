@@ -210,19 +210,19 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                                     <span style={{ fontSize: "13px" }}>{s.emoji}</span>
                                     <span style={{ fontSize: "10px", fontWeight: 800, color: "rgba(200,168,78,0.75)", letterSpacing: "0.06em", textTransform: "uppercase" }}>{s.title}</span>
                                     <div style={{ flex: 1, height: "1px", background: "linear-gradient(90deg, rgba(200,168,78,0.2), transparent)" }} />
-                                    <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.2)", fontWeight: 600 }}>{items.length}</span>
+                                    <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.25)", fontWeight: 600 }}>{items.length}</span>
                                 </div>
-                                {/* Slot grid */}
+                                {/* Slot grid — 64px slots sized so 10px Hebrew names fit one line */}
                                 <div style={{ display: "flex", flexWrap: "wrap", gap: "5px", alignItems: "flex-start" }}>
                                     {items.map((item, i) => (
                                         <div key={item.id} style={{
-                                            width: "56px",
+                                            width: "64px",
                                             background: "linear-gradient(145deg, rgba(12,36,12,0.85), rgba(6,18,6,0.92))",
                                             border: `1px solid ${item.price > 0 ? "rgba(200,168,78,0.45)" : "rgba(255,255,255,0.1)"}`,
                                             borderRadius: "9px",
                                             display: "flex", flexDirection: "column",
                                             alignItems: "center", justifyContent: "flex-start",
-                                            padding: "6px 3px 5px",
+                                            padding: "7px 4px 6px",
                                             gap: "3px",
                                             position: "relative",
                                             boxShadow: item.price > 0
@@ -232,19 +232,19 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                                         }}>
                                             {item.price > 0 && (
                                                 <div style={{
-                                                    position: "absolute", top: "-3px", right: "-3px",
+                                                    position: "absolute", top: "-5px", right: "-4px",
                                                     background: "linear-gradient(135deg, #c8a832, #f0d060)",
-                                                    color: "#0d2e0d", fontSize: "6px", fontWeight: 900,
-                                                    padding: "1px 4px", borderRadius: "5px",
+                                                    color: "#0d2e0d", fontSize: "10px", fontWeight: 900,
+                                                    padding: "2px 6px", borderRadius: "7px",
                                                     boxShadow: "0 1px 3px rgba(0,0,0,0.4)",
                                                 }}>+₪{item.price}</div>
                                             )}
                                             <Icon src={item.icon} size="30px" style={{ filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.5))" }} />
                                             <span style={{
-                                                fontSize: "7.5px", fontWeight: 700,
-                                                color: "rgba(255,255,255,0.55)",
+                                                fontSize: "10px", fontWeight: 700,
+                                                color: "rgba(255,255,255,0.6)",
                                                 textAlign: "center", lineHeight: 1.15,
-                                                maxWidth: "52px", overflow: "hidden",
+                                                maxWidth: "58px", overflow: "hidden",
                                                 textOverflow: "ellipsis", whiteSpace: "nowrap",
                                             }}>{item.he}</span>
                                         </div>
@@ -252,7 +252,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                                     {onEdit && (
                                         <button onClick={() => onEdit(STEPS.findIndex(st => st.id === s.id))}
                                             style={{
-                                                width: "56px", height: "68px",
+                                                width: "64px", height: "72px",
                                                 background: "rgba(255,255,255,0.02)",
                                                 border: "1px dashed rgba(200,168,78,0.18)",
                                                 borderRadius: "9px",
@@ -261,7 +261,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                                                 cursor: "pointer", gap: "3px",
                                             }}>
                                             <span style={{ fontSize: "14px", opacity: 0.5 }}>✏️</span>
-                                            <span style={{ fontSize: "7px", fontWeight: 700, color: "rgba(200,168,78,0.45)" }}>ערוך</span>
+                                            <span style={{ fontSize: "10px", fontWeight: 700, color: "rgba(200,168,78,0.55)" }}>ערוך</span>
                                         </button>
                                     )}
                                 </div>
@@ -436,8 +436,8 @@ function NutriStats({ all }) {
                             </div>
                         )}
                         <span style={{ fontSize: "20px", fontWeight: 900, color: s.color, lineHeight: 1 }}>{s.val}</span>
-                        <span style={{ fontSize: "8px", fontWeight: 800, color: s.color, opacity: 0.7, letterSpacing: "0.05em" }}>g</span>
-                        <span style={{ fontSize: "8px", fontWeight: 700, color: "rgba(255,255,255,0.38)", lineHeight: 1.1 }}>{s.label}</span>
+                        <span style={{ fontSize: "9px", fontWeight: 800, color: s.color, opacity: 0.7, letterSpacing: "0.05em" }}>g</span>
+                        <span style={{ fontSize: "10px", fontWeight: 700, color: "rgba(255,255,255,0.45)", lineHeight: 1.1 }}>{s.label}</span>
                     </div>
                 ))}
             </div>
@@ -446,7 +446,7 @@ function NutriStats({ all }) {
                     {msg.text}
                 </div>
             )}
-            <div style={{ textAlign: "center", marginTop: "6px", fontSize: "8.5px", fontWeight: 500, color: "rgba(255,255,255,0.22)", letterSpacing: "0.03em" }}>
+            <div style={{ textAlign: "center", marginTop: "6px", fontSize: "10px", fontWeight: 500, color: "rgba(255,255,255,0.28)", letterSpacing: "0.03em" }}>
                 * הערכה בלבד · לא מהווה ייעוץ תזונתי
             </div>
         </div>
@@ -721,7 +721,7 @@ const PT = {
     closedMsg: { fontSize: "12px", color: "rgba(255,255,255,0.35)", fontWeight: 600 },
     peakDot: { display: "inline-block", width: "5px", height: "5px", borderRadius: "50%", background: "#e57373", marginRight: "4px", verticalAlign: "middle", flexShrink: 0 },
     chipFull: { opacity: 0.3, cursor: "not-allowed", border: "1px solid rgba(255,255,255,0.06)" },
-    fullTag: { fontSize: "9px", fontWeight: 800, color: "#e57373", marginRight: "4px", letterSpacing: "0.04em" },
+    fullTag: { fontSize: "10px", fontWeight: 800, color: "#e57373", marginRight: "4px", letterSpacing: "0.04em" },
 };
 
 const KF = `

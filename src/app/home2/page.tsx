@@ -276,15 +276,15 @@ function SizePicker({ onSelect, onBack }: { onSelect: (s: string) => void; onBac
                                         animation: 'priceBadge 0.32s cubic-bezier(0.34,1.4,0.64,1) both',
                                     }}>
                                         <div style={{
-                                            padding: '6px 18px', borderRadius: '20px',
+                                            padding: '7px 20px', borderRadius: '20px',
                                             background: 'linear-gradient(135deg,rgba(20,8,0,0.92),rgba(8,4,0,0.96))',
                                             border: '1px solid rgba(240,200,50,0.45)',
                                             backdropFilter: 'blur(8px)',
                                             whiteSpace: 'nowrap', textAlign: 'center',
                                             boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
                                         }}>
-                                            <div style={{ fontSize: '10px', fontWeight: 900, color: 'var(--color-gold-bright)', marginBottom: '1px' }}>{card.tag}</div>
-                                            <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--color-gold-deep)' }}>{card.sub}</div>
+                                            <div style={{ fontSize: '11px', fontWeight: 900, color: 'var(--color-gold-bright)', marginBottom: '1px' }}>{card.tag}</div>
+                                            <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--color-gold-deep)' }}>{card.sub}</div>
                                         </div>
                                     </div>
                                 )}

@@ -196,8 +196,8 @@ export default function HeroBowlCard({ all, onRemove, comboBadges, lastAdd, anim
                         <div style={{
                             position: "absolute", bottom: "14px", left: "50%",
                             transform: "translateX(-50%)",
-                            fontSize: "9px", fontWeight: 700,
-                            color: "rgba(255,255,255,0.2)", whiteSpace: "nowrap",
+                            fontSize: "10px", fontWeight: 700,
+                            color: "rgba(255,255,255,0.25)", whiteSpace: "nowrap",
                         }}>הוסף מרכיבים ←</div>
                     )}
 
@@ -254,12 +254,12 @@ export default function HeroBowlCard({ all, onRemove, comboBadges, lastAdd, anim
                         <div style={{ display: "flex", flexWrap: "wrap", gap: "3px" }}>
                             {comboBadges.map(b => (
                                 <div key={b.id} style={{
-                                    display: "flex", alignItems: "center", gap: "3px",
-                                    padding: "2px 6px", borderRadius: "6px",
+                                    display: "flex", alignItems: "center", gap: "4px",
+                                    padding: "3px 8px", borderRadius: "7px",
                                     background: "rgba(200,168,78,0.2)", border: "1px solid rgba(200,168,78,0.4)",
                                 }}>
-                                    <span style={{ fontSize: "9px" }}>{b.icon}</span>
-                                    <span style={{ fontSize: "9px", fontWeight: 800, color: "#f0d060" }}>{b.he}</span>
+                                    <span style={{ fontSize: "10px" }}>{b.icon}</span>
+                                    <span style={{ fontSize: "10px", fontWeight: 800, color: "#f0d060" }}>{b.he}</span>
                                 </div>
                             ))}
                         </div>

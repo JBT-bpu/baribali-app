@@ -888,7 +888,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
                 }}
               >
                 <div style={{
-                  height: "26px", width: "100%", borderRadius: "6px",
+                  height: "30px", width: "100%", borderRadius: "7px",
                   background: i < step
                     ? "linear-gradient(90deg, rgba(40,120,40,0.7), rgba(60,150,60,0.6))"
                     : i === step
@@ -902,16 +902,16 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
                   transition: "all 0.4s cubic-bezier(0.34,1.56,0.64,1)",
                   boxShadow: i === step ? "0 0 10px rgba(240,208,80,0.5)" : "none",
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  overflow: "hidden", gap: "2px",
+                  overflow: "hidden", gap: "3px",
                 }}>
-                  <span style={{ fontSize: "10px", lineHeight: 1 }}>
+                  <span style={{ fontSize: "11px", lineHeight: 1 }}>
                     {i < step ? "✓" : s.emoji}
                   </span>
                   <span style={{
-                    fontSize: "8px", fontWeight: i === step ? 800 : 700,
+                    fontSize: "10px", fontWeight: i === step ? 800 : 700,
                     color: i === step ? "#3a2800" : i < step ? "#ffffff" : "rgba(255,255,255,0.55)",
                     letterSpacing: "0.01em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-                    maxWidth: "calc(100% - 16px)",
+                    maxWidth: "calc(100% - 18px)",
                     transition: "color 0.3s ease",
                   }}>{s.title}</span>
                 </div>
@@ -1168,11 +1168,11 @@ const S = {
   // same element trips React's "conflicting property" dev warning.
   chip: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "10px 3px 7px", borderRadius: "16px", cursor: "pointer", position: "relative", minHeight: "74px", backgroundImage: "linear-gradient(155deg, rgba(50,115,50,0.9), rgba(30,75,30,0.85))", border: "2px solid rgba(200,168,78,0.55)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", boxShadow: "0 3px 12px rgba(0,0,0,0.5), 0 0 8px rgba(200,168,78,0.08), inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.25)", color: "#ffffff", transition: "all 0.2s cubic-bezier(0.34,1.56,0.64,1)", animationName: "chipIn", animationDuration: "0.25s", animationTimingFunction: "ease", animationFillMode: "both", outline: "none" },
   chipOff: { opacity: 0.2, cursor: "not-allowed", filter: "grayscale(0.5)" },
-  check: { position: "absolute", top: "3px", left: "3px", width: "16px", height: "16px", borderRadius: "50%", background: "linear-gradient(135deg, #ffe066, #d4b84a)", color: "#0d2e0d", fontSize: "8px", fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 6px rgba(200,168,78,0.5)" },
-  popTag: { position: "absolute", top: "-1px", right: "-1px", background: "linear-gradient(135deg, #d4b84a, #f0d060)", color: "#0d2e0d", fontSize: "7px", fontWeight: 900, padding: "2px 6px", borderRadius: "16px 0 8px 0", boxShadow: "0 2px 4px rgba(0,0,0,0.35)" },
+  check: { position: "absolute", top: "3px", left: "3px", width: "18px", height: "18px", borderRadius: "50%", background: "linear-gradient(135deg, #ffe066, #d4b84a)", color: "#0d2e0d", fontSize: "10px", fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 6px rgba(200,168,78,0.5)" },
+  popTag: { position: "absolute", top: "-1px", right: "-1px", background: "linear-gradient(135deg, #d4b84a, #f0d060)", color: "#0d2e0d", fontSize: "10px", fontWeight: 900, padding: "3px 8px", borderRadius: "16px 0 8px 0", boxShadow: "0 2px 4px rgba(0,0,0,0.35)" },
   chipEmoji: { marginBottom: "2px", filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.4))" },
   chipName: { fontSize: "10.5px", fontWeight: 700, textAlign: "center", lineHeight: 1.15, color: "#ffffff", textShadow: "0 1px 3px rgba(0,0,0,0.6)" },
-  chipCost: { fontSize: "8px", fontWeight: 800, color: "#f0d060", background: "linear-gradient(135deg, rgba(200,168,78,0.2), rgba(200,168,78,0.08))", border: "1px solid rgba(200,168,78,0.35)", padding: "1px 5px", borderRadius: "5px", marginTop: "2px", boxShadow: "0 1px 2px rgba(0,0,0,0.3)" },
+  chipCost: { fontSize: "10px", fontWeight: 800, color: "#f0d060", background: "linear-gradient(135deg, rgba(200,168,78,0.2), rgba(200,168,78,0.08))", border: "1px solid rgba(200,168,78,0.35)", padding: "2px 7px", borderRadius: "6px", marginTop: "2px", boxShadow: "0 1px 2px rgba(0,0,0,0.3)" },
 
   bar: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 20px max(14px, env(safe-area-inset-bottom))", background: `linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.25) 100%), url(${footerImage}) center top / cover no-repeat`, borderTop: "2px solid rgba(200,168,78,0.4)", boxShadow: "0 -4px 20px rgba(0,0,0,0.5), 0 0 30px rgba(200,168,78,0.08)" },
   heroBtn: {

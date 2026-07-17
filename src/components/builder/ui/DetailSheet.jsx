@@ -188,8 +188,8 @@ const S = {
         fontSize: "14px", fontWeight: 900, lineHeight: 1,
     },
     macroLabel: {
-        fontSize: "9px", fontWeight: 600,
-        color: "rgba(255,255,255,0.35)",
+        fontSize: "10px", fontWeight: 600,
+        color: "rgba(255,255,255,0.4)",
         marginTop: "1px",
     },
 
