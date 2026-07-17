@@ -25,6 +25,7 @@ import HeroBowlCard from "./ui/HeroBowlCard.jsx";
 import BariModal from "../ui/bari/BariModal";
 import BariButton from "../ui/bari/BariButton";
 import MagicBackground from "./background/MagicBackground";
+import { useAnimatedNumber } from "../../lib/motionHooks";
 
 /*
   BariBali Builder — COMPLETE v3
@@ -369,6 +370,9 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
 
   const extras = all.reduce((s, i) => s + (i.price || 0), 0);
   const total = activeBase + extras;
+  // Rolls toward the new total instead of snapping — the price is the most
+  // watched number in the builder. (No-op under reduced motion.)
+  const displayTotal = useAnimatedNumber(total);
   const curSel = cur ? getSel(cur.id) : [];
 
   // ─── Price animation ───
@@ -1047,7 +1051,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
               <span style={{ fontSize: "17px", fontWeight: 900, color: "#ffffff", textShadow: "0 2px 4px rgba(0,0,0,0.5)" }}>{all.length}</span>
               <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)", fontWeight: 600 }}>מרכיבים</span>
               <div style={{ width: "1px", height: "14px", background: "rgba(200,168,78,0.25)" }} />
-              <span style={{ fontSize: "17px", fontWeight: 900, color: "#f0d060", textShadow: "0 2px 6px rgba(200,168,78,0.4)" }}>₪{total}</span>
+              <span style={{ fontSize: "17px", fontWeight: 900, color: "#f0d060", textShadow: "0 2px 6px rgba(200,168,78,0.4)" }}>₪{displayTotal}</span>
             </div>
             {/* Right: single combined CTA pill */}
             <div style={{

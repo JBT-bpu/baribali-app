@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
 import Tilt from "react-parallax-tilt";
+import { usePrefersReducedMotion } from "../../../lib/motionHooks";
 const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
 
 const MAX          = 14;
@@ -16,10 +17,13 @@ function ringColor(p) {
     if (p < 0.7)  return "#c8a832";
     return "#66dd44";
 }
+// drop-shadow() syntax — these are applied to CSS `filter`; the previous
+// box-shadow-style values were invalid there and silently dropped, so the
+// ring never actually glowed as designed.
 function ringGlow(p) {
     if (p < 0.35) return "none";
-    if (p < 0.7)  return "0 0 10px rgba(200,168,78,0.65)";
-    return "0 0 14px rgba(80,220,60,0.75)";
+    if (p < 0.7)  return "drop-shadow(0 0 6px rgba(200,168,78,0.65))";
+    return "drop-shadow(0 0 8px rgba(80,220,60,0.75))";
 }
 
 const KF = `
@@ -41,7 +45,9 @@ export default function HeroBowlCard({ all, onRemove, comboBadges, lastAdd, anim
     const lottieRef      = useRef(null);
     const prevIdsRef     = useRef(null);   // null = not yet seeded
     const targetFrameRef = useRef(null);   // frame to stop at during playback
+    const reducedMotion  = usePrefersReducedMotion();
     const [dropKey, setDropKey]   = useState(null);
+    const [firstPulse, setFirstPulse] = useState(false); // stronger ring flash on the very first ingredient
     const [bowlAnim, setBowlAnim] = useState(null);
     const [mounted, setMounted]   = useState(false);
     useEffect(() => { setMounted(true); }, []);
@@ -87,12 +93,21 @@ export default function HeroBowlCard({ all, onRemove, comboBadges, lastAdd, anim
         }
 
         const newItems = all.filter(i => !prevIdsRef.current.includes(i.id));
+        const wasEmpty = prevIdsRef.current.length === 0;
         prevIdsRef.current = currIds;
 
         const newFrame = Math.round(fillPct * (TOTAL_FRAMES - 1));
         const l = lottieRef.current;
 
         if (newItems.length > 0) {
+            // First ingredient in an empty bowl gets a bigger moment — a
+            // double haptic tick and a brief bright ring flash. First-action
+            // feedback shapes how the whole builder feels.
+            if (wasEmpty) {
+                navigator.vibrate?.([12, 60, 12]);
+                setFirstPulse(true);
+                setTimeout(() => setFirstPulse(false), 750);
+            }
             // ── Item ADDED: play forward from current fill frame to new fill frame ──
             if (l) {
                 const fromFrame = Math.round(l.currentFrame ?? 0);
@@ -121,9 +136,10 @@ export default function HeroBowlCard({ all, onRemove, comboBadges, lastAdd, anim
 
     return (
         <Tilt
+            tiltEnable={!reducedMotion}
+            glareEnable={!reducedMotion}
             tiltMaxAngleX={6}
             tiltMaxAngleY={6}
-            glareEnable
             glareMaxOpacity={0.18}
             glareColor="#f0d060"
             glarePosition="all"
@@ -159,11 +175,12 @@ export default function HeroBowlCard({ all, onRemove, comboBadges, lastAdd, anim
                         style={{ position: "absolute", inset: 0, width: "100%", height: "100%", transform: "rotate(-90deg)" }}>
                         <circle cx={CX} cy={CX} r={R} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="5" />
                         <circle cx={CX} cy={CX} r={R} fill="none"
-                            stroke={ringColor(fillPct)} strokeWidth="5" strokeLinecap="round"
+                            stroke={firstPulse ? "#ffe066" : ringColor(fillPct)}
+                            strokeWidth={firstPulse ? "6.5" : "5"} strokeLinecap="round"
                             strokeDasharray={CIRC} strokeDashoffset={offset}
                             style={{
-                                transition: "stroke-dashoffset 0.55s cubic-bezier(0.34,1.2,0.64,1), stroke 0.4s ease",
-                                filter: ringGlow(fillPct),
+                                transition: "stroke-dashoffset 0.55s cubic-bezier(0.34,1.2,0.64,1), stroke 0.4s ease, stroke-width 0.3s ease",
+                                filter: firstPulse ? "drop-shadow(0 0 12px rgba(255,224,102,0.95))" : ringGlow(fillPct),
                             }}
                         />
                     </svg>

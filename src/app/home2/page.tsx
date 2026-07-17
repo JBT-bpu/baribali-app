@@ -8,6 +8,7 @@ import { House, Search, Star, ClipboardList, User } from 'lucide-react';
 import ReviewsStrip from '@/components/ui/ReviewsStrip';
 import CatPopup from '@/components/ui/CatPopup';
 import { BariButton, BariModal, BariGlowBackground } from '@/components/ui/bari';
+import { usePrefersReducedMotion } from '@/lib/motionHooks';
 
 // Bottom nav — vector icons instead of emoji for consistent UI chrome
 // (the illustrated ingredient/card art elsewhere stays as-is, this is
@@ -128,6 +129,7 @@ function Particles() {
 
 // ─── Size Picker ──────────────────────────────────────────────────────────────
 function SizePicker({ onSelect, onBack }: { onSelect: (s: string) => void; onBack: () => void }) {
+    const reducedMotion = usePrefersReducedMotion();
     const [activeIdx, setActiveIdx] = useState(1);
     const [dragX, setDragX]         = useState(0);
     const [out, setOut]             = useState(false);
@@ -264,9 +266,10 @@ function SizePicker({ onSelect, onBack }: { onSelect: (s: string) => void; onBac
                         >
                             {/* Inner: entrance animation + visual styling + tilt/glare */}
                             <Tilt
+                                tiltEnable={!reducedMotion}
+                                glareEnable={!reducedMotion}
                                 tiltMaxAngleX={6}
                                 tiltMaxAngleY={6}
-                                glareEnable
                                 glareMaxOpacity={0.16}
                                 glareColor="var(--color-gold-deep)"
                                 glarePosition="all"
@@ -346,6 +349,7 @@ function SizePicker({ onSelect, onBack }: { onSelect: (s: string) => void; onBac
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function HomeV2() {
     const router = useRouter();
+    const reducedMotion = usePrefersReducedMotion();
 
     // ── Carousel state ──
     const [activeIdx, setActiveIdx]   = useState(1);   // salad in center by default
@@ -562,9 +566,10 @@ export default function HomeV2() {
                                 {/* Tilt/glare wrapper — kept on a separate node from the coverflow
                                     transform above so the two don't fight over the same style. */}
                                 <Tilt
+                                    tiltEnable={!reducedMotion}
+                                    glareEnable={!reducedMotion}
                                     tiltMaxAngleX={8}
                                     tiltMaxAngleY={8}
-                                    glareEnable
                                     glareMaxOpacity={0.18}
                                     glareColor="var(--color-gold-deep)"
                                     glarePosition="all"

@@ -458,7 +458,13 @@ const SHOP_WA = process.env.NEXT_PUBLIC_SHOP_WA_NUMBER || '972501234567';
 // ─── Post-order confirmation screen ─────────────────────────
 function OrderedScreen({ total, all, pickupTime, notes, orderNum: propOrderNum, orderId, onNewOrder }) {
     const fallbackNum = useMemo(() => `BB-${((Date.now() % 9000) + 1000)}`, []);
-    useEffect(() => { fireGoldConfetti(); }, []);
+    useEffect(() => {
+        // Delayed so the burst punctuates this screen's arrival — firing on
+        // mount collided with MixingAnimation's bloom peak that just ended,
+        // blurring two celebration moments into one.
+        const t = setTimeout(() => fireGoldConfetti(), 450);
+        return () => clearTimeout(t);
+    }, []);
     const orderNum = propOrderNum || fallbackNum;
     const [animData, setAnimData] = useState(null);
     useEffect(() => { fetch("/cat-salad-final.json").then(r => r.json()).then(setAnimData).catch(() => {}); }, []);

@@ -182,6 +182,32 @@ export default function OrderStatusView({ id }: { id: string }) {
         prevStatusRef.current = order.status;
     }, [order?.status, triggerCelebration, triggerRingPop, order]);
 
+    // Flash the tab title when the order becomes ready while this tab is
+    // hidden — customers park this page in the background while waiting.
+    // Stops and restores the title the moment they come back.
+    useEffect(() => {
+        if (order?.status !== 'ready' || !document.hidden) return;
+        const baseTitle = document.title;
+        let on = true;
+        document.title = '🎉 ההזמנה מוכנה!';
+        const interval = setInterval(() => {
+            on = !on;
+            document.title = on ? '🎉 ההזמנה מוכנה!' : baseTitle;
+        }, 1200);
+        const stop = () => {
+            if (!document.hidden) {
+                clearInterval(interval);
+                document.title = baseTitle;
+            }
+        };
+        document.addEventListener('visibilitychange', stop);
+        return () => {
+            clearInterval(interval);
+            document.title = baseTitle;
+            document.removeEventListener('visibilitychange', stop);
+        };
+    }, [order?.status]);
+
     if (notFound) return <NotFound />;
     if (!order) return <Loading />;
 
