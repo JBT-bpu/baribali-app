@@ -46,6 +46,23 @@ const S_W = 210;
 const S_H = 272;
 
 // ─── Particles ────────────────────────────────────────────────────────────────
+// Pre-renders one glow sprite per color once and drawImage()s it per particle —
+// per-frame ctx.shadowBlur (the slowest canvas op) and per-frame gradient
+// creation were the two most expensive things on this page. Same look.
+function makeGlowSprite(col: string, hardStop: number): HTMLCanvasElement {
+    const size = 64;
+    const s = document.createElement('canvas');
+    s.width = s.height = size;
+    const sctx = s.getContext('2d')!;
+    const g = sctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    g.addColorStop(0, col);
+    g.addColorStop(hardStop, col);
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    sctx.fillStyle = g;
+    sctx.fillRect(0, 0, size, size);
+    return s;
+}
+
 function Particles() {
     const ref = useRef<HTMLCanvasElement>(null);
     useEffect(() => {
@@ -59,18 +76,25 @@ function Particles() {
         // resolve CSS custom properties.
         const sparkCols = ['#c8a832', '#f0d060', '#ffe066', '#c8a84e', '#fffacc'];
         const bokehCols = ['#c8a832', '#f0d060', '#ffe066', '#c8a84e'];
-        type Spark = { x: number; y: number; r: number; s: number; o: number; col: string; d: number; ph: number };
-        type Bokeh = { x: number; y: number; r: number; s: number; o: number; col: string; ph: number };
-        const sparks: Spark[] = Array.from({ length: 120 }, () => ({
+        // Tight core + wide falloff reads like the old shadowBlur glow.
+        const sparkSprites = sparkCols.map(col => makeGlowSprite(col, 0.18));
+        const bokehSprites = bokehCols.map(col => makeGlowSprite(col, 0.55));
+        // Fewer particles on small screens — less overdraw on weaker GPUs.
+        const small = window.innerWidth < 480;
+        const SPARKS = small ? 64 : 120;
+        const BOKEH = small ? 14 : 26;
+        type Spark = { x: number; y: number; r: number; s: number; o: number; sp: number; d: number; ph: number };
+        type Bokeh = { x: number; y: number; r: number; s: number; o: number; sp: number; ph: number };
+        const sparks: Spark[] = Array.from({ length: SPARKS }, () => ({
             x: Math.random() * c.width, y: Math.random() * c.height,
             r: Math.random() * 2.8 + 0.5, s: Math.random() * 0.65 + 0.18,
-            o: Math.random() * 0.45 + 0.12, col: sparkCols[Math.floor(Math.random() * sparkCols.length)],
+            o: Math.random() * 0.45 + 0.12, sp: Math.floor(Math.random() * sparkSprites.length),
             d: (Math.random() - 0.5) * 0.32, ph: Math.random() * Math.PI * 2,
         }));
-        const bokeh: Bokeh[] = Array.from({ length: 26 }, () => ({
+        const bokeh: Bokeh[] = Array.from({ length: BOKEH }, () => ({
             x: Math.random() * c.width, y: Math.random() * c.height,
             r: Math.random() * 54 + 18, s: Math.random() * 0.14 + 0.03,
-            o: Math.random() * 0.10 + 0.04, col: bokehCols[Math.floor(Math.random() * bokehCols.length)],
+            o: Math.random() * 0.10 + 0.04, sp: Math.floor(Math.random() * bokehSprites.length),
             ph: Math.random() * Math.PI * 2,
         }));
         let raf: number, t = 0;
@@ -80,22 +104,20 @@ function Particles() {
                 b.y -= b.s; b.x += Math.sin(t * 0.35 + b.ph) * 0.28;
                 b.o = 0.04 + Math.sin(t * 0.45 + b.ph) * 0.07 + 0.04;
                 if (b.y < -b.r * 2) { b.y = c.height + b.r; b.x = Math.random() * c.width; }
-                const grad = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r);
-                grad.addColorStop(0, b.col); grad.addColorStop(0.55, b.col); grad.addColorStop(1, 'transparent');
-                ctx.save(); ctx.globalAlpha = Math.min(0.22, Math.max(0, b.o));
-                ctx.fillStyle = grad; ctx.beginPath();
-                ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+                ctx.globalAlpha = Math.min(0.22, Math.max(0, b.o));
+                ctx.drawImage(bokehSprites[b.sp], b.x - b.r, b.y - b.r, b.r * 2, b.r * 2);
             }
             for (const p of sparks) {
                 p.y -= p.s; p.x += p.d + Math.sin(t + p.ph) * 0.16;
                 p.o = 0.08 + Math.sin(t * 0.9 + p.ph) * 0.28 + 0.12;
                 if (p.y < -6) { p.y = c.height + 6; p.x = Math.random() * c.width; }
                 if (p.x < 0) p.x = c.width; if (p.x > c.width) p.x = 0;
-                ctx.save(); ctx.globalAlpha = Math.min(0.75, Math.max(0, p.o));
-                ctx.shadowBlur = p.r * 7; ctx.shadowColor = p.col;
-                ctx.fillStyle = p.col; ctx.beginPath();
-                ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+                ctx.globalAlpha = Math.min(0.75, Math.max(0, p.o));
+                // Sprite drawn at ~4.5x the core radius so the falloff shows.
+                const d = p.r * 4.5;
+                ctx.drawImage(sparkSprites[p.sp], p.x - d / 2, p.y - d / 2, d, d);
             }
+            ctx.globalAlpha = 1;
             raf = requestAnimationFrame(draw);
         };
         draw();
@@ -451,7 +473,7 @@ export default function HomeV2() {
                 @keyframes burst    { from{transform:scale(0)} to{transform:scale(55)} }
                 @keyframes swipeHint{ 0%,100%{transform:translateX(0);opacity:0.55} 40%{transform:translateX(-7px);opacity:0.9} 65%{transform:translateX(7px);opacity:0.9} }
                 @keyframes swipeHintFade{ 0%,80%{opacity:1} 100%{opacity:0} }
-                @keyframes glowPulse{ 0%,100%{filter:drop-shadow(0 0 22px rgba(240,200,50,.7)) drop-shadow(0 0 55px rgba(240,200,50,.3))} 50%{filter:drop-shadow(0 0 40px rgba(240,200,50,1)) drop-shadow(0 0 90px rgba(240,200,50,.55))} }
+                @keyframes glowFade { 0%,100%{opacity:0.5} 50%{opacity:1} }
                 @keyframes navRipple{ 0%{transform:scale(0);opacity:0.5} 100%{transform:scale(1);opacity:0} }
                 @keyframes snapGlow      { 0%{box-shadow:0 0 30px rgba(240,200,50,0.4)} 100%{box-shadow:0 0 0px rgba(240,200,50,0)} }
                 @keyframes sizePickerIn  { from{opacity:0;transform:scale(0.93) translateY(24px)} to{opacity:1;transform:none} }
@@ -525,6 +547,18 @@ export default function HomeV2() {
                                     transition: tr,
                                 }}
                             >
+                                {/* Pulsing halo behind the active card — a static radial
+                                    gradient whose OPACITY animates (compositor-only), replacing
+                                    the old glowPulse filter:drop-shadow keyframes which forced
+                                    a full repaint every frame. */}
+                                {isActive && (
+                                    <div aria-hidden style={{
+                                        position: 'absolute', inset: '-28px', zIndex: -1,
+                                        borderRadius: '40px', pointerEvents: 'none',
+                                        background: 'radial-gradient(ellipse 55% 55% at 50% 50%, rgba(240,200,50,0.5) 0%, rgba(240,200,50,0.16) 50%, transparent 72%)',
+                                        animation: 'glowFade 2.4s ease-in-out infinite',
+                                    }} />
+                                )}
                                 {/* Tilt/glare wrapper — kept on a separate node from the coverflow
                                     transform above so the two don't fight over the same style. */}
                                 <Tilt
@@ -547,7 +581,6 @@ export default function HomeV2() {
                                         boxShadow: isActive
                                             ? 'var(--shadow-card-glow)' + glowShadow
                                             : '0 6px 20px rgba(0,0,0,0.5)',
-                                        animation: isActive ? 'glowPulse 2.4s ease-in-out infinite' : undefined,
                                         position: 'relative',
                                     }}
                                 >

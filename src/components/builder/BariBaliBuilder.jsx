@@ -1032,9 +1032,11 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
               background: "linear-gradient(145deg, rgba(8,22,8,0.97), rgba(13,40,13,0.95))",
               cursor: "pointer",
               fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
-              boxShadow: "0 4px 18px rgba(0,0,0,0.4), 0 0 0 1px rgba(200,168,78,0.08)",
-              animation: "goldPulse 3s ease-in-out infinite",
-              ...(cur.id === "upgrade" && curSel.length === 0 ? { opacity: 0.5, animation: "none" } : {}),
+              // Static gold glow — was a goldPulse box-shadow loop, but infinite
+              // box-shadow animation repaints every frame and the CTA pill's
+              // shimmer already provides motion here.
+              boxShadow: "0 4px 18px rgba(0,0,0,0.4), 0 0 12px rgba(200,168,78,0.35), 0 0 0 1px rgba(200,168,78,0.08)",
+              ...(cur.id === "upgrade" && curSel.length === 0 ? { opacity: 0.5 } : {}),
             }}
             onClick={next}
             aria-label={step === steps.length - 1 ? (curSel.length > 0 ? "עבור לסיכום" : "דלג ועבור לסיכום") : `עבור לשלב הבא - ${steps[step + 1]?.title || ""}`}
@@ -1101,10 +1103,6 @@ const KF = `
   0% { width: 0%; opacity: 0; }
   30% { opacity: 1; }
   100% { opacity: 1; }
-}
-@keyframes goldPulse {
-  0%, 100% { box-shadow: 0 0 8px rgba(200,168,78,0.3), 0 0 20px rgba(200,168,78,0.1); }
-  50% { box-shadow: 0 0 16px rgba(200,168,78,0.5), 0 0 40px rgba(200,168,78,0.2); }
 }
 * { -webkit-tap-highlight-color:transparent; box-sizing:border-box; margin:0; padding:0; }
 ::-webkit-scrollbar{display:none}
