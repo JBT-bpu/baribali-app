@@ -10,10 +10,16 @@ import { BariButton, BariModal, BariGlowBackground, BariBottomNav } from '@/comp
 import { usePrefersReducedMotion } from '@/lib/motionHooks';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
+// Order = swipe/reading order (RTL, so this reads right-to-left visually).
+// Login/guest leads so new visitors are prompted to unlock privileges before
+// anything else; salad is the working build flow; tortilla is a placeholder
+// for a flow that isn't built yet, so it's flagged comingSoon instead of
+// wired to a route. More cards (e.g. Bari loyalty cards) are expected to
+// join this array later.
 const MAIN_CARDS = [
-    { id: 'tortilla', img: '/homepage-assets/card-tortilla.png', label: 'בנה טורטיה',  sub: 'קמח מחיטה מלאה · בריא · טעים' },
+    { id: 'login',    img: '/homepage-assets/card-login.png',    label: 'כניסה / פרופיל', sub: 'שמור סלטים · קבל המלצות והטבות' },
     { id: 'salad',    img: '/homepage-assets/card-salad.png',    label: 'בנה סלט',     sub: 'בחר מרכיבים · בחר גודל · הגש' },
-    { id: 'login',    img: '/homepage-assets/card-login.png',    label: 'כניסה / פרופיל', sub: 'שמור סלטים · קבל המלצות' },
+    { id: 'tortilla', img: '/homepage-assets/card-tortilla.png', label: 'בנה טורטיה',  sub: 'קמח מחיטה מלאה · בריא · טעים', comingSoon: true },
 ];
 
 const SIZE_CARDS = [
@@ -340,7 +346,7 @@ export default function HomeV2() {
     const reducedMotion = usePrefersReducedMotion();
 
     // ── Carousel state ──
-    const [activeIdx, setActiveIdx]   = useState(1);   // salad in center by default
+    const [activeIdx, setActiveIdx]   = useState(1);   // placeholder — resolved to login/salad by auth-state effect before reveal
     const [dragX, setDragX]           = useState(0);
     const [glowCard, setGlowCard]     = useState<number | null>(null);
     const dragging = useRef(false);
@@ -352,6 +358,8 @@ export default function HomeV2() {
     const [loginSheet, setLoginSheet] = useState(false);
     const [curtain, setCurtain]       = useState(false);
     const [ready, setReady]           = useState(false);
+    const [toast, setToast]           = useState<string | null>(null);
+    const toastTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // ── Swipe hint — only show on first visit ──
     const [showSwipeHint, setShowSwipeHint] = useState(false);
@@ -379,7 +387,15 @@ export default function HomeV2() {
         setShowCatPopup(false);
     }, []);
 
-    useEffect(() => { setReady(true); router.prefetch('/build'); }, [router]);
+    useEffect(() => {
+        // First-time/guest visitors land on the login/guest card; once
+        // they've continued (as guest or via Google — see completeAuth),
+        // that choice persists and future visits skip straight to salad.
+        const authed = localStorage.getItem('bb-user-authed');
+        setActiveIdx(MAIN_CARDS.findIndex(c => c.id === (authed ? 'salad' : 'login')));
+        setReady(true);
+        router.prefetch('/build');
+    }, [router]);
 
     const snapTo = useCallback((idx: number) => {
         if (idx < 0 || idx >= MAIN_CARDS.length) return;
@@ -388,6 +404,22 @@ export default function HomeV2() {
         setGlowCard(idx);
         setTimeout(() => setGlowCard(null), 600);
     }, []);
+
+    const showToast = useCallback((msg: string) => {
+        setToast(msg);
+        if (toastTimeout.current) clearTimeout(toastTimeout.current);
+        toastTimeout.current = setTimeout(() => setToast(null), 1800);
+    }, []);
+
+    // Guest and Google both just unlock the "signed in" state for now — no
+    // real auth backend exists yet (see kitchenAuth.ts / login stub). Skips
+    // the login card on future visits until it's cleared (e.g. sign-out).
+    const completeAuth = useCallback(() => {
+        localStorage.setItem('bb-user-authed', '1');
+        navigator.vibrate?.(12);
+        setLoginSheet(false);
+        snapTo(MAIN_CARDS.findIndex(c => c.id === 'salad'));
+    }, [snapTo]);
 
     const onDown = (e: React.PointerEvent) => {
         dragging.current = true; dragged.current = false;
@@ -406,7 +438,7 @@ export default function HomeV2() {
         const delta = e.clientX - startX.current;
         setDragX(0);
         if (Math.abs(delta) > 42) {
-            // RTL: swipe right → go to lower index (tortilla), swipe left → higher (login)
+            // RTL: swipe right → lower index, swipe left → higher index
             snapTo(delta < 0 ? activeIdx + 1 : activeIdx - 1);
         }
     };
@@ -414,14 +446,18 @@ export default function HomeV2() {
     const handleCardTap = (idx: number) => {
         if (dragged.current) return;
         if (idx !== activeIdx) { snapTo(idx); return; }
-        // Active card — trigger its action. Single tap for all three cards —
+        const mc = MAIN_CARDS[idx];
+        if (mc.comingSoon) {
+            navigator.vibrate?.(10);
+            showToast(`${mc.label} — בקרוב...`);
+            return;
+        }
+        // Active card — trigger its action. Single tap for salad/login —
         // the size picker itself is salad's confirmation step, so no
-        // tap-again-to-confirm needed (tortilla navigates directly since it
-        // has no size choice).
+        // tap-again-to-confirm needed.
         if (navigator.vibrate) navigator.vibrate(18);
-        if (idx === 0) { router.push('/build?type=tortilla'); }
-        else if (idx === 1) setSizePicker(true);
-        else if (idx === 2) setLoginSheet(true);
+        if (mc.id === 'salad') setSizePicker(true);
+        else if (mc.id === 'login') setLoginSheet(true);
     };
 
     const handleSizeSelect = useCallback((size: string) => {
@@ -471,6 +507,7 @@ export default function HomeV2() {
                 @keyframes swipeHintFade{ 0%,80%{opacity:1} 100%{opacity:0} }
                 @keyframes glowFade { 0%,100%{opacity:0.5} 50%{opacity:1} }
                 @keyframes snapGlow      { 0%{box-shadow:0 0 30px rgba(240,200,50,0.4)} 100%{box-shadow:0 0 0px rgba(240,200,50,0)} }
+                @keyframes toastIn       { from{opacity:0;transform:translateX(-50%) translateY(-10px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
                 @keyframes sizePickerIn  { from{opacity:0;transform:scale(0.93) translateY(24px)} to{opacity:1;transform:none} }
                 @keyframes sizePickerOut { to{opacity:0;transform:scale(0.96) translateY(-10px)} }
                 @keyframes cardCascade   { from{opacity:0;transform:translateY(26px) scale(0.86)} to{opacity:1;transform:none} }
@@ -584,6 +621,17 @@ export default function HomeV2() {
                                         src={mc.img} alt={mc.label} width={M_W} height={M_H}
                                         style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none', display: 'block' }}
                                     />
+                                    {mc.comingSoon && (
+                                        <div aria-hidden style={{
+                                            position: 'absolute', top: '10px', left: '-6px',
+                                            padding: '3px 14px',
+                                            background: 'linear-gradient(135deg, var(--color-gold-deep), var(--color-gold-bright))',
+                                            color: 'var(--color-green-ink)',
+                                            fontSize: '10px', fontWeight: 800, letterSpacing: '0.04em',
+                                            boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+                                            transform: 'rotate(-8deg)',
+                                        }}>בקרוב</div>
+                                    )}
                                 </Tilt>
                             </div>
                         );
@@ -650,6 +698,20 @@ export default function HomeV2() {
             {/* Bottom Nav */}
             <BariBottomNav />
 
+            {/* Coming-soon toast — tortilla tap feedback */}
+            {toast && (
+                <div style={{
+                    position: 'fixed', top: 'max(20px, env(safe-area-inset-top))', left: '50%',
+                    transform: 'translateX(-50%)', zIndex: 210,
+                    padding: '10px 22px', borderRadius: '999px',
+                    background: 'linear-gradient(135deg,rgba(20,8,0,0.94),rgba(8,4,0,0.97))',
+                    border: '1px solid rgba(240,200,50,0.45)',
+                    boxShadow: '0 6px 24px rgba(0,0,0,0.55)',
+                    color: 'var(--color-gold-bright)', fontSize: '13px', fontWeight: 800,
+                    whiteSpace: 'nowrap', animation: 'toastIn 0.3s cubic-bezier(0.34,1.4,0.64,1) both',
+                }}>{toast}</div>
+            )}
+
             {/* Gold curtain burst */}
             {curtain && (
                 <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', overflow: 'hidden' }}>
@@ -673,12 +735,20 @@ export default function HomeV2() {
                     <BariGlowBackground />
                     <Image src="/homepage-assets/card-login.png" alt="" width={160} height={200} style={{ width: '110px', height: 'auto', position: 'relative' }} />
                     <div style={{ position: 'relative', fontSize: '13px', color: 'rgba(255,255,255,0.5)', textAlign: 'center', lineHeight: 1.7, maxWidth: '250px', fontWeight: 600 }}>
-                        שמור סלטים · ראה היסטוריה · קבל המלצות אישיות
+                        שמור סלטים · ראה היסטוריה · קבל המלצות והטבות
                     </div>
-                    <button type="button" style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '10px', padding: '13px 28px', borderRadius: '50px', background: '#fff', border: 'none', cursor: 'pointer', fontSize: '15px', fontWeight: 800, color: '#1a1a1a', fontFamily: "var(--font-heebo), 'Heebo', sans-serif", boxShadow: '0 4px 20px rgba(0,0,0,0.35)' }}>
+                    <button type="button" onClick={completeAuth} style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '10px', padding: '13px 28px', borderRadius: '50px', background: '#fff', border: 'none', cursor: 'pointer', fontSize: '15px', fontWeight: 800, color: '#1a1a1a', fontFamily: "var(--font-heebo), 'Heebo', sans-serif", boxShadow: '0 4px 20px rgba(0,0,0,0.35)' }}>
                         <span style={{ fontSize: '17px', fontWeight: 900, color: '#4285F4' }}>G</span>
                         המשך עם Google
                     </button>
+                    <BariButton
+                        variant="secondary"
+                        onClick={completeAuth}
+                        fullWidth
+                        style={{ position: 'relative', fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }}
+                    >
+                        המשך כאורח
+                    </BariButton>
                     <BariButton
                         variant="ghost"
                         size="sm"
