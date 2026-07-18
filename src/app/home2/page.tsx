@@ -729,7 +729,7 @@ export default function HomeV2() {
             <BariModal open={loginSheet} onClose={() => setLoginSheet(false)} variant="sheet">
                 <div style={{
                     position: 'relative',
-                    padding: '8px 20px max(28px, env(safe-area-inset-bottom))',
+                    padding: '20px 20px max(28px, env(safe-area-inset-bottom))',
                     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px',
                 }}>
                     <BariGlowBackground />
