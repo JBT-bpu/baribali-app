@@ -4,22 +4,10 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Tilt from 'react-parallax-tilt';
-import { House, Search, Star, ClipboardList, User } from 'lucide-react';
 import ReviewsStrip from '@/components/ui/ReviewsStrip';
 import CatPopup from '@/components/ui/CatPopup';
-import { BariButton, BariModal, BariGlowBackground } from '@/components/ui/bari';
+import { BariButton, BariModal, BariGlowBackground, BariBottomNav } from '@/components/ui/bari';
 import { usePrefersReducedMotion } from '@/lib/motionHooks';
-
-// Bottom nav — vector icons instead of emoji for consistent UI chrome
-// (the illustrated ingredient/card art elsewhere stays as-is, this is
-// just navigation iconography).
-const NAV_ITEMS = [
-    { Icon: House, label: 'בית', active: true },
-    { Icon: Search, label: 'חיפוש', active: false },
-    { Icon: Star, label: 'מועדפים', active: false },
-    { Icon: ClipboardList, label: 'הזמנות', active: false },
-    { Icon: User, label: 'פרופיל', active: false },
-];
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 const MAIN_CARDS = [
@@ -365,9 +353,6 @@ export default function HomeV2() {
     const [curtain, setCurtain]       = useState(false);
     const [ready, setReady]           = useState(false);
 
-    // ── Bottom nav state ──
-    const [navRipple, setNavRipple]   = useState<string | null>(null);
-
     // ── Swipe hint — only show on first visit ──
     const [showSwipeHint, setShowSwipeHint] = useState(false);
     useEffect(() => {
@@ -473,12 +458,10 @@ export default function HomeV2() {
                 @keyframes pageOut  { to{opacity:0;transform:scale(0.96)} }
                 @keyframes logoIn   { from{opacity:0;transform:translateY(-14px)} to{opacity:1;transform:none} }
                 @keyframes labelIn  { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
-                @keyframes navIn    { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:none} }
                 @keyframes burst    { from{transform:scale(0)} to{transform:scale(55)} }
                 @keyframes swipeHint{ 0%,100%{transform:translateX(0);opacity:0.55} 40%{transform:translateX(-7px);opacity:0.9} 65%{transform:translateX(7px);opacity:0.9} }
                 @keyframes swipeHintFade{ 0%,80%{opacity:1} 100%{opacity:0} }
                 @keyframes glowFade { 0%,100%{opacity:0.5} 50%{opacity:1} }
-                @keyframes navRipple{ 0%{transform:scale(0);opacity:0.5} 100%{transform:scale(1);opacity:0} }
                 @keyframes snapGlow      { 0%{box-shadow:0 0 30px rgba(240,200,50,0.4)} 100%{box-shadow:0 0 0px rgba(240,200,50,0)} }
                 @keyframes sizePickerIn  { from{opacity:0;transform:scale(0.93) translateY(24px)} to{opacity:1;transform:none} }
                 @keyframes sizePickerOut { to{opacity:0;transform:scale(0.96) translateY(-10px)} }
@@ -657,67 +640,7 @@ export default function HomeV2() {
             <ReviewsStrip />
 
             {/* Bottom Nav */}
-            <div style={{ position: 'relative', zIndex: 2, width: '100%', padding: '10px 18px 28px', animation: 'navIn 0.6s ease 0.2s both' }}>
-                <div style={{ position: 'relative', borderRadius: '50px', overflow: 'hidden', boxShadow: '0 4px 24px rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,255,255,0.06)' }}>
-                    <Image src="/homepage-assets/nav-bg.png" alt="" width={1290} height={300}
-                        style={{ width: '100%', height: '58px', objectFit: 'cover', objectPosition: 'center', display: 'block', opacity: 0.6 }} />
-                    <div style={{ position: 'absolute', inset: 0, display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '0 8px' }}>
-                        {NAV_ITEMS.map(item => (
-                            <div
-                                key={item.label}
-                                onClick={() => {
-                                    setNavRipple(item.label);
-                                    setTimeout(() => setNavRipple(null), 450);
-                                }}
-                                style={{
-                                    position: 'relative',
-                                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
-                                    opacity: item.active ? 1 : 0.7,
-                                    cursor: 'pointer', padding: '4px 12px',
-                                    transition: 'opacity 0.25s ease',
-                                }}
-                            >
-                                {/* Tap ripple */}
-                                {navRipple === item.label && (
-                                    <div style={{
-                                        position: 'absolute', top: '50%', left: '50%',
-                                        width: '48px', height: '48px',
-                                        marginLeft: '-24px', marginTop: '-24px',
-                                        borderRadius: '50%',
-                                        background: 'rgba(240,200,50,0.25)',
-                                        animation: 'navRipple 0.4s ease-out forwards',
-                                        pointerEvents: 'none',
-                                    }} />
-                                )}
-                                <item.Icon
-                                    size={item.active ? 24 : 19}
-                                    color={item.active ? 'var(--color-gold-deep)' : '#fff'}
-                                    strokeWidth={2.3}
-                                    style={{
-                                        filter: item.active ? 'drop-shadow(0 0 10px var(--color-gold-deep))' : 'drop-shadow(0 1px 3px rgba(0,0,0,0.5))',
-                                        transition: 'width 0.25s ease, height 0.25s ease, filter 0.25s ease',
-                                    }}
-                                />
-                                <span style={{
-                                    fontSize: '11px', fontWeight: 700,
-                                    color: item.active ? 'var(--color-gold-deep)' : '#fff',
-                                    letterSpacing: '0.04em',
-                                    textShadow: '0 1px 4px rgba(0,0,0,0.8)',
-                                }}>{item.label}</span>
-                                {/* Active gold indicator line */}
-                                {item.active && (
-                                    <div style={{
-                                        width: '20px', height: '3px', borderRadius: '2px',
-                                        background: 'linear-gradient(90deg, var(--color-gold-deep), var(--color-gold-bright))',
-                                        marginTop: '1px',
-                                        boxShadow: '0 0 8px rgba(240,200,50,0.5)',
-                                    }} />
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
+            <BariBottomNav />
 
             {/* Gold curtain burst */}
             {curtain && (
