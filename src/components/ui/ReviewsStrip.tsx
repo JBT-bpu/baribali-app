@@ -53,7 +53,7 @@ export default function ReviewsStrip() {
     return (
         <div style={{
             position: 'relative', zIndex: 2,
-            width: '100%', padding: '0 16px 10px',
+            width: '100%', padding: '0 20px 10px',
             height: '96px', flexShrink: 0,
         }}>
             {r && (
