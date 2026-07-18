@@ -280,11 +280,16 @@ function SizePicker({ onSelect, onBack }: { onSelect: (s: string) => void; onBac
                                     : '0 6px 20px rgba(0,0,0,0.5)',
                                 animation: `cardCascade 0.45s cubic-bezier(0.22,1.2,0.36,1) ${i * 75}ms both`,
                                 position: 'relative',
+                                background: 'rgba(6,16,6,0.95)',
                             }}>
-                                <Image
-                                    src={card.img} alt={`גודל ${card.id}`} width={S_W} height={S_H}
-                                    style={{ width: '100%', height: '100%', objectFit: 'contain', pointerEvents: 'none', display: 'block' }}
-                                />
+                                {/* Small mat between the frame border and the artwork — see
+                                    matching comment on the main carousel cards above. */}
+                                <div style={{ position: 'absolute', inset: '5px', borderRadius: '11px', overflow: 'hidden' }}>
+                                    <Image
+                                        src={card.img} alt={`גודל ${card.id}`} width={S_W} height={S_H}
+                                        style={{ width: '100%', height: '100%', objectFit: 'contain', pointerEvents: 'none', display: 'block' }}
+                                    />
+                                </div>
 
                                 {/* Price badge — re-animates when this card becomes active */}
                                 {isActive && (
@@ -325,7 +330,8 @@ function SizePicker({ onSelect, onBack }: { onSelect: (s: string) => void; onBac
                     transition: 'opacity 0.2s',
                 }}
             >
-                בנה סלט ←
+                <span>בנה סלט</span>
+                <span>←</span>
             </BariButton>
 
             <BariButton
@@ -334,7 +340,8 @@ function SizePicker({ onSelect, onBack }: { onSelect: (s: string) => void; onBac
                 onClick={onBack}
                 style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif", marginTop: '-4px', borderRadius: '20px' }}
             >
-                ← חזרה
+                <span>←</span>
+                <span>חזרה</span>
             </BariButton>
         </div>
     );
@@ -615,12 +622,19 @@ export default function HomeV2() {
                                             ? 'var(--shadow-card-glow)' + glowShadow
                                             : '0 6px 20px rgba(0,0,0,0.5)',
                                         position: 'relative',
+                                        background: 'rgba(6,16,6,0.95)',
                                     }}
                                 >
-                                    <Image
-                                        src={mc.img} alt={mc.label} width={M_W} height={M_H}
-                                        style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none', display: 'block' }}
-                                    />
+                                    {/* Small mat between the frame border and the artwork — the
+                                        artwork already has its own ornate gold frame baked in, so
+                                        0 inset made it collide with the container's border/corner
+                                        clip instead of reading as a complete frame. */}
+                                    <div style={{ position: 'absolute', inset: '5px', borderRadius: '13px', overflow: 'hidden' }}>
+                                        <Image
+                                            src={mc.img} alt={mc.label} width={M_W} height={M_H}
+                                            style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none', display: 'block' }}
+                                        />
+                                    </div>
                                     {mc.comingSoon && (
                                         <div aria-hidden style={{
                                             position: 'absolute', top: '10px', left: '-6px',
