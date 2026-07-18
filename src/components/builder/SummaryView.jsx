@@ -736,6 +736,10 @@ const PT = {
 const KF = `
 @keyframes popBounce { 0%{transform:scale(0.3);opacity:0} 60%{transform:scale(1.15)} 100%{transform:scale(1);opacity:1} }
 @keyframes pFadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
-* { -webkit-tap-highlight-color:transparent; box-sizing:border-box; margin:0; padding:0; }
+/* Layered so Tailwind utility classes (used by BariButton etc.) can still
+   override this reset — same bug/fix as globals.css's global reset. */
+@layer base {
+  * { -webkit-tap-highlight-color:transparent; box-sizing:border-box; margin:0; padding:0; }
+}
 ::-webkit-scrollbar{display:none}
 `;

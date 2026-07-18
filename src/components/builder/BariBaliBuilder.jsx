@@ -697,35 +697,40 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
                 return (
                   <>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "7px" }}>
-                      {PRESETS.map(p => {
+                      {PRESETS.map((p, i) => {
                         const pc = PRESET_COLORS[p.id] || PRESET_COLORS.balanced;
                         const isOpen = expandedPreset === p.id;
                         return (
-                          <button
-                            key={p.id}
-                            onClick={() => setExpandedPreset(isOpen ? null : p.id)}
-                            style={{
-                              ...S.presetCard,
-                              background: pc.bg,
-                              borderWidth: "1px", borderStyle: "solid", borderColor: isOpen ? pc.text : pc.border,
-                              boxShadow: isOpen ? `${pc.glow}, inset 0 0 0 1px ${pc.border}` : pc.glow,
-                              opacity: expandedPreset && !isOpen ? 0.55 : 1,
-                              transform: isOpen ? "scale(1.02)" : "scale(1)",
-                              transition: "all 0.2s cubic-bezier(0.34,1.56,0.64,1)",
-                            }}
-                            aria-expanded={isOpen}
-                            aria-label={`מתכון ${p.he}`}
-                            tabIndex={0}
-                          >
-                            {p.id === "signature" && (
-                              <div style={{ position: "absolute", top: 0, right: 0, background: "linear-gradient(135deg, #c8a832, #f0d060)", color: "#0d2e0d", fontSize: "7px", fontWeight: 900, padding: "2px 7px", borderRadius: "0 10px 0 8px", letterSpacing: "0.04em" }}>
-                                מומלץ ✦
-                              </div>
-                            )}
-                            <Icon src={p.icon} size="20px" style={{ flexShrink: 0, filter: `drop-shadow(0 1px 4px ${pc.dot})` }} />
-                            <span style={{ flex: 1, fontSize: "11.5px", fontWeight: 800, color: pc.text, textAlign: "right", lineHeight: 1.2 }}>{p.he}</span>
-                            <span style={{ fontSize: "9px", fontWeight: 700, color: isOpen ? pc.text : "rgba(255,255,255,0.28)", flexShrink: 0, transition: "transform 0.2s", transform: isOpen ? "rotate(180deg)" : "none" }}>▾</span>
-                          </button>
+                          // Outer wrapper carries the idle float (staggered per
+                          // card for an organic, not-all-in-sync feel) so it
+                          // doesn't fight the button's own press/open transform.
+                          <div key={p.id} style={{ width: "100%", animation: `cardFloat 3.6s ease-in-out ${(i % 4) * 0.25}s infinite` }}>
+                            <button
+                              onClick={() => setExpandedPreset(isOpen ? null : p.id)}
+                              style={{
+                                ...S.presetCard,
+                                width: "100%",
+                                background: pc.bg,
+                                borderWidth: "1px", borderStyle: "solid", borderColor: isOpen ? pc.text : pc.border,
+                                boxShadow: isOpen ? `${pc.glow}, inset 0 0 0 1px ${pc.border}` : pc.glow,
+                                opacity: expandedPreset && !isOpen ? 0.55 : 1,
+                                transform: isOpen ? "scale(1.02)" : "scale(1)",
+                                transition: "all 0.2s cubic-bezier(0.34,1.56,0.64,1)",
+                              }}
+                              aria-expanded={isOpen}
+                              aria-label={`מתכון ${p.he}`}
+                              tabIndex={0}
+                            >
+                              {p.id === "signature" && (
+                                <div style={{ position: "absolute", top: 0, right: 0, background: "linear-gradient(135deg, #c8a832, #f0d060)", color: "#0d2e0d", fontSize: "7px", fontWeight: 900, padding: "2px 7px", borderRadius: "0 10px 0 8px", letterSpacing: "0.04em" }}>
+                                  מומלץ ✦
+                                </div>
+                              )}
+                              <Icon src={p.icon} size="20px" style={{ flexShrink: 0, filter: `drop-shadow(0 1px 4px ${pc.dot})` }} />
+                              <span style={{ flex: 1, fontSize: "11.5px", fontWeight: 800, color: pc.text, textAlign: "right", lineHeight: 1.2 }}>{p.he}</span>
+                              <span style={{ fontSize: "9px", fontWeight: 700, color: isOpen ? pc.text : "rgba(255,255,255,0.28)", flexShrink: 0, transition: "transform 0.2s", transform: isOpen ? "rotate(180deg)" : "none" }}>▾</span>
+                            </button>
+                          </div>
                         );
                       })}
                     </div>
@@ -1111,7 +1116,17 @@ const KF = `
   30% { opacity: 1; }
   100% { opacity: 1; }
 }
-* { -webkit-tap-highlight-color:transparent; box-sizing:border-box; margin:0; padding:0; }
+@keyframes cardFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+/* Layered so Tailwind utility classes (used by BariButton etc.) can still
+   override this reset — an unlayered rule here would otherwise beat every
+   Tailwind utility regardless of source order, per the CSS cascade layers
+   spec. Same bug/fix as the one in globals.css's global reset. */
+@layer base {
+  * { -webkit-tap-highlight-color:transparent; box-sizing:border-box; margin:0; padding:0; }
+}
 ::-webkit-scrollbar{display:none}
 button:focus-visible {
   outline: 2px solid rgba(200,168,78,0.8) !important;
@@ -1189,6 +1204,12 @@ const S = {
     transition: "all 0.35s cubic-bezier(0.34,1.56,0.64,1)",
     outline: "none", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", width: "100%",
     animation: "heroPulse 3s ease-in-out infinite", overflow: "hidden",
+    // A flex item with overflow != visible gets an automatic min-height of 0
+    // (CSS flexbox spec), so this button — the tallest thing in a scrollable
+    // flex column — was the one the flex-shrink algorithm sacrificed first,
+    // silently clipping the gold "לחצו להתחיל לבנות" strip below its own
+    // fold before the column ever got a chance to just scroll instead.
+    flexShrink: 0,
   },
   presetCard: {
     display: "flex", flexDirection: "row", alignItems: "center",
