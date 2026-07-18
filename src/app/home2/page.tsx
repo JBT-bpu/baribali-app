@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Tilt from 'react-parallax-tilt';
+import { ArrowLeft } from 'lucide-react';
 import ReviewsStrip from '@/components/ui/ReviewsStrip';
 import CatPopup from '@/components/ui/CatPopup';
 import { BariButton, BariModal, BariGlowBackground, BariBottomNav } from '@/components/ui/bari';
@@ -322,25 +323,26 @@ function SizePicker({ onSelect, onBack }: { onSelect: (s: string) => void; onBac
                 already show the active size; a third indicator was redundant. */}
             <BariButton
                 variant="primary"
+                size="lg"
                 onClick={doConfirm}
                 style={{
                     marginTop: '4px',
+                    width: 'min(84vw, 300px)',
                     fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
                     opacity: out ? 0 : 1,
                     transition: 'opacity 0.2s',
                 }}
             >
                 <span>בנה סלט</span>
-                <span>←</span>
+                <ArrowLeft size={19} strokeWidth={2.6} />
             </BariButton>
 
             <BariButton
-                variant="ghost"
-                size="sm"
+                variant="secondary"
                 onClick={onBack}
-                style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif", marginTop: '-4px', borderRadius: '20px' }}
+                style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif", marginTop: '-2px', borderRadius: '999px', paddingLeft: '22px', paddingRight: '22px' }}
             >
-                <span>←</span>
+                <ArrowLeft size={15} strokeWidth={2.4} />
                 <span>חזרה</span>
             </BariButton>
         </div>
