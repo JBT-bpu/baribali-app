@@ -1,6 +1,8 @@
 'use client';
 import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
+import { ArrowLeft } from 'lucide-react';
+import BariButton from './bari/BariButton';
 
 const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
 
@@ -89,20 +91,15 @@ export default function CatPopup({ onClose }: Props) {
                     <div style={{ width: '40px', height: '1.5px', background: 'linear-gradient(90deg,transparent,rgba(240,200,50,0.4),transparent)', margin: '0 auto 18px' }} />
 
                     {/* CTA */}
-                    <button
+                    <BariButton
+                        variant="primary"
+                        fullWidth
                         onClick={dismiss}
-                        style={{
-                            width: '100%', padding: '13px 0',
-                            borderRadius: '50px',
-                            background: 'linear-gradient(135deg,#c8a832 0%,#f0d060 45%,#ffe066 55%,#c8a832 100%)',
-                            border: 'none', cursor: 'pointer',
-                            fontSize: '15px', fontWeight: 900, color: '#1a0e00',
-                            fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
-                            boxShadow: '0 4px 20px rgba(240,200,50,0.35)',
-                        }}
+                        style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }}
                     >
-                        בואו נתחיל ←
-                    </button>
+                        <span>בואו נתחיל</span>
+                        <ArrowLeft size={17} strokeWidth={2.6} />
+                    </BariButton>
                 </div>
             </div>
         </div>

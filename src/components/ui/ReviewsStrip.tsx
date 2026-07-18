@@ -53,8 +53,8 @@ export default function ReviewsStrip() {
     return (
         <div style={{
             position: 'relative', zIndex: 2,
-            width: '100%', padding: '0 16px 10px',
-            height: '96px', flexShrink: 0,
+            width: '100%', padding: '0 20px 10px',
+            height: '100px', flexShrink: 0,
         }}>
             {r && (
                 <div style={{
@@ -63,7 +63,7 @@ export default function ReviewsStrip() {
                     background: 'linear-gradient(135deg, rgba(10,26,10,0.82), rgba(6,16,6,0.88))',
                     border: '1px solid rgba(240,200,50,0.14)',
                     backdropFilter: 'blur(12px)',
-                    padding: '10px 14px',
+                    padding: '12px 14px',
                     display: 'flex', flexDirection: 'column', gap: '5px',
                     opacity: visible ? 1 : 0,
                     transition: 'opacity 0.35s ease',

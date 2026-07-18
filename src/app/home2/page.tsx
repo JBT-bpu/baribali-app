@@ -4,28 +4,23 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Tilt from 'react-parallax-tilt';
-import { House, Search, Star, ClipboardList, User } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import ReviewsStrip from '@/components/ui/ReviewsStrip';
 import CatPopup from '@/components/ui/CatPopup';
-import { BariButton, BariModal, BariGlowBackground } from '@/components/ui/bari';
+import { BariButton, BariModal, BariGlowBackground, BariBottomNav } from '@/components/ui/bari';
 import { usePrefersReducedMotion } from '@/lib/motionHooks';
 
-// Bottom nav — vector icons instead of emoji for consistent UI chrome
-// (the illustrated ingredient/card art elsewhere stays as-is, this is
-// just navigation iconography).
-const NAV_ITEMS = [
-    { Icon: House, label: 'בית', active: true },
-    { Icon: Search, label: 'חיפוש', active: false },
-    { Icon: Star, label: 'מועדפים', active: false },
-    { Icon: ClipboardList, label: 'הזמנות', active: false },
-    { Icon: User, label: 'פרופיל', active: false },
-];
-
 // ─── Config ───────────────────────────────────────────────────────────────────
+// Order = swipe/reading order (RTL, so this reads right-to-left visually).
+// Login/guest leads so new visitors are prompted to unlock privileges before
+// anything else; salad is the working build flow; tortilla is a placeholder
+// for a flow that isn't built yet, so it's flagged comingSoon instead of
+// wired to a route. More cards (e.g. Bari loyalty cards) are expected to
+// join this array later.
 const MAIN_CARDS = [
-    { id: 'tortilla', img: '/homepage-assets/card-tortilla.png', label: 'בנה טורטיה',  sub: 'קמח מחיטה מלאה · בריא · טעים' },
+    { id: 'login',    img: '/homepage-assets/card-login.png',    label: 'כניסה / פרופיל', sub: 'שמור סלטים · קבל המלצות והטבות' },
     { id: 'salad',    img: '/homepage-assets/card-salad.png',    label: 'בנה סלט',     sub: 'בחר מרכיבים · בחר גודל · הגש' },
-    { id: 'login',    img: '/homepage-assets/card-login.png',    label: 'כניסה / פרופיל', sub: 'שמור סלטים · קבל המלצות' },
+    { id: 'tortilla', img: '/homepage-assets/card-tortilla.png', label: 'בנה טורטיה',  sub: 'קמח מחיטה מלאה · בריא · טעים', comingSoon: true },
 ];
 
 const SIZE_CARDS = [
@@ -286,11 +281,16 @@ function SizePicker({ onSelect, onBack }: { onSelect: (s: string) => void; onBac
                                     : '0 6px 20px rgba(0,0,0,0.5)',
                                 animation: `cardCascade 0.45s cubic-bezier(0.22,1.2,0.36,1) ${i * 75}ms both`,
                                 position: 'relative',
+                                background: 'rgba(6,16,6,0.95)',
                             }}>
-                                <Image
-                                    src={card.img} alt={`גודל ${card.id}`} width={S_W} height={S_H}
-                                    style={{ width: '100%', height: '100%', objectFit: 'contain', pointerEvents: 'none', display: 'block' }}
-                                />
+                                {/* Small mat between the frame border and the artwork — see
+                                    matching comment on the main carousel cards above. */}
+                                <div style={{ position: 'absolute', inset: '5px', borderRadius: '11px', overflow: 'hidden' }}>
+                                    <Image
+                                        src={card.img} alt={`גודל ${card.id}`} width={S_W} height={S_H}
+                                        style={{ width: '100%', height: '100%', objectFit: 'contain', pointerEvents: 'none', display: 'block' }}
+                                    />
+                                </div>
 
                                 {/* Price badge — re-animates when this card becomes active */}
                                 {isActive && (
@@ -323,24 +323,27 @@ function SizePicker({ onSelect, onBack }: { onSelect: (s: string) => void; onBac
                 already show the active size; a third indicator was redundant. */}
             <BariButton
                 variant="primary"
+                size="lg"
                 onClick={doConfirm}
                 style={{
                     marginTop: '4px',
+                    width: 'min(84vw, 300px)',
                     fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
                     opacity: out ? 0 : 1,
                     transition: 'opacity 0.2s',
                 }}
             >
-                בנה סלט ←
+                <span>בנה סלט</span>
+                <ArrowLeft size={19} strokeWidth={2.6} />
             </BariButton>
 
             <BariButton
-                variant="ghost"
-                size="sm"
+                variant="secondary"
                 onClick={onBack}
-                style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif", marginTop: '-4px', borderRadius: '20px' }}
+                style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif", marginTop: '-2px', borderRadius: '999px', paddingLeft: '22px', paddingRight: '22px' }}
             >
-                ← חזרה
+                <ArrowLeft size={15} strokeWidth={2.4} />
+                <span>חזרה</span>
             </BariButton>
         </div>
     );
@@ -352,7 +355,7 @@ export default function HomeV2() {
     const reducedMotion = usePrefersReducedMotion();
 
     // ── Carousel state ──
-    const [activeIdx, setActiveIdx]   = useState(1);   // salad in center by default
+    const [activeIdx, setActiveIdx]   = useState(1);   // placeholder — resolved to login/salad by auth-state effect before reveal
     const [dragX, setDragX]           = useState(0);
     const [glowCard, setGlowCard]     = useState<number | null>(null);
     const dragging = useRef(false);
@@ -364,9 +367,8 @@ export default function HomeV2() {
     const [loginSheet, setLoginSheet] = useState(false);
     const [curtain, setCurtain]       = useState(false);
     const [ready, setReady]           = useState(false);
-
-    // ── Bottom nav state ──
-    const [navRipple, setNavRipple]   = useState<string | null>(null);
+    const [toast, setToast]           = useState<string | null>(null);
+    const toastTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // ── Swipe hint — only show on first visit ──
     const [showSwipeHint, setShowSwipeHint] = useState(false);
@@ -394,7 +396,15 @@ export default function HomeV2() {
         setShowCatPopup(false);
     }, []);
 
-    useEffect(() => { setReady(true); router.prefetch('/build'); }, [router]);
+    useEffect(() => {
+        // First-time/guest visitors land on the login/guest card; once
+        // they've continued (as guest or via Google — see completeAuth),
+        // that choice persists and future visits skip straight to salad.
+        const authed = localStorage.getItem('bb-user-authed');
+        setActiveIdx(MAIN_CARDS.findIndex(c => c.id === (authed ? 'salad' : 'login')));
+        setReady(true);
+        router.prefetch('/build');
+    }, [router]);
 
     const snapTo = useCallback((idx: number) => {
         if (idx < 0 || idx >= MAIN_CARDS.length) return;
@@ -403,6 +413,22 @@ export default function HomeV2() {
         setGlowCard(idx);
         setTimeout(() => setGlowCard(null), 600);
     }, []);
+
+    const showToast = useCallback((msg: string) => {
+        setToast(msg);
+        if (toastTimeout.current) clearTimeout(toastTimeout.current);
+        toastTimeout.current = setTimeout(() => setToast(null), 1800);
+    }, []);
+
+    // Guest and Google both just unlock the "signed in" state for now — no
+    // real auth backend exists yet (see kitchenAuth.ts / login stub). Skips
+    // the login card on future visits until it's cleared (e.g. sign-out).
+    const completeAuth = useCallback(() => {
+        localStorage.setItem('bb-user-authed', '1');
+        navigator.vibrate?.(12);
+        setLoginSheet(false);
+        snapTo(MAIN_CARDS.findIndex(c => c.id === 'salad'));
+    }, [snapTo]);
 
     const onDown = (e: React.PointerEvent) => {
         dragging.current = true; dragged.current = false;
@@ -421,7 +447,7 @@ export default function HomeV2() {
         const delta = e.clientX - startX.current;
         setDragX(0);
         if (Math.abs(delta) > 42) {
-            // RTL: swipe right → go to lower index (tortilla), swipe left → higher (login)
+            // RTL: swipe right → lower index, swipe left → higher index
             snapTo(delta < 0 ? activeIdx + 1 : activeIdx - 1);
         }
     };
@@ -429,14 +455,18 @@ export default function HomeV2() {
     const handleCardTap = (idx: number) => {
         if (dragged.current) return;
         if (idx !== activeIdx) { snapTo(idx); return; }
-        // Active card — trigger its action. Single tap for all three cards —
+        const mc = MAIN_CARDS[idx];
+        if (mc.comingSoon) {
+            navigator.vibrate?.(10);
+            showToast(`${mc.label} — בקרוב...`);
+            return;
+        }
+        // Active card — trigger its action. Single tap for salad/login —
         // the size picker itself is salad's confirmation step, so no
-        // tap-again-to-confirm needed (tortilla navigates directly since it
-        // has no size choice).
+        // tap-again-to-confirm needed.
         if (navigator.vibrate) navigator.vibrate(18);
-        if (idx === 0) { router.push('/build?type=tortilla'); }
-        else if (idx === 1) setSizePicker(true);
-        else if (idx === 2) setLoginSheet(true);
+        if (mc.id === 'salad') setSizePicker(true);
+        else if (mc.id === 'login') setLoginSheet(true);
     };
 
     const handleSizeSelect = useCallback((size: string) => {
@@ -456,30 +486,37 @@ export default function HomeV2() {
         }, 260);
     }, [router]);
 
-    if (!ready) return <div style={{ minHeight: '100vh', background: '#020a02' }} />;
+    if (!ready) return <div style={{ minHeight: '100dvh', background: '#020a02' }} />;
 
     const card = MAIN_CARDS[activeIdx];
 
     return (
         <div style={{
-            minHeight: '100vh', width: '100%', position: 'relative',
+            minHeight: '100dvh', width: '100%', position: 'relative',
             fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: 'rtl',
             display: 'flex', flexDirection: 'column', alignItems: 'center',
-            justifyContent: 'space-between', overflow: 'hidden', userSelect: 'none',
+            justifyContent: 'space-between', overflowX: 'hidden', overflowY: 'auto', userSelect: 'none',
             background: 'url(/homepage-assets/BG_8K.webp) center center / cover no-repeat, #020a02',
         }}>
             <style>{`
+                /* On short viewports the logo+carousel+reviews+nav stack can
+                   exceed the visible height (real mobile browsers report a
+                   viewport shorter than the device screen once chrome/home-
+                   indicator space is subtracted). globals.css locks body
+                   scroll app-wide for the gesture-heavy pages; override it
+                   here so the nav is always reachable by scroll instead of
+                   being clipped. */
+                html, body { height: auto !important; min-height: 100%; overflow-y: auto !important; }
                 @keyframes pageIn   { from{opacity:0;transform:translateY(18px) scale(0.97)} to{opacity:1;transform:none} }
                 @keyframes pageOut  { to{opacity:0;transform:scale(0.96)} }
                 @keyframes logoIn   { from{opacity:0;transform:translateY(-14px)} to{opacity:1;transform:none} }
                 @keyframes labelIn  { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
-                @keyframes navIn    { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:none} }
                 @keyframes burst    { from{transform:scale(0)} to{transform:scale(55)} }
                 @keyframes swipeHint{ 0%,100%{transform:translateX(0);opacity:0.55} 40%{transform:translateX(-7px);opacity:0.9} 65%{transform:translateX(7px);opacity:0.9} }
                 @keyframes swipeHintFade{ 0%,80%{opacity:1} 100%{opacity:0} }
                 @keyframes glowFade { 0%,100%{opacity:0.5} 50%{opacity:1} }
-                @keyframes navRipple{ 0%{transform:scale(0);opacity:0.5} 100%{transform:scale(1);opacity:0} }
                 @keyframes snapGlow      { 0%{box-shadow:0 0 30px rgba(240,200,50,0.4)} 100%{box-shadow:0 0 0px rgba(240,200,50,0)} }
+                @keyframes toastIn       { from{opacity:0;transform:translateX(-50%) translateY(-10px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
                 @keyframes sizePickerIn  { from{opacity:0;transform:scale(0.93) translateY(24px)} to{opacity:1;transform:none} }
                 @keyframes sizePickerOut { to{opacity:0;transform:scale(0.96) translateY(-10px)} }
                 @keyframes cardCascade   { from{opacity:0;transform:translateY(26px) scale(0.86)} to{opacity:1;transform:none} }
@@ -587,12 +624,30 @@ export default function HomeV2() {
                                             ? 'var(--shadow-card-glow)' + glowShadow
                                             : '0 6px 20px rgba(0,0,0,0.5)',
                                         position: 'relative',
+                                        background: 'rgba(6,16,6,0.95)',
                                     }}
                                 >
-                                    <Image
-                                        src={mc.img} alt={mc.label} width={M_W} height={M_H}
-                                        style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none', display: 'block' }}
-                                    />
+                                    {/* Small mat between the frame border and the artwork — the
+                                        artwork already has its own ornate gold frame baked in, so
+                                        0 inset made it collide with the container's border/corner
+                                        clip instead of reading as a complete frame. */}
+                                    <div style={{ position: 'absolute', inset: '5px', borderRadius: '13px', overflow: 'hidden' }}>
+                                        <Image
+                                            src={mc.img} alt={mc.label} width={M_W} height={M_H}
+                                            style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none', display: 'block' }}
+                                        />
+                                    </div>
+                                    {mc.comingSoon && (
+                                        <div aria-hidden style={{
+                                            position: 'absolute', top: '10px', left: '-6px',
+                                            padding: '3px 14px',
+                                            background: 'linear-gradient(135deg, var(--color-gold-deep), var(--color-gold-bright))',
+                                            color: 'var(--color-green-ink)',
+                                            fontSize: '10px', fontWeight: 800, letterSpacing: '0.04em',
+                                            boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+                                            transform: 'rotate(-8deg)',
+                                        }}>בקרוב</div>
+                                    )}
                                 </Tilt>
                             </div>
                         );
@@ -657,67 +712,21 @@ export default function HomeV2() {
             <ReviewsStrip />
 
             {/* Bottom Nav */}
-            <div style={{ position: 'relative', zIndex: 2, width: '100%', padding: '10px 18px 28px', animation: 'navIn 0.6s ease 0.2s both' }}>
-                <div style={{ position: 'relative', borderRadius: '50px', overflow: 'hidden', boxShadow: '0 4px 24px rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,255,255,0.06)' }}>
-                    <Image src="/homepage-assets/nav-bg.png" alt="" width={1290} height={300}
-                        style={{ width: '100%', height: '58px', objectFit: 'cover', objectPosition: 'center', display: 'block', opacity: 0.6 }} />
-                    <div style={{ position: 'absolute', inset: 0, display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '0 8px' }}>
-                        {NAV_ITEMS.map(item => (
-                            <div
-                                key={item.label}
-                                onClick={() => {
-                                    setNavRipple(item.label);
-                                    setTimeout(() => setNavRipple(null), 450);
-                                }}
-                                style={{
-                                    position: 'relative',
-                                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
-                                    opacity: item.active ? 1 : 0.7,
-                                    cursor: 'pointer', padding: '4px 12px',
-                                    transition: 'opacity 0.25s ease',
-                                }}
-                            >
-                                {/* Tap ripple */}
-                                {navRipple === item.label && (
-                                    <div style={{
-                                        position: 'absolute', top: '50%', left: '50%',
-                                        width: '48px', height: '48px',
-                                        marginLeft: '-24px', marginTop: '-24px',
-                                        borderRadius: '50%',
-                                        background: 'rgba(240,200,50,0.25)',
-                                        animation: 'navRipple 0.4s ease-out forwards',
-                                        pointerEvents: 'none',
-                                    }} />
-                                )}
-                                <item.Icon
-                                    size={item.active ? 24 : 19}
-                                    color={item.active ? 'var(--color-gold-deep)' : '#fff'}
-                                    strokeWidth={2.3}
-                                    style={{
-                                        filter: item.active ? 'drop-shadow(0 0 10px var(--color-gold-deep))' : 'drop-shadow(0 1px 3px rgba(0,0,0,0.5))',
-                                        transition: 'width 0.25s ease, height 0.25s ease, filter 0.25s ease',
-                                    }}
-                                />
-                                <span style={{
-                                    fontSize: '11px', fontWeight: 700,
-                                    color: item.active ? 'var(--color-gold-deep)' : '#fff',
-                                    letterSpacing: '0.04em',
-                                    textShadow: '0 1px 4px rgba(0,0,0,0.8)',
-                                }}>{item.label}</span>
-                                {/* Active gold indicator line */}
-                                {item.active && (
-                                    <div style={{
-                                        width: '20px', height: '3px', borderRadius: '2px',
-                                        background: 'linear-gradient(90deg, var(--color-gold-deep), var(--color-gold-bright))',
-                                        marginTop: '1px',
-                                        boxShadow: '0 0 8px rgba(240,200,50,0.5)',
-                                    }} />
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
+            <BariBottomNav />
+
+            {/* Coming-soon toast — tortilla tap feedback */}
+            {toast && (
+                <div style={{
+                    position: 'fixed', top: 'max(20px, env(safe-area-inset-top))', left: '50%',
+                    transform: 'translateX(-50%)', zIndex: 210,
+                    padding: '10px 22px', borderRadius: '999px',
+                    background: 'linear-gradient(135deg,rgba(20,8,0,0.94),rgba(8,4,0,0.97))',
+                    border: '1px solid rgba(240,200,50,0.45)',
+                    boxShadow: '0 6px 24px rgba(0,0,0,0.55)',
+                    color: 'var(--color-gold-bright)', fontSize: '13px', fontWeight: 800,
+                    whiteSpace: 'nowrap', animation: 'toastIn 0.3s cubic-bezier(0.34,1.4,0.64,1) both',
+                }}>{toast}</div>
+            )}
 
             {/* Gold curtain burst */}
             {curtain && (
@@ -736,18 +745,26 @@ export default function HomeV2() {
             <BariModal open={loginSheet} onClose={() => setLoginSheet(false)} variant="sheet">
                 <div style={{
                     position: 'relative',
-                    padding: '8px 24px max(28px, env(safe-area-inset-bottom))',
+                    padding: '20px 20px max(28px, env(safe-area-inset-bottom))',
                     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px',
                 }}>
                     <BariGlowBackground />
                     <Image src="/homepage-assets/card-login.png" alt="" width={160} height={200} style={{ width: '110px', height: 'auto', position: 'relative' }} />
                     <div style={{ position: 'relative', fontSize: '13px', color: 'rgba(255,255,255,0.5)', textAlign: 'center', lineHeight: 1.7, maxWidth: '250px', fontWeight: 600 }}>
-                        שמור סלטים · ראה היסטוריה · קבל המלצות אישיות
+                        שמור סלטים · ראה היסטוריה · קבל המלצות והטבות
                     </div>
-                    <button type="button" style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '10px', padding: '13px 28px', borderRadius: '50px', background: '#fff', border: 'none', cursor: 'pointer', fontSize: '15px', fontWeight: 800, color: '#1a1a1a', fontFamily: "var(--font-heebo), 'Heebo', sans-serif", boxShadow: '0 4px 20px rgba(0,0,0,0.35)' }}>
+                    <button type="button" onClick={completeAuth} style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '10px', padding: '13px 28px', borderRadius: '50px', background: '#fff', border: 'none', cursor: 'pointer', fontSize: '15px', fontWeight: 800, color: '#1a1a1a', fontFamily: "var(--font-heebo), 'Heebo', sans-serif", boxShadow: '0 4px 20px rgba(0,0,0,0.35)' }}>
                         <span style={{ fontSize: '17px', fontWeight: 900, color: '#4285F4' }}>G</span>
                         המשך עם Google
                     </button>
+                    <BariButton
+                        variant="secondary"
+                        onClick={completeAuth}
+                        fullWidth
+                        style={{ position: 'relative', fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }}
+                    >
+                        המשך כאורח
+                    </BariButton>
                     <BariButton
                         variant="ghost"
                         size="sm"

@@ -1,6 +1,7 @@
 'use client';
 import { useMemo, useState, useEffect } from "react";
 import dynamic from "next/dynamic";
+import { ArrowLeft } from "lucide-react";
 import { fireGoldConfetti } from "../../lib/confetti";
 const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
 
@@ -503,7 +504,8 @@ function OrderedScreen({ total, all, pickupTime, notes, orderNum: propOrderNum, 
                         </a>
                     )}
                     <BariButton variant="ghost" fullWidth onClick={onNewOrder} style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif", animation: "fadeUp 0.5s ease 0.75s both" }}>
-                        הזמנה חדשה ←
+                        <span>הזמנה חדשה</span>
+                        <ArrowLeft size={17} strokeWidth={2.6} />
                     </BariButton>
                 </div>
                 <style>{`
@@ -534,7 +536,8 @@ function PaymentFailedScreen({ orderNum, onRetry }) {
                 )}
                 <div style={OS.divider} />
                 <BariButton variant="primary" fullWidth style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }} onClick={onRetry}>
-                    נסה שוב ←
+                    <span>נסה שוב</span>
+                    <ArrowLeft size={17} strokeWidth={2.6} />
                 </BariButton>
             </div>
             <style>{`
@@ -733,6 +736,10 @@ const PT = {
 const KF = `
 @keyframes popBounce { 0%{transform:scale(0.3);opacity:0} 60%{transform:scale(1.15)} 100%{transform:scale(1);opacity:1} }
 @keyframes pFadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
-* { -webkit-tap-highlight-color:transparent; box-sizing:border-box; margin:0; padding:0; }
+/* Layered so Tailwind utility classes (used by BariButton etc.) can still
+   override this reset — same bug/fix as globals.css's global reset. */
+@layer base {
+  * { -webkit-tap-highlight-color:transparent; box-sizing:border-box; margin:0; padding:0; }
+}
 ::-webkit-scrollbar{display:none}
 `;

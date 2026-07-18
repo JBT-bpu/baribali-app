@@ -75,11 +75,19 @@
   }
 }
 
-/* Global Styles */
-* {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
+/* Global Styles — layered so Tailwind utility classes (px-8, py-4, p-6, ...)
+   can still override this reset. An unlayered rule here would otherwise beat
+   every Tailwind utility regardless of source order, per the CSS cascade
+   layers spec — which is exactly what was silently zeroing out every
+   BariButton/BariModal/BariPanel/BariBadge's padding and margin utilities
+   app-wide (inline `style` padding was unaffected, since inline styles beat
+   both layered and unlayered CSS). */
+@layer base {
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+    }
 }
 
 html,
