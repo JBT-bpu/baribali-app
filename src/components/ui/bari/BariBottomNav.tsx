@@ -38,7 +38,7 @@ export default function BariBottomNav() {
                     display: 'flex',
                     justifyContent: 'space-around',
                     alignItems: 'center',
-                    padding: '6px 8px',
+                    padding: '4px 8px',
                     borderRadius: 'var(--radius-full)',
                     background: 'linear-gradient(180deg, rgba(20,45,20,0.6), rgba(6,18,6,0.72))',
                     backdropFilter: 'blur(22px) saturate(1.5)',
@@ -61,7 +61,7 @@ export default function BariBottomNav() {
                             style={{
                                 position: 'relative',
                                 display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
-                                padding: '8px 12px',
+                                padding: '5px 12px',
                                 borderRadius: 'var(--radius-full)',
                                 textDecoration: 'none',
                                 cursor: 'pointer',

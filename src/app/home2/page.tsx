@@ -441,19 +441,27 @@ export default function HomeV2() {
         }, 260);
     }, [router]);
 
-    if (!ready) return <div style={{ minHeight: '100vh', background: '#020a02' }} />;
+    if (!ready) return <div style={{ minHeight: '100dvh', background: '#020a02' }} />;
 
     const card = MAIN_CARDS[activeIdx];
 
     return (
         <div style={{
-            minHeight: '100vh', width: '100%', position: 'relative',
+            minHeight: '100dvh', width: '100%', position: 'relative',
             fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: 'rtl',
             display: 'flex', flexDirection: 'column', alignItems: 'center',
-            justifyContent: 'space-between', overflow: 'hidden', userSelect: 'none',
+            justifyContent: 'space-between', overflowX: 'hidden', overflowY: 'auto', userSelect: 'none',
             background: 'url(/homepage-assets/BG_8K.webp) center center / cover no-repeat, #020a02',
         }}>
             <style>{`
+                /* On short viewports the logo+carousel+reviews+nav stack can
+                   exceed the visible height (real mobile browsers report a
+                   viewport shorter than the device screen once chrome/home-
+                   indicator space is subtracted). globals.css locks body
+                   scroll app-wide for the gesture-heavy pages; override it
+                   here so the nav is always reachable by scroll instead of
+                   being clipped. */
+                html, body { height: auto !important; min-height: 100%; overflow-y: auto !important; }
                 @keyframes pageIn   { from{opacity:0;transform:translateY(18px) scale(0.97)} to{opacity:1;transform:none} }
                 @keyframes pageOut  { to{opacity:0;transform:scale(0.96)} }
                 @keyframes logoIn   { from{opacity:0;transform:translateY(-14px)} to{opacity:1;transform:none} }
