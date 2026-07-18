@@ -7,25 +7,30 @@ import Tilt from 'react-parallax-tilt';
 import { House, Search, Star, ClipboardList, User } from 'lucide-react';
 import ReviewsStrip from '@/components/ui/ReviewsStrip';
 import CatPopup from '@/components/ui/CatPopup';
+import GoogleSignInButton from '@/components/ui/GoogleSignInButton';
 import { BariButton, BariModal, BariGlowBackground } from '@/components/ui/bari';
 import { usePrefersReducedMotion } from '@/lib/motionHooks';
+import { useUser, avatarUrl } from '@/lib/auth';
+import { isSupabaseConfigured } from '@/lib/supabase';
 
 // Bottom nav — vector icons instead of emoji for consistent UI chrome
 // (the illustrated ingredient/card art elsewhere stays as-is, this is
-// just navigation iconography).
+// just navigation iconography). href: null = not yet a real destination.
 const NAV_ITEMS = [
-    { Icon: House, label: 'בית', active: true },
-    { Icon: Search, label: 'חיפוש', active: false },
-    { Icon: Star, label: 'מועדפים', active: false },
-    { Icon: ClipboardList, label: 'הזמנות', active: false },
-    { Icon: User, label: 'פרופיל', active: false },
+    { Icon: House, label: 'בית', active: true, href: null },
+    { Icon: Search, label: 'חיפוש', active: false, href: null },
+    { Icon: Star, label: 'מועדפים', active: false, href: '/favorites' },
+    { Icon: ClipboardList, label: 'הזמנות', active: false, href: '/profile' },
+    { Icon: User, label: 'פרופיל', active: false, href: '/profile' },
 ];
 
 // ─── Config ───────────────────────────────────────────────────────────────────
-const MAIN_CARDS = [
-    { id: 'tortilla', img: '/homepage-assets/card-tortilla.png', label: 'בנה טורטיה',  sub: 'קמח מחיטה מלאה · בריא · טעים' },
-    { id: 'salad',    img: '/homepage-assets/card-salad.png',    label: 'בנה סלט',     sub: 'בחר מרכיבים · בחר גודל · הגש' },
-    { id: 'login',    img: '/homepage-assets/card-login.png',    label: 'כניסה / פרופיל', sub: 'שמור סלטים · קבל המלצות' },
+// Salad first — under RTL it renders on the right, where reading starts.
+// Login is no longer a "product": it lives in the welcome step, the header
+// profile chip, and the bottom nav instead.
+const PRODUCT_CARDS = [
+    { id: 'salad',    img: '/homepage-assets/card-salad.png',    label: 'בנה סלט',    sub: 'בחר מרכיבים · בחר גודל' },
+    { id: 'tortilla', img: '/homepage-assets/card-tortilla.png', label: 'בנה טורטיה', sub: 'קמח מחיטה מלאה · בריא' },
 ];
 
 const SIZE_CARDS = [
@@ -37,10 +42,6 @@ const SIZE_CARDS = [
 // Relative visual heights for the size-comparison scale below the title —
 // not to scale with real ml, just enough of a size cue to read at a glance.
 const SIZE_SCALE_HEIGHTS = [26, 38, 52];
-
-// Main carousel — card dimensions
-const M_W = 192;   // card width px
-const M_H = 268;   // card height px
 
 // Size carousel — card dimensions
 const S_W = 210;
@@ -350,14 +351,7 @@ function SizePicker({ onSelect, onBack }: { onSelect: (s: string) => void; onBac
 export default function HomeV2() {
     const router = useRouter();
     const reducedMotion = usePrefersReducedMotion();
-
-    // ── Carousel state ──
-    const [activeIdx, setActiveIdx]   = useState(1);   // salad in center by default
-    const [dragX, setDragX]           = useState(0);
-    const [glowCard, setGlowCard]     = useState<number | null>(null);
-    const dragging = useRef(false);
-    const startX   = useRef(0);
-    const dragged  = useRef(false);
+    const { user, loading: authLoading } = useUser();
 
     // ── Screen state ──
     const [sizePicker, setSizePicker] = useState(false);
@@ -368,17 +362,21 @@ export default function HomeV2() {
     // ── Bottom nav state ──
     const [navRipple, setNavRipple]   = useState<string | null>(null);
 
-    // ── Swipe hint — only show on first visit ──
-    const [showSwipeHint, setShowSwipeHint] = useState(false);
+    // ── Welcome step: guest or Google ──
+    // Shown to guests once per visit (sessionStorage, so it never nags
+    // mid-session); signed-in users skip it entirely. Guest-first: ordering
+    // never requires an account — this is an offer, not a gate.
+    const [showWelcome, setShowWelcome] = useState(false);
     useEffect(() => {
-        if (!localStorage.getItem('bb-swipe-hint-seen')) {
-            setShowSwipeHint(true);
-            const t = setTimeout(() => {
-                localStorage.setItem('bb-swipe-hint-seen', '1');
-                setShowSwipeHint(false);
-            }, 6200); // ~2 cycles of 3s animation + 0.8s delay
-            return () => clearTimeout(t);
-        }
+        if (authLoading || user) return;
+        if (!isSupabaseConfigured()) return; // demo deployments: nothing to sign in to
+        if (sessionStorage.getItem('bb-welcome-done')) return;
+        setShowWelcome(true);
+    }, [authLoading, user]);
+    const continueAsGuest = useCallback(() => {
+        sessionStorage.setItem('bb-welcome-done', '1');
+        navigator.vibrate?.(12);
+        setShowWelcome(false);
     }, []);
 
     // ── Cat welcome popup — only show on first visit ──
@@ -396,47 +394,10 @@ export default function HomeV2() {
 
     useEffect(() => { setReady(true); router.prefetch('/build'); }, [router]);
 
-    const snapTo = useCallback((idx: number) => {
-        if (idx < 0 || idx >= MAIN_CARDS.length) return;
-        navigator.vibrate?.(8);
-        setActiveIdx(idx);
-        setGlowCard(idx);
-        setTimeout(() => setGlowCard(null), 600);
-    }, []);
-
-    const onDown = (e: React.PointerEvent) => {
-        dragging.current = true; dragged.current = false;
-        startX.current = e.clientX;
-        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    };
-    const onMove = (e: React.PointerEvent) => {
-        if (!dragging.current) return;
-        const d = e.clientX - startX.current;
-        if (Math.abs(d) > 5) dragged.current = true;
-        setDragX(d);
-    };
-    const onUp = (e: React.PointerEvent) => {
-        if (!dragging.current) return;
-        dragging.current = false;
-        const delta = e.clientX - startX.current;
-        setDragX(0);
-        if (Math.abs(delta) > 42) {
-            // RTL: swipe right → go to lower index (tortilla), swipe left → higher (login)
-            snapTo(delta < 0 ? activeIdx + 1 : activeIdx - 1);
-        }
-    };
-
-    const handleCardTap = (idx: number) => {
-        if (dragged.current) return;
-        if (idx !== activeIdx) { snapTo(idx); return; }
-        // Active card — trigger its action. Single tap for all three cards —
-        // the size picker itself is salad's confirmation step, so no
-        // tap-again-to-confirm needed (tortilla navigates directly since it
-        // has no size choice).
+    const handleProductTap = (id: string) => {
         if (navigator.vibrate) navigator.vibrate(18);
-        if (idx === 0) { router.push('/build?type=tortilla'); }
-        else if (idx === 1) setSizePicker(true);
-        else if (idx === 2) setLoginSheet(true);
+        if (id === 'tortilla') router.push('/build?type=tortilla');
+        else setSizePicker(true);
     };
 
     const handleSizeSelect = useCallback((size: string) => {
@@ -458,7 +419,7 @@ export default function HomeV2() {
 
     if (!ready) return <div style={{ minHeight: '100vh', background: '#020a02' }} />;
 
-    const card = MAIN_CARDS[activeIdx];
+    const avatar = user ? avatarUrl(user) : null;
 
     return (
         <div style={{
@@ -475,9 +436,8 @@ export default function HomeV2() {
                 @keyframes labelIn  { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
                 @keyframes navIn    { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:none} }
                 @keyframes burst    { from{transform:scale(0)} to{transform:scale(55)} }
-                @keyframes swipeHint{ 0%,100%{transform:translateX(0);opacity:0.55} 40%{transform:translateX(-7px);opacity:0.9} 65%{transform:translateX(7px);opacity:0.9} }
-                @keyframes swipeHintFade{ 0%,80%{opacity:1} 100%{opacity:0} }
                 @keyframes glowFade { 0%,100%{opacity:0.5} 50%{opacity:1} }
+                @keyframes welcomeIn { from{opacity:0;transform:scale(0.95) translateY(10px)} to{opacity:1;transform:none} }
                 @keyframes navRipple{ 0%{transform:scale(0);opacity:0.5} 100%{transform:scale(1);opacity:0} }
                 @keyframes snapGlow      { 0%{box-shadow:0 0 30px rgba(240,200,50,0.4)} 100%{box-shadow:0 0 0px rgba(240,200,50,0)} }
                 @keyframes sizePickerIn  { from{opacity:0;transform:scale(0.93) translateY(24px)} to{opacity:1;transform:none} }
@@ -494,82 +454,62 @@ export default function HomeV2() {
 
             <Particles />
 
-            {/* Logo */}
-            <div style={{ position: 'relative', zIndex: 2, padding: '44px 20px 0', paddingTop: 'max(44px, env(safe-area-inset-top))', animation: 'logoIn 0.6s cubic-bezier(0.34,1.3,0.64,1) both' }}>
+            {/* Header: profile chip + centered logo (spacer balances the chip so the logo stays centered) */}
+            <div style={{
+                position: 'relative', zIndex: 2, width: '100%',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '0 20px', paddingTop: 'max(20px, env(safe-area-inset-top))',
+                animation: 'logoIn 0.6s cubic-bezier(0.34,1.3,0.64,1) both',
+            }}>
+                <button
+                    type="button"
+                    onClick={() => { navigator.vibrate?.(8); user ? router.push('/profile') : setLoginSheet(true); }}
+                    aria-label={user ? 'הפרופיל שלי' : 'התחברות'}
+                    style={{
+                        width: '38px', height: '38px', borderRadius: '50%', flexShrink: 0,
+                        border: '2px solid rgba(200,168,78,0.4)', cursor: 'pointer',
+                        background: avatar ? `url(${avatar}) center / cover` : 'rgba(255,255,255,0.08)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        boxShadow: '0 2px 10px rgba(0,0,0,0.4)',
+                    }}
+                >
+                    {!avatar && <User size={17} color="rgba(255,255,255,0.65)" strokeWidth={2.3} />}
+                </button>
+
                 <Image src="/homepage-assets/logo.webp" alt="BariBali" width={220} height={140}
-                    style={{ width: '180px', height: 'auto', filter: 'drop-shadow(0 0 32px rgba(240,200,50,0.5)) drop-shadow(0 4px 14px rgba(0,0,0,0.65))' }} priority />
+                    style={{ width: '150px', height: 'auto', filter: 'drop-shadow(0 0 32px rgba(240,200,50,0.5)) drop-shadow(0 4px 14px rgba(0,0,0,0.65))' }} priority />
+
+                <div style={{ width: '38px', flexShrink: 0 }} aria-hidden />
             </div>
 
-            {/* ── Card Carousel — main menu ── */}
-            <div style={{ position: 'relative', zIndex: 2, width: '100%', flex: '1 1 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-
-                {/* Stage: position:relative is the containing block; left:50% on each card = guaranteed center */}
-                <div
-                    style={{
-                        position: 'relative', width: '100%', height: '290px',
-                        cursor: 'grab', touchAction: 'none', overflow: 'visible',
-                        animation: 'pageIn 0.7s cubic-bezier(0.34,1.15,0.64,1) 0.08s both',
-                    }}
-                    onPointerDown={onDown}
-                    onPointerMove={onMove}
-                    onPointerUp={onUp}
-                    onPointerCancel={onUp}
-                >
-                    {MAIN_CARDS.map((mc, i) => {
-                        // eff: fractional offset from center. 0 = center, ±1 = side, between during drag
-                        const eff = (i - activeIdx) + dragX / 152;
-                        const absEff = Math.abs(eff);
-                        const isActive = i === activeIdx && !dragging.current;
-
-                        // Transform components — perspective() is per-element so no shared vanishing point issues
-                        const tx   = eff * 138;                                  // px left/right
-                        const ry   = eff * 46;                                   // coverflow tilt: side cards face inward toward center
-                        const sc   = 1 - Math.min(absEff, 1) * 0.44;            // 1.0 → 0.56
-                        const op   = 1 - Math.min(absEff, 1.1) * 0.55;          // 1.0 → 0.45
-                        const zIdx = Math.round(10 - absEff * 5);
-
-                        const tr = dragging.current ? 'none'
-                            : 'transform 0.46s cubic-bezier(0.34,1.56,0.64,1), opacity 0.36s ease, border-color 0.3s, box-shadow 0.6s';
-
-                        const isGlowing = glowCard === i;
-                        const glowShadow = isGlowing ? ', 0 0 30px rgba(240,200,50,0.4)' : '';
-
-                        return (
-                            <div
-                                key={mc.id}
-                                onClick={() => handleCardTap(i)}
-                                style={{
-                                    position: 'absolute',
-                                    top: '50%', left: '50%',
-                                    width: `${M_W}px`, height: `${M_H}px`,
-                                    marginLeft: `${-M_W / 2}px`, marginTop: `${-M_H / 2}px`,
-                                    // perspective() inline = each card has its own vanishing point, always centered
-                                    transform: `perspective(800px) translateX(${tx}px) rotateY(${ry}deg) scale(${sc})`,
-                                    opacity: op,
-                                    zIndex: zIdx,
-                                    cursor: 'pointer',
-                                    transition: tr,
-                                }}
-                            >
-                                {/* Pulsing halo behind the active card — a static radial
-                                    gradient whose OPACITY animates (compositor-only), replacing
-                                    the old glowPulse filter:drop-shadow keyframes which forced
-                                    a full repaint every frame. */}
-                                {isActive && (
-                                    <div aria-hidden style={{
-                                        position: 'absolute', inset: '-28px', zIndex: -1,
-                                        borderRadius: '40px', pointerEvents: 'none',
-                                        background: 'radial-gradient(ellipse 55% 55% at 50% 50%, rgba(240,200,50,0.5) 0%, rgba(240,200,50,0.16) 50%, transparent 72%)',
-                                        animation: 'glowFade 2.4s ease-in-out infinite',
-                                    }} />
-                                )}
-                                {/* Tilt/glare wrapper — kept on a separate node from the coverflow
-                                    transform above so the two don't fight over the same style. */}
+            {/* ── Product pick — salad and tortilla, both visible, one tap ── */}
+            <div style={{ position: 'relative', zIndex: 2, width: '100%', flex: '1 1 auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{
+                    display: 'flex', gap: '16px', width: '100%', padding: '0 20px', justifyContent: 'center',
+                    animation: 'pageIn 0.7s cubic-bezier(0.34,1.15,0.64,1) 0.08s both',
+                }}>
+                    {PRODUCT_CARDS.map((p, i) => (
+                        <div
+                            key={p.id}
+                            onClick={() => handleProductTap(p.id)}
+                            style={{
+                                flex: '1 1 0', maxWidth: '172px', cursor: 'pointer',
+                                animation: `cardCascade 0.5s cubic-bezier(0.22,1.2,0.36,1) ${i * 90}ms both`,
+                            }}
+                        >
+                            <div style={{ position: 'relative' }}>
+                                {/* Ambient halo — same compositor-only opacity pulse as the old active-card glow */}
+                                <div aria-hidden style={{
+                                    position: 'absolute', inset: '-16px', zIndex: -1,
+                                    borderRadius: '34px', pointerEvents: 'none',
+                                    background: 'radial-gradient(ellipse 55% 55% at 50% 50%, rgba(240,200,50,0.35) 0%, rgba(240,200,50,0.1) 50%, transparent 72%)',
+                                    animation: 'glowFade 2.8s ease-in-out infinite',
+                                }} />
                                 <Tilt
                                     tiltEnable={!reducedMotion}
                                     glareEnable={!reducedMotion}
-                                    tiltMaxAngleX={8}
-                                    tiltMaxAngleY={8}
+                                    tiltMaxAngleX={7}
+                                    tiltMaxAngleY={7}
                                     glareMaxOpacity={0.18}
                                     glareColor="var(--color-gold-deep)"
                                     glarePosition="all"
@@ -577,80 +517,28 @@ export default function HomeV2() {
                                     transitionSpeed={400}
                                     onEnter={() => navigator.vibrate?.(8)}
                                     style={{
-                                        width: '100%', height: '100%',
-                                        borderRadius: '18px',
-                                        overflow: 'hidden',
-                                        border: isActive
-                                            ? '1.5px solid rgba(240,200,50,0.55)'
-                                            : '1px solid rgba(255,255,255,0.22)',
-                                        boxShadow: isActive
-                                            ? 'var(--shadow-card-glow)' + glowShadow
-                                            : '0 6px 20px rgba(0,0,0,0.5)',
-                                        position: 'relative',
+                                        borderRadius: '18px', overflow: 'hidden', position: 'relative',
+                                        border: '1.5px solid rgba(240,200,50,0.45)',
+                                        boxShadow: 'var(--shadow-card-glow)',
                                     }}
                                 >
                                     <Image
-                                        src={mc.img} alt={mc.label} width={M_W} height={M_H}
-                                        style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none', display: 'block' }}
+                                        src={p.img} alt={p.label} width={172} height={230}
+                                        style={{ width: '100%', height: 'auto', objectFit: 'cover', pointerEvents: 'none', display: 'block' }}
                                     />
                                 </Tilt>
                             </div>
-                        );
-                    })}
-                </div>
-
-                {/* Dynamic card label — re-animates on each idx change */}
-                <div key={`label-${activeIdx}`} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', marginTop: '10px', animation: 'labelIn 0.28s ease both' }}>
-                    <div style={{ fontFamily: "var(--font-display), 'Secular One', sans-serif", fontSize: '27px', fontWeight: 400, color: '#fff', letterSpacing: '0.01em', textShadow: '0 2px 14px rgba(0,0,0,0.9), 0 0 26px rgba(200,168,78,0.4)' }}>
-                        {card.label}
-                    </div>
-                    <div style={{ fontSize: '12px', fontWeight: 600, color: 'rgba(255,255,255,0.65)', letterSpacing: '0.04em' }}>
-                        {card.sub}
-                    </div>
-                </div>
-
-                {/* Dot indicators */}
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '16px' }}>
-                    {MAIN_CARDS.map((_, i) => (
-                        <div key={i} onClick={() => snapTo(i)} style={{
-                            width: i === activeIdx ? '22px' : '7px', height: '7px', borderRadius: '4px',
-                            background: i === activeIdx ? 'var(--color-gold-deep)' : 'rgba(255,255,255,0.45)',
-                            transition: 'all 0.3s cubic-bezier(0.34,1.4,0.64,1)',
-                            boxShadow: i === activeIdx ? '0 0 10px rgba(240,200,50,0.6)' : 'none',
-                            cursor: 'pointer',
-                        }} />
+                            <div style={{ textAlign: 'center', marginTop: '10px' }}>
+                                <div style={{ fontFamily: "var(--font-display), 'Secular One', sans-serif", fontSize: '19px', fontWeight: 400, color: '#fff', letterSpacing: '0.01em', textShadow: '0 2px 10px rgba(0,0,0,0.9), 0 0 20px rgba(200,168,78,0.4)' }}>
+                                    {p.label}
+                                </div>
+                                <div style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.6)', letterSpacing: '0.02em', marginTop: '2px' }}>
+                                    {p.sub}
+                                </div>
+                            </div>
+                        </div>
                     ))}
                 </div>
-
-                {/* Swipe hint — only on first visit, gold gradient arrow, fades after 2 cycles */}
-                {showSwipeHint && (
-                    <div style={{
-                        display: 'flex', alignItems: 'center', gap: '6px',
-                        marginTop: '10px',
-                        animation: 'swipeHint 3s ease-in-out 0.8s 2 both, swipeHintFade 6.2s ease 0.8s forwards',
-                    }}>
-                        <span style={{
-                            fontSize: '16px',
-                            background: 'linear-gradient(135deg, var(--color-gold-deep), var(--color-gold-bright), var(--color-gold-light))',
-                            WebkitBackgroundClip: 'text',
-                            WebkitTextFillColor: 'transparent',
-                            fontWeight: 900,
-                        }}>{'◂'}</span>
-                        <span style={{
-                            fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em',
-                            background: 'linear-gradient(135deg, var(--color-gold-deep), var(--color-gold-bright))',
-                            WebkitBackgroundClip: 'text',
-                            WebkitTextFillColor: 'transparent',
-                        }}>גרור לסיבוב</span>
-                        <span style={{
-                            fontSize: '16px',
-                            background: 'linear-gradient(135deg, var(--color-gold-light), var(--color-gold-bright), var(--color-gold-deep))',
-                            WebkitBackgroundClip: 'text',
-                            WebkitTextFillColor: 'transparent',
-                            fontWeight: 900,
-                        }}>{'▸'}</span>
-                    </div>
-                )}
             </div>
 
             {/* Reviews strip */}
@@ -668,6 +556,7 @@ export default function HomeV2() {
                                 onClick={() => {
                                     setNavRipple(item.label);
                                     setTimeout(() => setNavRipple(null), 450);
+                                    if (item.href) router.push(item.href);
                                 }}
                                 style={{
                                     position: 'relative',
@@ -732,7 +621,9 @@ export default function HomeV2() {
             {/* Size picker overlay */}
             {sizePicker && <SizePicker onSelect={handleSizeSelect} onBack={() => setSizePicker(false)} />}
 
-            {/* Login bottom sheet */}
+            {/* Login bottom sheet — a quick, in-place offer, never a gate.
+                Reachable from the header profile chip; ordering never routes
+                through here. */}
             <BariModal open={loginSheet} onClose={() => setLoginSheet(false)} variant="sheet">
                 <div style={{
                     position: 'relative',
@@ -742,12 +633,9 @@ export default function HomeV2() {
                     <BariGlowBackground />
                     <Image src="/homepage-assets/card-login.png" alt="" width={160} height={200} style={{ width: '110px', height: 'auto', position: 'relative' }} />
                     <div style={{ position: 'relative', fontSize: '13px', color: 'rgba(255,255,255,0.5)', textAlign: 'center', lineHeight: 1.7, maxWidth: '250px', fontWeight: 600 }}>
-                        שמור סלטים · ראה היסטוריה · קבל המלצות אישיות
+                        שמור היסטוריית הזמנות · כניסה מהירה בפעם הבאה
                     </div>
-                    <button type="button" style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '10px', padding: '13px 28px', borderRadius: '50px', background: '#fff', border: 'none', cursor: 'pointer', fontSize: '15px', fontWeight: 800, color: '#1a1a1a', fontFamily: "var(--font-heebo), 'Heebo', sans-serif", boxShadow: '0 4px 20px rgba(0,0,0,0.35)' }}>
-                        <span style={{ fontSize: '17px', fontWeight: 900, color: '#4285F4' }}>G</span>
-                        המשך עם Google
-                    </button>
+                    <GoogleSignInButton />
                     <BariButton
                         variant="ghost"
                         size="sm"
@@ -758,6 +646,37 @@ export default function HomeV2() {
                     </BariButton>
                 </div>
             </BariModal>
+
+            {/* Welcome step — guest or Google, shown once per visit to signed-out
+                users only. Guest-first: "המשך כאורח" is the equally-sized,
+                equally-prominent option, never a smaller afterthought link. */}
+            {showWelcome && (
+                <div style={{
+                    position: 'fixed', inset: 0, zIndex: 90,
+                    background: 'rgba(3,8,3,0.95)', backdropFilter: 'blur(24px) saturate(1.3)',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    gap: '18px', direction: 'rtl', padding: '24px',
+                    paddingTop: 'max(24px, env(safe-area-inset-top))',
+                    paddingBottom: 'max(24px, env(safe-area-inset-bottom))',
+                    fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
+                    animation: 'welcomeIn 0.4s cubic-bezier(0.22,1.2,0.36,1) both',
+                }}>
+                    <Image src="/homepage-assets/logo.webp" alt="BariBali" width={160} height={100}
+                        style={{ width: '130px', height: 'auto', filter: 'drop-shadow(0 0 26px rgba(240,200,50,0.45))' }} />
+                    <div style={{ fontSize: '21px', fontWeight: 900, color: '#fff', textAlign: 'center' }}>ברוכים הבאים!</div>
+                    <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.55)', textAlign: 'center', lineHeight: 1.7, maxWidth: '280px' }}>
+                        התחברות עם Google שומרת את היסטוריית ההזמנות שלכם.
+                        <br />
+                        לגמרי אפשר גם בלי — ההזמנה זהה.
+                    </div>
+                    <div style={{ width: '100%', maxWidth: '300px', display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
+                        <GoogleSignInButton fullWidth />
+                        <BariButton variant="secondary" fullWidth onClick={continueAsGuest} style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }}>
+                            המשך כאורח ←
+                        </BariButton>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -43,8 +43,15 @@ create table orders (
     -- paid_unverified = webhook reported success but has no cryptographic
     -- verification (no Tranzila signing secret configured) — kitchen must
     -- confirm payment at pickup, same as pay_at_pickup.
+  user_id        uuid references auth.users(id) on delete set null,
+    -- null for guest orders (guest-first: an account is never required);
+    -- set server-side from a verified access token, never client-claimed.
   created_at     timestamptz default now()
 );
+
+-- If the table already exists without user_id (created pre-auth), run:
+--   alter table orders add column if not exists user_id
+--     uuid references auth.users(id) on delete set null;
 
 -- Enable Row Level Security
 alter table orders enable row level security;
