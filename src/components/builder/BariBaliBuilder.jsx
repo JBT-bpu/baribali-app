@@ -1,6 +1,7 @@
 'use client';
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import dynamic from "next/dynamic";
+import { ArrowLeft } from "lucide-react";
 const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
 
 const headerImage = "/builder-assets/header-brand.png";
@@ -781,6 +782,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
                             style={{
                               width: "100%", padding: "11px 0", borderRadius: "10px",
                               border: "none", cursor: "pointer",
+                              display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
                               background: `linear-gradient(135deg, ${epc.dot}, ${epc.border})`,
                               color: "#0a1a0a", fontSize: "14px", fontWeight: 900,
                               fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
@@ -788,7 +790,8 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
                               letterSpacing: "0.02em",
                             }}
                           >
-                            בנה את {ep.he} ←
+                            <span>בנה את {ep.he}</span>
+                            <ArrowLeft size={15} strokeWidth={2.8} />
                           </button>
                         </div>
                       </div>

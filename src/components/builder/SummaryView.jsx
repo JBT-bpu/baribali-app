@@ -1,6 +1,7 @@
 'use client';
 import { useMemo, useState, useEffect } from "react";
 import dynamic from "next/dynamic";
+import { ArrowLeft } from "lucide-react";
 import { fireGoldConfetti } from "../../lib/confetti";
 const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
 
@@ -503,7 +504,8 @@ function OrderedScreen({ total, all, pickupTime, notes, orderNum: propOrderNum, 
                         </a>
                     )}
                     <BariButton variant="ghost" fullWidth onClick={onNewOrder} style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif", animation: "fadeUp 0.5s ease 0.75s both" }}>
-                        הזמנה חדשה ←
+                        <span>הזמנה חדשה</span>
+                        <ArrowLeft size={17} strokeWidth={2.6} />
                     </BariButton>
                 </div>
                 <style>{`
@@ -534,7 +536,8 @@ function PaymentFailedScreen({ orderNum, onRetry }) {
                 )}
                 <div style={OS.divider} />
                 <BariButton variant="primary" fullWidth style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }} onClick={onRetry}>
-                    נסה שוב ←
+                    <span>נסה שוב</span>
+                    <ArrowLeft size={17} strokeWidth={2.6} />
                 </BariButton>
             </div>
             <style>{`
