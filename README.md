@@ -74,9 +74,8 @@ npm start
 
 ## Known Gaps (as of this writing)
 
-- No real authentication system — `/login` and `/profile` are stubs.
 - Payment webhook has no cryptographic signature verification (no Tranzila verification credential configured yet); webhook-confirmed payments are marked `paid_unverified` and require a human check at pickup.
-- `/kitchen`'s shared-secret gate (`NEXT_PUBLIC_KITCHEN_API_SECRET`) is a deterrent against opportunistic bots, not real access control.
+- `/kitchen` is gated by a shared staff password (`KITCHEN_PASSWORD`, server-only) exchanged for an httpOnly session cookie. Set it in production; unset locally the board runs open. It's a single shared credential, not per-user staff accounts.
 
 ## RTL Support
 
