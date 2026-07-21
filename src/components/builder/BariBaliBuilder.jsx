@@ -27,6 +27,7 @@ import BariModal from "../ui/bari/BariModal";
 import BariButton from "../ui/bari/BariButton";
 import MagicBackground from "./background/MagicBackground";
 import { useAnimatedNumber } from "../../lib/motionHooks";
+import { takeReorder } from "../../lib/reorder";
 
 /*
   BariBali Builder — COMPLETE v3
@@ -331,8 +332,30 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
     return () => clearTimeout(t);
   }, [step]);
 
-  // ─── Load draft from localStorage ───
+  // ─── Load a reorder, else the saved draft, on mount ───
   useEffect(() => {
+    // "Order again" takes precedence over any saved draft — reconstruct the
+    // selection from the past order's item ids against the CURRENT catalog
+    // (so prices are current and off-menu items simply drop out).
+    const reorder = takeReorder();
+    if (reorder) {
+      const catalog = steps.flatMap(s => s.subgroups.flatMap(sg => sg.items));
+      const rebuilt = {};
+      reorder.itemIds.forEach(id => {
+        const item = catalog.find(i => i.id === id);
+        if (!item) return; // no longer on the menu
+        const inStep = steps.find(s => s.subgroups.some(sg => sg.items.some(i => i.id === id)));
+        if (!inStep) return;
+        (rebuilt[inStep.id] ||= []).push({ ...item, _meta: { stepId: inStep.id } });
+      });
+      setSels(rebuilt);
+      setStep(0);
+      // 'same' → straight to the summary to pick a fresh time + pay;
+      // 'edit' → land in the builder to change things.
+      if (reorder.mode === "same") setSummary(true);
+      return;
+    }
+
     try {
       const draft = localStorage.getItem("baribali-draft");
       if (draft) {
@@ -353,7 +376,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
         setNotes(parsed.notes || "");
       }
     } catch (e) { }
-  }, []);
+  }, [steps]);
 
   // ─── Save draft to localStorage ───
   useEffect(() => {

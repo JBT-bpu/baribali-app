@@ -1,18 +1,20 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import ParticleCanvas from '@/components/ui/ParticleCanvas';
 import GoogleSignInButton from '@/components/ui/GoogleSignInButton';
 import { BariPanel, BariBadge, BariButton } from '@/components/ui/bari';
 import { useUser, signOut, displayName, avatarUrl, getAccessToken } from '@/lib/auth';
+import { buildReorderHref, stashReorder, type ReorderMode } from '@/lib/reorder';
 
 interface HistoryOrder {
     id: string;
     order_num: string;
     items: { id: string; he: string; icon: string; price: number }[];
     total: number;
+    size: string | null;
     pickup_time: string | null;
     status: string;
     payment_status: string;
@@ -41,6 +43,13 @@ export default function ProfilePage() {
         });
         return () => { cancelled = true; };
     }, [user]);
+
+    // Reorder — stash the item set and send the builder to reconstruct it.
+    // 'same' jumps to the summary; 'edit' opens the builder to change things.
+    const startReorder = useCallback((order: HistoryOrder, mode: ReorderMode) => {
+        stashReorder(order.items.map(i => i.id), mode);
+        router.push(buildReorderHref(order));
+    }, [router]);
 
     const bg: React.CSSProperties = {
         minHeight: '100vh',
@@ -111,8 +120,12 @@ export default function ProfilePage() {
                     </BariPanel>
                 )}
                 {orders?.map(o => (
-                    <Link key={o.id} href={`/order/${o.id}`} style={{ textDecoration: 'none' }}>
-                        <BariPanel className="p-3.5" style={{ display: 'flex', flexDirection: 'column', gap: '8px', cursor: 'pointer' }}>
+                    <BariPanel key={o.id} className="p-3.5" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {/* Tap the order body to view its live status */}
+                        <div
+                            onClick={() => router.push(`/order/${o.id}`)}
+                            style={{ display: 'flex', flexDirection: 'column', gap: '8px', cursor: 'pointer' }}
+                        >
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <BariBadge>{o.order_num}</BariBadge>
                                 <span style={{ fontSize: '12px', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>
@@ -135,8 +148,18 @@ export default function ProfilePage() {
                                 {new Date(o.created_at).toLocaleDateString('he-IL', { day: 'numeric', month: 'long' })}
                                 {o.pickup_time ? ` · איסוף ${o.pickup_time}` : ''}
                             </div>
-                        </BariPanel>
-                    </Link>
+                        </div>
+
+                        {/* Reorder actions — the concrete payoff of having history */}
+                        <div style={{ display: 'flex', gap: '8px', paddingTop: '2px' }}>
+                            <BariButton variant="primary" size="sm" style={{ flex: 1 }} onClick={() => startReorder(o, 'same')}>
+                                הזמן שוב
+                            </BariButton>
+                            <BariButton variant="secondary" size="sm" style={{ flex: 1 }} onClick={() => startReorder(o, 'edit')}>
+                                שנה והזמן
+                            </BariButton>
+                        </div>
+                    </BariPanel>
                 ))}
 
                 <Link href="/home2" style={{ fontSize: '14px', fontWeight: 700, color: 'rgba(255,255,255,0.5)', textDecoration: 'none', textAlign: 'center', marginTop: '8px' }}>
