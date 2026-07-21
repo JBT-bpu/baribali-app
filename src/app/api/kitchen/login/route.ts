@@ -6,8 +6,13 @@ import {
     KITCHEN_COOKIE,
     KITCHEN_SESSION_TTL_MS,
 } from '@/lib/kitchenAuth';
+import { enforceRateLimit } from '@/lib/rateLimit';
 
 export async function POST(req: NextRequest) {
+    // Strict cap — this is the brute-force surface for the staff password.
+    const limited = enforceRateLimit(req, 'kitchen-login', 8, 60_000);
+    if (limited) return limited;
+
     // No password configured — the board runs open, so there's nothing to log
     // into. Report that so the client can just proceed.
     if (!kitchenAuthEnabled()) {
