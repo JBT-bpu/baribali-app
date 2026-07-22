@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 import { computeOrderTotal } from '@/lib/pricing';
 import { createDemoOrder } from '@/lib/demoStore';
+import { enforceRateLimit } from '@/lib/rateLimit';
 
 /**
  * If the request carries a valid Supabase access token, returns the
@@ -17,6 +18,9 @@ async function verifiedUserId(req: NextRequest): Promise<string | null> {
 }
 
 export async function POST(req: NextRequest) {
+    // Blunt order-spam from a single source.
+    const limited = enforceRateLimit(req, 'orders', 12, 60_000);
+    if (limited) return limited;
     try {
         const body = await req.json();
         const { items, total, pickupTime, notes, size, paymentChoice } = body;

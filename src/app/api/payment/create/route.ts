@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { createHypPaymentUrl } from '@/lib/hypPay';
+import { enforceRateLimit } from '@/lib/rateLimit';
 
 /*
 ──────────────────────────────────────────────────────────────
@@ -78,6 +79,8 @@ async function buildHypUrl(orderNum: string, total: number): Promise<string> {
 }
 
 export async function POST(req: NextRequest) {
+    const limited = enforceRateLimit(req, 'payment-create', 12, 60_000);
+    if (limited) return limited;
     try {
         const { orderId } = await req.json();
         if (!orderId) return NextResponse.json({ error: 'Missing orderId' }, { status: 400 });

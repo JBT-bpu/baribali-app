@@ -8,6 +8,7 @@ import { User } from 'lucide-react';
 import ReviewsStrip from '@/components/ui/ReviewsStrip';
 import CatPopup from '@/components/ui/CatPopup';
 import GoogleSignInButton from '@/components/ui/GoogleSignInButton';
+import LegalLinks from '@/components/legal/LegalLinks';
 import { BariButton, BariModal, BariGlowBackground, BariBottomNav } from '@/components/ui/bari';
 import { usePrefersReducedMotion } from '@/lib/motionHooks';
 import { useUser, avatarUrl } from '@/lib/auth';
@@ -597,6 +598,7 @@ export default function HomeV2() {
                         <BariButton variant="secondary" fullWidth onClick={continueAsGuest} style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }}>
                             המשך כאורח ←
                         </BariButton>
+                        <div style={{ textAlign: 'center' }}><LegalLinks /></div>
                     </div>
                 </div>
             )}

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 import { listDemoOrders } from '@/lib/demoStore';
+import { enforceRateLimit } from '@/lib/rateLimit';
 
 const SLOT_CAPACITY = 5;      // max orders per slot
 const SLOT_MINUTES = 5;       // slot size in minutes
@@ -67,7 +68,11 @@ function generateSlotTimes(fromDate: Date): string[] {
     return slots;
 }
 
-export async function GET(_req: NextRequest) {
+export async function GET(req: NextRequest) {
+    // Generous — this is polled during checkout — but still bounded.
+    const limited = enforceRateLimit(req, 'slots', 40, 60_000);
+    if (limited) return limited;
+
     const now = new Date();
     const slotTimes = generateSlotTimes(now);
 

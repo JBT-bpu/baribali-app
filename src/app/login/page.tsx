@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import ParticleCanvas from '@/components/ui/ParticleCanvas';
 import GoogleSignInButton from '@/components/ui/GoogleSignInButton';
+import LegalLinks from '@/components/legal/LegalLinks';
 import { useUser } from '@/lib/auth';
 
 export default function LoginPage() {
@@ -42,6 +43,7 @@ export default function LoginPage() {
                 }}>
                     המשך כאורח ←
                 </Link>
+                <LegalLinks />
             </div>
         </div>
     );
