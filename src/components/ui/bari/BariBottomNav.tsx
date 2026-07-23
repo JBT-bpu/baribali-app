@@ -4,18 +4,13 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion } from 'motion/react';
-import { House, Search, Star, ClipboardList, User, type LucideIcon } from 'lucide-react';
+import { House, ClipboardList, User, type LucideIcon } from 'lucide-react';
 
-// href: null = not yet a real destination (no page to send them to).
-// skipActive: "הזמנות" and "פרופיל" currently both resolve to /profile —
-// there's no dedicated order-history view yet (tracked separately) — so
-// only one of the two lights up as active to avoid two simultaneous pills.
-const NAV_ITEMS: { href: string | null; Icon: LucideIcon; label: string; skipActive?: boolean }[] = [
+// Three real destinations — every item goes somewhere and nothing is duplicated.
+const NAV_ITEMS: { href: string; Icon: LucideIcon; label: string }[] = [
     { href: '/home2', Icon: House, label: 'בית' },
-    { href: null, Icon: Search, label: 'חיפוש' },
-    { href: '/favorites', Icon: Star, label: 'מועדפים' },
-    { href: '/profile', Icon: ClipboardList, label: 'הזמנות', skipActive: true },
-    { href: '/profile', Icon: User, label: 'פרופיל' },
+    { href: '/orders', Icon: ClipboardList, label: 'ההזמנות שלי' },
+    { href: '/profile', Icon: User, label: 'האזור שלי' },
 ];
 
 /**
@@ -52,7 +47,7 @@ export default function BariBottomNav() {
                 }}
             >
                 {NAV_ITEMS.map(item => {
-                    const active = !item.skipActive && pathname === item.href;
+                    const active = pathname === item.href;
                     const content = (
                         <>
                             {/* Sliding active pill — layoutId makes motion animate it between items on route change */}
@@ -105,11 +100,10 @@ export default function BariBottomNav() {
                     const itemStyle = {
                         position: 'relative' as const,
                         display: 'flex', flexDirection: 'column' as const, alignItems: 'center' as const, gap: '2px',
-                        padding: '5px 12px',
+                        padding: '5px 16px',
                         borderRadius: 'var(--radius-full)',
                         textDecoration: 'none',
-                        cursor: item.href ? 'pointer' : 'default',
-                        opacity: item.href ? 1 : 0.65,
+                        cursor: 'pointer',
                     };
                     const onTap = () => {
                         navigator.vibrate?.(8);
@@ -117,14 +111,10 @@ export default function BariBottomNav() {
                         setTimeout(() => setRipple(null), 450);
                     };
 
-                    return item.href ? (
+                    return (
                         <Link key={item.label} href={item.href} onClick={onTap} style={itemStyle}>
                             {content}
                         </Link>
-                    ) : (
-                        <div key={item.label} onClick={onTap} style={itemStyle}>
-                            {content}
-                        </div>
                     );
                 })}
             </div>
