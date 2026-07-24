@@ -8,11 +8,9 @@ import { User } from 'lucide-react';
 import ReviewsStrip from '@/components/ui/ReviewsStrip';
 import CatPopup from '@/components/ui/CatPopup';
 import GoogleSignInButton from '@/components/ui/GoogleSignInButton';
-import LegalLinks from '@/components/legal/LegalLinks';
 import { BariButton, BariModal, BariGlowBackground, BariBottomNav } from '@/components/ui/bari';
 import { usePrefersReducedMotion } from '@/lib/motionHooks';
 import { useUser, avatarUrl } from '@/lib/auth';
-import { isSupabaseConfigured } from '@/lib/supabase';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 // Salad first — under RTL it renders on the right, where reading starts.
@@ -341,7 +339,7 @@ function SizePicker({ onSelect, onBack }: { onSelect: (s: string) => void; onBac
 export default function HomeV2() {
     const router = useRouter();
     const reducedMotion = usePrefersReducedMotion();
-    const { user, loading: authLoading } = useUser();
+    const { user } = useUser();
 
     // ── Screen state ──
     const [sizePicker, setSizePicker] = useState(false);
@@ -349,22 +347,8 @@ export default function HomeV2() {
     const [curtain, setCurtain]       = useState(false);
     const [ready, setReady]           = useState(false);
 
-    // ── Welcome step: guest or Google ──
-    // Shown to guests once per visit (sessionStorage, so it never nags
-    // mid-session); signed-in users skip it entirely. Guest-first: ordering
-    // never requires an account — this is an offer, not a gate.
-    const [showWelcome, setShowWelcome] = useState(false);
-    useEffect(() => {
-        if (authLoading || user) return;
-        if (!isSupabaseConfigured()) return; // demo deployments: nothing to sign in to
-        if (sessionStorage.getItem('bb-welcome-done')) return;
-        setShowWelcome(true);
-    }, [authLoading, user]);
-    const continueAsGuest = useCallback(() => {
-        sessionStorage.setItem('bb-welcome-done', '1');
-        navigator.vibrate?.(12);
-        setShowWelcome(false);
-    }, []);
+    // The guest-or-Google gate now lives on the app's front door (src/app/page.tsx),
+    // not as an overlay here.
 
     // ── Cat welcome popup — only show on first visit ──
     const [showCatPopup, setShowCatPopup] = useState(false);
@@ -423,7 +407,6 @@ export default function HomeV2() {
                 @keyframes labelIn  { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
                 @keyframes burst    { from{transform:scale(0)} to{transform:scale(55)} }
                 @keyframes glowFade { 0%,100%{opacity:0.5} 50%{opacity:1} }
-                @keyframes welcomeIn { from{opacity:0;transform:scale(0.95) translateY(10px)} to{opacity:1;transform:none} }
                 @keyframes snapGlow      { 0%{box-shadow:0 0 30px rgba(240,200,50,0.4)} 100%{box-shadow:0 0 0px rgba(240,200,50,0)} }
                 @keyframes sizePickerIn  { from{opacity:0;transform:scale(0.93) translateY(24px)} to{opacity:1;transform:none} }
                 @keyframes sizePickerOut { to{opacity:0;transform:scale(0.96) translateY(-10px)} }
@@ -570,38 +553,6 @@ export default function HomeV2() {
                     </BariButton>
                 </div>
             </BariModal>
-
-            {/* Welcome step — guest or Google, shown once per visit to signed-out
-                users only. Guest-first: "המשך כאורח" is the equally-sized,
-                equally-prominent option, never a smaller afterthought link. */}
-            {showWelcome && (
-                <div style={{
-                    position: 'fixed', inset: 0, zIndex: 90,
-                    background: 'rgba(3,8,3,0.95)', backdropFilter: 'blur(24px) saturate(1.3)',
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                    gap: '18px', direction: 'rtl', padding: '24px',
-                    paddingTop: 'max(24px, env(safe-area-inset-top))',
-                    paddingBottom: 'max(24px, env(safe-area-inset-bottom))',
-                    fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
-                    animation: 'welcomeIn 0.4s cubic-bezier(0.22,1.2,0.36,1) both',
-                }}>
-                    <Image src="/homepage-assets/logo.webp" alt="BariBali" width={160} height={100}
-                        style={{ width: '130px', height: 'auto', filter: 'drop-shadow(0 0 26px rgba(240,200,50,0.45))' }} />
-                    <div style={{ fontSize: '21px', fontWeight: 900, color: '#fff', textAlign: 'center' }}>ברוכים הבאים!</div>
-                    <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.55)', textAlign: 'center', lineHeight: 1.7, maxWidth: '280px' }}>
-                        התחברות עם Google שומרת את היסטוריית ההזמנות שלכם.
-                        <br />
-                        לגמרי אפשר גם בלי — ההזמנה זהה.
-                    </div>
-                    <div style={{ width: '100%', maxWidth: '300px', display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
-                        <GoogleSignInButton fullWidth />
-                        <BariButton variant="secondary" fullWidth onClick={continueAsGuest} style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }}>
-                            המשך כאורח ←
-                        </BariButton>
-                        <div style={{ textAlign: 'center' }}><LegalLinks /></div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

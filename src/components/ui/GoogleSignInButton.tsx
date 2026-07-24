@@ -10,7 +10,7 @@ import { isSupabaseConfigured } from '@/lib/supabase';
  * never a gate. Degrades to a disabled hint when Supabase isn't configured
  * (demo deployments).
  */
-export default function GoogleSignInButton({ fullWidth = false }: { fullWidth?: boolean }) {
+export default function GoogleSignInButton({ fullWidth = false, label = 'המשך עם Google' }: { fullWidth?: boolean; label?: string }) {
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
     const available = isSupabaseConfigured();
@@ -45,7 +45,7 @@ export default function GoogleSignInButton({ fullWidth = false }: { fullWidth?: 
                 }}
             >
                 <span style={{ fontSize: '17px', fontWeight: 900, color: '#4285F4' }}>G</span>
-                {busy ? 'רגע…' : 'המשך עם Google'}
+                {busy ? 'רגע…' : label}
             </button>
             {!available && (
                 <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>
