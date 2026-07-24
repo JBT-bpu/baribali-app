@@ -14,39 +14,35 @@ import { usePrefersReducedMotion } from '@/lib/motionHooks';
  * The app's front door. A short (~1.2s) brand animation that doubles as an
  * auth-check cover, then resolves into two choices: join the club (Google) or
  * continue as guest. Guest-first — the club is the hero, guest is a clear,
- * unpunished alternative. Shown every visit until sign-in (sessionStorage
- * `bb-welcome-done`, same flag the old home2 welcome overlay used); returning
- * guests and signed-in members skip straight to /home2 with no animation/gate.
+ * unpunished alternative. The gate stays on for every entry until the user
+ * actually signs in: only signed-in members skip straight to /home2. Guests
+ * see it each time they enter the app (deep links / internal nav go to /home2,
+ * so it isn't re-triggered while moving around mid-session).
  */
 export default function EntryPage() {
     const router = useRouter();
     const { user, loading } = useUser();
     const reducedMotion = usePrefersReducedMotion();
 
-    const [started, setStarted]   = useState(false);  // mount ran, not short-circuited
+    const [started, setStarted]   = useState(false);  // mount ran
     const [introDone, setIntroDone] = useState(false);
     const [leaving, setLeaving]   = useState(false);
 
-    // Decide on mount: returning guest → straight in; else run the door.
+    // Run the door on mount (play the intro; auth resolves underneath).
     useEffect(() => {
-        if (sessionStorage.getItem('bb-welcome-done')) {
-            router.replace('/home2');
-            return;
-        }
         setStarted(true);
         if (reducedMotion) { setIntroDone(true); return; }
         const t = setTimeout(() => setIntroDone(true), 1200);
         return () => clearTimeout(t);
-    }, [router, reducedMotion]);
+    }, [reducedMotion]);
 
-    // Signed-in members never see the gate.
+    // Signed-in members never see the gate; everyone else stays on the door.
     useEffect(() => {
         if (!started || loading) return;
         if (user) router.replace('/home2');
     }, [started, loading, user, router]);
 
     const continueAsGuest = useCallback(() => {
-        sessionStorage.setItem('bb-welcome-done', '1');
         navigator.vibrate?.(12);
         setLeaving(true);
         router.push('/home2');
