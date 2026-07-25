@@ -75,6 +75,22 @@ export default function ProfilePage() {
                     התנתקות
                 </BariButton>
 
+                {/* Legal & info */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '6px 14px', marginTop: '10px' }}>
+                    {[
+                        { href: '/terms', label: 'תנאי שימוש' },
+                        { href: '/privacy', label: 'פרטיות' },
+                        { href: '/cancellations', label: 'ביטולים' },
+                        { href: '/allergens', label: 'אלרגנים' },
+                        { href: '/accessibility', label: 'נגישות' },
+                        { href: '/contact', label: 'יצירת קשר' },
+                    ].map(l => (
+                        <Link key={l.href} href={l.href} style={{ fontSize: '12px', fontWeight: 600, color: 'rgba(255,255,255,0.4)', textDecoration: 'none' }}>
+                            {l.label}
+                        </Link>
+                    ))}
+                </div>
+
                 <Link href="/home2" style={{ fontSize: '14px', fontWeight: 700, color: 'rgba(255,255,255,0.5)', textDecoration: 'none', textAlign: 'center', marginTop: '4px' }}>
                     ← חזרה לדף הבית
                 </Link>

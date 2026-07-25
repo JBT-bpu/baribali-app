@@ -387,6 +387,13 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                         <span>שלח הזמנה</span>
                         <span style={S.orderBtnPrice}>₪{total}</span>
                     </BariButton>
+                    {/* Consent disclosure — links open the legal docs before ordering */}
+                    <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.45)", textAlign: "center", lineHeight: 1.6, marginTop: "8px", fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }}>
+                        בלחיצה על ״שלח הזמנה״ אני מאשר/ת את{" "}
+                        <a href="/terms" style={{ color: "rgba(240,208,96,0.8)" }}>תנאי השימוש</a>,{" "}
+                        <a href="/privacy" style={{ color: "rgba(240,208,96,0.8)" }}>מדיניות הפרטיות</a>{" "}
+                        ו<a href="/cancellations" style={{ color: "rgba(240,208,96,0.8)" }}>מדיניות הביטולים</a>.
+                    </div>
                 </div>
             </div>
             <style>{KF}</style>
