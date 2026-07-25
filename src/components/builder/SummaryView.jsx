@@ -40,6 +40,7 @@ function generatePickupSlots() {
 }
 import { STEPS, NUTRI, BASE } from "../../data/salad-data.js"; // NUTRI used in bowl calorie total
 import { effectiveItemPrice } from "../../lib/menuConfig";
+import { findDiscount, discountAmount } from "../../lib/discounts";
 const headerImage = "/builder-assets/header-brand.png";
 import MagicBackground from "./background/MagicBackground.jsx";
 import MixingAnimation from "./ui/MixingAnimation.jsx";
@@ -65,6 +66,9 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     const [realOrderId, setRealOrderId] = useState(null);
     const [paymentFailed, setPaymentFailed] = useState(false);
     const [failedOrderNum, setFailedOrderNum] = useState(null);
+    const [promoInput, setPromoInput] = useState("");
+    const [appliedDiscount, setAppliedDiscount] = useState(null);
+    const [promoError, setPromoError] = useState("");
 
     const highlightStep = (item) => {
         const step = STEPS.find(s => (sels[s.id] || []).some(i => i.id === item.id));
@@ -74,6 +78,13 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     };
     const MAX_NOTES_LENGTH = 200;
     const extras = all.filter(i => effectiveItemPrice(i.id, i.price) > 0);
+    const discAmount = discountAmount(total, appliedDiscount);
+    const finalTotal = total - discAmount;
+    const applyPromo = () => {
+        const d = findDiscount(promoInput);
+        setAppliedDiscount(d);
+        setPromoError(d ? "" : "קוד לא תקף");
+    };
     const grouped = STEPS.map(s => ({ s, items: sels[s.id] || [] })).filter(g => g.items.length > 0);
 
     const handleNotesChange = (e) => {
@@ -112,10 +123,11 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
             },
             body: JSON.stringify({
                 items: all.map(i => ({ id: i.id, he: i.he, icon: i.icon, price: effectiveItemPrice(i.id, i.price || 0) })),
-                total,
+                total: finalTotal,
                 pickupTime,
                 notes,
                 size: base,
+                discountCode: appliedDiscount?.code,
                 ...(DEMO_MODE ? { paymentChoice: choice } : {}),
             }),
         })
@@ -147,7 +159,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     };
 
     if (paymentFailed) return <PaymentFailedScreen orderNum={failedOrderNum} onRetry={() => setPaymentFailed(false)} />;
-    if (ordered) return <OrderedScreen total={total} all={all} pickupTime={pickupTime} notes={notes} orderNum={realOrderNum} orderId={realOrderId} onNewOrder={onNewOrder || onBack} />;
+    if (ordered) return <OrderedScreen total={finalTotal} all={all} pickupTime={pickupTime} notes={notes} orderNum={realOrderNum} orderId={realOrderId} onNewOrder={onNewOrder || onBack} />;
 
     return (
         <div style={S.root}>
@@ -176,7 +188,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                         </div>
                         <div style={S.pricePill}>
                             <span style={S.priceS}>₪</span>
-                            <span style={S.priceV}>{total}</span>
+                            <span style={S.priceV}>{finalTotal}</span>
                         </div>
                     </div>
                 </div>
@@ -331,9 +343,29 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                                 <span style={{ color: "#edd87e", fontWeight: 600 }}>₪{effectiveItemPrice(it.id, it.price)}</span>
                             </div>
                         ))}
+
+                        {/* Promo code */}
+                        <div style={{ display: "flex", gap: "6px", alignItems: "center", marginTop: "8px" }}>
+                            <input
+                                value={promoInput}
+                                onChange={e => { setPromoInput(e.target.value); setPromoError(""); }}
+                                placeholder="קוד הנחה"
+                                aria-label="קוד הנחה"
+                                style={{ flex: 1, padding: "8px 10px", borderRadius: "8px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.15)", color: "#fff", fontSize: "13px", fontWeight: 600, fontFamily: "var(--font-heebo), 'Heebo', sans-serif", outline: "none" }}
+                            />
+                            <button type="button" onClick={applyPromo} style={{ padding: "8px 14px", borderRadius: "8px", background: "rgba(200,168,78,0.2)", border: "1px solid rgba(200,168,78,0.4)", color: "#f0d060", fontSize: "13px", fontWeight: 800, cursor: "pointer", fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }}>החל</button>
+                        </div>
+                        {promoError && <div style={{ fontSize: "11px", color: "#ff7575", fontWeight: 600, marginTop: "4px" }}>{promoError}</div>}
+                        {appliedDiscount && (
+                            <div style={{ ...S.sumPriceLine, marginTop: "6px" }}>
+                                <span style={{ fontSize: "12px", color: "#7dd37d", fontWeight: 700 }}>הנחה · {appliedDiscount.code}</span>
+                                <span style={{ color: "#7dd37d", fontWeight: 700 }}>−₪{discAmount}</span>
+                            </div>
+                        )}
+
                         <div style={S.sumTotal}>
                             <span style={{ fontSize: "16px", fontWeight: 700, color: "rgba(255,255,255,0.55)" }}>סה"כ</span>
-                            <span style={{ fontFamily: "var(--font-display), 'Secular One', sans-serif" }}>₪{total}</span>
+                            <span style={{ fontFamily: "var(--font-display), 'Secular One', sans-serif" }}>₪{finalTotal}</span>
                         </div>
                     </BariPanel>
 
