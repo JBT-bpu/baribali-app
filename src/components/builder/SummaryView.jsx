@@ -128,8 +128,10 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                 }
                 if (data?.orderNum) setRealOrderNum(data.orderNum);
                 if (data?.id) setRealOrderId(data.id);
-                // If payment is enabled, redirect to payment page
-                if (data?.id && !data?.demo) {
+                // Online payment only when a gateway is configured. Otherwise the
+                // order is already pay-at-pickup (server set payAtPickup) — skip
+                // the redirect and let the confirmation screen show.
+                if (data?.id && !data?.demo && !data?.payAtPickup) {
                     const payRes = await fetch('/api/payment/create', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
