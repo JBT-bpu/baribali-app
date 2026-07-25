@@ -39,6 +39,7 @@ function generatePickupSlots() {
     return slots.length ? slots : null;
 }
 import { STEPS, NUTRI, BASE } from "../../data/salad-data.js"; // NUTRI used in bowl calorie total
+import { effectiveItemPrice } from "../../lib/menuConfig";
 const headerImage = "/builder-assets/header-brand.png";
 import MagicBackground from "./background/MagicBackground.jsx";
 import MixingAnimation from "./ui/MixingAnimation.jsx";
@@ -72,7 +73,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
         setTimeout(() => setHighlightedStep(null), 900);
     };
     const MAX_NOTES_LENGTH = 200;
-    const extras = all.filter(i => i.price > 0);
+    const extras = all.filter(i => effectiveItemPrice(i.id, i.price) > 0);
     const grouped = STEPS.map(s => ({ s, items: sels[s.id] || [] })).filter(g => g.items.length > 0);
 
     const handleNotesChange = (e) => {
@@ -110,7 +111,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                 ...(token ? { Authorization: `Bearer ${token}` } : {}),
             },
             body: JSON.stringify({
-                items: all.map(i => ({ id: i.id, he: i.he, icon: i.icon, price: i.price || 0 })),
+                items: all.map(i => ({ id: i.id, he: i.he, icon: i.icon, price: effectiveItemPrice(i.id, i.price || 0) })),
                 total,
                 pickupTime,
                 notes,
@@ -223,30 +224,30 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                                 </div>
                                 {/* Slot grid — 64px slots sized so 10px Hebrew names fit one line */}
                                 <div style={{ display: "flex", flexWrap: "wrap", gap: "5px", alignItems: "flex-start" }}>
-                                    {items.map((item, i) => (
+                                    {items.map((item, i) => { const p = effectiveItemPrice(item.id, item.price); return (
                                         <div key={item.id} style={{
                                             width: "64px",
                                             background: "linear-gradient(145deg, rgba(12,36,12,0.85), rgba(6,18,6,0.92))",
-                                            border: `1px solid ${item.price > 0 ? "rgba(200,168,78,0.45)" : "rgba(255,255,255,0.1)"}`,
+                                            border: `1px solid ${p > 0 ? "rgba(200,168,78,0.45)" : "rgba(255,255,255,0.1)"}`,
                                             borderRadius: "9px",
                                             display: "flex", flexDirection: "column",
                                             alignItems: "center", justifyContent: "flex-start",
                                             padding: "7px 4px 6px",
                                             gap: "3px",
                                             position: "relative",
-                                            boxShadow: item.price > 0
+                                            boxShadow: p > 0
                                                 ? "0 0 8px rgba(200,168,78,0.15), 0 2px 6px rgba(0,0,0,0.4)"
                                                 : "0 2px 6px rgba(0,0,0,0.4)",
                                             animation: `popBounce 0.3s ease ${gi * 60 + i * 40}ms both`,
                                         }}>
-                                            {item.price > 0 && (
+                                            {p > 0 && (
                                                 <div style={{
                                                     position: "absolute", top: "-5px", right: "-4px",
                                                     background: "linear-gradient(135deg, #c8a832, #f0d060)",
                                                     color: "#0d2e0d", fontSize: "10px", fontWeight: 900,
                                                     padding: "2px 6px", borderRadius: "7px",
                                                     boxShadow: "0 1px 3px rgba(0,0,0,0.4)",
-                                                }}>+₪{item.price}</div>
+                                                }}>+₪{p}</div>
                                             )}
                                             <Icon src={item.icon} size="30px" style={{ filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.5))" }} />
                                             <span style={{
@@ -257,7 +258,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                                                 textOverflow: "ellipsis", whiteSpace: "nowrap",
                                             }}>{item.he}</span>
                                         </div>
-                                    ))}
+                                    ); })}
                                     {onEdit && (
                                         <button onClick={() => onEdit(STEPS.findIndex(st => st.id === s.id))}
                                             style={{
@@ -327,7 +328,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                         {extras.map(it => (
                             <div key={it.id} style={S.sumPriceLine}>
                                 <span style={{ opacity: 0.7, fontSize: "12px" }}>+ {it.he}</span>
-                                <span style={{ color: "#edd87e", fontWeight: 600 }}>₪{it.price}</span>
+                                <span style={{ color: "#edd87e", fontWeight: 600 }}>₪{effectiveItemPrice(it.id, it.price)}</span>
                             </div>
                         ))}
                         <div style={S.sumTotal}>
