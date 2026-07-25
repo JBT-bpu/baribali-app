@@ -3,6 +3,7 @@ import { supabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 import { computeOrderTotal } from '@/lib/pricing';
 import { createDemoOrder } from '@/lib/demoStore';
 import { enforceRateLimit } from '@/lib/rateLimit';
+import { isPaymentConfigured } from '@/lib/payment';
 
 /**
  * If the request carries a valid Supabase access token, returns the
@@ -65,6 +66,12 @@ export async function POST(req: NextRequest) {
         // verified session token accompanies the request.
         const userId = await verifiedUserId(req);
 
+        // Without a configured payment gateway there's no way to pay online, so
+        // the order is pay-at-pickup and goes straight to the kitchen. With a
+        // gateway it starts `pending` and the payment/webhook flow marks it
+        // paid — until then it's correctly hidden from the board.
+        const payAtPickup = !isPaymentConfigured();
+
         const { data, error } = await supabaseAdmin
             .from('orders')
             .insert({
@@ -75,7 +82,7 @@ export async function POST(req: NextRequest) {
                 notes: notes ?? null,
                 size: size ?? null,
                 status: 'waiting',
-                payment_status: 'pending',
+                payment_status: payAtPickup ? 'pay_at_pickup' : 'pending',
                 user_id: userId,
             })
             .select('id, order_num, created_at')
@@ -86,7 +93,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Failed to create order' }, { status: 500 });
         }
 
-        return NextResponse.json({ id: data.id, orderNum: data.order_num, createdAt: data.created_at });
+        return NextResponse.json({ id: data.id, orderNum: data.order_num, createdAt: data.created_at, payAtPickup });
     } catch (err) {
         console.error('[POST /api/orders]', err);
         return NextResponse.json({ error: 'Failed to create order' }, { status: 500 });
