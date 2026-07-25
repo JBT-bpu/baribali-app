@@ -1,4 +1,4 @@
-import { SIZE_CONFIG, TORTILLA_BASE } from '@/data/salad-data.js';
+import { effectiveBase, effectiveSizePrice } from '@/lib/menuConfig';
 
 /**
  * "Order again" plumbing. A past order is a flat list of item ids plus a base
@@ -21,18 +21,18 @@ export interface ReorderPayload { itemIds: string[]; mode: ReorderMode; }
 
 const KEY = 'bb-reorder';
 
-/** Salad vs tortilla, from the stored base price (tortilla == TORTILLA_BASE). */
+/** Salad vs tortilla, from the stored base price (tortilla == the tortilla base). */
 export function detectOrderType(size: number | string | null | undefined): 'salad' | 'tortilla' {
-    return Number(size) === Number(TORTILLA_BASE) ? 'tortilla' : 'salad';
+    return Number(size) === effectiveBase('tortilla') ? 'tortilla' : 'salad';
 }
 
-/** Maps a stored salad base price (54/59/72) back to the ml size the /build
- *  URL expects. Returns null for an unknown/absent value → builder defaults. */
+/** Maps a stored salad base price back to the ml size the /build URL expects,
+ *  using current effective size prices. Null for an unknown value → default. */
 export function sizeMlFromBase(base: number | string | null | undefined): number | null {
     const b = Number(base);
     if (!Number.isFinite(b)) return null;
-    const entry = Object.entries(SIZE_CONFIG as Record<string, { price: number }>).find(([, c]) => c.price === b);
-    return entry ? Number(entry[0]) : null;
+    const ml = [750, 1000, 1500].find(m => effectiveSizePrice(m) === b);
+    return ml ?? null;
 }
 
 /** The /build destination for reordering a past order. */

@@ -28,6 +28,7 @@ import BariButton from "../ui/bari/BariButton";
 import MagicBackground from "./background/MagicBackground";
 import { useAnimatedNumber } from "../../lib/motionHooks";
 import { takeReorder } from "../../lib/reorder";
+import { effectiveItemPrice, effectiveBase, effectiveSizePrice } from "../../lib/menuConfig";
 
 /*
   BariBali Builder — COMPLETE v3
@@ -308,7 +309,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
     return () => clearTimeout(t);
   }, []);
   const [priceFlash, setPriceFlash] = useState(null);
-  const activeBase = isTortilla ? TORTILLA_BASE : (selectedSize ? SIZE_CONFIG[selectedSize].price : BASE);
+  const activeBase = isTortilla ? effectiveBase('tortilla') : (selectedSize ? effectiveSizePrice(selectedSize) : effectiveBase('salad'));
   const [prevPrice, setPrevPrice] = useState(activeBase);
   const [activeAnchor, setActiveAnchor] = useState(0);
   const [notes, setNotes] = useState("");
@@ -392,7 +393,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
   const all = useMemo(() => Object.values(sels).flat(), [sels]);
   const allTags = useMemo(() => all.flatMap(i => i.tags || []), [all]);
 
-  const extras = all.reduce((s, i) => s + (i.price || 0), 0);
+  const extras = all.reduce((s, i) => s + effectiveItemPrice(i.id, i.price || 0), 0);
   const total = activeBase + extras;
   // Rolls toward the new total instead of snapping — the price is the most
   // watched number in the builder. (No-op under reduced motion.)
@@ -614,7 +615,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
                     </div>
                     <div style={{ textAlign: "left" }}>
                       <div style={{ fontSize: "11px", color: "rgba(200,168,78,0.6)", fontWeight: 600 }}>החל מ</div>
-                      <div style={{ fontSize: "24px", fontWeight: 900, color: "#f0d060", textShadow: "0 2px 8px rgba(200,168,78,0.4)", lineHeight: 1 }}>₪{sc.price}</div>
+                      <div style={{ fontSize: "24px", fontWeight: 900, color: "#f0d060", textShadow: "0 2px 8px rgba(200,168,78,0.4)", lineHeight: 1 }}>₪{effectiveSizePrice(sc.ml)}</div>
                     </div>
                   </div>
                 </button>
@@ -673,7 +674,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
                   <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "6px", padding: "5px 10px", borderRadius: "10px", background: "rgba(200,168,78,0.1)", border: "1px solid rgba(200,168,78,0.25)", width: "fit-content", alignSelf: "flex-end" }}>
                     <span style={{ fontSize: "12px", fontWeight: 800, color: "#f0d060" }}>{sc.label}</span>
                     <div style={{ width: "1px", height: "12px", background: "rgba(200,168,78,0.3)" }} />
-                    <span style={{ fontSize: "18px", fontWeight: 900, color: "#f0d060", lineHeight: 1 }}>₪{sc.price}</span>
+                    <span style={{ fontSize: "18px", fontWeight: 900, color: "#f0d060", lineHeight: 1 }}>₪{effectiveSizePrice(sc.ml)}</span>
                   </div>
                   <span
                     onClick={(e) => { e.stopPropagation(); setSelectedSize(null); }}
@@ -1026,13 +1027,14 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
                     const on = curSel.some(s => s.id === item.id);
                     const full = !on && cur.maxPicks && cur.maxPicks > 1 && curSel.length >= cur.maxPicks;
                     const isPremiumStep = cur.id === "upgrade" || cur.id === "t_upgrade";
+                    const itemPrice = effectiveItemPrice(item.id, item.price);
                     return (
                       <button key={item.id} disabled={full}
                         onClick={() => toggle(cur.id, item, cur.maxPicks)}
                         onTouchStart={() => onChipTouchStart(item)} onTouchEnd={onChipTouchEnd}
                         onMouseDown={() => onChipTouchStart(item)} onMouseUp={onChipTouchEnd} onMouseLeave={onChipTouchEnd}
                         onKeyDown={(e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); toggle(cur.id, item, cur.maxPicks); } }}
-                        aria-label={`${item.he}${item.price > 0 ? `, תוספת ${item.price} שקלים` : ""}${on ? ", נבחר" : ""}${item.desc ? `, ${item.desc}` : ""}`}
+                        aria-label={`${item.he}${itemPrice > 0 ? `, תוספת ${itemPrice} שקלים` : ""}${on ? ", נבחר" : ""}${item.desc ? `, ${item.desc}` : ""}`}
                         aria-checked={on}
                         aria-disabled={full}
                         role="checkbox"
@@ -1044,7 +1046,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
                         <div style={{ position: "absolute", bottom: "4px", right: "5px", fontSize: "8px", color: "rgba(255,255,255,0.18)", lineHeight: 1, pointerEvents: "none" }} aria-hidden="true">ℹ</div>
                         <Icon src={item.icon} size="38px" style={{ ...S.chipEmoji, transform: lastAdd === item.id ? "scale(1.4) rotate(-10deg)" : "scale(1)", transition: "transform 0.25s cubic-bezier(0.34,1.56,0.64,1)" }} />
                         <span style={S.chipName}>{item.he}</span>
-                        {item.price > 0 && <span style={S.chipCost}>+₪{item.price}</span>}
+                        {itemPrice > 0 && <span style={S.chipCost}>+₪{itemPrice}</span>}
                       </button>
                     );
                   })}

@@ -11,6 +11,7 @@ import GoogleSignInButton from '@/components/ui/GoogleSignInButton';
 import { BariButton, BariModal, BariGlowBackground, BariBottomNav } from '@/components/ui/bari';
 import { usePrefersReducedMotion } from '@/lib/motionHooks';
 import { useUser, avatarUrl } from '@/lib/auth';
+import { effectiveSizePrice } from '@/lib/menuConfig';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 // Salad first — under RTL it renders on the right, where reading starts.
@@ -22,9 +23,9 @@ const PRODUCT_CARDS = [
 ];
 
 const SIZE_CARDS = [
-    { id: 'S', img: '/homepage-assets/size-s.png', tag: 'לתיאבון קליל', sub: '₪54 · 1-2 מנות' },
-    { id: 'M', img: '/homepage-assets/size-m.png', tag: 'המאוזן המושלם', sub: '₪59 · 2-3 מנות' },
-    { id: 'L', img: '/homepage-assets/size-l.png', tag: 'לרעבים אמיתיים', sub: '₪72 · 3-4 מנות' },
+    { id: 'S', img: '/homepage-assets/size-s.png', tag: 'לתיאבון קליל', sub: `₪${effectiveSizePrice(750)} · 1-2 מנות` },
+    { id: 'M', img: '/homepage-assets/size-m.png', tag: 'המאוזן המושלם', sub: `₪${effectiveSizePrice(1000)} · 2-3 מנות` },
+    { id: 'L', img: '/homepage-assets/size-l.png', tag: 'לרעבים אמיתיים', sub: `₪${effectiveSizePrice(1500)} · 3-4 מנות` },
 ];
 
 // Relative visual heights for the size-comparison scale below the title —

@@ -4,6 +4,7 @@ import { computeOrderTotal } from '@/lib/pricing';
 import { createDemoOrder } from '@/lib/demoStore';
 import { enforceRateLimit } from '@/lib/rateLimit';
 import { isPaymentConfigured } from '@/lib/payment';
+import { findDiscount, discountAmount } from '@/lib/discounts';
 
 /**
  * If the request carries a valid Supabase access token, returns the
@@ -24,7 +25,7 @@ export async function POST(req: NextRequest) {
     if (limited) return limited;
     try {
         const body = await req.json();
-        const { items, total, pickupTime, notes, size, paymentChoice } = body;
+        const { items, total, pickupTime, notes, size, paymentChoice, discountCode } = body;
 
         if (!items || !Array.isArray(items) || total == null) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -35,8 +36,14 @@ export async function POST(req: NextRequest) {
         if (!computed.valid) {
             return NextResponse.json({ error: 'Invalid order items or size' }, { status: 400 });
         }
-        if (computed.total !== total) {
-            console.error('[POST /api/orders] Price mismatch: client sent', total, 'server computed', computed.total);
+
+        // Validate + apply any discount server-side (the client preview is UX only).
+        const discount = findDiscount(discountCode);
+        const discAmount = discountAmount(computed.total, discount);
+        const finalTotal = computed.total - discAmount;
+
+        if (finalTotal !== total) {
+            console.error('[POST /api/orders] Price mismatch: client sent', total, 'server computed', finalTotal);
             return NextResponse.json({ error: 'Price mismatch' }, { status: 400 });
         }
 
@@ -50,7 +57,7 @@ export async function POST(req: NextRequest) {
                 'pay_at_pickup';
             const order = createDemoOrder({
                 items,
-                total: computed.total,
+                total: finalTotal,
                 pickupTime,
                 notes,
                 size,
@@ -77,13 +84,16 @@ export async function POST(req: NextRequest) {
             .insert({
                 order_num: orderNum,
                 items,
-                total: computed.total,
+                total: finalTotal,
                 pickup_time: pickupTime ?? null,
                 notes: notes ?? null,
                 size: size ?? null,
                 status: 'waiting',
                 payment_status: payAtPickup ? 'pay_at_pickup' : 'pending',
                 user_id: userId,
+                // Only reference the discount columns when a code was applied, so
+                // regular orders keep working even if the migration hasn't run.
+                ...(discount ? { discount_code: discount.code, discount_amount: discAmount } : {}),
             })
             .select('id, order_num, created_at')
             .single();

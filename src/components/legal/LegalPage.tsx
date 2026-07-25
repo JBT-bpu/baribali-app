@@ -1,11 +1,20 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
+/** All legal/info documents, cross-linked from the footer of every page. */
+export const LEGAL_PAGES: { href: string; label: string }[] = [
+    { href: '/terms', label: 'תנאי שימוש' },
+    { href: '/privacy', label: 'מדיניות פרטיות' },
+    { href: '/cancellations', label: 'ביטולים והחזרים' },
+    { href: '/allergens', label: 'אלרגנים' },
+    { href: '/accessibility', label: 'נגישות' },
+    { href: '/contact', label: 'יצירת קשר' },
+];
+
 /**
- * Shared readable layout for the legal/content pages (privacy, terms).
- * Server-rendered static content — good for SEO and works with no JS.
- * Bracketed [PLACEHOLDER] tokens in the content are business-specific blanks
- * the owner must fill before these are relied upon.
+ * Shared readable layout for the legal/info pages. Server-rendered static
+ * content — good for SEO, works with no JS. Bracketed [להשלים]/[לאימות] tokens
+ * are business-specific fields the owner must verify before relying on these.
  */
 export default function LegalPage({ title, lastUpdated, children }: { title: string; lastUpdated: string; children: ReactNode }) {
     return (
@@ -26,6 +35,15 @@ export default function LegalPage({ title, lastUpdated, children }: { title: str
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '22px', fontSize: '15px', lineHeight: 1.8 }}>
                     {children}
+                </div>
+
+                {/* Cross-links to the other legal/info documents */}
+                <div style={{ marginTop: '40px', paddingTop: '20px', borderTop: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexWrap: 'wrap', gap: '8px 18px' }}>
+                    {LEGAL_PAGES.filter(p => p.label !== title).map(p => (
+                        <Link key={p.href} href={p.href} style={{ fontSize: '13px', fontWeight: 600, color: 'rgba(200,168,78,0.8)', textDecoration: 'none' }}>
+                            {p.label}
+                        </Link>
+                    ))}
                 </div>
             </div>
         </div>
