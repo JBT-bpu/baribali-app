@@ -5,6 +5,7 @@ import { createDemoOrder } from '@/lib/demoStore';
 import { enforceRateLimit } from '@/lib/rateLimit';
 import { isPaymentConfigured } from '@/lib/payment';
 import { findDiscount, discountAmount } from '@/lib/discounts';
+import { getCustomerDiscount } from '@/lib/customerTags';
 
 /**
  * If the request carries a valid Supabase access token, returns the
@@ -37,9 +38,20 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Invalid order items or size' }, { status: 400 });
         }
 
-        // Validate + apply any discount server-side (the client preview is UX only).
-        const discount = findDiscount(discountCode);
-        const discAmount = discountAmount(computed.total, discount);
+        // Resolve the signed-in user up front (guests → null, no network call).
+        // Needed here because a customer's standing "tag" discount is keyed to it.
+        const userId = await verifiedUserId(req);
+
+        // Apply the best available discount server-side (the client preview is UX
+        // only). Two sources, never stacked — the customer gets whichever is
+        // larger: a promo code they typed, or a standing discount assigned to
+        // their account ("tag", e.g. an approved municipal worker's 10%).
+        const typedDiscount = findDiscount(discountCode);
+        const assignedDiscount = await getCustomerDiscount(userId);
+        const typedAmount = discountAmount(computed.total, typedDiscount);
+        const assignedAmount = discountAmount(computed.total, assignedDiscount);
+        const discount = assignedAmount >= typedAmount ? assignedDiscount : typedDiscount;
+        const discAmount = Math.max(assignedAmount, typedAmount);
         const finalTotal = computed.total - discAmount;
 
         if (finalTotal !== total) {
@@ -69,9 +81,8 @@ export async function POST(req: NextRequest) {
         // Generate order number: BB-XXXX (4-digit, time-seeded)
         const orderNum = `BB-${((Date.now() % 9000) + 1000)}`;
 
-        // Guest-first: user_id is simply null for guests, set only when a
-        // verified session token accompanies the request.
-        const userId = await verifiedUserId(req);
+        // (Guest-first: `userId` was resolved above — null for guests, set only
+        // from a verified session token, never client-claimed.)
 
         // Without a configured payment gateway there's no way to pay online, so
         // the order is pay-at-pickup and goes straight to the kitchen. With a

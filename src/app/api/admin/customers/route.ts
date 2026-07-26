@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 import { isAdminAuthorized } from '@/lib/adminAuth';
+import { getCustomerTagMap } from '@/lib/customerTags';
 
 // Read-only customer/orders view for the manager admin. Aggregates the orders
 // table (live Supabase data — the one part that can't be config-in-code).
@@ -35,6 +36,9 @@ export async function GET(req: NextRequest) {
         byUser.set(o.user_id, cur);
     }
 
+    // Each customer's current standing-discount tag, if any (one query).
+    const tagMap = await getCustomerTagMap([...byUser.keys()]);
+
     // Resolve names/emails for the (bounded) set of signed-in customers.
     const customers = [];
     for (const c of byUser.values()) {
@@ -45,7 +49,7 @@ export async function GET(req: NextRequest) {
             const meta = (data.user?.user_metadata ?? {}) as Record<string, unknown>;
             name = (meta.full_name as string) ?? (meta.name as string) ?? null;
         } catch { /* user may have been deleted — leave blank */ }
-        customers.push({ ...c, email, name });
+        customers.push({ ...c, email, name, discountCode: tagMap[c.userId] ?? null });
     }
     customers.sort((a, b) => b.total - a.total);
 

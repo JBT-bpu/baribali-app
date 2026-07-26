@@ -69,6 +69,22 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     const [promoInput, setPromoInput] = useState("");
     const [appliedDiscount, setAppliedDiscount] = useState(null);
     const [promoError, setPromoError] = useState("");
+    const [autoDiscount, setAutoDiscount] = useState(null); // standing "tag" discount for signed-in customers
+
+    // Signed-in customers may have a standing discount assigned to their account
+    // ("tag", e.g. an approved municipal worker's 10%). Fetch it so the shown
+    // total matches what the server will charge; the server re-applies it anyway.
+    useEffect(() => {
+        let cancelled = false;
+        getAccessToken().then(token => {
+            if (!token) return;
+            fetch('/api/my/discount', { headers: { Authorization: `Bearer ${token}` } })
+                .then(r => r.ok ? r.json() : null)
+                .then(d => { if (!cancelled && d?.discount) setAutoDiscount(d.discount); })
+                .catch(() => {});
+        }).catch(() => {});
+        return () => { cancelled = true; };
+    }, []);
 
     const highlightStep = (item) => {
         const step = STEPS.find(s => (sels[s.id] || []).some(i => i.id === item.id));
@@ -78,7 +94,12 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     };
     const MAX_NOTES_LENGTH = 200;
     const extras = all.filter(i => effectiveItemPrice(i.id, i.price) > 0);
-    const discAmount = discountAmount(total, appliedDiscount);
+    // Apply whichever discount is larger — the customer's standing tag or a
+    // typed promo code — never both stacked (mirrors the server's rule).
+    const autoAmount = discountAmount(total, autoDiscount);
+    const typedAmount = discountAmount(total, appliedDiscount);
+    const effectiveDiscount = typedAmount > autoAmount ? appliedDiscount : autoDiscount;
+    const discAmount = Math.max(autoAmount, typedAmount);
     const finalTotal = total - discAmount;
     const applyPromo = () => {
         const d = findDiscount(promoInput);
@@ -127,7 +148,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                 pickupTime,
                 notes,
                 size: base,
-                discountCode: appliedDiscount?.code,
+                discountCode: effectiveDiscount?.code,
                 ...(DEMO_MODE ? { paymentChoice: choice } : {}),
             }),
         })
@@ -169,7 +190,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
             {showMixing && (
                 <MixingAnimation
                     all={all}
-                    total={total}
+                    total={finalTotal}
                     onComplete={() => {
                         setShowMixing(false);
                         setOrdered(true);
@@ -356,9 +377,12 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                             <button type="button" onClick={applyPromo} style={{ padding: "8px 14px", borderRadius: "8px", background: "rgba(200,168,78,0.2)", border: "1px solid rgba(200,168,78,0.4)", color: "#f0d060", fontSize: "13px", fontWeight: 800, cursor: "pointer", fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }}>החל</button>
                         </div>
                         {promoError && <div style={{ fontSize: "11px", color: "#ff7575", fontWeight: 600, marginTop: "4px" }}>{promoError}</div>}
-                        {appliedDiscount && (
+                        {effectiveDiscount && discAmount > 0 && (
                             <div style={{ ...S.sumPriceLine, marginTop: "6px" }}>
-                                <span style={{ fontSize: "12px", color: "#7dd37d", fontWeight: 700 }}>הנחה · {appliedDiscount.code}</span>
+                                <span style={{ fontSize: "12px", color: "#7dd37d", fontWeight: 700 }}>
+                                    הנחה · {effectiveDiscount.note || effectiveDiscount.code}
+                                    {effectiveDiscount === autoDiscount && <span style={{ fontSize: "10px", color: "rgba(125,211,125,0.7)", fontWeight: 600 }}> · אוטומטי</span>}
+                                </span>
                                 <span style={{ color: "#7dd37d", fontWeight: 700 }}>−₪{discAmount}</span>
                             </div>
                         )}
@@ -418,7 +442,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                     {/* CTA */}
                     <BariButton variant="primary" fullWidth style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }} onClick={() => submitOrder()}>
                         <span>שלח הזמנה</span>
-                        <span style={S.orderBtnPrice}>₪{total}</span>
+                        <span style={S.orderBtnPrice}>₪{finalTotal}</span>
                     </BariButton>
                     {/* Consent disclosure — links open the legal docs before ordering */}
                     <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.45)", textAlign: "center", lineHeight: 1.6, marginTop: "8px", fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }}>
