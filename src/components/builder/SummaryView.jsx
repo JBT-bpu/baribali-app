@@ -42,7 +42,6 @@ import { STEPS, NUTRI, BASE } from "../../data/salad-data.js"; // NUTRI used in 
 import { effectiveItemPrice } from "../../lib/menuConfig";
 import { findDiscount, discountAmount } from "../../lib/discounts";
 const headerImage = "/builder-assets/header-brand.png";
-import MagicBackground from "./background/MagicBackground.jsx";
 import MixingAnimation from "./ui/MixingAnimation.jsx";
 import BariPanel from "../ui/bari/BariPanel";
 import BariButton from "../ui/bari/BariButton";
@@ -185,7 +184,6 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     return (
         <div style={S.root}>
             <div style={S.bg} /><div style={S.bgRay} />
-            <MagicBackground />
 
             {showMixing && (
                 <MixingAnimation

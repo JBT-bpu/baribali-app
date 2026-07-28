@@ -21,11 +21,10 @@ function Icon({ src, size = "1.4em", style = {} }) {
 import { STEPS, BASE, COMBOS, PRESETS, getSuggestions, TORTILLA_STEPS, TORTILLA_BASE, SIZE_CONFIG } from "../../data/salad-data.js";
 import DetailSheet from "./ui/DetailSheet.jsx";
 import SummaryView from "./SummaryView.jsx";
-import SplashScreen from "./ui/SplashScreen.jsx";
 import HeroBowlCard from "./ui/HeroBowlCard.jsx";
+import SizePicker from "../home/SizePicker";
 import BariModal from "../ui/bari/BariModal";
 import BariButton from "../ui/bari/BariButton";
-import MagicBackground from "./background/MagicBackground";
 import { useAnimatedNumber } from "../../lib/motionHooks";
 import { takeReorder } from "../../lib/reorder";
 import { effectiveItemPrice, effectiveBase, effectiveSizePrice } from "../../lib/menuConfig";
@@ -68,7 +67,23 @@ function haptic(type) {
 // ─── MICRO-SOUNDS ────────────────────────────────────────
 
 let audioCtx = null;
+// Micro-sounds are opt-out: some people build a salad in public. The builder
+// header exposes a toggle that flips this and persists the choice.
+const SOUND_KEY = "bb-sound";
+let soundEnabled = null; // null = preference not read yet
+function setSoundEnabled(on) {
+  soundEnabled = on;
+  try { localStorage.setItem(SOUND_KEY, on ? "1" : "0"); } catch (e) { }
+}
+function readSoundPref() {
+  try { return localStorage.getItem(SOUND_KEY) !== "0"; } catch (e) { return true; }
+}
+function isSoundOn() {
+  if (soundEnabled === null) soundEnabled = readSoundPref();
+  return soundEnabled;
+}
 function playSound(type) {
+  if (!isSoundOn()) return;
   try {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     if (audioCtx.state === "suspended") return;
@@ -279,24 +294,31 @@ function ClearConfirmModal({ open, onConfirm, onCancel }) {
 
 // ─── MAIN ───────────────────────────────────────────────────
 
-/** @param {{ sizeParam?: string | null, type?: string }} props */
-export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
+/** @param {{ sizeParam?: string | null, type?: string, entrance?: boolean, skipIntro?: boolean }} props */
+export default function BariBaliBuilder({ sizeParam = null, type = "salad", entrance = false, skipIntro = false }) {
   const isTortilla = type === "tortilla";
   const steps = useMemo(() => isTortilla ? STEPS.filter(s => s.id !== "finish") : STEPS, [isTortilla]);
-  const [splash, setSplash] = useState(() => {
-    if (typeof sessionStorage === "undefined") return false;
-    const seen = sessionStorage.getItem("bb-splash-seen");
-    return !seen;
-  });
   const [step, setStep] = useState(isTortilla ? 0 : -1);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+  // Sound preference. The toggle only renders once `mounted`, so reading the
+  // stored value here can't cause a hydration mismatch.
+  const [soundOn, setSoundOn] = useState(readSoundPref);
+  const toggleSound = useCallback(() => {
+    const nextOn = !soundOn;
+    setSoundOn(nextOn);
+    setSoundEnabled(nextOn);
+    haptic("tap");
+  }, [soundOn]);
   const [selectedSize, setSelectedSize] = useState(() => parseSizeParam(sizeParam));
   const [sels, setSels] = useState({});
   const [lastAdd, setLastAdd] = useState(null);
   const [lastRemove, setLastRemove] = useState(null);
   const [summary, setSummary] = useState(false);
-  const [anim, setAnim] = useState("enter");
+  // "enter" fades the whole screen in on mount. Skipped when arriving from the
+  // page transition — that slab fade is exactly what made the builder look like
+  // it appeared in one piece; the staggered `rise()` below does the arrival instead.
+  const [anim, setAnim] = useState(skipIntro ? null : "enter");
   const [slideDir, setSlideDir] = useState(1);
   const [comboBadges, setComboBadges] = useState([]);
   const [badgeFlash, setBadgeFlash] = useState(null);
@@ -314,7 +336,6 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
   const [activeAnchor, setActiveAnchor] = useState(0);
   const [notes, setNotes] = useState("");
   const [expandedPreset, setExpandedPreset] = useState(null);
-  const [isTransforming, setIsTransforming] = useState(false);
   const [bowlAnim, setBowlAnim] = useState(null);
   useEffect(() => {
     const file = isTortilla ? "/mexican-burrito.json" : "/cat-salad-bowl.json";
@@ -496,9 +517,6 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
     setSels({ veggies: v, protein: p, sauces: sc });
     haptic("step"); playSound("step");
 
-    // Trigger background transformation
-    setIsTransforming(true);
-    setTimeout(() => setIsTransforming(false), 500);
 
     setStep(0);
   }, [steps]);
@@ -521,9 +539,6 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
     setSlideDir(dir); setAnim("out");
     haptic("step"); playSound("step");
 
-    // Trigger background transformation
-    setIsTransforming(true);
-    setTimeout(() => setIsTransforming(false), 500);
 
     setTimeout(() => {
       setStep(target); setAnim("in"); setActiveAnchor(0);
@@ -578,6 +593,16 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
   };
   const onChipTouchEnd = () => { clearTimeout(longPressRef.current); };
 
+  // ─── Arrival stagger ───
+  // When the page transition hands off, the builder's regions
+  // rise into place from the bottom up, continuing the upward motion of the
+  // transition rather than landing as one slab. `entrance` is flipped by /build
+  // the moment the veil starts lifting. Defined above the early returns so both
+  // the preset screen and the step screen can use it.
+  const rise = (order) => entrance
+    ? { animation: `bbRise 640ms cubic-bezier(0.16,1,0.3,1) ${order * 85}ms both` }
+    : null;
+
   // ─── Anchor tab scroll ───
   const scrollToSg = (idx) => {
     setActiveAnchor(idx);
@@ -588,64 +613,34 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
   if (step === -1 && !summary) {
     const hasDraft = Object.keys(sels).length > 0 || notes;
 
-    // ── Size picker (shown when no size selected) ──
+    // ── No size yet (deep link / bookmark straight to /build) — show the SAME
+    //    shared picker the landing uses, so "which size?" is asked one way only.
     if (!selectedSize) {
       return (
-        <div style={S.root}>
-          {splash && <SplashScreen onDone={() => { sessionStorage.setItem("bb-splash-seen", "1"); setSplash(false); }} />}
-          <div style={S.bg} />
-          <MagicBackground isTransforming={isTransforming} />
-          <div style={{ ...S.main, padding: "0 0 40px", opacity: anim === "enter" ? 0 : 1, transition: "all 0.5s" }}>
-            <HeaderBanner />
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px", flex: 1, padding: "24px 16px 0" }}>
-              <div style={{ textAlign: "center", marginBottom: "8px" }}>
-                <div style={{ fontSize: "20px", fontWeight: 900, color: "#f0d060", textShadow: "0 2px 8px rgba(0,0,0,0.6)" }}>בחרו גודל סלט</div>
-                <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.45)", marginTop: "4px", fontWeight: 500 }}>המחיר משתנה בהתאם לגודל</div>
-              </div>
-              {Object.values(SIZE_CONFIG).map(sc => (
-                <button key={sc.ml} onClick={() => { setSelectedSize(sc.ml); haptic("step"); }}
-                  style={S.sizeCard}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-                      <span style={{ fontSize: "32px" }}>🥗</span>
-                      <div style={{ textAlign: "right" }}>
-                        <div style={{ fontSize: "20px", fontWeight: 900, color: "#ffffff", textShadow: "0 2px 6px rgba(0,0,0,0.6)" }}>{sc.label}</div>
-                        <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.5)", fontWeight: 500, marginTop: "2px" }}>{sc.desc}</div>
-                      </div>
-                    </div>
-                    <div style={{ textAlign: "left" }}>
-                      <div style={{ fontSize: "11px", color: "rgba(200,168,78,0.6)", fontWeight: 600 }}>החל מ</div>
-                      <div style={{ fontSize: "24px", fontWeight: 900, color: "#f0d060", textShadow: "0 2px 8px rgba(200,168,78,0.4)", lineHeight: 1 }}>₪{effectiveSizePrice(sc.ml)}</div>
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-          {mounted && <style>{KF}</style>}
-        </div>
+        <SizePicker
+          onSelect={(s) => { setSelectedSize(parseSizeParam(s)); haptic("step"); }}
+          onBack={() => { window.location.href = "/home2"; }}
+        />
       );
     }
 
     const sc = SIZE_CONFIG[selectedSize];
     return (
       <div style={S.root}>
-        {splash && <SplashScreen onDone={() => { sessionStorage.setItem("bb-splash-seen", "1"); setSplash(false); }} />}
         <div style={S.bg} />
-        <MagicBackground isTransforming={isTransforming} />
         <div style={{
           ...S.main, justifyContent: "space-between", padding: "0 0 20px",
           opacity: anim === "enter" ? 0 : 1, transform: anim === "enter" ? "translateY(12px)" : "none", transition: "all 0.5s"
         }}>
           {/* Brand header banner */}
-          <HeaderBanner />
+          <div style={rise(2) ?? undefined}><HeaderBanner /></div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "16px", flex: 1, padding: "16px 16px 24px", overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
 
             {/* HERO - Start Empty Button (Glassy) */}
             <button
               onClick={() => { setStep(0); haptic("step"); playSound("step"); }}
-              style={S.heroBtn}
+              style={{ ...S.heroBtn, ...rise(1) }}
               aria-label="התחל סלט ריק"
               tabIndex={0}
             >
@@ -700,7 +695,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
             </button>
 
             {/* Presets - Secondary */}
-            <div style={{ width: "100%" }}>
+            <div style={{ width: "100%", ...rise(0) }}>
               <div style={{ textAlign: "center", marginBottom: "14px" }}>
                 <div style={{ fontSize: "26px", marginBottom: "5px", filter: "drop-shadow(0 0 10px rgba(200,168,78,0.5))" }}>👨‍🍳</div>
                 <div style={{
@@ -852,7 +847,6 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
 
   return (
     <div style={S.root} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-      {splash && <SplashScreen onDone={() => { sessionStorage.setItem("bb-splash-seen", "1"); setSplash(false); }} />}
       <div style={S.bg} />
 
       {badgeFlash && <div style={S.badgeFlash}><span style={{ fontSize: "22px" }}>{badgeFlash.icon}</span><span style={S.badgeFlashTxt}>{badgeFlash.he}</span></div>}
@@ -872,7 +866,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
       <div style={{ ...S.main, opacity: anim === "enter" ? 0 : 1, transition: "opacity 0.4s" }}>
 
         {/* ── HEADER ── */}
-        <div style={S.header} role="banner">
+        <div style={{ ...S.header, ...rise(3) }} role="banner">
           {/* Contrast plate behind text */}
           <div style={{
             position: "absolute",
@@ -891,6 +885,18 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
             <div style={{ display: "flex", gap: "5px", flexShrink: 0, zIndex: 1 }}>
               <button onClick={back} aria-label="חזור" style={S.navBtn}>→</button>
               <button onClick={requestClearDraft} aria-label="נקה הכל" style={{ ...S.resetBtn, opacity: all.length > 0 ? 1 : 0.2, pointerEvents: all.length > 0 ? "auto" : "none" }}>↺</button>
+              {/* Sound toggle — rendered post-mount so the stored preference can't
+                  cause a hydration mismatch. */}
+              {mounted && (
+                <button
+                  onClick={toggleSound}
+                  aria-label={soundOn ? "כבה צלילים" : "הפעל צלילים"}
+                  aria-pressed={soundOn}
+                  style={{ ...S.resetBtn, opacity: soundOn ? 1 : 0.45 }}
+                >
+                  {soundOn ? "🔊" : "🔇"}
+                </button>
+              )}
             </div>
             {/* Step title — truly centered over the full row, single line */}
             <div style={{ position: "absolute", left: 0, right: 0, textAlign: "center", pointerEvents: "none" }}>
@@ -957,17 +963,19 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
         </div>
 
         {/* ── HERO BOWL CARD ── */}
-        <HeroBowlCard
-          all={all}
-          onRemove={removeFromBowl}
-          comboBadges={comboBadges}
-          lastAdd={lastAdd}
-          lastRemove={lastRemove}
-          animFile={isTortilla ? "/mexican-burrito.json" : "/cat-salad-bowl.json"}
-          freePlay={isTortilla}
-          bowlTop={isTortilla ? "44%" : "24%"}
-          max={isTortilla ? TORTILLA_MAX : BOWL_MAX}
-        />
+        <div style={rise(2) ?? undefined}>
+          <HeroBowlCard
+            all={all}
+            onRemove={removeFromBowl}
+            comboBadges={comboBadges}
+            lastAdd={lastAdd}
+            lastRemove={lastRemove}
+            animFile={isTortilla ? "/mexican-burrito.json" : "/cat-salad-bowl.json"}
+            freePlay={isTortilla}
+            bowlTop={isTortilla ? "44%" : "24%"}
+            max={isTortilla ? TORTILLA_MAX : BOWL_MAX}
+          />
+        </div>
 
         {/* Suggestions */}
         {suggestions.length > 0 && <div style={S.sugRow}>{suggestions.map((s, i) => <div key={i} style={S.sugPill}><span style={{ fontSize: "11px" }}>{s.icon}</span><span style={{ fontSize: "11px", fontWeight: 700, color: "#f0d060", textShadow: "0 1px 2px rgba(0,0,0,0.5)" }}>{s.text}</span></div>)}</div>}
@@ -1000,7 +1008,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
         )}
 
         {/* ── CONTENT (directional slide) ── */}
-        <div style={{ ...S.content, opacity: anim === "out" ? 0 : 1, transform: anim === "out" ? `translateX(${slideX})` : "translateX(0)", filter: anim === "out" ? "blur(3px)" : "blur(0px)", transition: "opacity 0.22s ease, transform 0.28s cubic-bezier(0.25,0.46,0.45,0.94), filter 0.22s ease" }} ref={scrollRef} role="main" aria-label={`${cur.title} - בחרו מרכיבים`}>
+        <div style={{ ...S.content, opacity: anim === "out" ? 0 : 1, transform: anim === "out" ? `translateX(${slideX})` : "translateX(0)", filter: anim === "out" ? "blur(3px)" : "blur(0px)", transition: "opacity 0.22s ease, transform 0.28s cubic-bezier(0.25,0.46,0.45,0.94), filter 0.22s ease", ...rise(1) }} ref={scrollRef} role="main" aria-label={`${cur.title} - בחרו מרכיבים`}>
 
           {/* Long-press discovery hint — shows once on load, fades out */}
           {showLongPressHint && (
@@ -1058,7 +1066,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
         </div>
 
         {/* ── BOTTOM ACTION ZONE ── */}
-        <div style={S.bar}>
+        <div style={{ ...S.bar, ...rise(0) }}>
           <button
             style={{
               flex: 1,
@@ -1113,6 +1121,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad" }) {
 // ─── KEYFRAMES ──────────────────────────────────────────────
 
 const KF = `
+@keyframes bbRise { 0%{opacity:0;transform:translateY(30px)} 100%{opacity:1;transform:none} }
 @keyframes chipIn { 0%{opacity:0;transform:translateY(10px) scale(0.92)} 100%{opacity:1;transform:none} }
 @keyframes expandIn { 0%{opacity:0;transform:translateY(-6px) scaleY(0.94);transform-origin:top} 100%{opacity:1;transform:none} }
 @keyframes popBounce { 0%{transform:scale(0.3);opacity:0} 60%{transform:scale(1.15)} 100%{transform:scale(1);opacity:1} }
@@ -1247,5 +1256,4 @@ const S = {
   },
   clearDraftBtn: { marginTop: "10px", padding: "6px 12px", borderRadius: "8px", cursor: "pointer", background: "rgba(239,83,80,0.1)", border: "1px solid rgba(239,83,80,0.25)", color: "#ef5350", fontSize: "11px", fontWeight: 600, fontFamily: "var(--font-heebo), 'Heebo', sans-serif", transition: "all 0.15s" },
 
-  sizeCard: { display: "flex", alignItems: "center", width: "100%", padding: "18px 20px", borderRadius: "18px", cursor: "pointer", background: "linear-gradient(155deg, rgba(13,46,13,0.97), rgba(8,28,8,0.93))", border: "2px solid rgba(200,168,78,0.4)", boxShadow: "0 0 0 1px rgba(200,168,78,0.08), 0 8px 30px rgba(0,0,0,0.5), 0 0 20px rgba(200,168,78,0.06), inset 0 1px 0 rgba(255,255,255,0.06)", transition: "all 0.2s cubic-bezier(0.34,1.56,0.64,1)", outline: "none", fontFamily: "var(--font-heebo), 'Heebo', sans-serif" },
 };
