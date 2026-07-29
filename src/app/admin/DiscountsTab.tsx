@@ -26,11 +26,24 @@ export default function DiscountsTab() {
     const remove = (i: number) => setRows(rs => rs.filter((_, idx) => idx !== i));
 
     const save = async () => {
-        setBusy(true);
-        setStatus('');
         const payload = rows
             .filter(r => r.code.trim())
             .map(r => ({ code: r.code.trim().toUpperCase(), type: r.type, value: Math.round(Number(r.value) || 0), active: r.active, note: r.note }));
+
+        // "50" meant as ₪50 but left on "אחוז" gives half the menu away. The
+        // server caps a discount at the order total, so this can't go negative —
+        // but it can very easily make orders free by accident.
+        const steep = payload.filter(d => d.active && d.type === 'percent' && d.value >= 50);
+        if (steep.length > 0 &&
+            !window.confirm(
+                `שימו לב — הקודים הבאים נותנים הנחה גדולה מאוד:\n` +
+                steep.map(d => `${d.code} — ${d.value}%${d.value >= 100 ? ' (הזמנה חינם)' : ''}`).join('\n') +
+                `\n\nאם התכוונתם לסכום בשקלים, שנו את הסוג ל״₪״.\n\nלהמשיך ולשמור?`)) {
+            return;
+        }
+
+        setBusy(true);
+        setStatus('');
         try {
             const res = await fetch('/api/admin/discounts', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },

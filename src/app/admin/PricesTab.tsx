@@ -45,20 +45,37 @@ export default function PricesTab() {
     const set = (key: string, val: string) => setPrices(p => ({ ...p, [key]: val }));
 
     const save = async () => {
+        const numeric: Record<string, number> = {};
+        let cleared = 0;
+        for (const [k, v] of Object.entries(prices)) {
+            const t = String(v).trim();
+            // An emptied field must NOT become ₪0. `Number('')` is 0, so clearing
+            // a box used to save a zero price — on the base field that makes every
+            // salad free. Empty now means "no override": the code default applies.
+            if (t === '') { cleared++; continue; }
+            const n = Number(t);
+            if (!Number.isFinite(n) || n < 0) continue;
+            numeric[k] = Math.round(n);
+        }
+
+        // A real ₪0 base or size is always deliberate, never a slip of the finger.
+        const zeroBases = BASE_FIELDS.filter(f => numeric[f.key] === 0).map(f => f.label);
+        if (zeroBases.length > 0 &&
+            !window.confirm(`שימו לב — המחירים הבאים מוגדרים ל-₪0:\n${zeroBases.join('\n')}\n\nלהמשיך ולשמור?`)) {
+            return;
+        }
+
         setBusy(true);
         setStatus('');
-        const numeric: Record<string, number> = {};
-        for (const [k, v] of Object.entries(prices)) {
-            const n = Number(v);
-            if (Number.isFinite(n) && n >= 0) numeric[k] = Math.round(n);
-        }
         try {
             const res = await fetch('/api/admin/menu-prices', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(numeric),
             });
             const data = await res.json().catch(() => ({}));
-            setStatus(res.ok ? 'נשמר ✓ — בצע deploy כדי לפרסם' : (data.error || 'השמירה נכשלה'));
+            setStatus(res.ok
+                ? `נשמר ✓ — בצע deploy כדי לפרסם${cleared ? ` · ${cleared} שדות ריקים חזרו למחיר ברירת המחדל` : ''}`
+                : (data.error || 'השמירה נכשלה'));
         } catch {
             setStatus('שגיאת רשת');
         }

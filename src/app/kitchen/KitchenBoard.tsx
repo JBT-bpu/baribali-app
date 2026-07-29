@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { CircleCheck, Circle } from 'lucide-react';
 import { isSupabaseConfigured } from '@/lib/supabase';
@@ -65,6 +65,16 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
     const [now, setNow] = useState(new Date());
     const [scrolled, setScrolled] = useState(false);
     const isDemo = !isSupabaseConfigured();
+    // A board that can't reach the server must never look like a quiet board.
+    // "אין הזמנות פעילות ✓" on a failed fetch is the worst thing this screen can
+    // do: during a rush the kitchen would sit idle while orders pile up.
+    const [loadError, setLoadError] = useState(false);
+    const [lastOk, setLastOk] = useState<Date | null>(null);
+    const [actionError, setActionError] = useState<string | null>(null);
+    // Latest orders without putting them in updateStatus's dependencies, so a
+    // failed status write can restore the row's previous value.
+    const ordersRef = useRef<Order[]>([]);
+    useEffect(() => { ordersRef.current = orders; }, [orders]);
 
     // If the session expired mid-shift, API calls start returning 401.
     // Re-run the server guard, which will render the login screen.
@@ -94,16 +104,25 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
     // store when Supabase isn't configured, so the client doesn't need its
     // own separate demo-fixture logic; this always hits the real endpoint.
     const loadOrders = useCallback(async () => {
-        // Session cookie is sent automatically (same-origin) — no header needed.
-        const res = await fetch('/api/kitchen/orders');
-        if (res.status === 401) { onUnauthorized(); return; }
-        if (res.ok) {
+        try {
+            // Session cookie is sent automatically (same-origin) — no header needed.
+            const res = await fetch('/api/kitchen/orders');
+            if (res.status === 401) { onUnauthorized(); return; }
+            if (!res.ok) { setLoadError(true); return; }
             const data = await res.json();
             // Keyed by order.id in the render below, so React reconciles in place
             // rather than remounting cards — no visual "jump" on each poll.
             setOrders(data as Order[]);
+            setLoadError(false);
+            setLastOk(new Date());
+        } catch {
+            // A dropped connection previously threw out of this callback, so the
+            // board silently stopped updating (and the first load stuck on
+            // "טוען הזמנות...", since setLoading never ran).
+            setLoadError(true);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     }, [onUnauthorized]);
 
     useEffect(() => { loadOrders(); }, [loadOrders]);
@@ -119,13 +138,25 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
     // Update order status — same endpoint in demo and live mode, the route
     // itself decides whether to write to Supabase or the demo store.
     const updateStatus = useCallback(async (id: string, status: OrderStatus) => {
+        const previous = ordersRef.current.find(o => o.id === id)?.status;
         setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o)); // optimistic
-        const res = await fetch(`/api/orders/${id}/status`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status }),
-        });
-        if (res.status === 401) onUnauthorized();
+        try {
+            const res = await fetch(`/api/orders/${id}/status`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status }),
+            });
+            if (res.status === 401) { onUnauthorized(); return; }
+            if (!res.ok) throw new Error('status write failed');
+            setActionError(null);
+        } catch {
+            // Put the card back and say so. Leaving the optimistic value up meant
+            // the board could show "מוכן" while the customer's order was never
+            // actually marked ready.
+            if (previous) setOrders(prev => prev.map(o => o.id === id ? { ...o, status: previous } : o));
+            setActionError('עדכון הסטטוס נכשל — נסו שוב');
+            setTimeout(() => setActionError(null), 5000);
+        }
     }, [onUnauthorized]);
 
     // Bucket orders into columns
@@ -180,8 +211,29 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
                 </div>
             </div>
 
+            {/* Connection lost — shown INSTEAD of the reassuring empty state */}
+            {loadError && (
+                <div style={K.errorBanner} role="alert">
+                    <span style={{ fontSize: '20px' }}>⚠️</span>
+                    <div>
+                        <div style={{ fontWeight: 900 }}>אין חיבור לשרת — ייתכן שיש הזמנות שאינן מוצגות</div>
+                        <div style={{ fontSize: '13px', opacity: 0.85, marginTop: '2px' }}>
+                            {lastOk
+                                ? `עודכן לאחרונה ${lastOk.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })} · מנסה שוב כל 4 שניות`
+                                : 'מנסה שוב כל 4 שניות'}
+                        </div>
+                    </div>
+                </div>
+            )}
+            {actionError && (
+                <div style={K.errorBanner} role="alert">
+                    <span style={{ fontSize: '20px' }}>⚠️</span>
+                    <div style={{ fontWeight: 900 }}>{actionError}</div>
+                </div>
+            )}
+
             {loading && <div style={K.loadingMsg}>טוען הזמנות...</div>}
-            {!loading && totalActive === 0 && (
+            {!loading && !loadError && totalActive === 0 && (
                 <div style={K.emptyMsg}>אין הזמנות פעילות כרגע ✓</div>
             )}
 
@@ -358,6 +410,12 @@ const K: Record<string, React.CSSProperties> = {
 
     loadingMsg: { padding: '60px', textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: '16px' },
     emptyMsg: { padding: '80px', textAlign: 'center', color: 'var(--color-green-accent)', fontSize: '18px', fontWeight: 700 },
+    errorBanner: {
+        display: 'flex', alignItems: 'center', gap: '12px',
+        margin: '12px 16px', padding: '14px 16px', borderRadius: '12px',
+        background: 'rgba(229,57,53,0.14)', border: '1px solid rgba(229,57,53,0.5)',
+        color: '#ff9a97', fontSize: '15px', lineHeight: 1.4,
+    },
 
     columns: {
         display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',

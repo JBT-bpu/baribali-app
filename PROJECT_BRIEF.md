@@ -132,7 +132,7 @@ Git history is authoritative for exact detail — commit messages are descriptiv
 - Real Hyp Pay SIGN/VERIFY (server-side, cryptographically checked) replacing the earlier placeholder
 - Supabase RLS confirmed correct via live testing (anon can insert, cannot read)
 - `user_id` on orders is server-verified from a Bearer token, never client-claimed
-- **`/kitchen` has real access control**: a server-only shared staff password (`KITCHEN_PASSWORD`) exchanged for an httpOnly, HMAC-signed session cookie. The server component gates the page before any board markup ships; the order API routes verify the same cookie. Replaces the old `NEXT_PUBLIC_` header "secret" that shipped in the browser bundle. Unset = board runs open (local/demo); **must be set on Vercel for production** (until then the live board is open).
+- **`/kitchen` has real access control**: a server-only shared staff password (`KITCHEN_PASSWORD`) exchanged for an httpOnly, HMAC-signed session cookie. The server component gates the page before any board markup ships; the order API routes verify the same cookie. Replaces the old `NEXT_PUBLIC_` header "secret" that shipped in the browser bundle. Unset = board runs open (local/demo); **set on Vercel in production** — verified live: `/kitchen` serves the login screen and `/api/kitchen/orders` returns 401 to anonymous requests.
 - **Rate limiting** (`src/lib/rateLimit.ts`) on orders (12/min), payment-create (12/min), slots (40/min), kitchen-login (8/min) — 429 + Retry-After. In-memory/per-process (approximate on serverless); webhook intentionally unthrottled so gateway callbacks aren't dropped.
 - **Privacy/terms pages exist** (`/privacy`, `/terms`) — drafted, but contain `[bracketed]` business-detail placeholders that must be filled before launch.
 
@@ -157,7 +157,7 @@ Git history is authoritative for exact detail — commit messages are descriptiv
 `main` is pushed and in sync with `origin` as of the 2026-07-22 checkpoint; production auto-deploys from it but is **still in demo mode** (Vercel env vars not set). Remaining:
 
 1. **Fill the `[bracketed]` placeholders in `/privacy` and `/terms`** before launch (business/legal name, ח.פ., address, contact email/phone, VAT-inclusive?, payment provider name, cancellation/refund policy, allergen statement, jurisdiction city, effective date, min age, retention period).
-2. Set a real `KITCHEN_PASSWORD` on Vercel — the live board runs **open** until it's set (auth is built; this just provides the production value).
+2. ~~Set a real `KITCHEN_PASSWORD` on Vercel~~ — **done**; verified live (login screen served, `/api/kitchen/orders` 401 anonymously).
 3. Add real Supabase/Hyp Pay env vars to **Vercel** to take production out of demo mode.
 4. Production domain — not yet decided.
 5. Hyp Pay **production** credentials (`HYP_MASOF`/`HYP_KEY`/`HYP_PASSP`) — integration built + tested against error paths; live credentials not yet arrived.
