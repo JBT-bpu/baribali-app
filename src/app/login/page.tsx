@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import ParticleCanvas from '@/components/ui/ParticleCanvas';
+import GoldField from '@/components/ui/GoldField';
 import GoogleSignInButton from '@/components/ui/GoogleSignInButton';
 import LegalLinks from '@/components/legal/LegalLinks';
 import { useUser } from '@/lib/auth';
@@ -20,13 +20,13 @@ export default function LoginPage() {
     return (
         <div style={{
             minHeight: '100vh',
-            background: 'url(/homepage-assets/bg-bokeh.webp) center top / cover no-repeat, linear-gradient(155deg, #030a03 0%, #071a07 30%, #0a200a 60%, #071a07 100%)',
+            background: 'url(/homepage-assets/BG_8K.webp) center top / cover no-repeat, linear-gradient(155deg, #030a03 0%, #071a07 30%, #0a200a 60%, #071a07 100%)',
             fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
             direction: 'rtl',
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
             gap: '18px', padding: '20px', position: 'relative', overflow: 'hidden',
         }}>
-            <ParticleCanvas intensity="medium" />
+            <GoldField zIndex={0} />
             <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '18px', maxWidth: '320px', width: '100%' }}>
                 <div style={{ fontSize: '28px', fontWeight: 800, color: 'var(--color-gold-light)' }}>🥗 BariBali</div>
                 <div style={{ fontSize: '22px', fontWeight: 900, color: '#fff', textAlign: 'center' }}>התחברות</div>

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import ParticleCanvas from '@/components/ui/ParticleCanvas';
+import GoldField from '@/components/ui/GoldField';
 import GoogleSignInButton from '@/components/ui/GoogleSignInButton';
 import { BariPanel, BariBadge, BariButton } from '@/components/ui/bari';
 import { useUser, getAccessToken } from '@/lib/auth';
@@ -27,7 +27,7 @@ const STATUS_HE: Record<string, string> = {
 
 const bg: React.CSSProperties = {
     minHeight: '100vh',
-    background: 'url(/homepage-assets/bg-bokeh.webp) center top / cover no-repeat, linear-gradient(155deg, #030a03 0%, #071a07 30%, #0a200a 60%, #071a07 100%)',
+    background: 'url(/homepage-assets/BG_8K.webp) center top / cover no-repeat, linear-gradient(155deg, #030a03 0%, #071a07 30%, #0a200a 60%, #071a07 100%)',
     fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
     direction: 'rtl', position: 'relative', overflow: 'hidden',
 };
@@ -36,19 +36,29 @@ export default function OrdersPage() {
     const router = useRouter();
     const { user, loading } = useUser();
     const [orders, setOrders] = useState<HistoryOrder[] | null>(null);
+    // A failed load must not look like "you have no orders" — and must not leave
+    // the page spinning forever if the access token never arrives.
+    const [loadError, setLoadError] = useState(false);
+    const [reloadKey, setReloadKey] = useState(0);
 
     useEffect(() => {
         if (!user) return;
         let cancelled = false;
-        getAccessToken().then(token => {
-            if (!token || cancelled) return;
-            fetch('/api/my/orders', { headers: { Authorization: `Bearer ${token}` } })
-                .then(r => r.ok ? r.json() : [])
-                .then(data => { if (!cancelled) setOrders(data as HistoryOrder[]); })
-                .catch(() => { if (!cancelled) setOrders([]); });
-        });
+        getAccessToken()
+            .then(token => {
+                if (cancelled) return;
+                if (!token) { setLoadError(true); setOrders([]); return; }
+                return fetch('/api/my/orders', { headers: { Authorization: `Bearer ${token}` } })
+                    .then(async r => {
+                        if (cancelled) return;
+                        if (!r.ok) { setLoadError(true); setOrders([]); return; }
+                        const data = await r.json();
+                        setOrders(Array.isArray(data) ? data as HistoryOrder[] : []);
+                    });
+            })
+            .catch(() => { if (!cancelled) { setLoadError(true); setOrders([]); } });
         return () => { cancelled = true; };
-    }, [user]);
+    }, [user, reloadKey]);
 
     // Reorder — stash the item set and send the builder to reconstruct it.
     // 'same' jumps to the summary; 'edit' opens the builder to change things.
@@ -67,7 +77,7 @@ export default function OrdersPage() {
     if (!user) {
         return (
             <div style={{ ...bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '18px', padding: '20px' }}>
-                <ParticleCanvas intensity="medium" />
+                <GoldField zIndex={0} />
                 <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', maxWidth: '320px', width: '100%' }}>
                     <div style={{ fontSize: '48px' }}>📋</div>
                     <div style={{ fontSize: '20px', fontWeight: 900, color: '#fff' }}>ההזמנות שלי</div>
@@ -84,7 +94,7 @@ export default function OrdersPage() {
 
     return (
         <div style={{ ...bg, padding: '0 0 60px' }}>
-            <ParticleCanvas intensity="medium" />
+            <GoldField zIndex={0} />
             <div style={{ position: 'relative', zIndex: 1, maxWidth: '430px', margin: '0 auto', padding: '24px 16px', paddingTop: 'max(24px, env(safe-area-inset-top))', display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
                 <div style={{ fontSize: '22px', fontWeight: 900, color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -94,7 +104,19 @@ export default function OrdersPage() {
                 {orders === null && (
                     <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.35)', fontWeight: 600, textAlign: 'center', padding: '24px 0' }}>טוען הזמנות…</div>
                 )}
-                {orders?.length === 0 && (
+                {/* Couldn't load — distinct from "no orders", which would tell a
+                    returning customer their history had vanished. */}
+                {loadError && orders?.length === 0 && (
+                    <BariPanel className="p-5" style={{ textAlign: 'center' }}>
+                        <div style={{ fontSize: '32px', marginBottom: '8px' }}>⚠️</div>
+                        <div style={{ fontSize: '14px', fontWeight: 700, color: 'rgba(255,255,255,0.7)' }}>לא הצלחנו לטעון את ההזמנות</div>
+                        <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginTop: '4px' }}>ההיסטוריה שלכם שמורה — נסו שוב</div>
+                        <BariButton variant="secondary" size="sm" style={{ marginTop: '14px' }} onClick={() => { setLoadError(false); setOrders(null); setReloadKey(k => k + 1); }}>
+                            נסו שוב
+                        </BariButton>
+                    </BariPanel>
+                )}
+                {!loadError && orders?.length === 0 && (
                     <BariPanel className="p-5" style={{ textAlign: 'center' }}>
                         <div style={{ fontSize: '32px', marginBottom: '8px' }}>🥗</div>
                         <div style={{ fontSize: '14px', fontWeight: 700, color: 'rgba(255,255,255,0.6)' }}>עדיין אין הזמנות</div>

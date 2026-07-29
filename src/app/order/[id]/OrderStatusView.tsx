@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import ParticleCanvas from '@/components/ui/ParticleCanvas';
+import GoldField from '@/components/ui/GoldField';
 import BariBadge from '@/components/ui/bari/BariBadge';
 import BariGlowBackground from '@/components/ui/bari/BariGlowBackground';
 import { fireGoldConfetti } from '@/lib/confetti';
@@ -20,7 +20,20 @@ interface Order {
     pickup_time: string | null;
     notes: string | null;
     status: OrderStatus;
+    payment_status?: string;
     created_at: string;
+}
+
+/** What the customer needs to know about money, in their own terms. */
+function paymentLabel(payment: string | undefined): { text: string; owed: boolean } | null {
+    switch (payment) {
+        case 'paid':
+        case 'paid_unverified': return { text: 'שולם ✓', owed: false };
+        case 'pay_at_pickup':   return { text: 'לתשלום באיסוף', owed: true };
+        case 'pending':         return { text: 'ממתין לתשלום', owed: true };
+        case 'failed':          return { text: 'התשלום נכשל — שלמו באיסוף', owed: true };
+        default:                return null;
+    }
 }
 
 const STATUS_STEPS: { key: OrderStatus; label: string; icon: string }[] = [
@@ -74,7 +87,9 @@ function fireHaptic() {
 
 /* ── Countdown Hook ── */
 function useCountdown(pickupTime: string | null) {
-    const [now, setNow] = useState(Date.now());
+    // Lazy initialiser: Date.now() as a bare argument re-evaluates on every
+    // render (and is an impure call during render).
+    const [now, setNow] = useState(() => Date.now());
 
     useEffect(() => {
         if (!pickupTime) return;
@@ -145,6 +160,7 @@ export default function OrderStatusView({ id }: { id: string }) {
         // needed to read it via /api/orders/[id].
         let cancelled = false;
         let initial = true;
+        let interval: ReturnType<typeof setInterval> | undefined;
 
         const load = () => {
             fetch(`/api/orders/${id}`)
@@ -158,14 +174,21 @@ export default function OrderStatusView({ id }: { id: string }) {
                     const d = data as Order;
                     setOrder(d);
                     if (prevStatusRef.current === null) prevStatusRef.current = d.status;
+                    // 'collected' is terminal — nothing will change again. Without
+                    // this the page polled every 4s forever, so a tab left open
+                    // after pickup kept hitting the API all day.
+                    if (d.status === 'collected' && interval) {
+                        clearInterval(interval);
+                        interval = undefined;
+                    }
                 })
                 .catch(() => { if (!cancelled && initial) setNotFound(true); })
                 .finally(() => { initial = false; });
         };
 
         load();
-        const interval = setInterval(load, 4000);
-        return () => { cancelled = true; clearInterval(interval); };
+        interval = setInterval(load, 4000);
+        return () => { cancelled = true; if (interval) clearInterval(interval); };
     }, [id]);
 
     // Track status changes and fire effects
@@ -231,7 +254,7 @@ export default function OrderStatusView({ id }: { id: string }) {
     return (
         <div style={P.root}>
             <BariGlowBackground />
-            <ParticleCanvas intensity="medium" />
+            <GoldField zIndex={0} />
 
             <div style={P.content}>
                 {/* Header */}
@@ -307,6 +330,23 @@ export default function OrderStatusView({ id }: { id: string }) {
                     <div style={P.itemNames}>{order.items.map(i => i.he).join(' · ')}</div>
                     {order.notes && <div style={P.notes}>📝 {order.notes}</div>}
                     <div style={P.total}>₪{order.total}</div>
+                    {(() => {
+                        const pay = paymentLabel(order.payment_status);
+                        if (!pay) return null;
+                        return (
+                            <div style={{
+                                marginTop: '6px', display: 'inline-flex', alignItems: 'center', gap: '6px',
+                                padding: '5px 12px', borderRadius: 'var(--radius-full)',
+                                fontSize: '12px', fontWeight: 800,
+                                background: pay.owed ? 'rgba(255,183,77,0.14)' : 'rgba(102,187,106,0.14)',
+                                border: `1px solid ${pay.owed ? 'rgba(255,183,77,0.42)' : 'rgba(102,187,106,0.42)'}`,
+                                color: pay.owed ? '#ffcc80' : '#a5d6a7',
+                            }}>
+                                <span>{pay.owed ? '💳' : '✓'}</span>
+                                <span>{pay.text}</span>
+                            </div>
+                        );
+                    })()}
                 </div>
 
                 <div style={P.footer}>מתרענן אוטומטית · לא צריך לרענן</div>
@@ -366,7 +406,7 @@ function NotFound() {
 const shimmerGradient = 'linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.04) 75%)';
 
 const P: Record<string, React.CSSProperties> = {
-    root: { position: 'relative', minHeight: '100vh', background: 'url(/homepage-assets/bg-bokeh.webp) center top / cover no-repeat, linear-gradient(155deg, #030a03 0%, #071a07 30%, #0a200a 60%, #071a07 100%)', fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: 'rtl', color: '#fff' },
+    root: { position: 'relative', minHeight: '100vh', background: 'url(/homepage-assets/BG_8K.webp) center top / cover no-repeat, linear-gradient(155deg, #030a03 0%, #071a07 30%, #0a200a 60%, #071a07 100%)', fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: 'rtl', color: '#fff' },
     content: { position: 'relative', zIndex: 1, maxWidth: '420px', margin: '0 auto', padding: '32px 20px 60px', paddingTop: 'max(32px, env(safe-area-inset-top))', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' },
 
     logo: { fontSize: '18px', fontWeight: 900, color: '#f0d060', letterSpacing: '0.04em', animation: 'fadeUp 0.4s ease both' },

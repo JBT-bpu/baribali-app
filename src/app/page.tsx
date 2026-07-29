@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import ParticleCanvas from '@/components/ui/ParticleCanvas';
+import GoldField from '@/components/ui/GoldField';
 import GoogleSignInButton from '@/components/ui/GoogleSignInButton';
 import LegalLinks from '@/components/legal/LegalLinks';
 import { BariButton } from '@/components/ui/bari';
@@ -92,7 +92,7 @@ export default function EntryPage() {
 
             {/* Darkening gradient so the content reads over the photo bg */}
             <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.42) 0%, rgba(0,0,0,0.55) 45%, rgba(2,10,2,0.86) 100%)' }} />
-            <ParticleCanvas intensity="medium" />
+            <GoldField zIndex={0} />
 
             {/* Logo + gold glow ring + one-time sheen sweep */}
             <div style={{

@@ -3,14 +3,14 @@
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ClipboardList, ChevronLeft } from 'lucide-react';
-import ParticleCanvas from '@/components/ui/ParticleCanvas';
+import GoldField from '@/components/ui/GoldField';
 import GoogleSignInButton from '@/components/ui/GoogleSignInButton';
 import { BariPanel, BariButton } from '@/components/ui/bari';
 import { useUser, signOut, displayName, avatarUrl } from '@/lib/auth';
 
 const bg: React.CSSProperties = {
     minHeight: '100vh',
-    background: 'url(/homepage-assets/bg-bokeh.webp) center top / cover no-repeat, linear-gradient(155deg, #030a03 0%, #071a07 30%, #0a200a 60%, #071a07 100%)',
+    background: 'url(/homepage-assets/BG_8K.webp) center top / cover no-repeat, linear-gradient(155deg, #030a03 0%, #071a07 30%, #0a200a 60%, #071a07 100%)',
     fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
     direction: 'rtl', position: 'relative', overflow: 'hidden',
 };
@@ -28,7 +28,7 @@ export default function ProfilePage() {
     if (!user) {
         return (
             <div style={{ ...bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '18px', padding: '20px' }}>
-                <ParticleCanvas intensity="medium" />
+                <GoldField zIndex={0} />
                 <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', maxWidth: '320px', width: '100%' }}>
                     <div style={{ fontSize: '48px' }}>👤</div>
                     <div style={{ fontSize: '20px', fontWeight: 900, color: '#fff' }}>האזור שלי</div>
@@ -47,7 +47,7 @@ export default function ProfilePage() {
 
     return (
         <div style={{ ...bg, padding: '0 0 60px' }}>
-            <ParticleCanvas intensity="medium" />
+            <GoldField zIndex={0} />
             <div style={{ position: 'relative', zIndex: 1, maxWidth: '430px', margin: '0 auto', padding: '24px 16px', paddingTop: 'max(24px, env(safe-area-inset-top))', display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
                 {/* Identity card */}

@@ -1,8 +1,7 @@
 /**
- * Ambient gold-glow backdrop — a lighter, reusable version of the glow
- * treatment MagicBackground uses for the builder. Meant for panels/modals/
- * hero sections elsewhere that want the same brand ambiance without the
- * full floating-produce particle system.
+ * Ambient gold-glow backdrop — a static, self-contained glow for panels,
+ * modals and hero sections that want the brand ambiance without mounting the
+ * animated particle field (components/ui/GoldField).
  */
 export default function BariGlowBackground({ className = '' }: { className?: string }) {
     return (

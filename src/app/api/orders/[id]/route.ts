@@ -16,7 +16,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     const { data, error } = await supabaseAdmin
         .from('orders')
-        .select('id, order_num, items, total, pickup_time, notes, status, created_at')
+        // payment_status is included so the customer can see whether anything is
+        // still owed — with no gateway configured every order is pay-at-pickup,
+        // and nothing on the status page said so.
+        .select('id, order_num, items, total, pickup_time, notes, status, payment_status, created_at')
         .eq('id', id)
         .single();
 
