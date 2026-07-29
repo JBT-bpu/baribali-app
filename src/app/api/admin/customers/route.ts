@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 import { isAdminAuthorized } from '@/lib/adminAuth';
 import { getCustomerTagMap } from '@/lib/customerTags';
+import { customerMap } from '@/lib/customerNames';
 
 // Read-only customer/orders view for the manager admin. Aggregates the orders
 // table (live Supabase data — the one part that can't be config-in-code).
@@ -39,18 +40,15 @@ export async function GET(req: NextRequest) {
     // Each customer's current standing-discount tag, if any (one query).
     const tagMap = await getCustomerTagMap([...byUser.keys()]);
 
-    // Resolve names/emails for the (bounded) set of signed-in customers.
-    const customers = [];
-    for (const c of byUser.values()) {
-        let email: string | null = null, name: string | null = null;
-        try {
-            const { data } = await supabaseAdmin.auth.admin.getUserById(c.userId);
-            email = data.user?.email ?? null;
-            const meta = (data.user?.user_metadata ?? {}) as Record<string, unknown>;
-            name = (meta.full_name as string) ?? (meta.name as string) ?? null;
-        } catch { /* user may have been deleted — leave blank */ }
-        customers.push({ ...c, email, name, discountCode: tagMap[c.userId] ?? null });
-    }
+    // Names/emails for the signed-in customers, through the shared cache (this
+    // used to be an uncached getUserById per customer on every request).
+    const people = await customerMap([...byUser.keys()]);
+    const customers = [...byUser.values()].map(c => ({
+        ...c,
+        email: people[c.userId]?.email ?? null,
+        name: people[c.userId]?.name ?? null,
+        discountCode: tagMap[c.userId] ?? null,
+    }));
     customers.sort((a, b) => b.total - a.total);
 
     return NextResponse.json({ customers, guests: { count: guestCount, total: guestTotal } });
