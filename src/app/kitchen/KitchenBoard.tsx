@@ -2,44 +2,32 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { CircleCheck, Circle } from 'lucide-react';
 import { isSupabaseConfigured } from '@/lib/supabase';
-import BariButton from '@/components/ui/bari/BariButton';
+import { SIZE_CONFIG } from '@/data/salad-data.js';
+import { sizeMlFromBase, detectOrderType } from '@/lib/reorder';
+import OrderTabs from './OrderTabs';
+import ActiveOrder, { STAGES } from './ActiveOrder';
+import { type Order, type OrderStatus, byPickupThenReceived } from './types';
 
-// ─── Types ──────────────────────────────────────────────────────
-type OrderStatus = 'waiting' | 'preparing' | 'ready' | 'collected';
-
-interface OrderItem {
-    id: string;
-    he: string;
-    icon: string;
-    price: number;
-}
-
-interface Order {
-    id: string;
-    order_num: string;
-    items: OrderItem[];
-    total: number;
-    pickup_time: string | null;
-    notes: string | null;
-    size: string | null;
-    status: OrderStatus;
-    created_at: string;
-}
-
-// ─── Status config ───────────────────────────────────────────────
-const STATUS_CONFIG: Record<OrderStatus, { label: string; color: string; bg: string; border: string; next: OrderStatus | null; nextLabel: string | null }> = {
-    waiting:    { label: 'ממתין',   color: '#aaa',    bg: 'rgba(255,255,255,0.05)', border: 'rgba(255,255,255,0.12)', next: 'preparing', nextLabel: 'התחל הכנה' },
-    preparing:  { label: 'בהכנה',   color: '#ff9800', bg: 'rgba(255,152,0,0.1)',    border: 'rgba(255,152,0,0.35)',   next: 'ready',     nextLabel: 'מוכן ✓' },
-    ready:      { label: 'מוכן',    color: 'var(--color-green-accent)', bg: 'rgba(76,175,80,0.12)',   border: 'rgba(76,175,80,0.4)',    next: 'collected', nextLabel: 'נאסף ✓' },
-    collected:  { label: 'נאסף',    color: '#555',    bg: 'rgba(255,255,255,0.02)', border: 'rgba(255,255,255,0.06)', next: null,        nextLabel: null },
-};
+/**
+ * The staff board: the whole queue visible as tabs, one order worked on at a
+ * time underneath.
+ *
+ * The rule that shapes this component: **a new order must never move the worker
+ * off the order in their hands.** Arrivals re-sort the tab strip and chime, but
+ * `activeId` only changes from a tap, or when the active order leaves the board.
+ * Stage and tick progress are kept per order and survive switching tabs and a
+ * refresh, so glancing at the next ticket costs nothing.
+ *
+ * `authEnabled` comes from the server guard (page.tsx) — the board can't read
+ * the server-only KITCHEN_PASSWORD, so it's told whether a session is in play,
+ * which gates the logout button and the 401 bounce-back.
+ */
 
 /* ── Kitchen alert chime ──
-   Deliberately more assertive than the customer-facing chimes: a rising
-   three-note figure, repeated by the caller until someone acknowledges. It has
-   to carry over extractor fans and conversation. */
+   More assertive than the customer-facing chimes: a rising three-note figure,
+   repeated by the caller until acknowledged. It has to carry over extractor
+   fans and conversation. */
 function playKitchenChime(ctx: AudioContext) {
     const notes = [784, 988, 1319]; // G5, B5, E6
     notes.forEach((freq, i) => {
@@ -58,57 +46,73 @@ function playKitchenChime(ctx: AudioContext) {
     });
 }
 
-// ─── Helpers ────────────────────────────────────────────────────
-function minutesUntilPickup(pickupTime: string | null): number | null {
-    if (!pickupTime) return null;
-    const [h, m] = pickupTime.split(':').map(Number);
-    const now = new Date();
-    const pickup = new Date();
-    pickup.setHours(h, m, 0, 0);
-    return Math.round((pickup.getTime() - now.getTime()) / 60000);
+/**
+ * Which bowl to reach for. `size` on an order is the BASE PRICE the customer
+ * paid (54 / 59 / 72 / 42), not a size — printing it raw showed the cook "59",
+ * which means nothing. Mapped back through the helpers the reorder flow uses.
+ */
+function sizeLabel(size: string | null): string | null {
+    if (size === null || size === '') return null;
+    if (detectOrderType(size) === 'tortilla') return 'טורטייה';
+    const ml = sizeMlFromBase(size);
+    const cfg = ml ? (SIZE_CONFIG as Record<string, { label: string }>)[String(ml)] : null;
+    return cfg?.label ?? null;
 }
 
-function getColumn(order: Order): 'now' | 'soon' | 'later' | 'done' {
-    if (order.status === 'collected') return 'done';
-    const mins = minutesUntilPickup(order.pickup_time);
-    if (mins === null || mins <= 5) return 'now';
-    if (mins <= 15) return 'soon';
-    return 'later';
+const STAGE_KEY = 'bb-kitchen-stages';
+const CHECK_KEY = 'bb-kitchen-checks';
+
+function loadMap<T>(key: string): Record<string, T> {
+    try { return JSON.parse(localStorage.getItem(key) || '{}'); } catch { return {}; }
 }
 
-// ─── Main component ──────────────────────────────────────────────
-// `authEnabled` comes from the server guard (page.tsx) — the board itself
-// can't read the server-only KITCHEN_PASSWORD, so it's told whether a session
-// is in play, which is what gates the logout button and the 401 bounce-back.
 export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) {
     const router = useRouter();
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
     const [now, setNow] = useState(new Date());
-    const [scrolled, setScrolled] = useState(false);
     const isDemo = !isSupabaseConfigured();
-    // A board that can't reach the server must never look like a quiet board.
-    // "אין הזמנות פעילות ✓" on a failed fetch is the worst thing this screen can
-    // do: during a rush the kitchen would sit idle while orders pile up.
+
+    // A board that can't reach the server must never look like a quiet board:
+    // during a rush the kitchen would sit idle while orders piled up.
     const [loadError, setLoadError] = useState(false);
     const [lastOk, setLastOk] = useState<Date | null>(null);
     const [actionError, setActionError] = useState<string | null>(null);
-    // Latest orders without putting them in updateStatus's dependencies, so a
-    // failed status write can restore the row's previous value.
+    const [undo, setUndo] = useState<{ id: string; orderNum: string } | null>(null);
+
+    // The order in the worker's hands. Never reassigned by incoming data.
+    const [activeId, setActiveId] = useState<string | null>(null);
+    // Per-order work state, restored on first render so a refresh mid-shift
+    // loses nothing. (Nothing that depends on it renders before orders arrive,
+    // so reading storage here can't cause a hydration mismatch.)
+    const [stages, setStages] = useState<Record<string, number>>(() => loadMap<number>(STAGE_KEY));
+    const [checks, setChecks] = useState<Record<string, string[]>>(() => loadMap<string[]>(CHECK_KEY));
+
     const ordersRef = useRef<Order[]>([]);
     useEffect(() => { ordersRef.current = orders; }, [orders]);
+    // Read inside loadOrders without making it a dependency (which would restart
+    // the poll on every tab tap).
+    const activeIdRef = useRef<string | null>(null);
+    useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
 
     // ── New-order alert ──
-    // Staff are at a stove, not watching the tablet. Arrivals chime and pulse
-    // until someone acknowledges, rather than appearing silently in a column.
     const [newIds, setNewIds] = useState<string[]>([]);
     const [audioBlocked, setAudioBlocked] = useState(false);
     const knownIdsRef = useRef<Set<string>>(new Set());
     const seededRef = useRef(false);
     const audioCtxRef = useRef<AudioContext | null>(null);
 
-    // Browsers only allow audio after a gesture; the board is opened by a tap
-    // (login/launch), so latch onto the first interaction and keep the context.
+    const onUnauthorized = useCallback(() => { if (authEnabled) router.refresh(); }, [authEnabled, router]);
+    const logout = useCallback(async () => {
+        await fetch('/api/kitchen/logout', { method: 'POST' }).catch(() => {});
+        router.refresh();
+    }, [router]);
+
+    const persist = useCallback((key: string, value: unknown) => {
+        try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* private mode */ }
+    }, []);
+
+    // Browsers only allow audio after a gesture; latch onto the first one.
     const ensureAudio = useCallback(() => {
         try {
             if (!audioCtxRef.current) {
@@ -128,12 +132,10 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
         return () => window.removeEventListener('pointerdown', onFirstTouch);
     }, [ensureAudio]);
 
-    const acknowledge = useCallback(() => {
-        setNewIds([]);
-        ensureAudio();
-    }, [ensureAudio]);
+    const acknowledge = useCallback(() => { setNewIds([]); ensureAudio(); }, [ensureAudio]);
 
-    // Repeat the chime until acknowledged — one chime is easy to miss in a rush.
+    // Repeat until acknowledged — one chime is easy to miss in a rush. The alert
+    // is audio only: a work surface should not strobe at someone holding a knife.
     useEffect(() => {
         if (newIds.length === 0) return;
         const ring = () => {
@@ -148,8 +150,8 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
     }, [newIds, ensureAudio]);
 
     // ── Keep the screen awake ──
-    // A wall tablet that dims and locks every minute is unusable: staff would be
-    // unlocking Android before they can even see the board.
+    // A wall tablet that dims and locks is unusable: staff would be unlocking
+    // Android before they could even read the board.
     useEffect(() => {
         type Sentinel = { release: () => Promise<void> };
         let sentinel: Sentinel | null = null;
@@ -159,7 +161,6 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
             catch { /* denied or unsupported — the device timeout applies */ }
         };
         acquire();
-        // The lock is dropped whenever the page is hidden, so take it again.
         const onVisible = () => { if (document.visibilityState === 'visible') acquire(); };
         document.addEventListener('visibilitychange', onVisible);
         return () => {
@@ -168,64 +169,44 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
         };
     }, []);
 
-    // If the session expired mid-shift, API calls start returning 401.
-    // Re-run the server guard, which will render the login screen.
-    const onUnauthorized = useCallback(() => {
-        if (authEnabled) router.refresh();
-    }, [authEnabled, router]);
-
-    const logout = useCallback(async () => {
-        await fetch('/api/kitchen/logout', { method: 'POST' }).catch(() => {});
-        router.refresh();
-    }, [router]);
-
-    // Refresh clock every minute to re-bucket orders
+    // Re-evaluate urgency every minute.
     useEffect(() => {
         const t = setInterval(() => setNow(new Date()), 60000);
         return () => clearInterval(t);
     }, []);
 
-    // Header elevation once the page scrolls
-    useEffect(() => {
-        const onScroll = () => setScrolled(window.scrollY > 4);
-        window.addEventListener('scroll', onScroll);
-        return () => window.removeEventListener('scroll', onScroll);
-    }, []);
-
-    // Initial load — the API route itself falls back to the shared demo
-    // store when Supabase isn't configured, so the client doesn't need its
-    // own separate demo-fixture logic; this always hits the real endpoint.
     const loadOrders = useCallback(async () => {
         try {
-            // Session cookie is sent automatically (same-origin) — no header needed.
             const res = await fetch('/api/kitchen/orders');
             if (res.status === 401) { onUnauthorized(); return; }
             if (!res.ok) { setLoadError(true); return; }
-            const data = await res.json();
-            // Keyed by order.id in the render below, so React reconciles in place
-            // rather than remounting cards — no visual "jump" on each poll.
-            const list = data as Order[];
+            const list = (await res.json() as Order[]).sort(byPickupThenReceived);
             setOrders(list);
             setLoadError(false);
             setLastOk(new Date());
 
-            // Anything not seen before is an arrival. The very first load seeds
-            // the set silently — opening the board mid-service must not alarm.
+            // Pick an order only when nothing is selected, or when the selected
+            // one has left the board. A new arrival must never pull the worker
+            // off what is in their hands.
+            const current = activeIdRef.current;
+            if (!current || !list.some(o => o.id === current)) {
+                setActiveId(list.length ? list[0].id : null);
+            }
+
+            // Anything not seen before is an arrival. The first load seeds the
+            // set silently — opening the board mid-service must not alarm.
             const ids = list.map(o => o.id);
             if (!seededRef.current) {
                 knownIdsRef.current = new Set(ids);
                 seededRef.current = true;
             } else {
                 const arrivals = ids.filter(i => !knownIdsRef.current.has(i));
-                if (arrivals.length > 0) {
-                    setNewIds(prev => [...new Set([...prev, ...arrivals])]);
-                }
+                if (arrivals.length > 0) setNewIds(prev => [...new Set([...prev, ...arrivals])]);
                 knownIdsRef.current = new Set(ids);
             }
         } catch {
-            // A dropped connection previously threw out of this callback, so the
-            // board silently stopped updating (and the first load stuck on
-            // "טוען הזמנות...", since setLoading never ran).
+            // A dropped connection used to throw out of here, silently freezing
+            // the board (and sticking the first load on "loading" forever).
             setLoadError(true);
         } finally {
             setLoading(false);
@@ -233,21 +214,44 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
     }, [onUnauthorized]);
 
     useEffect(() => { loadOrders(); }, [loadOrders]);
-
-    // Poll for updates — replaces the old Realtime subscription, since
-    // anon-client Realtime access relied on the RLS policies that are now
-    // locked down. Also picks up new demo orders created elsewhere in the app.
     useEffect(() => {
         const id = setInterval(loadOrders, 4000);
         return () => clearInterval(id);
     }, [loadOrders]);
 
-    // Update order status — same endpoint in demo and live mode, the route
-    // itself decides whether to write to Supabase or the demo store.
+    const setStage = useCallback((orderId: string, index: number) => {
+        setStages(prev => {
+            const next = { ...prev, [orderId]: Math.max(0, Math.min(STAGES.length - 1, index)) };
+            persist(STAGE_KEY, next);
+            return next;
+        });
+    }, [persist]);
+
+    const toggleItem = useCallback((orderId: string, itemId: string) => {
+        setChecks(prev => {
+            const cur = prev[orderId] ?? [];
+            const next = { ...prev, [orderId]: cur.includes(itemId) ? cur.filter(i => i !== itemId) : [...cur, itemId] };
+            persist(CHECK_KEY, next);
+            return next;
+        });
+        navigator.vibrate?.(10);
+    }, [persist]);
+
     const updateStatus = useCallback(async (id: string, status: OrderStatus) => {
-        // Touching an order is itself an acknowledgement — no extra tap to silence.
+        // Touching an order acknowledges the alert — no extra tap to silence it.
         setNewIds(prev => prev.filter(n => n !== id));
         const previous = ordersRef.current.find(o => o.id === id)?.status;
+
+        // Collected orders leave the board entirely, so a fat-finger during a
+        // rush was unrecoverable without database access.
+        if (status === 'collected') {
+            const num = ordersRef.current.find(o => o.id === id)?.order_num ?? '';
+            setUndo({ id, orderNum: num });
+            setTimeout(() => setUndo(u => (u?.id === id ? null : u)), 20000);
+            const rest = ordersRef.current.filter(o => o.id !== id);
+            setActiveId(rest.length ? rest[0].id : null);
+        }
+
         setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o)); // optimistic
         try {
             const res = await fetch(`/api/orders/${id}/status`, {
@@ -259,89 +263,60 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
             if (!res.ok) throw new Error('status write failed');
             setActionError(null);
         } catch {
-            // Put the card back and say so. Leaving the optimistic value up meant
-            // the board could show "מוכן" while the customer's order was never
-            // actually marked ready.
+            // Leaving the optimistic value up meant the board could show "מוכן"
+            // while the customer's order was never actually marked ready.
             if (previous) setOrders(prev => prev.map(o => o.id === id ? { ...o, status: previous } : o));
             setActionError('עדכון הסטטוס נכשל — נסו שוב');
             setTimeout(() => setActionError(null), 5000);
         }
     }, [onUnauthorized]);
 
-    // Bucket orders into columns
-    const columns = {
-        now:   orders.filter(o => getColumn(o) === 'now'),
-        soon:  orders.filter(o => getColumn(o) === 'soon'),
-        later: orders.filter(o => getColumn(o) === 'later'),
-    };
-
-    const totalActive = orders.filter(o => o.status !== 'collected').length;
+    const active = orders.find(o => o.id === activeId) ?? null;
 
     return (
         <div style={K.root}>
             <style>{`
-                @keyframes checkPop { 0%{transform:scale(0.4)} 60%{transform:scale(1.15)} 100%{transform:scale(1)} }
-                @keyframes newOrderPulse {
-                    0%,100% { box-shadow: 0 0 0 0 rgba(76,175,80,0.55); }
-                    50%     { box-shadow: 0 0 0 14px rgba(76,175,80,0); }
-                }
-                @media (max-width: 900px) {
-                    .kitchen-columns { grid-template-columns: 1fr 1fr !important; }
-                    .kitchen-columns > :last-child { grid-column: 1 / -1; }
-                }
-                @media (max-width: 620px) {
-                    .kitchen-columns { grid-template-columns: 1fr !important; }
-                    .kitchen-columns > :last-child { grid-column: auto; }
+                /* Built for a wall tablet in landscape; stacks if it ever isn't. */
+                @media (max-width: 760px) {
+                    .kitchen-active-body { flex-direction: column !important; }
+                    .kitchen-active-body > * { flex: none !important; }
                 }
             `}</style>
 
             {/* Header */}
-            <div style={{ ...K.header, boxShadow: scrolled ? '0 4px 16px rgba(0,0,0,0.45)' : 'none' }}>
+            <div style={K.header}>
                 <div style={K.headerTitle}>🥗 מטבח BariBali</div>
                 <div style={K.headerMeta}>
-                    {isDemo && (
-                        <>
-                            <span style={K.demoBadge}>DEMO — חבר Supabase להזמנות אמיתיות</span>
-                            <button
-                                type="button"
-                                style={K.resetBtn}
-                                onClick={async () => {
-                                    await fetch('/api/demo/reset', { method: 'POST' });
-                                    loadOrders();
-                                }}
-                            >
-                                🔄 אפס נתוני דמו
-                            </button>
-                        </>
-                    )}
+                    {isDemo && <span style={K.demoBadge}>DEMO</span>}
                     <span style={K.clock}>{now.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}</span>
-                    <span style={K.activeCount}>{totalActive} הזמנות פעילות</span>
-                    {/* Wall-tablet kiosk: hides Android's browser chrome so the
-                        board owns the whole screen. */}
+                    <span style={K.activeCount}>{orders.length} הזמנות</span>
                     <button
                         type="button"
-                        style={K.resetBtn}
+                        style={K.headerBtn}
                         onClick={() => {
                             if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
                             else document.documentElement.requestFullscreen?.().catch(() => {});
                         }}
-                    >
-                        ⛶ מסך מלא
-                    </button>
-                    {authEnabled && (
-                        <button type="button" style={K.resetBtn} onClick={logout}>
-                            🔒 יציאה
-                        </button>
-                    )}
+                    >⛶ מסך מלא</button>
+                    {authEnabled && <button type="button" style={K.headerBtn} onClick={logout}>🔒 יציאה</button>}
                 </div>
             </div>
 
-            {/* New orders — pulses and chimes until acknowledged */}
+            {/* Alerts */}
+            {undo && (
+                <div style={K.undoBar} role="status">
+                    <span>הזמנה {undo.orderNum} סומנה כנמסרה</span>
+                    <button type="button" style={K.undoBtn}
+                        onClick={() => { const u = undo; setUndo(null); updateStatus(u.id, 'ready'); }}>
+                        ↩ החזר ללוח
+                    </button>
+                </div>
+            )}
             {newIds.length > 0 && (
                 <button type="button" onClick={acknowledge} style={K.newBanner} aria-live="assertive">
-                    <span style={{ fontSize: '26px' }}>🔔</span>
+                    <span style={{ fontSize: '24px' }}>🔔</span>
                     <span style={{ flex: 1, textAlign: 'right' }}>
-                        {newIds.length === 1 ? 'הזמנה חדשה!' : `${newIds.length} הזמנות חדשות!`}
+                        {newIds.length === 1 ? 'הזמנה חדשה' : `${newIds.length} הזמנות חדשות`}
                     </span>
                     <span style={K.newBannerCta}>הבנתי</span>
                 </button>
@@ -351,8 +326,6 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
                     🔇 הצליל חסום — לחצו כאן פעם אחת כדי לאפשר התראות קוליות
                 </button>
             )}
-
-            {/* Connection lost — shown INSTEAD of the reassuring empty state */}
             {loadError && (
                 <div style={K.errorBanner} role="alert">
                     <span style={{ fontSize: '20px' }}>⚠️</span>
@@ -374,268 +347,93 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
             )}
 
             {loading && <div style={K.loadingMsg}>טוען הזמנות...</div>}
-            {!loading && !loadError && totalActive === 0 && (
+            {!loading && !loadError && orders.length === 0 && (
                 <div style={K.emptyMsg}>אין הזמנות פעילות כרגע ✓</div>
             )}
 
-            {/* Columns */}
-            {!loading && (
-                <div className="kitchen-columns" style={K.columns}>
-                    <Column title="עכשיו" accent="#e53935" orders={columns.now} onUpdate={updateStatus} />
-                    <Column title="עוד 10–15 דק׳" accent="#ff9800" orders={columns.soon} onUpdate={updateStatus} />
-                    <Column title="מאוחר יותר" accent="#555" orders={columns.later} onUpdate={updateStatus} />
-                </div>
+            {orders.length > 0 && (
+                <>
+                    <OrderTabs orders={orders} activeId={activeId} onSelect={setActiveId} newIds={newIds} />
+                    {active && (
+                        <ActiveOrder
+                            key={active.id}
+                            order={active}
+                            sizeLabel={sizeLabel(active.size)}
+                            stageIndex={stages[active.id] ?? 0}
+                            onStage={i => setStage(active.id, i)}
+                            onStatus={s => updateStatus(active.id, s)}
+                            checked={checks[active.id] ?? []}
+                            onToggleItem={itemId => toggleItem(active.id, itemId)}
+                        />
+                    )}
+                </>
             )}
         </div>
     );
 }
 
-// ─── Column ─────────────────────────────────────────────────────
-function Column({ title, accent, orders, onUpdate }: {
-    title: string;
-    accent: string;
-    orders: Order[];
-    onUpdate: (id: string, status: OrderStatus) => void;
-}) {
-    return (
-        <div style={K.column}>
-            <div style={{ ...K.colHeader, borderBottom: `3px solid ${accent}` }}>
-                <span style={{ ...K.colTitle, color: accent }}>{title}</span>
-                {orders.length > 0 && (
-                    <span style={{ ...K.colBadge, background: accent }}>{orders.length}</span>
-                )}
-            </div>
-            <div style={K.colBody}>
-                {orders.length === 0 && <div style={K.colEmpty}>ריק</div>}
-                {orders.map(order => (
-                    <OrderCard key={order.id} order={order} onUpdate={onUpdate} />
-                ))}
-            </div>
-        </div>
-    );
-}
-
-// ─── Order card ─────────────────────────────────────────────────
-function OrderCard({ order, onUpdate }: { order: Order; onUpdate: (id: string, status: OrderStatus) => void }) {
-    const cfg = STATUS_CONFIG[order.status];
-    const nextStatus = cfg.next;
-    const mins = minutesUntilPickup(order.pickup_time);
-    const isUrgent = mins !== null && mins <= 5;
-
-    // Checklist state — resets when this card's order changes
-    const [checked, setChecked] = useState<Set<string>>(new Set());
-    const allChecked = order.items.length > 0 && checked.size === order.items.length;
-
-    const toggle = (id: string) => {
-        setChecked(prev => {
-            const next = new Set(prev);
-            next.has(id) ? next.delete(id) : next.add(id);
-            return next;
-        });
-        // Light haptic on touch devices
-        if (navigator.vibrate) navigator.vibrate(12);
-    };
-
-    return (
-        <div style={{ ...K.card, background: cfg.bg, border: `1.5px solid ${isUrgent ? '#e53935' : cfg.border}` }}>
-
-            {/* Card header */}
-            <div style={K.cardTop}>
-                <span style={K.cardNum}>{order.order_num}</span>
-                <span style={{ ...K.cardStatus, color: cfg.color }}>{cfg.label}</span>
-                {order.pickup_time && (
-                    <span style={{ ...K.cardTime, color: isUrgent ? '#e53935' : '#ccc' }}>
-                        ⏰ {order.pickup_time}
-                        {mins !== null && (
-                            <span style={{ fontSize: '13px', marginRight: '4px' }}>
-                                ({mins > 0 ? `${mins} דק׳` : 'עכשיו!'})
-                            </span>
-                        )}
-                    </span>
-                )}
-            </div>
-
-            {/* Size + total row */}
-            <div style={K.cardMeta}>
-                {order.size && <span style={K.sizePill}>{order.size}</span>}
-                <span style={K.metaTotal}>₪{order.total}</span>
-            </div>
-
-            {/* ── Ingredient checklist ── */}
-            <div style={K.checkProgress}>
-                <span style={K.checkProgressText}>
-                    {checked.size} / {order.items.length} נוספו
-                </span>
-                <div style={K.checkBar}>
-                    <div style={{ ...K.checkBarFill, width: `${order.items.length ? Math.round((checked.size / order.items.length) * 100) : 0}%` }} />
-                </div>
-            </div>
-
-            <div style={K.checklist}>
-                {order.items.map(it => {
-                    const done = checked.has(it.id);
-                    return (
-                        <button
-                            key={it.id}
-                            type="button"
-                            style={{ ...K.checkRow, ...(done ? K.checkRowDone : {}) }}
-                            onClick={() => toggle(it.id)}
-                        >
-                            <span style={K.checkEmoji}>
-                                {it.icon && it.icon.startsWith('/')
-                                    ? <img src={it.icon} alt={it.he} style={{ width: '30px', height: '30px', objectFit: 'contain' }} />
-                                    : it.icon}
-                            </span>
-                            <span style={{ ...K.checkName, ...(done ? K.checkNameDone : {}) }}>{it.he}</span>
-                            <span style={{ ...K.checkMark, ...(done ? K.checkMarkDone : {}) }}>
-                                {done
-                                    ? <CircleCheck size={22} strokeWidth={2.3} style={{ animation: 'checkPop 0.25s cubic-bezier(0.34,1.56,0.64,1) both' }} />
-                                    : <Circle size={22} strokeWidth={2} />}
-                            </span>
-                        </button>
-                    );
-                })}
-            </div>
-
-            {/* Notes */}
-            {order.notes && (
-                <div style={K.cardNotes}>📝 {order.notes}</div>
-            )}
-
-            {/* Action button */}
-            {nextStatus && (
-                <BariButton
-                    variant="secondary"
-                    size="lg"
-                    fullWidth
-                    style={{
-                        background: allChecked ? cfg.color : 'rgba(255,255,255,0.08)',
-                        color: allChecked ? (order.status === 'waiting' ? '#fff' : '#000') : 'rgba(255,255,255,0.3)',
-                        border: allChecked ? 'none' : '1.5px solid rgba(255,255,255,0.1)',
-                        fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
-                        marginTop: '4px',
-                    }}
-                    onClick={() => {
-                        if (navigator.vibrate) navigator.vibrate([20, 50, 30]);
-                        onUpdate(order.id, nextStatus);
-                    }}
-                >
-                    {allChecked ? cfg.nextLabel : `${cfg.nextLabel} (${order.items.length - checked.size} נותרו)`}
-                </BariButton>
-            )}
-        </div>
-    );
-}
-
-// ─── Styles ─────────────────────────────────────────────────────
 const K: Record<string, React.CSSProperties> = {
     root: {
         minHeight: '100vh', background: '#0a0a0a',
         fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: 'rtl',
-        color: '#fff', padding: '0 0 40px',
+        color: '#fff', display: 'flex', flexDirection: 'column',
     },
     header: {
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '16px 24px',
-        paddingTop: 'max(16px, env(safe-area-inset-top))',
-        background: 'rgba(255,255,255,0.04)',
-        borderBottom: '1px solid rgba(255,255,255,0.08)',
-        position: 'sticky', top: 0, zIndex: 10,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
+        padding: '12px 20px', paddingTop: 'max(12px, env(safe-area-inset-top))',
+        borderBottom: '1px solid rgba(255,255,255,0.1)', flexWrap: 'wrap',
     },
     headerTitle: { fontSize: '20px', fontWeight: 900, color: 'var(--color-gold-light)' },
-    headerMeta: { display: 'flex', alignItems: 'center', gap: '16px' },
-    clock: { fontSize: '22px', fontWeight: 800, color: '#fff', letterSpacing: '0.04em' },
-    activeCount: { fontSize: '13px', color: 'rgba(255,255,255,0.4)', fontWeight: 600 },
-    demoBadge: { fontSize: '11px', fontWeight: 700, color: '#ff9800', background: 'rgba(255,152,0,0.12)', border: '1px solid rgba(255,152,0,0.3)', padding: '4px 10px', borderRadius: '8px' },
-    resetBtn: { fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.5)', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', padding: '4px 10px', borderRadius: '8px', cursor: 'pointer', fontFamily: "var(--font-heebo), 'Heebo', sans-serif" },
-
+    headerMeta: { display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' },
+    clock: { fontSize: '22px', fontWeight: 800, letterSpacing: '0.04em' },
+    activeCount: { fontSize: '14px', fontWeight: 700, color: 'rgba(255,255,255,0.55)' },
+    demoBadge: {
+        fontSize: '11px', fontWeight: 900, padding: '4px 10px', borderRadius: '8px',
+        background: 'rgba(255,152,0,0.2)', border: '1px solid rgba(255,152,0,0.5)', color: '#ffcc80',
+    },
+    headerBtn: {
+        padding: '8px 14px', borderRadius: '10px', cursor: 'pointer',
+        background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)',
+        color: '#fff', fontSize: '14px', fontWeight: 800,
+        fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
+    },
     loadingMsg: { padding: '60px', textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: '16px' },
     emptyMsg: { padding: '80px', textAlign: 'center', color: 'var(--color-green-accent)', fontSize: '18px', fontWeight: 700 },
     errorBanner: {
         display: 'flex', alignItems: 'center', gap: '12px',
-        margin: '12px 16px', padding: '14px 16px', borderRadius: '12px',
+        margin: '10px 16px', padding: '14px 16px', borderRadius: '12px',
         background: 'rgba(229,57,53,0.14)', border: '1px solid rgba(229,57,53,0.5)',
         color: '#ff9a97', fontSize: '15px', lineHeight: 1.4,
     },
     newBanner: {
         display: 'flex', alignItems: 'center', gap: '14px', width: 'calc(100% - 32px)',
-        margin: '12px 16px', padding: '18px 20px', borderRadius: '14px',
-        background: 'linear-gradient(135deg, rgba(76,175,80,0.24), rgba(76,175,80,0.12))',
-        border: '2px solid rgba(76,175,80,0.7)', cursor: 'pointer',
-        color: '#c8f7c9', fontSize: '22px', fontWeight: 900,
+        margin: '10px 16px', padding: '14px 18px', borderRadius: '12px',
+        background: 'rgba(76,175,80,0.18)', border: '2px solid rgba(76,175,80,0.65)',
+        cursor: 'pointer', color: '#c8f7c9', fontSize: '20px', fontWeight: 900,
         fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
-        animation: 'newOrderPulse 1.1s ease-in-out infinite',
     },
     newBannerCta: {
-        flexShrink: 0, padding: '10px 20px', borderRadius: '10px',
+        flexShrink: 0, padding: '8px 18px', borderRadius: '10px',
         background: 'rgba(255,255,255,0.14)', border: '1px solid rgba(255,255,255,0.3)',
-        fontSize: '16px', fontWeight: 800, color: '#fff',
+        fontSize: '15px', fontWeight: 800, color: '#fff',
     },
     audioHint: {
-        display: 'block', width: 'calc(100% - 32px)', margin: '0 16px 12px',
+        display: 'block', width: 'calc(100% - 32px)', margin: '0 16px 10px',
         padding: '12px 16px', borderRadius: '12px', cursor: 'pointer',
         background: 'rgba(255,152,0,0.14)', border: '1px solid rgba(255,152,0,0.5)',
         color: '#ffcc80', fontSize: '15px', fontWeight: 700,
-        fontFamily: "var(--font-heebo), 'Heebo', sans-serif", textAlign: 'center' as const,
+        fontFamily: "var(--font-heebo), 'Heebo', sans-serif", textAlign: 'center',
     },
-
-    columns: {
-        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
-        gap: '16px', padding: '20px 16px',
+    undoBar: {
+        display: 'flex', alignItems: 'center', gap: '14px',
+        margin: '10px 16px', padding: '12px 16px', borderRadius: '12px',
+        background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.2)',
+        color: 'rgba(255,255,255,0.85)', fontSize: '15px', fontWeight: 700,
     },
-    column: { display: 'flex', flexDirection: 'column', gap: '12px' },
-    colHeader: {
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '10px 4px', marginBottom: '4px',
+    undoBtn: {
+        marginInlineStart: 'auto', padding: '10px 18px', borderRadius: '10px', cursor: 'pointer',
+        background: 'rgba(255,255,255,0.14)', border: '1px solid rgba(255,255,255,0.3)',
+        color: '#fff', fontSize: '15px', fontWeight: 800,
+        fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
     },
-    colTitle: { fontSize: '16px', fontWeight: 900, letterSpacing: '0.02em' },
-    colBadge: {
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        width: '24px', height: '24px', borderRadius: '50%',
-        fontSize: '13px', fontWeight: 900, color: '#000',
-    },
-    colBody: { display: 'flex', flexDirection: 'column', gap: '10px' },
-    colEmpty: { fontSize: '13px', color: 'rgba(255,255,255,0.2)', padding: '12px 4px', textAlign: 'center' },
-
-    card: {
-        borderRadius: '14px', padding: '14px',
-        display: 'flex', flexDirection: 'column', gap: '8px',
-        transition: 'border-color 0.2s',
-    },
-    cardTop: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' },
-    cardNum: { fontSize: '15px', fontWeight: 900, color: '#fff', letterSpacing: '0.04em' },
-    cardStatus: { fontSize: '12px', fontWeight: 700, marginRight: 'auto' },
-    cardTime: { fontSize: '12px', fontWeight: 700 },
-
-    cardMeta: { display: 'flex', alignItems: 'center', gap: '8px', marginTop: '-2px' },
-    sizePill: { fontSize: '11px', fontWeight: 800, color: 'var(--color-gold-light)', background: 'rgba(240,208,96,0.12)', border: '1px solid rgba(240,208,96,0.25)', padding: '2px 8px', borderRadius: '8px' },
-    metaTotal: { fontSize: '15px', fontWeight: 900, color: 'rgba(255,255,255,0.5)', marginRight: 'auto' },
-
-    checkProgress: { display: 'flex', alignItems: 'center', gap: '10px', marginTop: '4px' },
-    checkProgressText: { fontSize: '12px', fontWeight: 700, color: 'rgba(255,255,255,0.4)', whiteSpace: 'nowrap' as const, minWidth: '70px' },
-    checkBar: { flex: 1, height: '4px', borderRadius: '4px', background: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
-    checkBarFill: { height: '100%', borderRadius: '4px', background: 'var(--color-green-accent)', transition: 'width 0.2s ease' },
-
-    checklist: { display: 'flex', flexDirection: 'column' as const, gap: '4px', marginTop: '2px' },
-    checkRow: {
-        display: 'flex', alignItems: 'center', gap: '12px',
-        padding: '12px 14px', borderRadius: '12px', cursor: 'pointer',
-        border: '1.5px solid rgba(255,255,255,0.08)',
-        background: 'rgba(255,255,255,0.04)',
-        minHeight: '60px', width: '100%', textAlign: 'right' as const,
-        fontFamily: "var(--font-heebo), 'Heebo', sans-serif", transition: 'background 0.15s, border-color 0.15s',
-    },
-    checkRowDone: { background: 'rgba(76,175,80,0.12)', border: '1.5px solid rgba(76,175,80,0.35)' },
-    checkEmoji: { fontSize: '30px', lineHeight: 1, flexShrink: 0 },
-    checkName: { fontSize: '18px', fontWeight: 700, color: '#fff', flex: 1 },
-    checkNameDone: { textDecoration: 'line-through', color: 'rgba(255,255,255,0.4)' },
-    checkMark: { fontSize: '20px', fontWeight: 900, color: 'rgba(255,255,255,0.2)', flexShrink: 0, minWidth: '28px', textAlign: 'center' as const },
-    checkMarkDone: { color: 'var(--color-green-accent)' },
-
-    cardNotes: {
-        fontSize: '12px', color: 'rgba(255,200,100,0.8)', fontWeight: 600,
-        padding: '6px 8px', borderRadius: '8px',
-        background: 'rgba(255,200,100,0.08)', border: '1px solid rgba(255,200,100,0.15)',
-    },
-
 };

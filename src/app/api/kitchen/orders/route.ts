@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 import { isKitchenAuthorized } from '@/lib/kitchenAuth';
+import { customerMap } from '@/lib/customerNames';
 import { listDemoOrders } from '@/lib/demoStore';
 
 export async function GET(req: NextRequest) {
@@ -32,5 +33,12 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: 'Failed to fetch orders' }, { status: 500 });
     }
 
-    return NextResponse.json(data ?? []);
+    // Name for signed-in customers so staff can call them by name at handover.
+    // Cached per user id, so this costs nothing on the board's 4s poll; guests
+    // simply have no user and stay null.
+    const orders = data ?? [];
+    const names = await customerMap(orders.map(o => o.user_id));
+    return NextResponse.json(
+        orders.map(o => ({ ...o, customer_name: o.user_id ? names[o.user_id]?.name ?? null : null })),
+    );
 }
