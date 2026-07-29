@@ -20,7 +20,11 @@ import crypto from 'crypto';
  */
 
 export const KITCHEN_COOKIE = 'bb_kitchen_session';
-export const KITCHEN_SESSION_TTL_MS = 12 * 60 * 60 * 1000; // one shift
+// The board lives on a wall tablet inside the shop, so a per-shift login was
+// pure friction for staff. Rotating KITCHEN_PASSWORD still invalidates every
+// outstanding session immediately (the signing key is derived from it), which
+// is the lever to pull if a device ever goes missing.
+export const KITCHEN_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 function kitchenPassword(): string | undefined {
     return process.env.KITCHEN_PASSWORD || undefined;

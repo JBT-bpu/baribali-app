@@ -75,7 +75,7 @@ src/
 ## 7. Known gaps & non-obvious facts
 
 - **`TORTILLA_STEPS` is imported but never used.** `BariBaliBuilder` renders the salad step set for tortillas too, so a "tortilla" today = salad ingredients on a wrap base price (₪42). Tortilla orders are distinguished **only by base price**, not by their item ids (this is why `src/lib/reorder.ts` detects type from the base).
-- **`/kitchen` runs open until `KITCHEN_PASSWORD` is set on Vercel** — the auth code is deployed, but the production value isn't set yet.
+- **`/kitchen` auth is live in production** — `KITCHEN_PASSWORD` is set on Vercel (verified: the deployed `/kitchen` renders the login screen and `/api/kitchen/orders` returns 401 anonymously). Unset locally = board runs open, which is the intended dev behaviour.
 - **Payment webhook has no signature verification** → confirmed payments land as `paid_unverified` (staff confirm at pickup) rather than `paid`. Blocked on a Hyp verification credential.
 - **`/privacy` and `/terms` are drafts** with `[bracketed]` business-detail placeholders that must be filled before launch.
 - **Rate limiting** (`src/lib/rateLimit.ts`) is in-memory/per-process — a deterrent, approximate on serverless (no shared store).

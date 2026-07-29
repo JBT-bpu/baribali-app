@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { CircleCheck, Circle } from 'lucide-react';
 import { isSupabaseConfigured } from '@/lib/supabase';
@@ -36,6 +36,28 @@ const STATUS_CONFIG: Record<OrderStatus, { label: string; color: string; bg: str
     collected:  { label: 'נאסף',    color: '#555',    bg: 'rgba(255,255,255,0.02)', border: 'rgba(255,255,255,0.06)', next: null,        nextLabel: null },
 };
 
+/* ── Kitchen alert chime ──
+   Deliberately more assertive than the customer-facing chimes: a rising
+   three-note figure, repeated by the caller until someone acknowledges. It has
+   to carry over extractor fans and conversation. */
+function playKitchenChime(ctx: AudioContext) {
+    const notes = [784, 988, 1319]; // G5, B5, E6
+    notes.forEach((freq, i) => {
+        const t = ctx.currentTime + i * 0.16;
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.0001, t);
+        gain.gain.exponentialRampToValueAtTime(0.32, t + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.34);
+        gain.connect(ctx.destination);
+        const osc = ctx.createOscillator();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, t);
+        osc.connect(gain);
+        osc.start(t);
+        osc.stop(t + 0.36);
+    });
+}
+
 // ─── Helpers ────────────────────────────────────────────────────
 function minutesUntilPickup(pickupTime: string | null): number | null {
     if (!pickupTime) return null;
@@ -65,6 +87,86 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
     const [now, setNow] = useState(new Date());
     const [scrolled, setScrolled] = useState(false);
     const isDemo = !isSupabaseConfigured();
+    // A board that can't reach the server must never look like a quiet board.
+    // "אין הזמנות פעילות ✓" on a failed fetch is the worst thing this screen can
+    // do: during a rush the kitchen would sit idle while orders pile up.
+    const [loadError, setLoadError] = useState(false);
+    const [lastOk, setLastOk] = useState<Date | null>(null);
+    const [actionError, setActionError] = useState<string | null>(null);
+    // Latest orders without putting them in updateStatus's dependencies, so a
+    // failed status write can restore the row's previous value.
+    const ordersRef = useRef<Order[]>([]);
+    useEffect(() => { ordersRef.current = orders; }, [orders]);
+
+    // ── New-order alert ──
+    // Staff are at a stove, not watching the tablet. Arrivals chime and pulse
+    // until someone acknowledges, rather than appearing silently in a column.
+    const [newIds, setNewIds] = useState<string[]>([]);
+    const [audioBlocked, setAudioBlocked] = useState(false);
+    const knownIdsRef = useRef<Set<string>>(new Set());
+    const seededRef = useRef(false);
+    const audioCtxRef = useRef<AudioContext | null>(null);
+
+    // Browsers only allow audio after a gesture; the board is opened by a tap
+    // (login/launch), so latch onto the first interaction and keep the context.
+    const ensureAudio = useCallback(() => {
+        try {
+            if (!audioCtxRef.current) {
+                const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+                if (Ctor) audioCtxRef.current = new Ctor();
+            }
+            const ctx = audioCtxRef.current;
+            if (ctx?.state === 'suspended') ctx.resume().catch(() => {});
+            if (ctx?.state === 'running') setAudioBlocked(false);
+            return ctx;
+        } catch { return null; }
+    }, []);
+
+    useEffect(() => {
+        const onFirstTouch = () => { ensureAudio(); };
+        window.addEventListener('pointerdown', onFirstTouch);
+        return () => window.removeEventListener('pointerdown', onFirstTouch);
+    }, [ensureAudio]);
+
+    const acknowledge = useCallback(() => {
+        setNewIds([]);
+        ensureAudio();
+    }, [ensureAudio]);
+
+    // Repeat the chime until acknowledged — one chime is easy to miss in a rush.
+    useEffect(() => {
+        if (newIds.length === 0) return;
+        const ring = () => {
+            const ctx = ensureAudio();
+            if (!ctx || ctx.state !== 'running') { setAudioBlocked(true); return; }
+            playKitchenChime(ctx);
+            navigator.vibrate?.([120, 60, 120]);
+        };
+        ring();
+        const id = setInterval(ring, 10000);
+        return () => clearInterval(id);
+    }, [newIds, ensureAudio]);
+
+    // ── Keep the screen awake ──
+    // A wall tablet that dims and locks every minute is unusable: staff would be
+    // unlocking Android before they can even see the board.
+    useEffect(() => {
+        type Sentinel = { release: () => Promise<void> };
+        let sentinel: Sentinel | null = null;
+        const nav = navigator as Navigator & { wakeLock?: { request: (t: 'screen') => Promise<Sentinel> } };
+        const acquire = async () => {
+            try { if (nav.wakeLock && document.visibilityState === 'visible') sentinel = await nav.wakeLock.request('screen'); }
+            catch { /* denied or unsupported — the device timeout applies */ }
+        };
+        acquire();
+        // The lock is dropped whenever the page is hidden, so take it again.
+        const onVisible = () => { if (document.visibilityState === 'visible') acquire(); };
+        document.addEventListener('visibilitychange', onVisible);
+        return () => {
+            document.removeEventListener('visibilitychange', onVisible);
+            sentinel?.release().catch(() => {});
+        };
+    }, []);
 
     // If the session expired mid-shift, API calls start returning 401.
     // Re-run the server guard, which will render the login screen.
@@ -94,16 +196,40 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
     // store when Supabase isn't configured, so the client doesn't need its
     // own separate demo-fixture logic; this always hits the real endpoint.
     const loadOrders = useCallback(async () => {
-        // Session cookie is sent automatically (same-origin) — no header needed.
-        const res = await fetch('/api/kitchen/orders');
-        if (res.status === 401) { onUnauthorized(); return; }
-        if (res.ok) {
+        try {
+            // Session cookie is sent automatically (same-origin) — no header needed.
+            const res = await fetch('/api/kitchen/orders');
+            if (res.status === 401) { onUnauthorized(); return; }
+            if (!res.ok) { setLoadError(true); return; }
             const data = await res.json();
             // Keyed by order.id in the render below, so React reconciles in place
             // rather than remounting cards — no visual "jump" on each poll.
-            setOrders(data as Order[]);
+            const list = data as Order[];
+            setOrders(list);
+            setLoadError(false);
+            setLastOk(new Date());
+
+            // Anything not seen before is an arrival. The very first load seeds
+            // the set silently — opening the board mid-service must not alarm.
+            const ids = list.map(o => o.id);
+            if (!seededRef.current) {
+                knownIdsRef.current = new Set(ids);
+                seededRef.current = true;
+            } else {
+                const arrivals = ids.filter(i => !knownIdsRef.current.has(i));
+                if (arrivals.length > 0) {
+                    setNewIds(prev => [...new Set([...prev, ...arrivals])]);
+                }
+                knownIdsRef.current = new Set(ids);
+            }
+        } catch {
+            // A dropped connection previously threw out of this callback, so the
+            // board silently stopped updating (and the first load stuck on
+            // "טוען הזמנות...", since setLoading never ran).
+            setLoadError(true);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     }, [onUnauthorized]);
 
     useEffect(() => { loadOrders(); }, [loadOrders]);
@@ -119,13 +245,27 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
     // Update order status — same endpoint in demo and live mode, the route
     // itself decides whether to write to Supabase or the demo store.
     const updateStatus = useCallback(async (id: string, status: OrderStatus) => {
+        // Touching an order is itself an acknowledgement — no extra tap to silence.
+        setNewIds(prev => prev.filter(n => n !== id));
+        const previous = ordersRef.current.find(o => o.id === id)?.status;
         setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o)); // optimistic
-        const res = await fetch(`/api/orders/${id}/status`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status }),
-        });
-        if (res.status === 401) onUnauthorized();
+        try {
+            const res = await fetch(`/api/orders/${id}/status`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status }),
+            });
+            if (res.status === 401) { onUnauthorized(); return; }
+            if (!res.ok) throw new Error('status write failed');
+            setActionError(null);
+        } catch {
+            // Put the card back and say so. Leaving the optimistic value up meant
+            // the board could show "מוכן" while the customer's order was never
+            // actually marked ready.
+            if (previous) setOrders(prev => prev.map(o => o.id === id ? { ...o, status: previous } : o));
+            setActionError('עדכון הסטטוס נכשל — נסו שוב');
+            setTimeout(() => setActionError(null), 5000);
+        }
     }, [onUnauthorized]);
 
     // Bucket orders into columns
@@ -141,6 +281,10 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
         <div style={K.root}>
             <style>{`
                 @keyframes checkPop { 0%{transform:scale(0.4)} 60%{transform:scale(1.15)} 100%{transform:scale(1)} }
+                @keyframes newOrderPulse {
+                    0%,100% { box-shadow: 0 0 0 0 rgba(76,175,80,0.55); }
+                    50%     { box-shadow: 0 0 0 14px rgba(76,175,80,0); }
+                }
                 @media (max-width: 900px) {
                     .kitchen-columns { grid-template-columns: 1fr 1fr !important; }
                     .kitchen-columns > :last-child { grid-column: 1 / -1; }
@@ -172,6 +316,18 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
                     )}
                     <span style={K.clock}>{now.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}</span>
                     <span style={K.activeCount}>{totalActive} הזמנות פעילות</span>
+                    {/* Wall-tablet kiosk: hides Android's browser chrome so the
+                        board owns the whole screen. */}
+                    <button
+                        type="button"
+                        style={K.resetBtn}
+                        onClick={() => {
+                            if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+                            else document.documentElement.requestFullscreen?.().catch(() => {});
+                        }}
+                    >
+                        ⛶ מסך מלא
+                    </button>
                     {authEnabled && (
                         <button type="button" style={K.resetBtn} onClick={logout}>
                             🔒 יציאה
@@ -180,8 +336,45 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
                 </div>
             </div>
 
+            {/* New orders — pulses and chimes until acknowledged */}
+            {newIds.length > 0 && (
+                <button type="button" onClick={acknowledge} style={K.newBanner} aria-live="assertive">
+                    <span style={{ fontSize: '26px' }}>🔔</span>
+                    <span style={{ flex: 1, textAlign: 'right' }}>
+                        {newIds.length === 1 ? 'הזמנה חדשה!' : `${newIds.length} הזמנות חדשות!`}
+                    </span>
+                    <span style={K.newBannerCta}>הבנתי</span>
+                </button>
+            )}
+            {audioBlocked && newIds.length > 0 && (
+                <button type="button" onClick={acknowledge} style={K.audioHint}>
+                    🔇 הצליל חסום — לחצו כאן פעם אחת כדי לאפשר התראות קוליות
+                </button>
+            )}
+
+            {/* Connection lost — shown INSTEAD of the reassuring empty state */}
+            {loadError && (
+                <div style={K.errorBanner} role="alert">
+                    <span style={{ fontSize: '20px' }}>⚠️</span>
+                    <div>
+                        <div style={{ fontWeight: 900 }}>אין חיבור לשרת — ייתכן שיש הזמנות שאינן מוצגות</div>
+                        <div style={{ fontSize: '13px', opacity: 0.85, marginTop: '2px' }}>
+                            {lastOk
+                                ? `עודכן לאחרונה ${lastOk.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })} · מנסה שוב כל 4 שניות`
+                                : 'מנסה שוב כל 4 שניות'}
+                        </div>
+                    </div>
+                </div>
+            )}
+            {actionError && (
+                <div style={K.errorBanner} role="alert">
+                    <span style={{ fontSize: '20px' }}>⚠️</span>
+                    <div style={{ fontWeight: 900 }}>{actionError}</div>
+                </div>
+            )}
+
             {loading && <div style={K.loadingMsg}>טוען הזמנות...</div>}
-            {!loading && totalActive === 0 && (
+            {!loading && !loadError && totalActive === 0 && (
                 <div style={K.emptyMsg}>אין הזמנות פעילות כרגע ✓</div>
             )}
 
@@ -358,6 +551,33 @@ const K: Record<string, React.CSSProperties> = {
 
     loadingMsg: { padding: '60px', textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: '16px' },
     emptyMsg: { padding: '80px', textAlign: 'center', color: 'var(--color-green-accent)', fontSize: '18px', fontWeight: 700 },
+    errorBanner: {
+        display: 'flex', alignItems: 'center', gap: '12px',
+        margin: '12px 16px', padding: '14px 16px', borderRadius: '12px',
+        background: 'rgba(229,57,53,0.14)', border: '1px solid rgba(229,57,53,0.5)',
+        color: '#ff9a97', fontSize: '15px', lineHeight: 1.4,
+    },
+    newBanner: {
+        display: 'flex', alignItems: 'center', gap: '14px', width: 'calc(100% - 32px)',
+        margin: '12px 16px', padding: '18px 20px', borderRadius: '14px',
+        background: 'linear-gradient(135deg, rgba(76,175,80,0.24), rgba(76,175,80,0.12))',
+        border: '2px solid rgba(76,175,80,0.7)', cursor: 'pointer',
+        color: '#c8f7c9', fontSize: '22px', fontWeight: 900,
+        fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
+        animation: 'newOrderPulse 1.1s ease-in-out infinite',
+    },
+    newBannerCta: {
+        flexShrink: 0, padding: '10px 20px', borderRadius: '10px',
+        background: 'rgba(255,255,255,0.14)', border: '1px solid rgba(255,255,255,0.3)',
+        fontSize: '16px', fontWeight: 800, color: '#fff',
+    },
+    audioHint: {
+        display: 'block', width: 'calc(100% - 32px)', margin: '0 16px 12px',
+        padding: '12px 16px', borderRadius: '12px', cursor: 'pointer',
+        background: 'rgba(255,152,0,0.14)', border: '1px solid rgba(255,152,0,0.5)',
+        color: '#ffcc80', fontSize: '15px', fontWeight: 700,
+        fontFamily: "var(--font-heebo), 'Heebo', sans-serif", textAlign: 'center' as const,
+    },
 
     columns: {
         display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
