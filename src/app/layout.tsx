@@ -36,6 +36,14 @@ export const viewport: Viewport = {
     maximumScale: 1,
     userScalable: false,
     themeColor: '#020a02',
+    // Without this every `env(safe-area-inset-*)` in the app resolves to 0, so
+    // the notch/home-indicator padding the components already ask for never
+    // actually happens — and an installed PWA gets letterboxed bars instead of
+    // running edge to edge. Enabling it means content now reaches the physical
+    // screen edges, so every top-anchored surface must supply its own top
+    // inset (they all do: home2, size picker, legal, kitchen, profile, orders,
+    // order status, and the builder/summary headers).
+    viewportFit: 'cover',
 };
 
 export default function RootLayout({

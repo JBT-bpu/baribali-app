@@ -906,7 +906,10 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
             pointerEvents: "none"
           }} />
           {/* Single compact header row: [→ ↺] · title (abs centered) · [←] */}
-          <div style={{ position: "relative", display: "flex", alignItems: "center", padding: "7px 10px 4px" }}>
+          {/* No side padding — S.header already supplies the 16px gutter. This
+              row used to add another 10px on top of it, so the nav buttons sat
+              further in than the progress bar directly beneath them. */}
+          <div style={{ position: "relative", display: "flex", alignItems: "center", padding: "7px 0 4px" }}>
             {/* Back + reset cluster — left */}
             <div style={{ display: "flex", gap: "5px", flexShrink: 0, zIndex: 1 }}>
               <button onClick={back} aria-label="חזור" style={S.navBtn}>→</button>
@@ -1241,12 +1244,14 @@ const S = {
   // Every top-level row below uses the same 16px side gutter. This screen ran
   // 10px (grid, tabs) / 12px (header, suggestions) / 20px (bottom bar), so the
   // CTA was inset twice as far as the chip grid directly above it.
-  header: { padding: "8px 16px 6px", background: `linear-gradient(to bottom, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.28) 100%), url(${headerImage}) center / cover no-repeat`, borderBottom: "2px solid rgba(200,168,78,0.4)", boxShadow: "0 4px 20px rgba(0,0,0,0.5), 0 0 30px rgba(200,168,78,0.08)", position: "relative" },
+  // paddingTop carries the status bar / notch now that viewport-fit=cover is
+  // on; the header's own background fills that strip.
+  header: { padding: "8px 16px 6px", paddingTop: "calc(8px + env(safe-area-inset-top))", background: `linear-gradient(to bottom, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.28) 100%), url(${headerImage}) center / cover no-repeat`, borderBottom: "2px solid rgba(200,168,78,0.4)", boxShadow: "0 4px 20px rgba(0,0,0,0.5), 0 0 30px rgba(200,168,78,0.08)", position: "relative" },
   headerTop: { display: "flex", alignItems: "center" },
-  backBtn: { width: "34px", height: "34px", borderRadius: "10px", cursor: "pointer", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", color: "#ffffff", fontSize: "16px", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-heebo), 'Heebo', sans-serif" },
-  navBtn: { width: "34px", height: "34px", borderRadius: "10px", cursor: "pointer", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", color: "#ffffff", fontSize: "16px", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-heebo), 'Heebo', sans-serif" },
-  navBtnNext: { width: "34px", height: "34px", borderRadius: "10px", cursor: "pointer", background: "linear-gradient(135deg, rgba(200,168,78,0.35), rgba(240,208,96,0.25))", border: "1.5px solid rgba(200,168,78,0.55)", color: "#f0d060", fontSize: "16px", fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", boxShadow: "0 0 10px rgba(200,168,78,0.25)" },
-  resetBtn: { width: "34px", height: "34px", borderRadius: "10px", cursor: "pointer", background: "rgba(239,83,80,0.18)", border: "1.5px solid rgba(239,83,80,0.5)", color: "#ff7575", fontSize: "17px", fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", boxShadow: "0 0 8px rgba(239,83,80,0.2)" },
+  backBtn: { width: "44px", height: "44px", borderRadius: "10px", cursor: "pointer", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", color: "#ffffff", fontSize: "16px", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-heebo), 'Heebo', sans-serif" },
+  navBtn: { width: "44px", height: "44px", borderRadius: "10px", cursor: "pointer", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", color: "#ffffff", fontSize: "16px", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-heebo), 'Heebo', sans-serif" },
+  navBtnNext: { width: "44px", height: "44px", borderRadius: "10px", cursor: "pointer", background: "linear-gradient(135deg, rgba(200,168,78,0.35), rgba(240,208,96,0.25))", border: "1.5px solid rgba(200,168,78,0.55)", color: "#f0d060", fontSize: "16px", fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", boxShadow: "0 0 10px rgba(200,168,78,0.25)" },
+  resetBtn: { width: "44px", height: "44px", borderRadius: "10px", cursor: "pointer", background: "rgba(239,83,80,0.18)", border: "1.5px solid rgba(239,83,80,0.5)", color: "#ff7575", fontSize: "17px", fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", boxShadow: "0 0 8px rgba(239,83,80,0.2)" },
   pricePill: { display: "flex", alignItems: "baseline", gap: "2px", background: "linear-gradient(135deg, rgba(200,168,78,0.15), rgba(180,140,40,0.08))", border: "1px solid rgba(200,168,78,0.4)", padding: "4px 12px", borderRadius: "12px", transition: "all 0.2s cubic-bezier(0.34,1.56,0.64,1)" },
   priceS: { fontSize: "11px", color: "#d4b84a", fontWeight: 700 },
   priceV: { fontSize: "22px", color: "#ffffff", fontWeight: 900, textShadow: "0 2px 8px rgba(200,168,78,0.5)" },
@@ -1282,7 +1287,8 @@ const S = {
   },
   chipInfo: {
     position: "absolute", bottom: "3px", right: "3px",
-    width: "20px", height: "20px", borderRadius: "50%",
+    // 24px is the WCAG 2.5.8 minimum target size; it was 20px.
+    width: "24px", height: "24px", borderRadius: "50%",
     display: "flex", alignItems: "center", justifyContent: "center",
     background: "rgba(0,0,0,0.42)", border: "1px solid rgba(255,255,255,0.28)",
     color: "rgba(255,255,255,0.8)", fontSize: "11px", fontWeight: 900,

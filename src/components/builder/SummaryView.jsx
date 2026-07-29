@@ -748,7 +748,9 @@ const S = {
     bg: { position: "fixed", inset: 0, zIndex: 0, background: "linear-gradient(155deg, #030a03 0%, #071a07 20%, #0a200a 45%, #071a07 70%, #030a03 100%)", filter: "blur(2px) brightness(0.65)" },
     bgRay: { position: "fixed", top: "-30%", left: "50%", transform: "translateX(-50%)", width: "110%", height: "70%", zIndex: 0, pointerEvents: "none", background: "radial-gradient(ellipse 70% 60% at 50% 20%, rgba(255,224,100,0.05) 0%, rgba(200,168,78,0.02) 50%, transparent 70%)" },
     main: { position: "relative", zIndex: 2, display: "flex", flexDirection: "column", height: "100dvh" },
-    header: { background: `linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.5)), url(/builder-assets/header-brand.png) center / cover no-repeat`, borderBottom: "2px solid rgba(200,168,78,0.4)" },
+    // paddingTop keeps the brand art clear of the notch now that
+    // viewport-fit=cover is on; the header background fills the strip above it.
+    header: { paddingTop: "env(safe-area-inset-top)", background: `linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.5)), url(/builder-assets/header-brand.png) center / cover no-repeat`, borderBottom: "2px solid rgba(200,168,78,0.4)" },
     // 16px side gutter, matching `content` and `bar` — the screen used to run
     // 12/14/16/28px at different heights, which read as the header and footer
     // being crowded against the edge.
