@@ -291,14 +291,17 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                             <div style={S.comboBannerTitle}>🏆 שילובים שנבחרו</div>
                             <div style={S.comboBannerRow}>
                                 {comboBadges.map(b => (
-                                    <BariBadge key={b.id} icon={<span style={{ fontSize: "16px" }}>{b.icon}</span>}>{b.he}</BariBadge>
+                                    <BariBadge key={b.id} icon={<span style={{ fontSize: "14px" }}>{b.icon}</span>}>{b.he}</BariBadge>
                                 ))}
                             </div>
                         </div>
                     )}
 
                     {/* ── RPG Inventory ── */}
-                    <div style={{ margin: "0 12px 8px" }}>
+                    {/* No side margin: `content` already supplies the 16px
+                        gutter, and the extra 12px here made these panels
+                        narrower than the combo banner right above them. */}
+                    <div style={{ margin: "0 0 8px" }}>
                         {grouped.map(({ s, items }, gi) => (
                             <BariPanel key={s.id} className="p-2.5" style={{
                                 marginBottom: "10px",
@@ -739,12 +742,17 @@ const OS = {
 };
 
 const S = {
-    root: { position: "relative", width: "100%", maxWidth: "430px", minHeight: "100vh", margin: "0 auto", overflow: "hidden", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: "rtl" },
+    // dvh — see the note in BariBaliBuilder: `100vh` would push the total +
+    // "לתשלום" bar below the browser chrome on a phone.
+    root: { position: "relative", width: "100%", maxWidth: "430px", minHeight: "100dvh", margin: "0 auto", overflow: "hidden", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: "rtl" },
     bg: { position: "fixed", inset: 0, zIndex: 0, background: "linear-gradient(155deg, #030a03 0%, #071a07 20%, #0a200a 45%, #071a07 70%, #030a03 100%)", filter: "blur(2px) brightness(0.65)" },
     bgRay: { position: "fixed", top: "-30%", left: "50%", transform: "translateX(-50%)", width: "110%", height: "70%", zIndex: 0, pointerEvents: "none", background: "radial-gradient(ellipse 70% 60% at 50% 20%, rgba(255,224,100,0.05) 0%, rgba(200,168,78,0.02) 50%, transparent 70%)" },
-    main: { position: "relative", zIndex: 2, display: "flex", flexDirection: "column", height: "100vh" },
+    main: { position: "relative", zIndex: 2, display: "flex", flexDirection: "column", height: "100dvh" },
     header: { background: `linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.5)), url(/builder-assets/header-brand.png) center / cover no-repeat`, borderBottom: "2px solid rgba(200,168,78,0.4)" },
-    headerTop: { display: "flex", alignItems: "center", gap: "8px", padding: "8px 12px 10px" },
+    // 16px side gutter, matching `content` and `bar` — the screen used to run
+    // 12/14/16/28px at different heights, which read as the header and footer
+    // being crowded against the edge.
+    headerTop: { display: "flex", alignItems: "center", gap: "8px", padding: "8px 16px 10px" },
     backBtn: { width: "44px", height: "44px", borderRadius: "10px", cursor: "pointer", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)", color: "#a5d6a7", fontSize: "16px", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", flexShrink: 0 },
     pricePill: { display: "flex", alignItems: "baseline", gap: "1px", background: "linear-gradient(135deg, rgba(200,168,78,0.22), rgba(184,134,11,0.1))", border: "1px solid rgba(200,168,78,0.4)", padding: "4px 11px", borderRadius: "12px" },
     priceS: { fontSize: "10px", color: "#d4b84a", fontWeight: 600 },
@@ -755,7 +763,10 @@ const S = {
     sumBowl: { position: "relative", zIndex: 1, width: "280px", minHeight: "120px", padding: "14px 14px 10px", borderRadius: "16px 16px 50% 50% / 16px 16px 44% 44%", background: "linear-gradient(170deg, rgba(22,65,22,0.85), rgba(15,48,15,0.8))", border: "1px solid rgba(200,168,78,0.28)", boxShadow: "0 10px 36px rgba(0,0,0,0.5), 0 0 0 1px rgba(200,168,78,0.08), inset 0 2px 6px rgba(0,0,0,0.25)", display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" },
     sumBowlMeta: { marginTop: "10px", display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", fontWeight: 600, color: "rgba(255,255,255,0.5)", letterSpacing: "0.03em" },
     bowlLayer: { display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "3px" },
-    comboBanner: { marginBottom: "14px", padding: "12px 14px", borderRadius: "14px", background: "linear-gradient(135deg, rgba(200,168,78,0.14) 0%, rgba(180,140,40,0.08) 100%)", border: "1.5px solid rgba(200,168,78,0.4)", boxShadow: "0 0 24px rgba(200,168,78,0.12), inset 0 1px 0 rgba(255,255,255,0.06)", animation: "pFadeIn 0.5s ease both" },
+    // 16px inner gutter + a smaller badge glyph (below): four bordered pills in
+    // a bordered box used to fill the row edge-to-edge with nothing to spare,
+    // which is what made it read as crowded.
+    comboBanner: { marginBottom: "14px", padding: "12px 16px", borderRadius: "14px", background: "linear-gradient(135deg, rgba(200,168,78,0.14) 0%, rgba(180,140,40,0.08) 100%)", border: "1.5px solid rgba(200,168,78,0.4)", boxShadow: "0 0 24px rgba(200,168,78,0.12), inset 0 1px 0 rgba(255,255,255,0.06)", animation: "pFadeIn 0.5s ease both" },
     comboBannerTitle: { fontSize: "10px", fontWeight: 800, color: "rgba(200,168,78,0.6)", letterSpacing: "0.06em", marginBottom: "8px" },
     comboBannerRow: { display: "flex", gap: "8px", flexWrap: "wrap" },
     notesToggle: { width: "100%", margin: "12px 0", padding: "10px 12px", borderRadius: "12px", display: "flex", alignItems: "center", gap: "8px", background: "rgba(15,45,15,0.6)", backdropFilter: "blur(8px)", border: "1px solid rgba(200,168,78,0.15)", cursor: "pointer", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.45)", direction: "rtl", textAlign: "right" },
@@ -765,7 +776,7 @@ const S = {
     sumTotal: { display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: "36px", fontWeight: 900, color: "#f0d060", textShadow: "0 0 24px rgba(200,168,78,0.55), 0 2px 8px rgba(200,168,78,0.3)", padding: "12px 0 2px", marginTop: "10px", borderTop: "1px solid rgba(200,168,78,0.2)" },
     bar: {
         display: "flex", flexDirection: "column", gap: "10px",
-        padding: "12px 14px 18px",
+        padding: "12px 16px 18px",
         background: `linear-gradient(rgba(0,0,0,0.72), rgba(0,0,0,0.68)), url(/builder-assets/footer-brand.png) center top / cover no-repeat`,
         borderTop: "2px solid rgba(200,168,78,0.4)",
         boxShadow: "0 -6px 28px rgba(0,0,0,0.55)",

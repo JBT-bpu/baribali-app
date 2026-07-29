@@ -12,7 +12,7 @@ export default async function AdminPage() {
     if (!adminAuthEnabled()) {
         return (
             <div style={{
-                minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center',
                 background: '#0a0a0a', color: 'rgba(255,255,255,0.5)', direction: 'rtl',
                 fontFamily: "var(--font-heebo), 'Heebo', sans-serif", padding: '24px', textAlign: 'center',
             }}>

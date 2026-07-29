@@ -47,7 +47,7 @@ export default function AdminBoard() {
 
 const S: Record<string, React.CSSProperties> = {
     root: {
-        minHeight: '100vh', background: '#0a0a0a', color: '#fff',
+        minHeight: '100dvh', background: '#0a0a0a', color: '#fff',
         fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: 'rtl',
     },
     header: {

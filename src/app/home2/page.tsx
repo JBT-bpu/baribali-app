@@ -134,13 +134,13 @@ export default function HomeV2() {
         router.push(`/build?size=${size}`);
     }, [router]);
 
-    if (!ready) return <div style={{ minHeight: '100vh', background: '#020a02' }} />;
+    if (!ready) return <div style={{ minHeight: '100dvh', background: '#020a02' }} />;
 
     const avatar = user ? avatarUrl(user) : null;
 
     return (
         <div style={{
-            minHeight: '100vh', width: '100%', position: 'relative',
+            minHeight: '100dvh', width: '100%', position: 'relative',
             fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: 'rtl',
             display: 'flex', flexDirection: 'column', alignItems: 'center',
             justifyContent: 'space-between', overflowX: 'hidden', overflowY: 'auto', userSelect: 'none',
@@ -176,7 +176,7 @@ export default function HomeV2() {
             <div style={{
                 position: 'relative', zIndex: 2, width: '100%',
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '0 20px', paddingTop: 'max(20px, env(safe-area-inset-top))',
+                padding: '0 16px', paddingTop: 'max(20px, env(safe-area-inset-top))',
                 animation: 'logoIn 0.6s cubic-bezier(0.34,1.3,0.64,1) both',
             }}>
                 <button
