@@ -24,8 +24,16 @@ export async function POST(req: NextRequest) {
     // Blunt order-spam from a single source.
     const limited = enforceRateLimit(req, 'orders', 12, 60_000);
     if (limited) return limited;
+    // Parsed separately so a malformed body reports as a client error rather
+    // than a 500 (which reads as "our fault" in logs and to the caller).
+    let body;
     try {
-        const body = await req.json();
+        body = await req.json();
+    } catch {
+        return NextResponse.json({ error: 'Malformed request body' }, { status: 400 });
+    }
+
+    try {
         const { items, total, pickupTime, notes, size, paymentChoice, discountCode } = body;
 
         if (!items || !Array.isArray(items) || total == null) {

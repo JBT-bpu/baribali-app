@@ -1,5 +1,5 @@
 'use client';
-import { useMemo, useState, useEffect } from "react";
+import { useCallback, useMemo, useRef, useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { fireGoldConfetti } from "../../lib/confetti";
 const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
@@ -68,6 +68,15 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     const [promoInput, setPromoInput] = useState("");
     const [appliedDiscount, setAppliedDiscount] = useState(null);
     const [promoError, setPromoError] = useState("");
+    const [submitting, setSubmitting] = useState(false);
+    const [submitError, setSubmitError] = useState("");
+    // The confirmation screen may only appear once BOTH the mixing animation has
+    // finished AND the server has actually accepted the order. Previously the
+    // animation's completion alone flipped to "ordered", so a failed request
+    // still showed a confirmation (with a fabricated order number) and the
+    // customer would arrive to collect food nobody had been told to make.
+    const outcomeRef = useRef(null); // null = pending | 'ok' | 'fail'
+    const mixDoneRef = useRef(false);
     const [autoDiscount, setAutoDiscount] = useState(null); // standing "tag" discount for signed-in customers
 
     // Signed-in customers may have a standing discount assigned to their account
@@ -127,55 +136,108 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
         return { greens, vegs, prots, tops, rest };
     }, [all]);
 
+    // Shows the confirmation only when the animation has finished *and* the
+    // server accepted the order.
+    const settle = useCallback(() => {
+        if (!mixDoneRef.current || outcomeRef.current === null) return;
+        setShowMixing(false);
+        setSubmitting(false);
+        if (outcomeRef.current === 'ok') setOrdered(true);
+    }, []);
+
+    const failSubmit = useCallback((message) => {
+        outcomeRef.current = 'fail';
+        setShowMixing(false);          // stop the animation rather than let it "complete"
+        setSubmitting(false);
+        setSubmitError(message);
+        navigator.vibrate?.([30, 40, 30]);
+    }, []);
+
     const submitOrder = async (choiceOverride) => {
+        if (submitting) return;        // a double-tap must not create two orders
         const choice = choiceOverride ?? paymentChoice;
         const isFailureTest = choice === "fail";
+        setSubmitting(true);
+        setSubmitError("");
+        outcomeRef.current = null;
+        // The failure-test path shows no animation, so there is nothing to wait
+        // for — treat the "animation done" gate as already satisfied.
+        mixDoneRef.current = isFailureTest;
         if (navigator.vibrate) navigator.vibrate(isFailureTest ? [30, 40, 30] : [15, 40, 30]);
         if (!isFailureTest) setShowMixing(true);
-        // Signed-in customers get the order linked to their account (order
-        // history on /profile); guests order exactly the same without it.
-        const token = await getAccessToken().catch(() => null);
-        fetch('/api/orders', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            },
-            body: JSON.stringify({
-                items: all.map(i => ({ id: i.id, he: i.he, icon: i.icon, price: effectiveItemPrice(i.id, i.price || 0) })),
-                total: finalTotal,
-                pickupTime,
-                notes,
-                size: base,
-                discountCode: effectiveDiscount?.code,
-                ...(DEMO_MODE ? { paymentChoice: choice } : {}),
-            }),
-        })
-            .then(r => r.ok ? r.json() : null)
-            .then(async data => {
-                if (data?.paymentFailed) {
-                    setShowMixing(false);
-                    setFailedOrderNum(data.orderNum ?? null);
-                    setPaymentFailed(true);
-                    return;
+
+        try {
+            // Signed-in customers get the order linked to their account (order
+            // history on /profile); guests order exactly the same without it.
+            const token = await getAccessToken().catch(() => null);
+            const res = await fetch('/api/orders', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
+                body: JSON.stringify({
+                    items: all.map(i => ({ id: i.id, he: i.he, icon: i.icon, price: effectiveItemPrice(i.id, i.price || 0) })),
+                    total: finalTotal,
+                    pickupTime,
+                    notes,
+                    size: base,
+                    discountCode: effectiveDiscount?.code,
+                    ...(DEMO_MODE ? { paymentChoice: choice } : {}),
+                }),
+            });
+            const data = await res.json().catch(() => null);
+
+            if (!res.ok) {
+                failSubmit(
+                    res.status === 429
+                        ? "נשלחו יותר מדי הזמנות. נסו שוב בעוד רגע."
+                        : "לא הצלחנו לשלוח את ההזמנה. נסו שוב."
+                );
+                return;
+            }
+            if (data?.paymentFailed) {
+                setShowMixing(false);
+                setSubmitting(false);
+                setFailedOrderNum(data.orderNum ?? null);
+                setPaymentFailed(true);
+                return;
+            }
+            // No id/order number means nothing was actually recorded — never
+            // present that as a confirmed order.
+            if (!data?.id && !data?.orderNum) {
+                failSubmit("לא הצלחנו לשלוח את ההזמנה. נסו שוב.");
+                return;
+            }
+
+            if (data.orderNum) setRealOrderNum(data.orderNum);
+            if (data.id) setRealOrderId(data.id);
+
+            // Online payment only when a gateway is configured. Otherwise the
+            // order is already pay-at-pickup (server set payAtPickup) — skip
+            // the redirect and let the confirmation screen show.
+            if (data.id && !data.demo && !data.payAtPickup) {
+                const payRes = await fetch('/api/payment/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ orderId: data.id }),
+                }).then(r => r.ok ? r.json() : null).catch(() => null);
+                if (payRes?.paymentUrl) {
+                    window.location.href = payRes.paymentUrl;
+                    return; // leaving the page — don't settle
                 }
-                if (data?.orderNum) setRealOrderNum(data.orderNum);
-                if (data?.id) setRealOrderId(data.id);
-                // Online payment only when a gateway is configured. Otherwise the
-                // order is already pay-at-pickup (server set payAtPickup) — skip
-                // the redirect and let the confirmation screen show.
-                if (data?.id && !data?.demo && !data?.payAtPickup) {
-                    const payRes = await fetch('/api/payment/create', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ orderId: data.id }),
-                    }).then(r => r.ok ? r.json() : null).catch(() => null);
-                    if (payRes?.paymentUrl) {
-                        window.location.href = payRes.paymentUrl;
-                    }
-                }
-            })
-            .catch(() => {}); // silent fallback
+                // The order exists but we can't reach the gateway; it is on the
+                // board as pending, so send them to its status page rather than
+                // claim success here.
+                failSubmit("ההזמנה נקלטה אך התשלום לא נפתח. פנו לקופה עם מספר ההזמנה " + (data.orderNum ?? ""));
+                return;
+            }
+
+            outcomeRef.current = 'ok';
+            settle();
+        } catch {
+            failSubmit("אין חיבור לרשת. בדקו את החיבור ונסו שוב.");
+        }
     };
 
     if (paymentFailed) return <PaymentFailedScreen orderNum={failedOrderNum} onRetry={() => setPaymentFailed(false)} />;
@@ -189,10 +251,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                 <MixingAnimation
                     all={all}
                     total={finalTotal}
-                    onComplete={() => {
-                        setShowMixing(false);
-                        setOrdered(true);
-                    }}
+                    onComplete={() => { mixDoneRef.current = true; settle(); }}
                 />
             )}
 
@@ -437,9 +496,27 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                             </span>
                         </div>
                     </div>
+                    {/* Submission failure — shown instead of a false confirmation */}
+                    {submitError && (
+                        <div role="alert" style={{
+                            display: "flex", alignItems: "center", gap: "8px",
+                            padding: "10px 12px", borderRadius: "12px",
+                            background: "rgba(239,83,80,0.12)", border: "1px solid rgba(239,83,80,0.4)",
+                            fontSize: "12.5px", fontWeight: 700, color: "#ff9a97", lineHeight: 1.5,
+                        }}>
+                            <span style={{ fontSize: "16px", flexShrink: 0 }}>⚠️</span>
+                            <span>{submitError}</span>
+                        </div>
+                    )}
                     {/* CTA */}
-                    <BariButton variant="primary" fullWidth style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }} onClick={() => submitOrder()}>
-                        <span>שלח הזמנה</span>
+                    <BariButton
+                        variant="primary"
+                        fullWidth
+                        disabled={submitting}
+                        style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif", opacity: submitting ? 0.6 : 1 }}
+                        onClick={() => submitOrder()}
+                    >
+                        <span>{submitting ? "שולח…" : submitError ? "נסו שוב" : "שלח הזמנה"}</span>
                         <span style={S.orderBtnPrice}>₪{finalTotal}</span>
                     </BariButton>
                     {/* Consent disclosure — links open the legal docs before ordering */}
@@ -527,8 +604,7 @@ function NutriStats({ all }) {
 const SHOP_WA = process.env.NEXT_PUBLIC_SHOP_WA_NUMBER || '972501234567';
 
 // ─── Post-order confirmation screen ─────────────────────────
-function OrderedScreen({ total, all, pickupTime, notes, orderNum: propOrderNum, orderId, onNewOrder }) {
-    const fallbackNum = useMemo(() => `BB-${((Date.now() % 9000) + 1000)}`, []);
+function OrderedScreen({ total, all, pickupTime, notes, orderNum, orderId, onNewOrder }) {
     useEffect(() => {
         // Delayed so the burst punctuates this screen's arrival — firing on
         // mount collided with MixingAnimation's bloom peak that just ended,
@@ -536,7 +612,9 @@ function OrderedScreen({ total, all, pickupTime, notes, orderNum: propOrderNum, 
         const t = setTimeout(() => fireGoldConfetti(), 450);
         return () => clearTimeout(t);
     }, []);
-    const orderNum = propOrderNum || fallbackNum;
+    // No invented order number: this screen used to fall back to a client-side
+    // `BB-xxxx`, which meant a failed order could still show the customer a
+    // plausible confirmation. The number is only ever the server's.
     const [animData, setAnimData] = useState(null);
     useEffect(() => { fetch("/cat-salad-final.json").then(r => r.json()).then(setAnimData).catch(() => {}); }, []);
 
@@ -544,7 +622,8 @@ function OrderedScreen({ total, all, pickupTime, notes, orderNum: propOrderNum, 
         const items = all.map(i => i.he).join(', ');
         const timeLine = pickupTime ? `⏰ איסוף: ${pickupTime}\n` : '';
         const noteLine = notes ? `📝 ${notes}\n` : '';
-        const msg = `🥗 *הזמנה ${orderNum}*\n${timeLine}💰 סה"כ: ₪${total}\n\n*מרכיבים:*\n${items}\n${noteLine}`;
+        const head = orderNum ? `🥗 *הזמנה ${orderNum}*` : '🥗 *הזמנה*';
+        const msg = `${head}\n${timeLine}💰 סה"כ: ₪${total}\n\n*מרכיבים:*\n${items}\n${noteLine}`;
         return `https://wa.me/${SHOP_WA}?text=${encodeURIComponent(msg)}`;
     }, [orderNum, all, total, pickupTime, notes]);
 
@@ -558,9 +637,11 @@ function OrderedScreen({ total, all, pickupTime, notes, orderNum: propOrderNum, 
                     </div>
                     <div style={OS.title}>בהכנה!</div>
                     <div style={OS.subtitle}>מכינים את הסלט שלכם עכשיו 🐱</div>
-                    <div style={{ marginTop: "14px", animation: "fadeUp 0.5s ease 0.35s both" }}>
-                        <BariBadge>הזמנה {orderNum}</BariBadge>
-                    </div>
+                    {orderNum && (
+                        <div style={{ marginTop: "14px", animation: "fadeUp 0.5s ease 0.35s both" }}>
+                            <BariBadge>הזמנה {orderNum}</BariBadge>
+                        </div>
+                    )}
                     <div style={OS.price}>₪{total}</div>
                     <div style={OS.meta}>{all.length} מרכיבים{pickupTime ? ` · איסוף: ${pickupTime}` : ' · מוכן בכ-8 דקות'}</div>
                     <div style={OS.divider} />

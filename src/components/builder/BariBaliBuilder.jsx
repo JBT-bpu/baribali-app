@@ -325,6 +325,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
   const [shownBadges, setShownBadges] = useState(new Set());
   const [detailCtx, setDetailCtx] = useState(null); // { item, stepId, maxPicks }
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [draftNotice, setDraftNotice] = useState(false);
   const [showLongPressHint, setShowLongPressHint] = useState(true);
   useEffect(() => {
     const t = setTimeout(() => setShowLongPressHint(false), 15000);
@@ -396,6 +397,13 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
 
         setSels(migratedSels);
         setNotes(parsed.notes || "");
+        // Say so. Silently repopulating a bowl from a previous visit looks like
+        // a bug ("why is there already stuff in here?"); the clear button is
+        // right there once you know it came from a saved draft.
+        if (Object.values(migratedSels).some(v => v.length > 0)) {
+          setDraftNotice(true);
+          setTimeout(() => setDraftNotice(false), 7000);
+        }
       }
     } catch (e) { }
   }, [steps]);
@@ -637,6 +645,15 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
 
           <div style={{ display: "flex", flexDirection: "column", gap: "16px", flex: 1, padding: "16px 16px 24px", overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
 
+            {/* Draft was restored — explain the pre-filled bowl */}
+            {draftNotice && (
+              <div style={S.draftNotice} role="status">
+                <span style={{ fontSize: "15px" }}>📝</span>
+                <span style={{ flex: 1 }}>המשכנו מהטיוטה הקודמת שלכם</span>
+                <button onClick={requestClearDraft} style={S.draftNoticeBtn}>התחל מחדש</button>
+              </div>
+            )}
+
             {/* HERO - Start Empty Button (Glassy) */}
             <button
               onClick={() => { setStep(0); haptic("step"); playSound("step"); }}
@@ -845,6 +862,15 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
 
   const slideX = anim === "out" ? (slideDir > 0 ? "-60px" : "60px") : anim === "in" ? "0" : undefined;
 
+  // Global bowl cap, surfaced. `toggle` has always enforced it by silently
+  // returning the previous state, so at 14/14 an ingredient chip still looked
+  // tappable and simply did nothing — which reads as the app being broken.
+  // Steps with their own maxPicks, premium upgrades and the finish step are
+  // exempt from the cap (see toggle), so they must not be blocked here either.
+  const bowlCap = isTortilla ? TORTILLA_MAX : BOWL_MAX;
+  const capApplies = !!cur && !cur.maxPicks && cur.id !== "finish" && cur.id !== "upgrade" && cur.id !== "t_upgrade";
+  const bowlFull = capApplies && all.length >= bowlCap;
+
   return (
     <div style={S.root} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
       <div style={S.bg} />
@@ -1016,7 +1042,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
               <span style={{ fontSize: "32px", lineHeight: 1 }}>👆</span>
               <div>
                 <div style={{ fontSize: "13px", fontWeight: 900, color: "#f0d060", marginBottom: "2px" }}>למידע נוסף על הרכיב</div>
-                <div style={{ fontSize: "11px", fontWeight: 600, color: "rgba(255,255,255,0.65)" }}>לחיצה ארוכה</div>
+                <div style={{ fontSize: "11px", fontWeight: 600, color: "rgba(255,255,255,0.65)" }}>לחצו על ⓘ או לחיצה ארוכה</div>
               </div>
             </div>
           )}
@@ -1026,6 +1052,14 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
             <div style={S.introCard}><span style={{ fontSize: "13px" }}>{cur.emoji}</span><span style={S.introText}>{cur.intro}</span></div>
           )}
 
+          {/* Bowl at capacity — says why the chips below are unavailable */}
+          {bowlFull && (
+            <div style={S.capNotice} role="status">
+              <span style={{ fontSize: "16px" }}>🥣</span>
+              <span>הקערה מלאה ({all.length}/{bowlCap}) — הסירו מרכיב כדי להוסיף אחר</span>
+            </div>
+          )}
+
           {cur.subgroups.map((sg, si) => {
             return (
               <div key={si} ref={el => sgRefs.current[si] = el}>
@@ -1033,29 +1067,45 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                 <div style={S.grid}>
                   {sg.items.map((item, idx) => {
                     const on = curSel.some(s => s.id === item.id);
-                    const full = !on && cur.maxPicks && cur.maxPicks > 1 && curSel.length >= cur.maxPicks;
+                    // Unavailable either because this step is at its own limit, or
+                    // because the bowl as a whole is full. Removing is always allowed.
+                    const full = !on && ((cur.maxPicks && cur.maxPicks > 1 && curSel.length >= cur.maxPicks) || bowlFull);
                     const isPremiumStep = cur.id === "upgrade" || cur.id === "t_upgrade";
                     const itemPrice = effectiveItemPrice(item.id, item.price);
+                    // A div rather than a <button>: it already carries
+                    // role="checkbox", and the info affordance inside is a real
+                    // button — which cannot legally nest inside a button.
                     return (
-                      <button key={item.id} disabled={full}
-                        onClick={() => toggle(cur.id, item, cur.maxPicks)}
+                      <div key={item.id}
+                        onClick={() => { if (!full) toggle(cur.id, item, cur.maxPicks); }}
                         onTouchStart={() => onChipTouchStart(item)} onTouchEnd={onChipTouchEnd}
                         onMouseDown={() => onChipTouchStart(item)} onMouseUp={onChipTouchEnd} onMouseLeave={onChipTouchEnd}
-                        onKeyDown={(e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); toggle(cur.id, item, cur.maxPicks); } }}
+                        onKeyDown={(e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); if (!full) toggle(cur.id, item, cur.maxPicks); } }}
                         aria-label={`${item.he}${itemPrice > 0 ? `, תוספת ${itemPrice} שקלים` : ""}${on ? ", נבחר" : ""}${item.desc ? `, ${item.desc}` : ""}`}
                         aria-checked={on}
                         aria-disabled={full}
                         role="checkbox"
-                        tabIndex={0}
+                        tabIndex={full ? -1 : 0}
                         style={{ ...S.chip, ...chipVisual(cur.id, on), ...(full ? S.chipOff : {}), animationDelay: `${(si * 5 + idx) * 20}ms` }}>
                         {on && <div style={S.check} aria-hidden="true">✓</div>}
                         {isPremiumStep && <div style={{ position: "absolute", top: "-2px", left: "-2px", fontSize: "12px", filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.6))" }} aria-hidden="true">👑</div>}
                         {item.pop && <div style={S.popTag} aria-hidden="true">פופולרי</div>}
-                        <div style={{ position: "absolute", bottom: "4px", right: "5px", fontSize: "8px", color: "rgba(255,255,255,0.18)", lineHeight: 1, pointerEvents: "none" }} aria-hidden="true">ℹ</div>
+                        {/* Ingredient info. Was an 8px glyph at 0.18 opacity with
+                            pointerEvents:none — effectively invisible, and the only
+                            way in was a long-press nobody discovers. Now a real
+                            control (long-press still works). */}
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); clearTimeout(longPressRef.current); setDetailCtx({ item, stepId: cur.id, maxPicks: cur.maxPicks }); haptic("tap"); }}
+                          onTouchStart={(e) => e.stopPropagation()}
+                          onMouseDown={(e) => e.stopPropagation()}
+                          aria-label={`מידע על ${item.he}`}
+                          style={S.chipInfo}
+                        >ℹ</button>
                         <Icon src={item.icon} size="38px" style={{ ...S.chipEmoji, transform: lastAdd === item.id ? "scale(1.4) rotate(-10deg)" : "scale(1)", transition: "transform 0.25s cubic-bezier(0.34,1.56,0.64,1)" }} />
                         <span style={S.chipName}>{item.he}</span>
                         {itemPrice > 0 && <span style={S.chipCost}>+₪{itemPrice}</span>}
-                      </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -1211,6 +1261,28 @@ const S = {
 
   longPressHint: { display: "flex", alignItems: "center", gap: "12px", padding: "14px 16px", margin: "4px 0 10px", borderRadius: "16px", background: "linear-gradient(135deg, rgba(200,168,78,0.22), rgba(180,140,40,0.12))", border: "2px solid rgba(200,168,78,0.55)", boxShadow: "0 0 20px rgba(200,168,78,0.25), 0 4px 16px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08)", animation: "hintPop 15s ease both, hintGlow 1s ease-in-out infinite alternate", pointerEvents: "none" },
   introCard: { display: "flex", alignItems: "center", gap: "8px", padding: "10px 12px", margin: "4px 0 8px", borderRadius: "12px", background: "linear-gradient(145deg, rgba(13,46,13,0.95), rgba(8,28,8,0.9))", border: "1px solid rgba(200,168,78,0.2)", boxShadow: "0 2px 10px rgba(0,0,0,0.4)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" },
+  draftNotice: {
+    display: "flex", alignItems: "center", gap: "8px",
+    padding: "9px 12px", borderRadius: "12px",
+    background: "rgba(200,168,78,0.12)", border: "1px solid rgba(200,168,78,0.35)",
+    fontSize: "12px", fontWeight: 700, color: "#f0d060", lineHeight: 1.5,
+  },
+  draftNoticeBtn: {
+    flexShrink: 0, padding: "5px 10px", borderRadius: "8px", cursor: "pointer",
+    background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.2)",
+    color: "rgba(255,255,255,0.75)", fontSize: "11px", fontWeight: 800,
+    fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
+  },
+  chipInfo: {
+    position: "absolute", bottom: "3px", right: "3px",
+    width: "20px", height: "20px", borderRadius: "50%",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    background: "rgba(0,0,0,0.42)", border: "1px solid rgba(255,255,255,0.28)",
+    color: "rgba(255,255,255,0.8)", fontSize: "11px", fontWeight: 900,
+    lineHeight: 1, cursor: "pointer", padding: 0,
+    fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
+  },
+  capNotice: { display: "flex", alignItems: "center", gap: "8px", padding: "10px 12px", margin: "4px 0 8px", borderRadius: "12px", background: "rgba(255,183,77,0.12)", border: "1px solid rgba(255,183,77,0.42)", fontSize: "12px", fontWeight: 700, color: "#ffcc80", lineHeight: 1.5 },
   introText: { fontSize: "12px", color: "rgba(255,255,255,0.65)", fontWeight: 500, textShadow: "0 1px 2px rgba(0,0,0,0.5)" },
 
   sgLabel: { fontSize: "11px", fontWeight: 800, color: "rgba(200,168,78,0.85)", padding: "10px 4px 6px", textShadow: "0 1px 3px rgba(0,0,0,0.7), 0 0 8px rgba(0,0,0,0.3)" },
