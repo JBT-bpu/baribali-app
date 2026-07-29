@@ -4,43 +4,25 @@ import { groupByZone, type ZoneId } from '@/lib/orderZones';
 import { type Order, type OrderStatus, urgencyOf, minutesUntilPickup, paymentLabel } from './types';
 
 /**
- * The order being worked on, occupying the screen.
+ * The order the worker is on.
  *
- * Everything the cook needs is visible at once — no paging between veg, protein
- * and sauces — grouped in the order the salad is actually assembled. Ingredients
- * take the wide side; the short, glanceable things (sauces, mixing, notes,
- * payment) sit in a fixed column so the worker always knows where to look.
- *
- * Ticking individual ingredients is offered but never required: the stages at
- * the bottom are how work is recorded. Asking someone to tap fourteen items with
- * wet hands is work the screen invented, not work the kitchen needs.
+ * A `waiting` order is a decision, not a task: it renders as an accept screen —
+ * what was ordered, when it's due, anything special — with one large button.
+ * Only once accepted does it become the work surface, where everything is
+ * visible at once, grouped in the order the salad is actually assembled, and
+ * the worker taps each ingredient as they add it at their own pace. That
+ * tapping IS the progress; there are no stages to advance.
  */
-
-export interface Stage {
-    id: string;
-    label: string;
-    /** Zones considered "in play" during this stage — used to highlight, never to hide. */
-    zones: ZoneId[];
-}
-
-export const STAGES: Stage[] = [
-    { id: 'base',    label: 'ירקות',   zones: ['base'] },
-    { id: 'protein', label: 'תוספות',  zones: ['protein'] },
-    { id: 'sauce',   label: 'רטבים',   zones: ['sauce', 'finish'] },
-    { id: 'pack',    label: 'אריזה',   zones: [] },
-];
 
 /** Wide-side zones (the bulk of the assembly) vs the fixed side column. */
 const MAIN_ZONES: ZoneId[] = ['base', 'protein', 'other'];
 
 export default function ActiveOrder({
-    order, sizeLabel, stageIndex, onStage, onStatus, checked, onToggleItem,
+    order, sizeLabel, onStatus, checked, onToggleItem,
 }: {
     order: Order;
     /** Which bowl to reach for — the board maps the stored base price to this. */
     sizeLabel: string | null;
-    stageIndex: number;
-    onStage: (next: number) => void;
     onStatus: (status: OrderStatus) => void;
     checked: string[];
     onToggleItem: (itemId: string) => void;
@@ -52,46 +34,99 @@ export default function ActiveOrder({
     const { level, lateBy } = urgencyOf(order.pickup_time);
     const mins = minutesUntilPickup(order.pickup_time);
     const pay = paymentLabel(order.payment_status);
-    const activeZones = STAGES[stageIndex]?.zones ?? [];
+    const doneCount = order.items.filter(i => checked.includes(i.id)).length;
 
-    const renderZone = (g: { zone: { id: ZoneId; title: string }; items: Order['items'] }, big: boolean) => {
-        const dim = activeZones.length > 0 && !activeZones.includes(g.zone.id);
+    const renderZone = (g: { zone: { id: ZoneId; title: string }; items: Order['items'] }, big: boolean) => (
+        <section key={g.zone.id} style={S.zone}>
+            <div style={S.zoneTitle}>
+                <span>{g.zone.title}</span>
+                <span style={S.zoneCount}>{g.items.length}</span>
+            </div>
+            <div style={S.chips}>
+                {g.items.map(it => {
+                    const done = checked.includes(it.id);
+                    return (
+                        <button
+                            key={it.id}
+                            type="button"
+                            onClick={() => onToggleItem(it.id)}
+                            style={{ ...S.chip, ...(big ? S.chipBig : {}), ...(done ? S.chipDone : {}) }}
+                        >
+                            {it.icon?.startsWith('/')
+                                ? <img src={it.icon} alt="" style={{ width: big ? '34px' : '26px', height: big ? '34px' : '26px', objectFit: 'contain' }} />
+                                : <span style={{ fontSize: big ? '26px' : '20px' }}>{it.icon}</span>}
+                            <span style={S.chipName}>{it.he}</span>
+                            {done && <span style={S.chipTick}>✓</span>}
+                        </button>
+                    );
+                })}
+            </div>
+        </section>
+    );
+
+    // ── Not accepted yet: one decision, made large ──
+    if (order.status === 'waiting') {
         return (
-            <section key={g.zone.id} style={{ ...S.zone, ...(dim ? S.zoneDim : {}) }}>
-                <div style={S.zoneTitle}>
-                    <span>{g.zone.title}</span>
-                    <span style={S.zoneCount}>{g.items.length}</span>
+            <div style={S.acceptRoot}>
+                <div style={S.acceptCard}>
+                    <div style={S.acceptTag}>🔔 הזמנה חדשה</div>
+
+                    <div style={S.acceptHead}>
+                        <span style={S.acceptNum}>{order.order_num}</span>
+                        {order.customer_name && <span style={S.acceptName}>· {order.customer_name}</span>}
+                    </div>
+
+                    <div style={{ ...S.acceptTime, color: level === 'late' ? '#ff8a80' : '#fff' }}>
+                        {order.pickup_time ? `איסוף ${order.pickup_time}` : 'ללא שעת איסוף'}
+                        {lateBy > 0
+                            ? <span style={S.headLate}> · באיחור {lateBy} דק׳</span>
+                            : mins !== null && <span style={S.headMins}> · נשארו {mins} דק׳</span>}
+                    </div>
+
+                    <div style={S.acceptFacts}>
+                        {sizeLabel && <span style={S.fact}>🥣 {sizeLabel}</span>}
+                        <span style={S.fact}>{order.items.length} מרכיבים</span>
+                        {pay && (
+                            <span style={{ ...S.fact, ...(pay.owed ? S.payOwed : S.payDone) }}>
+                                {pay.owed ? '💳' : '✓'} {pay.text}
+                            </span>
+                        )}
+                    </div>
+
+                    {/* Anything special is seen BEFORE committing to the order */}
+                    {order.notes && (
+                        <div style={S.notes} role="alert">
+                            <span style={{ fontSize: '22px' }}>⚠️</span>
+                            <span>{order.notes}</span>
+                        </div>
+                    )}
+
+                    {/* Read-only here — so the worker can check stock before accepting */}
+                    <div style={S.acceptItems}>
+                        {grouped.map(g => (
+                            <div key={g.zone.id} style={S.acceptZoneRow}>
+                                <span style={S.acceptZoneName}>{g.zone.title}</span>
+                                <span style={S.acceptZoneItems}>{g.items.map(i => i.he).join(' · ')}</span>
+                            </div>
+                        ))}
+                    </div>
+
+                    <button type="button" style={S.acceptBtn} onClick={() => onStatus('preparing')}>
+                        קבל הזמנה והתחל הכנה ←
+                    </button>
                 </div>
-                <div style={S.chips}>
-                    {g.items.map(it => {
-                        const done = checked.includes(it.id);
-                        return (
-                            <button
-                                key={it.id}
-                                type="button"
-                                onClick={() => onToggleItem(it.id)}
-                                style={{ ...S.chip, ...(big ? S.chipBig : {}), ...(done ? S.chipDone : {}) }}
-                            >
-                                {it.icon?.startsWith('/')
-                                    ? <img src={it.icon} alt="" style={{ width: big ? '34px' : '26px', height: big ? '34px' : '26px', objectFit: 'contain' }} />
-                                    : <span style={{ fontSize: big ? '26px' : '20px' }}>{it.icon}</span>}
-                                <span style={S.chipName}>{it.he}</span>
-                                {done && <span style={S.chipTick}>✓</span>}
-                            </button>
-                        );
-                    })}
-                </div>
-            </section>
+            </div>
         );
-    };
+    }
 
     return (
         <div style={S.root}>
-            {/* Identity — order, customer, when, which bowl */}
+            {/* Identity — order, customer, when */}
             <div style={S.header}>
                 <div style={S.headLeft}>
                     <span style={S.headNum}>{order.order_num}</span>
                     {order.customer_name && <span style={S.headName}>· {order.customer_name}</span>}
+                    <span style={S.progress}>{doneCount}/{order.items.length}</span>
                 </div>
                 <div style={S.headRight}>
                     {order.pickup_time && (
@@ -131,36 +166,9 @@ export default function ActiveOrder({
                 </div>
             </div>
 
-            {/* Stage rail — guidance and progress; never hides any part of the order */}
-            <div style={S.rail}>
-                {STAGES.map((s, i) => (
-                    <button
-                        key={s.id}
-                        type="button"
-                        onClick={() => onStage(i)}
-                        style={{
-                            ...S.railStep,
-                            ...(i < stageIndex ? S.railDone : {}),
-                            ...(i === stageIndex ? S.railNow : {}),
-                        }}
-                    >
-                        {i < stageIndex ? '✓ ' : i === stageIndex ? '● ' : '○ '}{s.label}
-                    </button>
-                ))}
-            </div>
-
-            {/* Actions */}
+            {/* Only the actions that change the customer's order. Accepting
+                happened on the previous screen, so nothing competes here. */}
             <div style={S.actions}>
-                {order.status !== 'ready' && stageIndex < STAGES.length - 1 && (
-                    <button type="button" style={S.secondaryBtn} onClick={() => onStage(stageIndex + 1)}>
-                        סיימתי {STAGES[stageIndex]?.label} ←
-                    </button>
-                )}
-                {order.status === 'waiting' && (
-                    <button type="button" style={S.secondaryBtn} onClick={() => onStatus('preparing')}>
-                        התחל הכנה
-                    </button>
-                )}
                 {order.status !== 'ready' && (
                     <button type="button" style={S.primaryBtn} onClick={() => onStatus('ready')}>
                         מוכן לאיסוף ✓
@@ -177,11 +185,51 @@ export default function ActiveOrder({
 }
 
 const S: Record<string, React.CSSProperties> = {
+    // ── Accept screen ──
+    acceptRoot: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', minHeight: 0, overflowY: 'auto' },
+    acceptCard: {
+        width: '100%', maxWidth: '720px',
+        display: 'flex', flexDirection: 'column', gap: '14px',
+        padding: '24px 28px', borderRadius: '18px',
+        background: 'rgba(76,175,80,0.08)', border: '2px solid rgba(76,175,80,0.45)',
+        boxShadow: '0 18px 50px rgba(0,0,0,0.5)',
+    },
+    acceptTag: {
+        alignSelf: 'flex-start', padding: '6px 16px', borderRadius: '999px',
+        background: 'rgba(76,175,80,0.9)', color: '#04140a',
+        fontSize: '15px', fontWeight: 900, letterSpacing: '0.02em',
+    },
+    acceptHead: { display: 'flex', alignItems: 'baseline', gap: '10px', flexWrap: 'wrap' },
+    acceptNum: { fontSize: '44px', fontWeight: 900, color: 'var(--color-gold-light)', lineHeight: 1 },
+    acceptName: { fontSize: '26px', fontWeight: 800, color: 'rgba(255,255,255,0.9)' },
+    acceptTime: { fontSize: '24px', fontWeight: 800 },
+    acceptFacts: { display: 'flex', flexWrap: 'wrap', gap: '10px' },
+    fact: {
+        padding: '8px 14px', borderRadius: '999px',
+        background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.18)',
+        fontSize: '16px', fontWeight: 800, color: 'rgba(255,255,255,0.9)',
+    },
+    acceptItems: {
+        display: 'flex', flexDirection: 'column', gap: '8px',
+        padding: '14px 16px', borderRadius: '12px',
+        background: 'rgba(0,0,0,0.28)', border: '1px solid rgba(255,255,255,0.1)',
+    },
+    acceptZoneRow: { display: 'flex', gap: '10px', alignItems: 'baseline', flexWrap: 'wrap' },
+    acceptZoneName: { flexShrink: 0, minWidth: '120px', fontSize: '14px', fontWeight: 900, color: 'rgba(255,255,255,0.5)' },
+    acceptZoneItems: { fontSize: '18px', fontWeight: 700, color: '#fff', lineHeight: 1.5 },
+    acceptBtn: {
+        width: '100%', minHeight: '84px', borderRadius: '14px', cursor: 'pointer',
+        background: 'linear-gradient(135deg, #43a047, #66bb6a)', border: 'none',
+        color: '#04140a', fontSize: '26px', fontWeight: 900,
+        fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
+    },
+
     root: { display: 'flex', flexDirection: 'column', gap: '10px', padding: '12px 16px 16px', minHeight: 0, flex: 1 },
     header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' },
-    headLeft: { display: 'flex', alignItems: 'baseline', gap: '8px' },
+    headLeft: { display: 'flex', alignItems: 'baseline', gap: '10px' },
     headNum: { fontSize: '30px', fontWeight: 900, color: 'var(--color-gold-light)' },
     headName: { fontSize: '20px', fontWeight: 800, color: 'rgba(255,255,255,0.85)' },
+    progress: { fontSize: '16px', fontWeight: 800, color: 'rgba(255,255,255,0.45)' },
     headRight: { display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' },
     headTime: { fontSize: '19px', fontWeight: 800 },
     headMins: { fontSize: '15px', fontWeight: 700, color: 'rgba(255,255,255,0.55)' },
@@ -200,9 +248,8 @@ const S: Record<string, React.CSSProperties> = {
     sideCol: { flex: 1, display: 'flex', flexDirection: 'column', gap: '10px', minWidth: 0, overflowY: 'auto' },
     zone: {
         background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
-        borderRadius: '12px', padding: '10px 12px', transition: 'opacity 0.2s ease',
+        borderRadius: '12px', padding: '10px 12px',
     },
-    zoneDim: { opacity: 0.45 },
     zoneTitle: {
         display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px',
         fontSize: '15px', fontWeight: 900, color: 'rgba(255,255,255,0.75)',
@@ -230,22 +277,7 @@ const S: Record<string, React.CSSProperties> = {
     bowlLabel: { fontSize: '14px', fontWeight: 800, color: 'rgba(255,255,255,0.6)' },
     bowlValue: { fontSize: '20px', fontWeight: 900, color: 'var(--color-gold-light)' },
     empty: { padding: '30px', textAlign: 'center', color: 'rgba(255,255,255,0.3)' },
-    rail: { display: 'flex', gap: '8px', flexWrap: 'wrap' },
-    railStep: {
-        flex: 1, minWidth: '110px', minHeight: '44px', borderRadius: '10px', cursor: 'pointer',
-        background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)',
-        color: 'rgba(255,255,255,0.55)', fontSize: '15px', fontWeight: 800,
-        fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
-    },
-    railDone: { background: 'rgba(76,175,80,0.14)', borderColor: 'rgba(76,175,80,0.4)', color: '#a5d6a7' },
-    railNow: { background: 'rgba(255,152,0,0.16)', borderColor: 'rgba(255,152,0,0.55)', color: '#ffcc80' },
     actions: { display: 'flex', gap: '10px' },
-    secondaryBtn: {
-        flex: 1, minHeight: '62px', borderRadius: '12px', cursor: 'pointer',
-        background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.22)',
-        color: '#fff', fontSize: '18px', fontWeight: 800,
-        fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
-    },
     primaryBtn: {
         flex: 1.4, minHeight: '62px', borderRadius: '12px', cursor: 'pointer',
         background: 'linear-gradient(135deg, #c8a832, #f0d060)', border: 'none',

@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { SIZE_CONFIG } from '@/data/salad-data.js';
 import { sizeMlFromBase, detectOrderType } from '@/lib/reorder';
 import OrderTabs from './OrderTabs';
-import ActiveOrder, { STAGES } from './ActiveOrder';
+import ActiveOrder from './ActiveOrder';
 import { type Order, type OrderStatus, byPickupThenReceived } from './types';
 
 /**
@@ -16,8 +16,8 @@ import { type Order, type OrderStatus, byPickupThenReceived } from './types';
  * The rule that shapes this component: **a new order must never move the worker
  * off the order in their hands.** Arrivals re-sort the tab strip and chime, but
  * `activeId` only changes from a tap, or when the active order leaves the board.
- * Stage and tick progress are kept per order and survive switching tabs and a
- * refresh, so glancing at the next ticket costs nothing.
+ * Which ingredients are already in the bowl is kept per order and survives
+ * switching tabs and a refresh, so glancing at the next ticket costs nothing.
  *
  * `authEnabled` comes from the server guard (page.tsx) — the board can't read
  * the server-only KITCHEN_PASSWORD, so it's told whether a session is in play,
@@ -59,7 +59,6 @@ function sizeLabel(size: string | null): string | null {
     return cfg?.label ?? null;
 }
 
-const STAGE_KEY = 'bb-kitchen-stages';
 const CHECK_KEY = 'bb-kitchen-checks';
 
 function loadMap<T>(key: string): Record<string, T> {
@@ -82,10 +81,8 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
 
     // The order in the worker's hands. Never reassigned by incoming data.
     const [activeId, setActiveId] = useState<string | null>(null);
-    // Per-order work state, restored on first render so a refresh mid-shift
-    // loses nothing. (Nothing that depends on it renders before orders arrive,
-    // so reading storage here can't cause a hydration mismatch.)
-    const [stages, setStages] = useState<Record<string, number>>(() => loadMap<number>(STAGE_KEY));
+    // Which ingredients are already in the bowl, restored on first render so a
+    // refresh mid-shift loses nothing.
     const [checks, setChecks] = useState<Record<string, string[]>>(() => loadMap<string[]>(CHECK_KEY));
 
     const ordersRef = useRef<Order[]>([]);
@@ -94,6 +91,16 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
     // the poll on every tab tap).
     const activeIdRef = useRef<string | null>(null);
     useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
+
+    // ── Rehearsal ──
+    // Drips fake orders in one at a time so the chime, a tab appearing, the
+    // accept screen and the focus rule can all be exercised for real. Hidden
+    // unless the page is opened with ?sim=1: a button that injects six orders
+    // must not be one stray tap away during service.
+    const simOn = useSearchParams().get('sim') === '1';
+    const [simLeft, setSimLeft] = useState(0);
+    const simTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    useEffect(() => () => { if (simTimer.current) clearTimeout(simTimer.current); }, []);
 
     // ── New-order alert ──
     const [newIds, setNewIds] = useState<string[]>([]);
@@ -219,14 +226,6 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
         return () => clearInterval(id);
     }, [loadOrders]);
 
-    const setStage = useCallback((orderId: string, index: number) => {
-        setStages(prev => {
-            const next = { ...prev, [orderId]: Math.max(0, Math.min(STAGES.length - 1, index)) };
-            persist(STAGE_KEY, next);
-            return next;
-        });
-    }, [persist]);
-
     const toggleItem = useCallback((orderId: string, itemId: string) => {
         setChecks(prev => {
             const cur = prev[orderId] ?? [];
@@ -271,6 +270,29 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
         }
     }, [onUnauthorized]);
 
+    // One order every 10s, so each arrival lands like a real one.
+    const runSimulation = useCallback((count: number) => {
+        if (simLeft > 0) return;
+        setSimLeft(count);
+        let left = count;
+        const step = async () => {
+            await fetch('/api/kitchen/simulate', { method: 'POST' }).catch(() => {});
+            loadOrders();
+            left -= 1;
+            setSimLeft(left);
+            if (left > 0) simTimer.current = setTimeout(step, 10000);
+        };
+        step();
+    }, [simLeft, loadOrders]);
+
+    const clearSimulation = useCallback(async () => {
+        if (simTimer.current) clearTimeout(simTimer.current);
+        setSimLeft(0);
+        await fetch('/api/kitchen/simulate', { method: 'DELETE' }).catch(() => {});
+        setNewIds([]);
+        loadOrders();
+    }, [loadOrders]);
+
     const active = orders.find(o => o.id === activeId) ?? null;
 
     return (
@@ -298,6 +320,21 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
                             else document.documentElement.requestFullscreen?.().catch(() => {});
                         }}
                     >⛶ מסך מלא</button>
+                    {simOn && (
+                        <>
+                            <button
+                                type="button"
+                                style={{ ...K.headerBtn, ...K.simBtn, opacity: simLeft > 0 ? 0.6 : 1 }}
+                                onClick={() => runSimulation(6)}
+                                disabled={simLeft > 0}
+                            >
+                                {simLeft > 0 ? `🧪 שולח… נותרו ${simLeft}` : '🧪 סימולציה · 6 הזמנות'}
+                            </button>
+                            <button type="button" style={{ ...K.headerBtn, ...K.simBtn }} onClick={clearSimulation}>
+                                🧹 נקה סימולציה
+                            </button>
+                        </>
+                    )}
                     {authEnabled && <button type="button" style={K.headerBtn} onClick={logout}>🔒 יציאה</button>}
                 </div>
             </div>
@@ -359,8 +396,6 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
                             key={active.id}
                             order={active}
                             sizeLabel={sizeLabel(active.size)}
-                            stageIndex={stages[active.id] ?? 0}
-                            onStage={i => setStage(active.id, i)}
                             onStatus={s => updateStatus(active.id, s)}
                             checked={checks[active.id] ?? []}
                             onToggleItem={itemId => toggleItem(active.id, itemId)}
@@ -396,6 +431,9 @@ const K: Record<string, React.CSSProperties> = {
         background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)',
         color: '#fff', fontSize: '14px', fontWeight: 800,
         fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
+    },
+    simBtn: {
+        background: 'rgba(156,39,176,0.18)', border: '1px solid rgba(186,104,200,0.55)', color: '#e1bee7',
     },
     loadingMsg: { padding: '60px', textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: '16px' },
     emptyMsg: { padding: '80px', textAlign: 'center', color: 'var(--color-green-accent)', fontSize: '18px', fontWeight: 700 },
