@@ -875,7 +875,14 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
     <div style={S.root} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
       <div style={S.bg} />
 
-      {badgeFlash && <div style={S.badgeFlash}><span style={{ fontSize: "22px" }}>{badgeFlash.icon}</span><span style={S.badgeFlashTxt}>{badgeFlash.he}</span></div>}
+      {/* Earned-badge toast. With an emblem there is no pill: the art already
+          has its own gold frame and its title baked in, so the old bordered
+          container would just be a border around a border. Falls back to the
+          emoji + text pill for any badge whose emblem isn't drawn yet. */}
+      {badgeFlash && (badgeFlash.emblem
+        ? <div style={S.badgeFlashArt}><img src={badgeFlash.emblem} alt={badgeFlash.he} style={{ width: "88px", height: "88px", objectFit: "contain", display: "block" }} /></div>
+        : <div style={S.badgeFlash}><span style={{ fontSize: "22px" }}>{badgeFlash.icon}</span><span style={S.badgeFlashTxt}>{badgeFlash.he}</span></div>
+      )}
 
       {/* Detail overlay */}
       {detailCtx && (
@@ -1261,6 +1268,10 @@ const S = {
   badgePillTxt: { fontSize: "10px", fontWeight: 800, color: "#f0d060", textShadow: "0 1px 2px rgba(0,0,0,0.5)" },
   badgeFlash: { position: "fixed", top: "58px", left: "50%", transform: "translateX(-50%)", zIndex: 200, display: "flex", alignItems: "center", gap: "8px", padding: "8px 16px", borderRadius: "14px", background: "linear-gradient(135deg, rgba(8,22,8,0.97), rgba(13,40,13,0.97))", border: "2px solid rgba(200,168,78,0.5)", boxShadow: "0 4px 24px rgba(200,168,78,0.25), 0 0 40px rgba(200,168,78,0.1)", backdropFilter: "blur(16px)", animation: "flashIn 2.2s ease both" },
   badgeFlashTxt: { fontSize: "14px", fontWeight: 800, color: "#f0d060" },
+  // Emblem variant: no background, no border — just the art, lifted off the
+  // page with shadow/glow. pointerEvents none so a 2.2s celebration can never
+  // swallow a tap on the chips underneath.
+  badgeFlashArt: { position: "fixed", top: "58px", left: "50%", transform: "translateX(-50%)", zIndex: 200, pointerEvents: "none", animation: "flashIn 2.2s ease both", filter: "drop-shadow(0 6px 20px rgba(0,0,0,0.6)) drop-shadow(0 0 26px rgba(200,168,78,0.35))" },
 
   sugRow: { display: "flex", gap: "6px", padding: "5px 16px 2px" },
   sugPill: { display: "flex", alignItems: "center", gap: "4px", padding: "3px 9px", borderRadius: "9px", background: "rgba(200,168,78,0.22)", border: "1px solid rgba(200,168,78,0.4)" },

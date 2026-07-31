@@ -337,29 +337,55 @@ export const NUTRI = {
 
 // ─── COMBO BADGES ───────────────────────────────────────────
 
+/*
+  Each badge carries two pieces of art:
+
+  - `emblem` — the full ornate crest, WITH its Hebrew title baked into the
+    artwork. Used where there is room to read it (the summary panel at ~104px
+    and the earn-flash at 56px). Because the title is part of the image, `he`
+    is not rendered as text alongside it — it becomes the `alt` instead.
+  - `icon` — a small stripped glyph for the 10-22px inline spots. Still emoji
+    until that set is drawn; `Icon` (BariBaliBuilder.jsx / SummaryView.jsx)
+    renders a path when it starts with "/" and an emoji otherwise, so these can
+    be swapped one at a time with nothing breaking in between.
+
+  `he` matches the wording baked into each emblem, so the alt text and the
+  visible art never disagree.
+*/
 export const COMBOS = [
-    { id: "protein_power", icon: "💪", he: "עשיר בחלבון", check: tags => tags.filter(t => t === "protein").length >= 3 },
+    { id: "protein_power", icon: "💪", emblem: "/icons/badges/emblem/protein_power.webp", he: "עתיר חלבון", check: tags => tags.filter(t => t === "protein").length >= 3 },
     {
-        id: "rainbow", icon: "🌈", he: "צבעוני!", check: (_, items) => {
+        id: "rainbow", icon: "🌈", emblem: "/icons/badges/emblem/rainbow.webp", he: "צבעוני", check: (_, items) => {
             const c = new Set(items.flatMap(i => (i.tags || []).filter(t => ["red", "green", "orange", "purple", "yellow", "white", "brown"].includes(t))));
             return c.size >= 4;
         }
     },
     {
-        id: "vegan", icon: "🌱", he: "טבעוני", check: (_, items) => {
+        id: "vegan", icon: "🌱", emblem: "/icons/badges/emblem/vegan.webp", he: "טבעוני", check: (_, items) => {
             const noAnimal = !items.some(i => ["egg", "tuna", "feta5", "baby_mozzarella", "tuna_p", "feta_p", "egg_p", "halloumi_p", "parmesan_p"].includes(i.id));
             return items.length >= 4 && noAnimal && !items.some(i => (i.tags || []).includes("dairy"));
         }
     },
-    { id: "fiber_bomb", icon: "🌾", he: "סיבים!", check: tags => tags.filter(t => t === "fiber").length >= 4 },
-    { id: "spicy", icon: "🔥", he: "חריף!", check: tags => tags.filter(t => t === "spicy").length >= 2 },
-    { id: "crunchy", icon: "🥜", he: "קראנצ'י", check: tags => tags.filter(t => t === "crunch").length >= 4 },
+    { id: "fiber_bomb", icon: "🌾", emblem: "/icons/badges/emblem/fiber_bomb.webp", he: "עשיר בסיבים", check: tags => tags.filter(t => t === "fiber").length >= 4 },
+    { id: "spicy", icon: "🔥", emblem: "/icons/badges/emblem/spicy.webp", he: "חריף", check: tags => tags.filter(t => t === "spicy").length >= 2 },
+    { id: "crunchy", icon: "🥜", emblem: "/icons/badges/emblem/crunchy.webp", he: "קראנצ'י", check: tags => tags.filter(t => t === "crunch").length >= 4 },
     {
-        id: "balanced", icon: "⚖️", he: "מאוזן", check: (tags, items) => {
+        id: "balanced", icon: "⚖️", emblem: "/icons/badges/emblem/balanced.webp", he: "ארוחה מאוזנת", check: (tags, items) => {
             return ["base", "protein", "fiber", "fresh"].every(t => tags.includes(t)) && items.length >= 6;
         }
     },
 ];
+
+/*
+  Emblems for markers that are NOT combo badges and so have no `check` of their
+  own — they are awarded by other code paths (the nutrition cards in
+  SummaryView, the suggestion pills below). Kept out of COMBOS deliberately:
+  putting them there would make them look earnable by the combo rules.
+*/
+export const BADGE_ART = {
+    excellent: { emblem: "/icons/badges/emblem/excellent.webp", he: "מעולה" },
+    herb:      { emblem: "/icons/badges/emblem/herb.webp",      he: "עשבי תיבול" },
+};
 
 export function getSuggestions(allTags, all) {
     const s = [], has = t => allTags.includes(t), cnt = t => allTags.filter(x => x === t).length;
