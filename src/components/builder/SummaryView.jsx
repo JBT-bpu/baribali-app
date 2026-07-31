@@ -44,19 +44,55 @@ const ARC_DEPTH = 0.40;       // extra depth at the centre
 // to 3/4 that 14 ingredients landed in just four columns.)
 const GOLDEN = 0.6180339887, SQRT2M1 = 0.4142135624;
 
+/*
+  Ingredients stack like a food pyramid: vegetables are the wide base, protein
+  and grains sit above them, and dressings/toppings/crunch finish on top.
+
+  Each tier gets a narrower horizontal spread, a lower band inside the bowl, a
+  smaller icon and a higher z-index — so the base spreads across the back of
+  the bowl and the finishing touches sit small, central and in front of it,
+  which is how a made salad actually looks.
+
+  It also suits the bowl's own shape: the interior is full width near the top
+  rim and narrows toward the front, so the widest tier naturally belongs at
+  the back.
+*/
+const BOWL_TIERS = {
+    veggies: 0, t_fillings: 0,
+    protein: 1, t_protein: 1,
+    sauces: 2, finish: 2, upgrade: 2, t_sauces: 2, t_upgrade: 2, wrap: 2,
+};
+
+const TIER = [
+    { half: 0.40, v0: 0.00, v1: 0.52, size: 12.5, jitter: 3.0 }, // base: widest, back, largest
+    { half: 0.30, v0: 0.30, v1: 0.80, size: 10.5, jitter: 2.5 },
+    { half: 0.21, v0: 0.55, v1: 1.00, size: 8.5,  jitter: 2.0 }, // top: narrowest, front, smallest
+];
+
+/** Falls back to tags for items rebuilt from a past order without step meta. */
+function tierOf(item) {
+    const s = item._meta?.stepId;
+    if (s && s in BOWL_TIERS) return BOWL_TIERS[s];
+    const t = item.tags || [];
+    if (t.includes("protein") || t.includes("grain")) return 1;
+    if (t.some(x => ["base", "green", "fresh", "red", "orange", "purple", "yellow", "white", "brown"].includes(x))) return 0;
+    return 2;
+}
+
 /**
- * `i` drives the position (even coverage), `id` only the size and tilt — so a
- * given ingredient always looks the same, and adding one re-tosses the bowl
- * rather than leaving a gap.
+ * `i` drives the position (even coverage) and is the index WITHIN the tier, so
+ * each tier spreads across its own band. `id` drives only size and tilt, so a
+ * given ingredient always looks the same.
  *
- * `n` narrows the spread when there is little in the bowl: three ingredients
- * flung to both far corners looks like a mistake, whereas a small pile in the
- * middle looks like three ingredients.
+ * `n` narrows the spread when a tier holds little: three ingredients flung to
+ * both far corners looks like a mistake, a small pile looks like three
+ * ingredients.
  */
-function bowlPlace(id, i, n) {
+function bowlPlace(id, i, n, tier) {
+    const T = TIER[tier];
     const u = ((i + 1) * GOLDEN) % 1;
     const v = ((i + 1) * SQRT2M1) % 1;
-    const sizePct = 11 + hash01(id, 0x9e3779b9) * 3.5;
+    const sizePct = T.size + hash01(id, 0x9e3779b9) * T.jitter;
 
     // Half the icon's height, as a fraction of the bowl's height. Without this
     // an icon centred on the arc hangs half its body over the gold rim. The
@@ -64,13 +100,17 @@ function bowlPlace(id, i, n) {
     // cos(t)+sin(t), which is ~1.2 at the 13 degrees this can reach.
     const r = (sizePct / 100) * BOWL_AR / 2 * 1.2;
 
-    const half = 0.40 * Math.min(1, 0.35 + (n / 14) * 0.65);
+    const half = T.half * Math.min(1, 0.4 + (n / 8) * 0.6);
     const x = 0.5 - half + u * half * 2;
+
+    // The arc is still enforced per-column regardless of tier, so no tier can
+    // push an ingredient onto the gold rim.
     const top = RIM_TOP + r;
     const bottom = ARC_BASE + ARC_DEPTH * (1 - Math.pow(2 * x - 1, 2)) - r;
-    const y = bottom > top ? top + v * (bottom - top) : (top + bottom) / 2;
+    const span = Math.max(bottom - top, 0);
+    const y = top + span * (T.v0 + v * (T.v1 - T.v0));
 
-    return { x, y, sizePct, depth: bottom > top ? v : 0.5, rot: (hash01(id, 0xc2b2ae35) - 0.5) * 26 };
+    return { x, y, sizePct, tier, rot: (hash01(id, 0xc2b2ae35) - 0.5) * 26 };
 }
 
 // ─── Pickup slot generator ─────────────────────────────────────
@@ -177,6 +217,16 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
         setPromoError(d ? "" : "קוד לא תקף");
     };
     const grouped = STEPS.map(s => ({ s, items: sels[s.id] || [] })).filter(g => g.items.length > 0);
+
+    // Index and count are per TIER, not per bowl, so each layer of the pyramid
+    // spreads evenly across its own band instead of inheriting gaps from the
+    // tiers around it.
+    const bowlItems = useMemo(() => {
+        const seen = [0, 0, 0], totals = [0, 0, 0];
+        const tagged = all.map(it => ({ it, tier: tierOf(it) }));
+        tagged.forEach(t => totals[t.tier]++);
+        return tagged.map(t => ({ ...t, k: seen[t.tier]++, n: totals[t.tier] }));
+    }, [all]);
 
     const handleNotesChange = (e) => {
         const value = e.target.value;
@@ -329,8 +379,8 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                     <div style={S.sumBowlWrap}>
                         <div style={S.sumBowlGlow} />
                         <div style={S.sumBowl}>
-                            {all.map((it, i) => {
-                                const p = bowlPlace(it.id, i, all.length);
+                            {bowlItems.map(({ it, tier, k, n }, i) => {
+                                const p = bowlPlace(it.id, k, n, tier);
                                 return (
                                     <span
                                         key={it.id}
@@ -343,8 +393,9 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                                             width: `${p.sizePct.toFixed(1)}%`,
                                             aspectRatio: "1",
                                             transform: `translate(-50%, -50%) rotate(${p.rot.toFixed(1)}deg)`,
-                                            // Lower in the bowl draws in front.
-                                            zIndex: Math.round(p.y * 100),
+                                            // Tier first, then depth: toppings always sit in
+                                            // front of the vegetables they were scattered over.
+                                            zIndex: p.tier * 100 + Math.round(p.y * 50),
                                             cursor: "pointer",
                                             animation: `popBounce 0.3s ease ${i * 35}ms both`,
                                             filter: "drop-shadow(0 2px 5px rgba(0,0,0,0.45))",
