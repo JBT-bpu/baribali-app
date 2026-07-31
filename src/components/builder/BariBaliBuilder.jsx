@@ -18,7 +18,7 @@ function Icon({ src, size = "1.4em", style = {} }) {
   return <span style={{ fontSize: size, lineHeight: 1, ...style }}>{src}</span>;
 }
 
-import { STEPS, BASE, COMBOS, PRESETS, getSuggestions, TORTILLA_STEPS, TORTILLA_BASE, SIZE_CONFIG } from "../../data/salad-data.js";
+import { STEPS, BASE, COMBOS, BADGE_ART, LEGENDARY_AT, PRESETS, getSuggestions, TORTILLA_STEPS, TORTILLA_BASE, SIZE_CONFIG } from "../../data/salad-data.js";
 import DetailSheet from "./ui/DetailSheet.jsx";
 import SummaryView from "./SummaryView.jsx";
 import HeroBowlCard from "./ui/HeroBowlCard.jsx";
@@ -441,6 +441,9 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
   // ─── Combo detection ───
   useEffect(() => {
     const earned = COMBOS.filter(c => c.check(allTags, all));
+    // "אגדי" is a badge about badges, so it can't live in COMBOS without
+    // checking itself. Awarded here, once enough others have landed.
+    if (earned.length >= LEGENDARY_AT) earned.push({ id: "legendary", ...BADGE_ART.legendary });
     setComboBadges(earned);
     earned.forEach(b => {
       if (!shownBadges.has(b.id) && all.length > 0) {
