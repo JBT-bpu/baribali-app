@@ -276,9 +276,9 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                     <div style={S.sumBowlWrap}>
                         <div style={S.sumBowlGlow} />
                         <div style={S.sumBowl}>
-                            <div style={S.bowlLayer}>{[...layers.tops, ...layers.prots].map((it, i) => <span key={it.id} onClick={() => highlightStep(it)} style={{ cursor: "pointer", animation: `popBounce 0.3s ease ${i * 35 + 250}ms both`, filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.35))" }}><Icon src={it.icon} size="20px" /></span>)}</div>
-                            <div style={S.bowlLayer}>{layers.vegs.map((it, i) => <span key={it.id} onClick={() => highlightStep(it)} style={{ cursor: "pointer", animation: `popBounce 0.3s ease ${i * 35 + 120}ms both`, filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.25))" }}><Icon src={it.icon} size="23px" /></span>)}</div>
-                            <div style={S.bowlLayer}>{[...layers.greens, ...layers.rest].map((it, i) => <span key={it.id} onClick={() => highlightStep(it)} style={{ cursor: "pointer", animation: `popBounce 0.3s ease ${i * 35}ms both`, filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.2))" }}><Icon src={it.icon} size="26px" /></span>)}</div>
+                            <div style={S.bowlLayer}>{[...layers.tops, ...layers.prots].map((it, i) => <span key={it.id} onClick={() => highlightStep(it)} style={{ cursor: "pointer", animation: `popBounce 0.3s ease ${i * 35 + 250}ms both`, filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.35))" }}><Icon src={it.icon} size="18px" /></span>)}</div>
+                            <div style={S.bowlLayer}>{layers.vegs.map((it, i) => <span key={it.id} onClick={() => highlightStep(it)} style={{ cursor: "pointer", animation: `popBounce 0.3s ease ${i * 35 + 120}ms both`, filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.25))" }}><Icon src={it.icon} size="21px" /></span>)}</div>
+                            <div style={S.bowlLayer}>{[...layers.greens, ...layers.rest].map((it, i) => <span key={it.id} onClick={() => highlightStep(it)} style={{ cursor: "pointer", animation: `popBounce 0.3s ease ${i * 35}ms both`, filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.2))" }}><Icon src={it.icon} size="24px" /></span>)}</div>
                         </div>
                         <NutriStats all={all} />
                         <div style={S.sumBowlMeta}>
@@ -569,7 +569,7 @@ function NutriStats({ all }) {
     else if (totals.p >= 15 && totals.fb >= 6) msg = { text: "ארוחה מאוזנת ✨",             color: "#6abf69" };
 
     return (
-        <div style={{ width: "100%", marginTop: "10px", animation: "pFadeIn 0.5s ease 0.35s both" }}>
+        <div style={S.nutBox}>
             {/* Kcal total */}
             <div style={{ textAlign: "center", marginBottom: "8px" }}>
                 <span style={{ fontSize: "26px", fontWeight: 900, color: "#ffffff", letterSpacing: "-0.5px" }}>
@@ -581,7 +581,12 @@ function NutriStats({ all }) {
             <div style={{ display: "flex", gap: "5px" }}>
                 {stats.map(s => (
                     <div key={s.key} style={{
-                        flex: 1, background: s.bg, border: `1px solid ${s.border}`,
+                        // No border: these now sit inside the NutBox's gold
+                        // frame, and an outlined card inside an outlined frame
+                        // is the same border-inside-border density that made
+                        // the combo panel feel cramped. The tinted fill alone
+                        // still separates the four macros.
+                        flex: 1, background: s.bg,
                         borderRadius: "10px", padding: "9px 2px 7px",
                         display: "flex", flexDirection: "column",
                         alignItems: "center", gap: "2px", position: "relative",
@@ -767,7 +772,53 @@ const S = {
     content: { flex: 1, overflowY: "auto", overflowX: "hidden", padding: "12px 16px max(24px, env(safe-area-inset-bottom))", scrollbarWidth: "none" },
     sumBowlWrap: { position: "relative", margin: "8px auto 18px", width: "100%", maxWidth: "320px", display: "flex", flexDirection: "column", alignItems: "center" },
     sumBowlGlow: { position: "absolute", bottom: "20px", left: "50%", transform: "translateX(-50%)", width: "200px", height: "60px", borderRadius: "50%", background: "radial-gradient(ellipse, rgba(200,168,78,0.18) 0%, transparent 70%)", pointerEvents: "none", filter: "blur(8px)" },
-    sumBowl: { position: "relative", zIndex: 1, width: "280px", minHeight: "120px", padding: "14px 14px 10px", borderRadius: "16px 16px 50% 50% / 16px 16px 44% 44%", background: "linear-gradient(170deg, rgba(22,65,22,0.85), rgba(15,48,15,0.8))", border: "1px solid rgba(200,168,78,0.28)", boxShadow: "0 10px 36px rgba(0,0,0,0.5), 0 0 0 1px rgba(200,168,78,0.08), inset 0 2px 6px rgba(0,0,0,0.25)", display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" },
+    /*
+      The bowl is now artwork, so every CSS approximation of it — the gradient
+      fill, the faked border-radius bowl shape, the rim border and inset shadow
+      — is gone; the image carries all of it.
+
+      The padding places ingredients in the bowl's INTERIOR rather than over the
+      rim or the outer body. Measured off the art by scanning gold density down
+      the image: the top rim occupies 0-5% of the height and the front rim band
+      runs 58-68%, leaving 6-57% as usable interior. CSS percentage padding
+      resolves against WIDTH, so those figures are converted through the 0.52
+      aspect ratio — hence 3% / 23% rather than 6% / 43%.
+    */
+    sumBowl: {
+        position: "relative", zIndex: 1,
+        width: "100%", maxWidth: "320px",
+        aspectRatio: "1325 / 689",
+        backgroundImage: "url(/builder-assets/summary-bowl.webp)",
+        backgroundSize: "100% 100%",
+        backgroundRepeat: "no-repeat",
+        padding: "3% 6% 23%",
+        display: "flex", flexDirection: "column",
+        alignItems: "center", justifyContent: "center", gap: "2px",
+    },
+    /*
+      Ornate frame around the WHOLE nutrition block — kcal, the four macros and
+      the message — rather than around each macro card. The art is 1.56:1; four
+      cards side by side are ~1.1:1 each, so per-card framing would have
+      squashed the corner filigree badly and left no room inside at ~76px wide.
+
+      `minHeight` + the aspect ratio keep the frame at its native proportion,
+      and `backgroundSize: 100% 100%` lets it stretch a little when a long
+      message pushes the content taller, which is far less noticeable on a
+      rectangular frame than on the bowl.
+
+      Padding clears the corner flourishes, which reach further in than the thin
+      frame line does (measured: the line itself is only ~2%).
+    */
+    nutBox: {
+        width: "100%", marginTop: "10px",
+        aspectRatio: "800 / 512",
+        backgroundImage: "url(/builder-assets/summary-nutbox.webp)",
+        backgroundSize: "100% 100%",
+        backgroundRepeat: "no-repeat",
+        padding: "5% 8%",
+        display: "flex", flexDirection: "column", justifyContent: "center",
+        animation: "pFadeIn 0.5s ease 0.35s both",
+    },
     sumBowlMeta: { marginTop: "10px", display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", fontWeight: 600, color: "rgba(255,255,255,0.5)", letterSpacing: "0.03em" },
     bowlLayer: { display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "3px" },
     // 16px inner gutter + a smaller badge glyph (below): four bordered pills in
@@ -779,13 +830,12 @@ const S = {
     // crowding it was fighting is gone.
     comboBanner: { marginBottom: "14px", padding: "12px 16px", borderRadius: "14px", background: "linear-gradient(135deg, rgba(200,168,78,0.14) 0%, rgba(180,140,40,0.08) 100%)", border: "1.5px solid rgba(200,168,78,0.4)", boxShadow: "0 0 24px rgba(200,168,78,0.12), inset 0 1px 0 rgba(255,255,255,0.06)", animation: "pFadeIn 0.5s ease both" },
     comboBannerTitle: { fontSize: "10px", fontWeight: 800, color: "rgba(200,168,78,0.6)", letterSpacing: "0.06em", marginBottom: "8px" },
-    // minmax(96px) is a legibility floor, not a guess: the two-line titles
-    // (ארוחה מאוזנת, עשיר בסיבים) read comfortably at ~104px and get tight by
-    // 80px. This gives 3 columns on a normal phone and drops to 2 on a 320px
-    // screen rather than shrinking them past readable.
-    comboBannerRow: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(96px, 1fr))", gap: "10px", justifyItems: "center" },
-    // maxWidth stops a lone earned badge from stretching to the full panel.
-    comboEmblem: { width: "100%", maxWidth: "128px", height: "auto", display: "block" },
+    // A fixed 6-across trophy wall. At this size (~38px on a 320px screen,
+    // ~56px on a large phone) the Hebrew baked into each emblem is NOT
+    // readable — that is the intent: the wall is scanned for shape and colour,
+    // the way a collection is. The title still reaches screen readers via alt.
+    comboBannerRow: { display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: "6px", justifyItems: "center" },
+    comboEmblem: { width: "100%", height: "auto", display: "block" },
     notesToggle: { width: "100%", margin: "12px 0", padding: "10px 12px", borderRadius: "12px", display: "flex", alignItems: "center", gap: "8px", background: "rgba(15,45,15,0.6)", backdropFilter: "blur(8px)", border: "1px solid rgba(200,168,78,0.15)", cursor: "pointer", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.45)", direction: "rtl", textAlign: "right" },
     notesInput: { width: "100%", padding: "8px 10px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.04)", color: "#e8f5e9", fontSize: "12px", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", outline: "none", direction: "rtl", resize: "vertical", minHeight: "60px" },
     sumPriceCard: { marginTop: "14px", padding: "14px 16px", borderRadius: "14px", background: "linear-gradient(145deg, rgba(15,45,15,0.9), rgba(20,55,20,0.85))", border: "1px solid rgba(200,168,78,0.25)", boxShadow: "0 4px 16px rgba(0,0,0,0.3)" },
