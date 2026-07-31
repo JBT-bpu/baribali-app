@@ -24,50 +24,42 @@ function Icon({ src, size = "1.2em", style = {} }) {
   density per column: ~66% down at centre, ~30% at the edges) and stays
   deliberately inside it, so an icon can never sit on the gold band.
 */
-const hash01 = (str, seed) => {
-    let h = seed >>> 0;
-    for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 2654435761);
-    return ((h >>> 0) % 100000) / 100000;
-};
+/*
+  The bowl is read, not admired: its job is to let someone confirm at a glance
+  that their order is right. A realistic scattered pile looked better in
+  isolation but made that harder, so ingredients sit in tidy rows — one row per
+  layer of the build, in the order the salad is assembled.
 
-// Bowl geometry, all as fractions of the art box.
+    row 0  ירקות     the base, widest, largest icons
+    row 1  חלבון     protein and grains
+    row 2  תוספות    sauces, crunch, finishing touches
+
+  No overlap, no rotation, nothing hidden behind anything else.
+
+  The rows also fit the bowl's geometry: the interior runs nearly full width
+  near the top rim and narrows toward the front, so the widest row belongs at
+  the back and the narrowest at the front.
+
+  `y` and `width` are fractions of the art box, and were chosen so that each
+  row's lowest pixel clears the front-rim arc across its whole width — see
+  ARC_* below, measured off the artwork.
+*/
 const BOWL_AR = 1325 / 689;   // width / height
-const RIM_TOP = 0.07;         // below the top rim
 const ARC_BASE = 0.24;        // front rim at the far left/right
 const ARC_DEPTH = 0.40;       // extra depth at the centre
 
-// Two irrationals, stepped per index, to spread ingredients evenly without a
-// visible grid. Golden ratio for x because it is the hardest number to
-// approximate with a fraction, so it never falls into a repeating column;
-// sqrt(2)-1 for y, chosen to be unrelated to it. (A per-id hash clustered and
-// left a hole in the middle, and the plastic constant 0.7548 sits close enough
-// to 3/4 that 14 ingredients landed in just four columns.)
-const GOLDEN = 0.6180339887, SQRT2M1 = 0.4142135624;
+const BOWL_ROWS = [
+    { y: 0.17, width: 0.84, maxSize: 10.5 },
+    { y: 0.35, width: 0.56, maxSize: 9.5 },
+    { y: 0.49, width: 0.32, maxSize: 8.5 },
+];
+const BOWL_GAP = 1.5;         // % of bowl width, between icons in a row
 
-/*
-  Ingredients stack like a food pyramid: vegetables are the wide base, protein
-  and grains sit above them, and dressings/toppings/crunch finish on top.
-
-  Each tier gets a narrower horizontal spread, a lower band inside the bowl, a
-  smaller icon and a higher z-index — so the base spreads across the back of
-  the bowl and the finishing touches sit small, central and in front of it,
-  which is how a made salad actually looks.
-
-  It also suits the bowl's own shape: the interior is full width near the top
-  rim and narrows toward the front, so the widest tier naturally belongs at
-  the back.
-*/
 const BOWL_TIERS = {
     veggies: 0, t_fillings: 0,
     protein: 1, t_protein: 1,
     sauces: 2, finish: 2, upgrade: 2, t_sauces: 2, t_upgrade: 2, wrap: 2,
 };
-
-const TIER = [
-    { half: 0.40, v0: 0.00, v1: 0.52, size: 12.5, jitter: 3.0 }, // base: widest, back, largest
-    { half: 0.30, v0: 0.30, v1: 0.80, size: 10.5, jitter: 2.5 },
-    { half: 0.21, v0: 0.55, v1: 1.00, size: 8.5,  jitter: 2.0 }, // top: narrowest, front, smallest
-];
 
 /** Falls back to tags for items rebuilt from a past order without step meta. */
 function tierOf(item) {
@@ -80,37 +72,13 @@ function tierOf(item) {
 }
 
 /**
- * `i` drives the position (even coverage) and is the index WITHIN the tier, so
- * each tier spreads across its own band. `id` drives only size and tilt, so a
- * given ingredient always looks the same.
- *
- * `n` narrows the spread when a tier holds little: three ingredients flung to
- * both far corners looks like a mistake, a small pile looks like three
- * ingredients.
+ * Icon size for a row, as a % of the bowl's width. Shrinks to fit rather than
+ * overflowing or overlapping, so a crowded row of vegetables stays readable.
  */
-function bowlPlace(id, i, n, tier) {
-    const T = TIER[tier];
-    const u = ((i + 1) * GOLDEN) % 1;
-    const v = ((i + 1) * SQRT2M1) % 1;
-    const sizePct = T.size + hash01(id, 0x9e3779b9) * T.jitter;
-
-    // Half the icon's height, as a fraction of the bowl's height. Without this
-    // an icon centred on the arc hangs half its body over the gold rim. The
-    // 1.2 covers the tilt: rotating a square pushes its corners out by
-    // cos(t)+sin(t), which is ~1.2 at the 13 degrees this can reach.
-    const r = (sizePct / 100) * BOWL_AR / 2 * 1.2;
-
-    const half = T.half * Math.min(1, 0.4 + (n / 8) * 0.6);
-    const x = 0.5 - half + u * half * 2;
-
-    // The arc is still enforced per-column regardless of tier, so no tier can
-    // push an ingredient onto the gold rim.
-    const top = RIM_TOP + r;
-    const bottom = ARC_BASE + ARC_DEPTH * (1 - Math.pow(2 * x - 1, 2)) - r;
-    const span = Math.max(bottom - top, 0);
-    const y = top + span * (T.v0 + v * (T.v1 - T.v0));
-
-    return { x, y, sizePct, tier, rot: (hash01(id, 0xc2b2ae35) - 0.5) * 26 };
+function bowlIconSize(row, count) {
+    if (!count) return 0;
+    const avail = row.width * 100 - (count - 1) * BOWL_GAP;
+    return Math.max(3, Math.min(row.maxSize, avail / count));
 }
 
 // ─── Pickup slot generator ─────────────────────────────────────
@@ -218,14 +186,12 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     };
     const grouped = STEPS.map(s => ({ s, items: sels[s.id] || [] })).filter(g => g.items.length > 0);
 
-    // Index and count are per TIER, not per bowl, so each layer of the pyramid
-    // spreads evenly across its own band instead of inheriting gaps from the
-    // tiers around it.
-    const bowlItems = useMemo(() => {
-        const seen = [0, 0, 0], totals = [0, 0, 0];
-        const tagged = all.map(it => ({ it, tier: tierOf(it) }));
-        tagged.forEach(t => totals[t.tier]++);
-        return tagged.map(t => ({ ...t, k: seen[t.tier]++, n: totals[t.tier] }));
+    // Ingredients bucketed into the bowl's three rows, keeping the order they
+    // were chosen in within each row.
+    const bowlRows = useMemo(() => {
+        const rows = [[], [], []];
+        all.forEach(it => rows[tierOf(it)].push(it));
+        return rows;
     }, [all]);
 
     const handleNotesChange = (e) => {
@@ -379,30 +345,46 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                     <div style={S.sumBowlWrap}>
                         <div style={S.sumBowlGlow} />
                         <div style={S.sumBowl}>
-                            {bowlItems.map(({ it, tier, k, n }, i) => {
-                                const p = bowlPlace(it.id, k, n, tier);
+                            {bowlRows.map((items, t) => {
+                                if (!items.length) return null;
+                                const row = BOWL_ROWS[t];
+                                // bowlIconSize works in % of the BOWL; the icons and gap live
+                                // inside the row, whose own width is a fraction of the bowl, so
+                                // both convert into % of the row before being used.
+                                const size = bowlIconSize(row, items.length) / row.width;
+                                const gap = BOWL_GAP / row.width;
                                 return (
-                                    <span
-                                        key={it.id}
-                                        onClick={() => highlightStep(it)}
+                                    <div
+                                        key={t}
                                         style={{
-                                            position: "absolute",
-                                            left: `${(p.x * 100).toFixed(2)}%`,
-                                            top: `${(p.y * 100).toFixed(2)}%`,
-                                            // Sized as a % of the bowl so it scales with it.
-                                            width: `${p.sizePct.toFixed(1)}%`,
-                                            aspectRatio: "1",
-                                            transform: `translate(-50%, -50%) rotate(${p.rot.toFixed(1)}deg)`,
-                                            // Tier first, then depth: toppings always sit in
-                                            // front of the vegetables they were scattered over.
-                                            zIndex: p.tier * 100 + Math.round(p.y * 50),
-                                            cursor: "pointer",
-                                            animation: `popBounce 0.3s ease ${i * 35}ms both`,
-                                            filter: "drop-shadow(0 2px 5px rgba(0,0,0,0.45))",
+                                            position: "absolute", left: "50%",
+                                            top: `${(row.y * 100).toFixed(1)}%`,
+                                            transform: "translate(-50%, -50%)",
+                                            width: `${(row.width * 100).toFixed(0)}%`,
+                                            display: "flex", alignItems: "center", justifyContent: "center",
+                                            gap: `${gap.toFixed(2)}%`,
+                                            // Later rows draw in front, so a finishing topping
+                                            // is never hidden behind a vegetable.
+                                            zIndex: t + 1,
                                         }}
                                     >
-                                        <Icon src={it.icon} size="100%" style={{ display: "block" }} />
-                                    </span>
+                                        {items.map((it, i) => (
+                                            <span
+                                                key={it.id}
+                                                onClick={() => highlightStep(it)}
+                                                style={{
+                                                    width: `${size.toFixed(2)}%`,
+                                                    aspectRatio: "1",
+                                                    flexShrink: 0,
+                                                    cursor: "pointer",
+                                                    animation: `popBounce 0.3s ease ${(t * 120 + i * 35)}ms both`,
+                                                    filter: "drop-shadow(0 2px 5px rgba(0,0,0,0.45))",
+                                                }}
+                                            >
+                                                <Icon src={it.icon} size="100%" style={{ display: "block" }} />
+                                            </span>
+                                        ))}
+                                    </div>
                                 );
                             })}
                         </div>
