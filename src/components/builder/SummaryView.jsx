@@ -11,6 +11,68 @@ function Icon({ src, size = "1.2em", style = {} }) {
     return <span style={{ fontSize: size, lineHeight: 1, ...style }}>{src}</span>;
 }
 
+/*
+  Scatters ingredients inside the bowl art so it reads as a filled bowl rather
+  than three tidy rows.
+
+  Position comes from a hash of the ingredient ID, never its index in the list,
+  so adding or removing one ingredient never reshuffles the others — a scatter
+  that reshuffles on every render is far worse than a neat grid.
+
+  The bowl's front rim is an arc, deepest in the middle and rising toward the
+  sides. `yMax` models that arc from measurements taken off the artwork (gold
+  density per column: ~66% down at centre, ~30% at the edges) and stays
+  deliberately inside it, so an icon can never sit on the gold band.
+*/
+const hash01 = (str, seed) => {
+    let h = seed >>> 0;
+    for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 2654435761);
+    return ((h >>> 0) % 100000) / 100000;
+};
+
+// Bowl geometry, all as fractions of the art box.
+const BOWL_AR = 1325 / 689;   // width / height
+const RIM_TOP = 0.07;         // below the top rim
+const ARC_BASE = 0.24;        // front rim at the far left/right
+const ARC_DEPTH = 0.40;       // extra depth at the centre
+
+// Two irrationals, stepped per index, to spread ingredients evenly without a
+// visible grid. Golden ratio for x because it is the hardest number to
+// approximate with a fraction, so it never falls into a repeating column;
+// sqrt(2)-1 for y, chosen to be unrelated to it. (A per-id hash clustered and
+// left a hole in the middle, and the plastic constant 0.7548 sits close enough
+// to 3/4 that 14 ingredients landed in just four columns.)
+const GOLDEN = 0.6180339887, SQRT2M1 = 0.4142135624;
+
+/**
+ * `i` drives the position (even coverage), `id` only the size and tilt — so a
+ * given ingredient always looks the same, and adding one re-tosses the bowl
+ * rather than leaving a gap.
+ *
+ * `n` narrows the spread when there is little in the bowl: three ingredients
+ * flung to both far corners looks like a mistake, whereas a small pile in the
+ * middle looks like three ingredients.
+ */
+function bowlPlace(id, i, n) {
+    const u = ((i + 1) * GOLDEN) % 1;
+    const v = ((i + 1) * SQRT2M1) % 1;
+    const sizePct = 11 + hash01(id, 0x9e3779b9) * 3.5;
+
+    // Half the icon's height, as a fraction of the bowl's height. Without this
+    // an icon centred on the arc hangs half its body over the gold rim. The
+    // 1.2 covers the tilt: rotating a square pushes its corners out by
+    // cos(t)+sin(t), which is ~1.2 at the 13 degrees this can reach.
+    const r = (sizePct / 100) * BOWL_AR / 2 * 1.2;
+
+    const half = 0.40 * Math.min(1, 0.35 + (n / 14) * 0.65);
+    const x = 0.5 - half + u * half * 2;
+    const top = RIM_TOP + r;
+    const bottom = ARC_BASE + ARC_DEPTH * (1 - Math.pow(2 * x - 1, 2)) - r;
+    const y = bottom > top ? top + v * (bottom - top) : (top + bottom) / 2;
+
+    return { x, y, sizePct, depth: bottom > top ? v : 0.5, rot: (hash01(id, 0xc2b2ae35) - 0.5) * 26 };
+}
+
 // ─── Pickup slot generator ─────────────────────────────────────
 function generatePickupSlots() {
     const now = new Date();
@@ -126,15 +188,6 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
         }
     };
 
-    const layers = useMemo(() => {
-        // Each item goes into exactly one layer — priority: prots > greens > vegs > tops > rest
-        const prots  = all.filter(i => i._meta?.stepId === "protein");
-        const greens = all.filter(i => !prots.includes(i) && (i.tags || []).some(t => ["base", "green"].includes(t) && t !== "herb"));
-        const vegs   = all.filter(i => !prots.includes(i) && !greens.includes(i) && (i.tags || []).some(t => ["fresh", "red", "orange", "yellow", "purple", "warm"].includes(t)));
-        const tops   = all.filter(i => !prots.includes(i) && !greens.includes(i) && !vegs.includes(i) && (i.tags || []).some(t => ["crunch", "herb", "fat", "sweet"].includes(t)));
-        const rest   = all.filter(i => !prots.includes(i) && !greens.includes(i) && !vegs.includes(i) && !tops.includes(i));
-        return { greens, vegs, prots, tops, rest };
-    }, [all]);
 
     // Shows the confirmation only when the animation has finished *and* the
     // server accepted the order.
@@ -276,9 +329,31 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                     <div style={S.sumBowlWrap}>
                         <div style={S.sumBowlGlow} />
                         <div style={S.sumBowl}>
-                            <div style={S.bowlLayer}>{[...layers.tops, ...layers.prots].map((it, i) => <span key={it.id} onClick={() => highlightStep(it)} style={{ cursor: "pointer", animation: `popBounce 0.3s ease ${i * 35 + 250}ms both`, filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.35))" }}><Icon src={it.icon} size="18px" /></span>)}</div>
-                            <div style={S.bowlLayer}>{layers.vegs.map((it, i) => <span key={it.id} onClick={() => highlightStep(it)} style={{ cursor: "pointer", animation: `popBounce 0.3s ease ${i * 35 + 120}ms both`, filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.25))" }}><Icon src={it.icon} size="21px" /></span>)}</div>
-                            <div style={S.bowlLayer}>{[...layers.greens, ...layers.rest].map((it, i) => <span key={it.id} onClick={() => highlightStep(it)} style={{ cursor: "pointer", animation: `popBounce 0.3s ease ${i * 35}ms both`, filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.2))" }}><Icon src={it.icon} size="24px" /></span>)}</div>
+                            {all.map((it, i) => {
+                                const p = bowlPlace(it.id, i, all.length);
+                                return (
+                                    <span
+                                        key={it.id}
+                                        onClick={() => highlightStep(it)}
+                                        style={{
+                                            position: "absolute",
+                                            left: `${(p.x * 100).toFixed(2)}%`,
+                                            top: `${(p.y * 100).toFixed(2)}%`,
+                                            // Sized as a % of the bowl so it scales with it.
+                                            width: `${p.sizePct.toFixed(1)}%`,
+                                            aspectRatio: "1",
+                                            transform: `translate(-50%, -50%) rotate(${p.rot.toFixed(1)}deg)`,
+                                            // Lower in the bowl draws in front.
+                                            zIndex: Math.round(p.y * 100),
+                                            cursor: "pointer",
+                                            animation: `popBounce 0.3s ease ${i * 35}ms both`,
+                                            filter: "drop-shadow(0 2px 5px rgba(0,0,0,0.45))",
+                                        }}
+                                    >
+                                        <Icon src={it.icon} size="100%" style={{ display: "block" }} />
+                                    </span>
+                                );
+                            })}
                         </div>
                         <NutriStats all={all} />
                         <div style={S.sumBowlMeta}>
@@ -770,7 +845,7 @@ const S = {
     priceS: { fontSize: "10px", color: "#d4b84a", fontWeight: 600 },
     priceV: { fontSize: "20px", color: "#ffffff", fontWeight: 900, textShadow: "0 2px 8px rgba(200,168,78,0.5)" },
     content: { flex: 1, overflowY: "auto", overflowX: "hidden", padding: "12px 16px max(24px, env(safe-area-inset-bottom))", scrollbarWidth: "none" },
-    sumBowlWrap: { position: "relative", margin: "8px auto 18px", width: "100%", maxWidth: "320px", display: "flex", flexDirection: "column", alignItems: "center" },
+    sumBowlWrap: { position: "relative", margin: "8px auto 18px", width: "100%", maxWidth: "360px", display: "flex", flexDirection: "column", alignItems: "center" },
     sumBowlGlow: { position: "absolute", bottom: "20px", left: "50%", transform: "translateX(-50%)", width: "200px", height: "60px", borderRadius: "50%", background: "radial-gradient(ellipse, rgba(200,168,78,0.18) 0%, transparent 70%)", pointerEvents: "none", filter: "blur(8px)" },
     /*
       The bowl is now artwork, so every CSS approximation of it — the gradient
@@ -786,14 +861,13 @@ const S = {
     */
     sumBowl: {
         position: "relative", zIndex: 1,
-        width: "100%", maxWidth: "320px",
+        width: "100%", maxWidth: "360px",
         aspectRatio: "1325 / 689",
         backgroundImage: "url(/builder-assets/summary-bowl.webp)",
         backgroundSize: "100% 100%",
         backgroundRepeat: "no-repeat",
-        padding: "3% 6% 23%",
-        display: "flex", flexDirection: "column",
-        alignItems: "center", justifyContent: "center", gap: "2px",
+        // Ingredients are absolutely positioned by bowlPlace(), so no padding
+        // or flex centring here — the scatter owns its own bounds.
     },
     /*
       Ornate frame around the WHOLE nutrition block — kcal, the four macros and
@@ -820,7 +894,6 @@ const S = {
         animation: "pFadeIn 0.5s ease 0.35s both",
     },
     sumBowlMeta: { marginTop: "10px", display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", fontWeight: 600, color: "rgba(255,255,255,0.5)", letterSpacing: "0.03em" },
-    bowlLayer: { display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "3px" },
     // 16px inner gutter + a smaller badge glyph (below): four bordered pills in
     // a bordered box used to fill the row edge-to-edge with nothing to spare,
     // which is what made it read as crowded.
