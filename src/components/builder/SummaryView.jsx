@@ -49,11 +49,14 @@ const ARC_BASE = 0.24;        // front rim at the far left/right
 const ARC_DEPTH = 0.40;       // extra depth at the centre
 
 const BOWL_ROWS = [
-    { y: 0.17, width: 0.84, maxSize: 10.5 },
-    { y: 0.35, width: 0.56, maxSize: 9.5 },
-    { y: 0.49, width: 0.32, maxSize: 8.5 },
+    { y: 0.195, width: 0.86, maxSize: 13.0 },
+    { y: 0.360, width: 0.60, maxSize: 11.5 },
+    { y: 0.490, width: 0.36, maxSize: 10.0 },
 ];
-const BOWL_GAP = 1.5;         // % of bowl width, between icons in a row
+const BOWL_GAP = 1.5;         // % of bowl width, between icons when they fit
+// Each icon advances at least this fraction of its own width, so no ingredient
+// is ever more than ~40% covered by the next one.
+const BOWL_MIN_STEP = 0.62;
 
 const BOWL_TIERS = {
     veggies: 0, t_fillings: 0,
@@ -72,13 +75,29 @@ function tierOf(item) {
 }
 
 /**
- * Icon size for a row, as a % of the bowl's width. Shrinks to fit rather than
- * overflowing or overlapping, so a crowded row of vegetables stays readable.
+ * Lays out one row: icon size and the distance between centres, both as a % of
+ * the bowl's width.
+ *
+ * Icons stay at a readable size and OVERLAP when the row is crowded, rather
+ * than all shrinking — eleven vegetables shrunk to fit came out at ~23px,
+ * which is unreadable, where overlapping keeps them at ~42px. Overlap is
+ * capped at ~40% of an icon, and only past that does the size come down.
+ *
+ * With room to spare the icons simply spread out and never touch.
  */
-function bowlIconSize(row, count) {
-    if (!count) return 0;
-    const avail = row.width * 100 - (count - 1) * BOWL_GAP;
-    return Math.max(3, Math.min(row.maxSize, avail / count));
+function bowlRowLayout(row, count) {
+    if (!count) return { size: 0, step: 0 };
+    const W = row.width * 100;
+
+    // Largest size at which `count` icons still fit at the tightest allowed
+    // overlap; capped by the row's own maximum.
+    const size = Math.max(3, Math.min(row.maxSize, W / (1 + BOWL_MIN_STEP * (count - 1))));
+    if (count === 1) return { size, step: 0 };
+
+    // Spread to fill the row if there is room, but never further apart than
+    // one icon plus a gap.
+    const step = Math.min(size + BOWL_GAP, (W - size) / (count - 1));
+    return { size, step };
 }
 
 // ─── Pickup slot generator ─────────────────────────────────────
@@ -348,37 +367,29 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                             {bowlRows.map((items, t) => {
                                 if (!items.length) return null;
                                 const row = BOWL_ROWS[t];
-                                // bowlIconSize works in % of the BOWL; the icons and gap live
-                                // inside the row, whose own width is a fraction of the bowl, so
-                                // both convert into % of the row before being used.
-                                const size = bowlIconSize(row, items.length) / row.width;
-                                const gap = BOWL_GAP / row.width;
+                                const { size, step } = bowlRowLayout(row, items.length);
+                                const total = size + step * (items.length - 1);
+                                const startX = 50 - total / 2;   // centred, in % of the bowl
                                 return (
-                                    <div
-                                        key={t}
-                                        style={{
-                                            position: "absolute", left: "50%",
-                                            top: `${(row.y * 100).toFixed(1)}%`,
-                                            transform: "translate(-50%, -50%)",
-                                            width: `${(row.width * 100).toFixed(0)}%`,
-                                            display: "flex", alignItems: "center", justifyContent: "center",
-                                            gap: `${gap.toFixed(2)}%`,
-                                            // Later rows draw in front, so a finishing topping
-                                            // is never hidden behind a vegetable.
-                                            zIndex: t + 1,
-                                        }}
-                                    >
+                                    <div key={t} style={{ position: "absolute", inset: 0, zIndex: t + 1 }}>
                                         {items.map((it, i) => (
                                             <span
                                                 key={it.id}
                                                 onClick={() => highlightStep(it)}
                                                 style={{
+                                                    position: "absolute",
+                                                    // RTL: the first ingredient sits on the RIGHT and
+                                                    // each next one tucks in behind it to the left,
+                                                    // so the row fans the way the text reads.
+                                                    left: `${(startX + (items.length - 1 - i) * step).toFixed(2)}%`,
+                                                    top: `${(row.y * 100).toFixed(2)}%`,
                                                     width: `${size.toFixed(2)}%`,
                                                     aspectRatio: "1",
-                                                    flexShrink: 0,
+                                                    transform: "translateY(-50%)",
+                                                    zIndex: items.length - i,
                                                     cursor: "pointer",
                                                     animation: `popBounce 0.3s ease ${(t * 120 + i * 35)}ms both`,
-                                                    filter: "drop-shadow(0 2px 5px rgba(0,0,0,0.45))",
+                                                    filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.55))",
                                                 }}
                                             >
                                                 <Icon src={it.icon} size="100%" style={{ display: "block" }} />
