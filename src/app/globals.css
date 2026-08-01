@@ -90,11 +90,26 @@
     }
 }
 
+/*
+  `min-height` + scrollable, NOT `height: 100%` + `overflow: hidden`.
+
+  The old rule made the viewport itself unscrollable, so anything taller than
+  one screen was clipped with no way to reach it: the legal documents past
+  their first screenful, a long order history, a 14-ingredient order on the
+  kitchen board. Only the builder/summary escaped it, because they happen to
+  have an inner scroll container with a definite height.
+
+  Horizontal scrolling stays off — the coverflow decks deliberately overhang
+  their stage — and `overscroll-behavior-y` keeps the app-like feel the old
+  rule was reaching for (no rubber-band, no pull-to-refresh mid-build) without
+  taking the content with it.
+*/
 html,
 body {
     width: 100%;
-    height: 100%;
-    overflow: hidden;
+    min-height: 100%;
+    overflow-x: hidden;
+    overscroll-behavior-y: none;
 }
 
 body {

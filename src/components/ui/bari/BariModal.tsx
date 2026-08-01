@@ -39,7 +39,7 @@ export default function BariModal({ open, onClose, title, children, variant = 's
             <Drawer.Portal>
                 <Drawer.Overlay className="fixed inset-0 z-[300] bg-black/65 backdrop-blur-[5px]" />
                 <Drawer.Content
-                    className="fixed inset-x-0 bottom-0 z-[300] mx-auto flex max-h-[90vh] w-full max-w-[430px] flex-col rounded-t-2xl border border-gold/18 outline-none"
+                    className="fixed inset-x-0 bottom-0 z-[300] mx-auto flex max-h-[90dvh] w-full max-w-[430px] flex-col rounded-t-2xl border border-gold/18 outline-none"
                     style={{ background: PANEL_BG, direction: 'rtl' }}
                 >
                     <Drawer.Handle className="mx-auto mt-3 h-1 w-10 rounded-full bg-white/20" />

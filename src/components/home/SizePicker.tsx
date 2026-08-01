@@ -99,7 +99,12 @@ export default function SizePicker({ onSelect, onBack, dive = false }: { onSelec
             backdropFilter: 'blur(28px) saturate(1.3)',
             WebkitBackdropFilter: 'blur(28px) saturate(1.3)',
             display: 'flex', flexDirection: 'column', alignItems: 'center',
-            justifyContent: 'center', gap: 'min(12px, 2vh)', direction: 'rtl',
+            // `safe center` — plain `center` centres the stack and then puts the
+            // overflow equally above and below on a short screen, and the part
+            // above the top edge cannot be scrolled to. `safe` falls back to
+            // start-alignment the moment it would overflow, so the breadcrumb
+            // and title stay reachable on a small phone.
+            justifyContent: 'safe center', gap: 'min(12px, 2vh)', direction: 'rtl',
             fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
             paddingTop: 'max(16px, env(safe-area-inset-top))',
             paddingBottom: 'max(16px, env(safe-area-inset-bottom))',

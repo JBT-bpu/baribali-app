@@ -409,14 +409,22 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
 
 const K: Record<string, React.CSSProperties> = {
     root: {
-        minHeight: '100vh', background: '#0a0a0a',
+        // `height`, not `min-height`, and dvh rather than vh. As a min-height
+        // the board had no definite height, so ActiveOrder's `flex: 1` columns
+        // grew with the order instead of scrolling inside it — a long order
+        // pushed the מוכן button off the bottom of the tablet, unreachable.
+        // A definite height makes the inner `overflow-y: auto` actually work.
+        height: '100dvh', background: '#0a0a0a',
         fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: 'rtl',
         color: '#fff', display: 'flex', flexDirection: 'column',
     },
+    // flexShrink: 0 on every fixed row below — the board column now has a
+    // definite height, so without it the header and banners would be squeezed
+    // to make room for the active order instead of the order scrolling.
     header: {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
-        padding: '12px 20px', paddingTop: 'max(12px, env(safe-area-inset-top))',
-        borderBottom: '1px solid rgba(255,255,255,0.1)', flexWrap: 'wrap',
+        padding: '12px 16px', paddingTop: 'max(12px, env(safe-area-inset-top))',
+        borderBottom: '1px solid rgba(255,255,255,0.1)', flexWrap: 'wrap', flexShrink: 0,
     },
     headerTitle: { fontSize: '20px', fontWeight: 900, color: 'var(--color-gold-light)' },
     headerMeta: { display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' },
@@ -441,14 +449,14 @@ const K: Record<string, React.CSSProperties> = {
         display: 'flex', alignItems: 'center', gap: '12px',
         margin: '10px 16px', padding: '14px 16px', borderRadius: '12px',
         background: 'rgba(229,57,53,0.14)', border: '1px solid rgba(229,57,53,0.5)',
-        color: '#ff9a97', fontSize: '15px', lineHeight: 1.4,
+        color: '#ff9a97', fontSize: '15px', lineHeight: 1.4, flexShrink: 0,
     },
     newBanner: {
         display: 'flex', alignItems: 'center', gap: '14px', width: 'calc(100% - 32px)',
         margin: '10px 16px', padding: '14px 18px', borderRadius: '12px',
         background: 'rgba(76,175,80,0.18)', border: '2px solid rgba(76,175,80,0.65)',
         cursor: 'pointer', color: '#c8f7c9', fontSize: '20px', fontWeight: 900,
-        fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
+        fontFamily: "var(--font-heebo), 'Heebo', sans-serif", flexShrink: 0,
     },
     newBannerCta: {
         flexShrink: 0, padding: '8px 18px', borderRadius: '10px',
@@ -460,13 +468,13 @@ const K: Record<string, React.CSSProperties> = {
         padding: '12px 16px', borderRadius: '12px', cursor: 'pointer',
         background: 'rgba(255,152,0,0.14)', border: '1px solid rgba(255,152,0,0.5)',
         color: '#ffcc80', fontSize: '15px', fontWeight: 700,
-        fontFamily: "var(--font-heebo), 'Heebo', sans-serif", textAlign: 'center',
+        fontFamily: "var(--font-heebo), 'Heebo', sans-serif", textAlign: 'center', flexShrink: 0,
     },
     undoBar: {
         display: 'flex', alignItems: 'center', gap: '14px',
         margin: '10px 16px', padding: '12px 16px', borderRadius: '12px',
         background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.2)',
-        color: 'rgba(255,255,255,0.85)', fontSize: '15px', fontWeight: 700,
+        color: 'rgba(255,255,255,0.85)', fontSize: '15px', fontWeight: 700, flexShrink: 0,
     },
     undoBtn: {
         marginInlineStart: 'auto', padding: '10px 18px', borderRadius: '10px', cursor: 'pointer',

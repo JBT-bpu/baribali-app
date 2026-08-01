@@ -218,8 +218,12 @@ export default function HeroSelector({ onChooseSalad, onNudge, onActiveChange }:
 
             {/* Pips */}
             <div style={S.pips}>
+                {/* The dot stays 8px, but it sits inside a padded button so the
+                    tap target is ~22x24 rather than 8x8. */}
                 {HEROES.map((h, i) => (
-                    <button key={h.id} onClick={() => go(i, i > activeIdx ? 1 : -1)} aria-label={h.title} style={{ ...S.pip, ...(i === activeIdx ? S.pipOn : {}) }} />
+                    <button key={h.id} onClick={() => go(i, i > activeIdx ? 1 : -1)} aria-label={h.title} style={S.pipHit}>
+                        <span style={{ ...S.pip, ...(i === activeIdx ? S.pipOn : {}) }} />
+                    </button>
                 ))}
             </div>
 
@@ -263,8 +267,11 @@ const S: Record<string, React.CSSProperties> = {
     cardCopy: { position: 'absolute', insetInline: 0, bottom: 0, zIndex: 4, padding: '22px 14px 13px', textAlign: 'center', background: 'linear-gradient(180deg, transparent, rgba(3,10,3,0.6) 42%, rgba(3,10,3,0.92))' },
     cardTitle: { fontFamily: "var(--font-display), 'Secular One', sans-serif", fontSize: '18px', color: '#fff', textShadow: '0 2px 8px rgba(0,0,0,0.9)' },
     cardSub: { fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.62)', marginTop: '3px' },
-    pips: { display: 'flex', gap: '7px', marginTop: '6px', marginBottom: '6px' },
-    pip: { width: '8px', height: '8px', border: 0, borderRadius: 'var(--radius-full)', background: 'rgba(255,255,255,0.22)', transition: 'width 0.28s ease, background 0.28s ease', cursor: 'pointer', padding: 0 },
+    // gap/margins absorbed into pipHit's padding so the row keeps its original
+    // footprint while each dot gains a usable target.
+    pips: { display: 'flex', gap: 0, marginTop: 0, marginBottom: 0 },
+    pipHit: { display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px 7px', border: 0, background: 'transparent', cursor: 'pointer' },
+    pip: { display: 'block', width: '8px', height: '8px', borderRadius: 'var(--radius-full)', background: 'rgba(255,255,255,0.22)', transition: 'width 0.28s ease, background 0.28s ease' },
     pipOn: { width: '26px', background: 'linear-gradient(90deg, #c8a832, #f0d060)' },
     selection: { textAlign: 'center', width: '100%', maxWidth: '320px', padding: '0 12px 4px' },
     statusChip: { display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 800, letterSpacing: '0.02em' },

@@ -337,29 +337,126 @@ export const NUTRI = {
 
 // ─── COMBO BADGES ───────────────────────────────────────────
 
+/*
+  Each badge carries two pieces of art:
+
+  - `emblem` — the full ornate crest, WITH its Hebrew title baked into the
+    artwork. Used where there is room to read it (the summary panel at ~104px
+    and the earn-flash at 56px). Because the title is part of the image, `he`
+    is not rendered as text alongside it — it becomes the `alt` instead.
+  - `icon` — a small stripped glyph for the 10-22px inline spots. Still emoji
+    until that set is drawn; `Icon` (BariBaliBuilder.jsx / SummaryView.jsx)
+    renders a path when it starts with "/" and an emoji otherwise, so these can
+    be swapped one at a time with nothing breaking in between.
+
+  `he` matches the wording baked into each emblem, so the alt text and the
+  visible art never disagree.
+*/
+const art = id => `/icons/badges/emblem/${id}.webp`;
+
+/** Item ids belonging to a catalog step, both salad and tortilla variants. */
+const stepItemIds = stepId => new Set(
+    [...STEPS, ...TORTILLA_STEPS]
+        .filter(s => s.id === stepId)
+        .flatMap(s => s.subgroups.flatMap(g => g.items.map(i => i.id)))
+);
+
+const sum = (items, key) => items.reduce((t, i) => t + ((NUTRI[i.id] || {})[key] || 0), 0);
+const cnt = (tags, t) => tags.filter(x => x === t).length;
+
 export const COMBOS = [
-    { id: "protein_power", icon: "💪", he: "עשיר בחלבון", check: tags => tags.filter(t => t === "protein").length >= 3 },
+    { id: "protein_power", icon: "💪", emblem: art("protein_power"), he: "עתיר חלבון",
+      check: tags => cnt(tags, "protein") >= 3 },
     {
-        id: "rainbow", icon: "🌈", he: "צבעוני!", check: (_, items) => {
+        id: "rainbow", icon: "🌈", emblem: art("rainbow"), he: "צבעוני", check: (_, items) => {
             const c = new Set(items.flatMap(i => (i.tags || []).filter(t => ["red", "green", "orange", "purple", "yellow", "white", "brown"].includes(t))));
             return c.size >= 4;
         }
     },
     {
-        id: "vegan", icon: "🌱", he: "טבעוני", check: (_, items) => {
+        id: "vegan", icon: "🌱", emblem: art("vegan"), he: "טבעוני", check: (_, items) => {
             const noAnimal = !items.some(i => ["egg", "tuna", "feta5", "baby_mozzarella", "tuna_p", "feta_p", "egg_p", "halloumi_p", "parmesan_p"].includes(i.id));
             return items.length >= 4 && noAnimal && !items.some(i => (i.tags || []).includes("dairy"));
         }
     },
-    { id: "fiber_bomb", icon: "🌾", he: "סיבים!", check: tags => tags.filter(t => t === "fiber").length >= 4 },
-    { id: "spicy", icon: "🔥", he: "חריף!", check: tags => tags.filter(t => t === "spicy").length >= 2 },
-    { id: "crunchy", icon: "🥜", he: "קראנצ'י", check: tags => tags.filter(t => t === "crunch").length >= 4 },
+    { id: "fiber_bomb", icon: "🌾", emblem: art("fiber_bomb"), he: "עשיר בסיבים",
+      check: tags => cnt(tags, "fiber") >= 4 },
+    { id: "spicy", icon: "🔥", emblem: art("spicy"), he: "חריף",
+      check: tags => cnt(tags, "spicy") >= 2 },
+    { id: "crunchy", icon: "🥜", emblem: art("crunchy"), he: "קראנצ'י",
+      check: tags => cnt(tags, "crunch") >= 4 },
     {
-        id: "balanced", icon: "⚖️", he: "מאוזן", check: (tags, items) => {
+        id: "balanced", icon: "⚖️", emblem: art("balanced"), he: "ארוחה מאוזנת", check: (tags, items) => {
             return ["base", "protein", "fiber", "fresh"].every(t => tags.includes(t)) && items.length >= 6;
         }
     },
+    // 10g of fibre is roughly a third of an adult daily reference intake — a
+    // real nutritional result rather than a participation award.
+    { id: "excellent", icon: "⭐", emblem: art("excellent"), he: "מעולה",
+      check: (_, items) => sum(items, "fb") >= 10 },
+    // Only 5 items in the whole catalog carry "herb", so 2 is already deliberate.
+    { id: "herb", icon: "🌿", emblem: art("herb"), he: "עשבי תיבול",
+      check: tags => cnt(tags, "herb") >= 2 },
+    {
+        id: "mediterranean", icon: "🫒", emblem: art("mediterranean"), he: "ים תיכוני", check: (_, items) => {
+            const has = ids => items.some(i => ids.includes(i.id));
+            return has(["feta5", "feta_p"]) && has(["black_olives", "green_olives"]);
+        }
+    },
+    // A SUBSTANTIAL bowl that is still light — that is the achievement. At
+    // 4 items / 350 kcal it fired on virtually any small bowl (a 4-item bowl
+    // runs 40-120 kcal, and even a full 12-item bowl is only ~450), so it was
+    // effectively automatic. 6 items and 300 kcal makes it mean something.
+    { id: "light", icon: "🪶", emblem: art("light"), he: "קליל",
+      check: (_, items) => items.length >= 6 && sum(items, "kcal") <= 300 },
+    { id: "loaded", icon: "🥗", emblem: art("loaded"), he: "גדוש",
+      check: (_, items) => items.length >= 12 },
+    { id: "all_green", icon: "🥬", emblem: art("all_green"), he: "ירוק לגמרי",
+      check: tags => cnt(tags, "green") >= 6 },
+    // Only 5 items in the catalog carry "fresh", so 3 is already a deliberate
+    // choice. Requiring 4 would mean picking nearly the entire pool by
+    // coincidence — rare to the point of being unreachable in practice.
+    { id: "farm_fresh", icon: "🌅", emblem: art("farm_fresh"), he: "טרי מהשדה",
+      check: tags => cnt(tags, "fresh") >= 3 },
+    {
+        id: "sauce_lover", icon: "🫗", emblem: art("sauce_lover"), he: "אוהב רטבים", check: (_, items) => {
+            // Sauces are a catalog STEP, not a tag, so the id set is derived.
+            const sauces = stepItemIds("sauces");
+            const tSauces = stepItemIds("t_sauces");
+            return items.filter(i => sauces.has(i.id) || tSauces.has(i.id)).length >= 3;
+        }
+    },
+    { id: "flavor_blast", icon: "💥", emblem: art("flavor_blast"), he: "פיצוץ טעמים",
+      check: tags => cnt(tags, "flavor") >= 4 },
+    {
+        id: "signature", icon: "🏅", emblem: art("signature"), he: "חתימת הבית", check: (_, items) => {
+            // PRESETS is declared below; this only runs at call time, long after
+            // module init, so the forward reference is safe.
+            const sig = PRESETS.find(p => p.id === "signature");
+            if (!sig) return false;
+            const have = new Set(items.map(i => i.id));
+            return sig.items.every(id => have.has(id));
+        }
+    },
 ];
+
+/**
+ * Badges that exist as art and as a goal, but are not earned from the contents
+ * of a single bowl.
+ *
+ * `legendary` is awarded by the builder once enough COMBOS have been earned —
+ * it is a badge about badges, so it cannot be a COMBOS entry without recursing.
+ * `explorer` and `regular` need order history, which is only available for
+ * signed-in customers; ordering here is guest-first, so they stay unearned
+ * until that is wired deliberately rather than being half-implemented now.
+ */
+export const LEGENDARY_AT = 5;
+
+export const BADGE_ART = {
+    legendary: { emblem: art("legendary"), he: "אגדי",      icon: "👑" },
+    explorer:  { emblem: art("explorer"),  he: "הרפתקן",    icon: "🧭" },
+    regular:   { emblem: art("regular"),   he: "לקוח קבוע", icon: "🔄" },
+};
 
 export function getSuggestions(allTags, all) {
     const s = [], has = t => allTags.includes(t), cnt = t => allTags.filter(x => x === t).length;

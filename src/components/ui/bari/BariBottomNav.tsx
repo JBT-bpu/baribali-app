@@ -25,7 +25,7 @@ export default function BariBottomNav() {
     const [ripple, setRipple] = useState<string | null>(null);
 
     return (
-        <div style={{ position: 'relative', zIndex: 2, width: '100%', padding: '10px 20px max(28px, env(safe-area-inset-bottom))', animation: 'navIn 0.6s ease 0.2s both' }}>
+        <div style={{ position: 'relative', zIndex: 2, width: '100%', padding: '10px 16px max(28px, env(safe-area-inset-bottom))', animation: 'navIn 0.6s ease 0.2s both' }}>
             <style>{`
                 @keyframes navIn { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:none} }
                 @keyframes navRipple { 0%{transform:scale(0);opacity:0.5} 100%{transform:scale(1);opacity:0} }

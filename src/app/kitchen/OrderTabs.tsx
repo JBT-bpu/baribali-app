@@ -76,6 +76,9 @@ const S: Record<string, React.CSSProperties> = {
         display: 'flex', gap: '10px', padding: '10px 16px',
         overflowX: 'auto', WebkitOverflowScrolling: 'touch',
         borderBottom: '1px solid rgba(255,255,255,0.1)',
+        // The board column has a definite height; the strip keeps its size and
+        // the active order scrolls instead.
+        flexShrink: 0,
     },
     tab: {
         position: 'relative', flex: '1 1 0', minWidth: '130px', maxWidth: '220px',

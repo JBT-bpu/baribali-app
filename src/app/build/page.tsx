@@ -65,7 +65,7 @@ function BuilderWithSize() {
                 ? 'none'
                 : 'opacity 0.85s cubic-bezier(0.16, 1, 0.3, 1), transform 0.95s cubic-bezier(0.16, 1, 0.3, 1)',
             willChange: visible ? 'auto' : 'opacity, transform',
-            minHeight: '100vh',
+            minHeight: '100dvh',
         }}>
             {/* Same gold field as the landing and the size picker — and arriving
                 from the dive it restores that field mote-for-mote (persistKey) and
@@ -82,7 +82,7 @@ export default function BuildPage() {
     // flash a bright screen between the two pages.
     return (
         <Suspense fallback={
-            <div style={{ minHeight: '100vh', background: '#020a02' }}>
+            <div style={{ minHeight: '100dvh', background: '#020a02' }}>
                 <DropCover />
             </div>
         }>

@@ -57,7 +57,7 @@ export default function AdminLogin() {
 
 const S: Record<string, React.CSSProperties> = {
     root: {
-        minHeight: '100vh', background: '#0a0a0a',
+        minHeight: '100dvh', background: '#0a0a0a',
         fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: 'rtl',
         display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px',
     },

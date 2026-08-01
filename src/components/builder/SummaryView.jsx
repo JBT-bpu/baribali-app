@@ -11,6 +11,103 @@ function Icon({ src, size = "1.2em", style = {} }) {
     return <span style={{ fontSize: size, lineHeight: 1, ...style }}>{src}</span>;
 }
 
+/*
+  Scatters ingredients inside the bowl art so it reads as a filled bowl rather
+  than three tidy rows.
+
+  Position comes from a hash of the ingredient ID, never its index in the list,
+  so adding or removing one ingredient never reshuffles the others — a scatter
+  that reshuffles on every render is far worse than a neat grid.
+
+  The bowl's front rim is an arc, deepest in the middle and rising toward the
+  sides. `yMax` models that arc from measurements taken off the artwork (gold
+  density per column: ~66% down at centre, ~30% at the edges) and stays
+  deliberately inside it, so an icon can never sit on the gold band.
+*/
+/*
+  The bowl is read, not admired: its job is to let someone confirm at a glance
+  that their order is right. A realistic scattered pile looked better in
+  isolation but made that harder, so ingredients sit in tidy rows — one row per
+  layer of the build, in the order the salad is assembled.
+
+    row 0  ירקות     the base, widest, largest icons
+    row 1  תוספות    everything that goes on top — protein, sauces, extras
+
+  Two rows rather than three: with the artwork this shallow, a third row cost
+  every icon about a quarter of its size, and size is what makes them readable.
+
+  No overlap, no rotation, nothing hidden behind anything else.
+
+  The rows also fit the bowl's geometry: the interior runs nearly full width
+  near the top rim and narrows toward the front, so the widest row belongs at
+  the back and the narrowest at the front.
+
+  `y` and `width` are fractions of the art box, and were chosen so that each
+  row's lowest pixel clears the front-rim arc across its whole width — see
+  ARC_* below, measured off the artwork.
+*/
+// One piece of art holds both the nutrition plaque and the bowl, so every
+// figure below is a fraction of THAT panel, measured off it directly:
+//   nutrition plaque interior   x 8.2-91.4%,  y 16-56%
+//   bowl interior begins        y 56.4%
+//   front rim                   ~78% at the centre, ~70% at the far edges
+const PANEL_AR = 760 / 1035;  // width / height
+const RIM_BASE = 0.69;        // front rim at the far left/right
+const RIM_DEPTH = 0.09;       // extra depth at the centre
+
+// Sat lower in the bowl than it needed to; the interior starts at 56.4% and
+// the base row's top edge was only reaching 58.6%, so both rows move up into
+// that headroom. This also buys the lower row more clearance from the rim.
+const BOWL_ROWS = [
+    { y: 0.625, width: 0.74, maxSize: 16.0 },
+    { y: 0.692, width: 0.46, maxSize: 12.5 },
+];
+const BOWL_GAP = 1.5;         // % of bowl width, between icons when they fit
+// Each icon advances at least this fraction of its own width, so no ingredient
+// is ever more than ~40% covered by the next one.
+const BOWL_MIN_STEP = 0.62;
+
+const BOWL_TIERS = {
+    veggies: 0, t_fillings: 0,
+    protein: 1, t_protein: 1,
+    sauces: 1, finish: 1, upgrade: 1, t_sauces: 1, t_upgrade: 1, wrap: 1,
+};
+
+/** Falls back to tags for items rebuilt from a past order without step meta. */
+function tierOf(item) {
+    const s = item._meta?.stepId;
+    if (s && s in BOWL_TIERS) return BOWL_TIERS[s];
+    const t = item.tags || [];
+    if (t.some(x => ["base", "green", "fresh", "red", "orange", "purple", "yellow", "white", "brown"].includes(x))) return 0;
+    return 1;
+}
+
+/**
+ * Lays out one row: icon size and the distance between centres, both as a % of
+ * the bowl's width.
+ *
+ * Icons stay at a readable size and OVERLAP when the row is crowded, rather
+ * than all shrinking — eleven vegetables shrunk to fit came out at ~23px,
+ * which is unreadable, where overlapping keeps them at ~42px. Overlap is
+ * capped at ~40% of an icon, and only past that does the size come down.
+ *
+ * With room to spare the icons simply spread out and never touch.
+ */
+function bowlRowLayout(row, count) {
+    if (!count) return { size: 0, step: 0 };
+    const W = row.width * 100;
+
+    // Largest size at which `count` icons still fit at the tightest allowed
+    // overlap; capped by the row's own maximum.
+    const size = Math.max(3, Math.min(row.maxSize, W / (1 + BOWL_MIN_STEP * (count - 1))));
+    if (count === 1) return { size, step: 0 };
+
+    // Spread to fill the row if there is room, but never further apart than
+    // one icon plus a gap.
+    const step = Math.min(size + BOWL_GAP, (W - size) / (count - 1));
+    return { size, step };
+}
+
 // ─── Pickup slot generator ─────────────────────────────────────
 function generatePickupSlots() {
     const now = new Date();
@@ -116,6 +213,14 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     };
     const grouped = STEPS.map(s => ({ s, items: sels[s.id] || [] })).filter(g => g.items.length > 0);
 
+    // Ingredients bucketed into the bowl's three rows, keeping the order they
+    // were chosen in within each row.
+    const bowlRows = useMemo(() => {
+        const rows = BOWL_ROWS.map(() => []);
+        all.forEach(it => rows[tierOf(it)].push(it));
+        return rows;
+    }, [all]);
+
     const handleNotesChange = (e) => {
         const value = e.target.value;
         if (value.length <= MAX_NOTES_LENGTH) {
@@ -126,15 +231,6 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
         }
     };
 
-    const layers = useMemo(() => {
-        // Each item goes into exactly one layer — priority: prots > greens > vegs > tops > rest
-        const prots  = all.filter(i => i._meta?.stepId === "protein");
-        const greens = all.filter(i => !prots.includes(i) && (i.tags || []).some(t => ["base", "green"].includes(t) && t !== "herb"));
-        const vegs   = all.filter(i => !prots.includes(i) && !greens.includes(i) && (i.tags || []).some(t => ["fresh", "red", "orange", "yellow", "purple", "warm"].includes(t)));
-        const tops   = all.filter(i => !prots.includes(i) && !greens.includes(i) && !vegs.includes(i) && (i.tags || []).some(t => ["crunch", "herb", "fat", "sweet"].includes(t)));
-        const rest   = all.filter(i => !prots.includes(i) && !greens.includes(i) && !vegs.includes(i) && !tops.includes(i));
-        return { greens, vegs, prots, tops, rest };
-    }, [all]);
 
     // Shows the confirmation only when the animation has finished *and* the
     // server accepted the order.
@@ -275,12 +371,46 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                     {/* Layered bowl — hero */}
                     <div style={S.sumBowlWrap}>
                         <div style={S.sumBowlGlow} />
-                        <div style={S.sumBowl}>
-                            <div style={S.bowlLayer}>{[...layers.tops, ...layers.prots].map((it, i) => <span key={it.id} onClick={() => highlightStep(it)} style={{ cursor: "pointer", animation: `popBounce 0.3s ease ${i * 35 + 250}ms both`, filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.35))" }}><Icon src={it.icon} size="20px" /></span>)}</div>
-                            <div style={S.bowlLayer}>{layers.vegs.map((it, i) => <span key={it.id} onClick={() => highlightStep(it)} style={{ cursor: "pointer", animation: `popBounce 0.3s ease ${i * 35 + 120}ms both`, filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.25))" }}><Icon src={it.icon} size="23px" /></span>)}</div>
-                            <div style={S.bowlLayer}>{[...layers.greens, ...layers.rest].map((it, i) => <span key={it.id} onClick={() => highlightStep(it)} style={{ cursor: "pointer", animation: `popBounce 0.3s ease ${i * 35}ms both`, filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.2))" }}><Icon src={it.icon} size="26px" /></span>)}</div>
+                        {/* One piece of art: the nutrition plaque and the bowl are a
+                            single frame, so both live inside it as positioned slots
+                            rather than as two stacked panels with their own borders. */}
+                        <div style={S.panel}>
+                            <div style={S.panelNut}><NutriStats all={all} /></div>
+                            {bowlRows.map((items, t) => {
+                                if (!items.length) return null;
+                                const row = BOWL_ROWS[t];
+                                const { size, step } = bowlRowLayout(row, items.length);
+                                const total = size + step * (items.length - 1);
+                                const startX = 50 - total / 2;   // centred, in % of the bowl
+                                return (
+                                    <div key={t} style={{ position: "absolute", inset: 0, zIndex: t + 1 }}>
+                                        {items.map((it, i) => (
+                                            <span
+                                                key={it.id}
+                                                onClick={() => highlightStep(it)}
+                                                style={{
+                                                    position: "absolute",
+                                                    // RTL: the first ingredient sits on the RIGHT and
+                                                    // each next one tucks in behind it to the left,
+                                                    // so the row fans the way the text reads.
+                                                    left: `${(startX + (items.length - 1 - i) * step).toFixed(2)}%`,
+                                                    top: `${(row.y * 100).toFixed(2)}%`,
+                                                    width: `${size.toFixed(2)}%`,
+                                                    aspectRatio: "1",
+                                                    transform: "translateY(-50%)",
+                                                    zIndex: items.length - i,
+                                                    cursor: "pointer",
+                                                    animation: `popBounce 0.3s ease ${(t * 120 + i * 35)}ms both`,
+                                                    filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.55))",
+                                                }}
+                                            >
+                                                <Icon src={it.icon} size="100%" style={{ display: "block" }} />
+                                            </span>
+                                        ))}
+                                    </div>
+                                );
+                            })}
                         </div>
-                        <NutriStats all={all} />
                         <div style={S.sumBowlMeta}>
                             <span>{all.length} מרכיבים</span>
                         </div>
@@ -289,16 +419,24 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                     {comboBadges.length > 0 && (
                         <div style={S.comboBanner}>
                             <div style={S.comboBannerTitle}>🏆 שילובים שנבחרו</div>
+                            {/* Emblems, not pills. Each emblem already contains its
+                                Hebrew title in the artwork, so `he` goes to alt
+                                rather than being drawn a second time. */}
                             <div style={S.comboBannerRow}>
                                 {comboBadges.map(b => (
-                                    <BariBadge key={b.id} icon={<span style={{ fontSize: "16px" }}>{b.icon}</span>}>{b.he}</BariBadge>
+                                    b.emblem
+                                        ? <img key={b.id} src={b.emblem} alt={b.he} style={S.comboEmblem} />
+                                        : <BariBadge key={b.id} icon={<span style={{ fontSize: "14px" }}>{b.icon}</span>}>{b.he}</BariBadge>
                                 ))}
                             </div>
                         </div>
                     )}
 
                     {/* ── RPG Inventory ── */}
-                    <div style={{ margin: "0 12px 8px" }}>
+                    {/* No side margin: `content` already supplies the 16px
+                        gutter, and the extra 12px here made these panels
+                        narrower than the combo banner right above them. */}
+                    <div style={{ margin: "0 0 8px" }}>
                         {grouped.map(({ s, items }, gi) => (
                             <BariPanel key={s.id} className="p-2.5" style={{
                                 marginBottom: "10px",
@@ -560,11 +698,13 @@ function NutriStats({ all }) {
     else if (totals.fb >= 10)                  msg = { text: "עשיר בסיבים תזונתיים! 🌿",    color: "#a080e0" };
     else if (totals.p >= 15 && totals.fb >= 6) msg = { text: "ארוחה מאוזנת ✨",             color: "#6abf69" };
 
+    // The frame around this now belongs to the panel art; this just fills the
+    // slot the panel positions it into.
     return (
-        <div style={{ width: "100%", marginTop: "10px", animation: "pFadeIn 0.5s ease 0.35s both" }}>
+        <div style={{ width: "100%", display: "flex", flexDirection: "column", justifyContent: "center" }}>
             {/* Kcal total */}
             <div style={{ textAlign: "center", marginBottom: "8px" }}>
-                <span style={{ fontSize: "26px", fontWeight: 900, color: "#ffffff", letterSpacing: "-0.5px" }}>
+                <span style={{ fontSize: "22px", fontWeight: 900, color: "#ffffff", letterSpacing: "-0.5px" }}>
                     ~{Math.round(totals.kcal)}
                 </span>
                 <span style={{ fontSize: "12px", fontWeight: 700, color: "rgba(255,255,255,0.38)", marginRight: "4px" }}> קק״ל</span>
@@ -573,8 +713,13 @@ function NutriStats({ all }) {
             <div style={{ display: "flex", gap: "5px" }}>
                 {stats.map(s => (
                     <div key={s.key} style={{
-                        flex: 1, background: s.bg, border: `1px solid ${s.border}`,
-                        borderRadius: "10px", padding: "9px 2px 7px",
+                        // No border: these now sit inside the NutBox's gold
+                        // frame, and an outlined card inside an outlined frame
+                        // is the same border-inside-border density that made
+                        // the combo panel feel cramped. The tinted fill alone
+                        // still separates the four macros.
+                        flex: 1, background: s.bg,
+                        borderRadius: "9px", padding: "6px 2px 5px",
                         display: "flex", flexDirection: "column",
                         alignItems: "center", gap: "2px", position: "relative",
                     }}>
@@ -583,7 +728,7 @@ function NutriStats({ all }) {
                                 {s.badge}
                             </div>
                         )}
-                        <span style={{ fontSize: "20px", fontWeight: 900, color: s.color, lineHeight: 1 }}>{s.val}</span>
+                        <span style={{ fontSize: "18px", fontWeight: 900, color: s.color, lineHeight: 1 }}>{s.val}</span>
                         <span style={{ fontSize: "9px", fontWeight: 800, color: s.color, opacity: 0.7, letterSpacing: "0.05em" }}>g</span>
                         <span style={{ fontSize: "10px", fontWeight: 700, color: "rgba(255,255,255,0.45)", lineHeight: 1.1 }}>{s.label}</span>
                     </div>
@@ -739,25 +884,77 @@ const OS = {
 };
 
 const S = {
-    root: { position: "relative", width: "100%", maxWidth: "430px", minHeight: "100vh", margin: "0 auto", overflow: "hidden", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: "rtl" },
+    // dvh — see the note in BariBaliBuilder: `100vh` would push the total +
+    // "לתשלום" bar below the browser chrome on a phone.
+    root: { position: "relative", width: "100%", maxWidth: "430px", minHeight: "100dvh", margin: "0 auto", overflow: "hidden", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: "rtl" },
     bg: { position: "fixed", inset: 0, zIndex: 0, background: "linear-gradient(155deg, #030a03 0%, #071a07 20%, #0a200a 45%, #071a07 70%, #030a03 100%)", filter: "blur(2px) brightness(0.65)" },
     bgRay: { position: "fixed", top: "-30%", left: "50%", transform: "translateX(-50%)", width: "110%", height: "70%", zIndex: 0, pointerEvents: "none", background: "radial-gradient(ellipse 70% 60% at 50% 20%, rgba(255,224,100,0.05) 0%, rgba(200,168,78,0.02) 50%, transparent 70%)" },
-    main: { position: "relative", zIndex: 2, display: "flex", flexDirection: "column", height: "100vh" },
-    header: { background: `linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.5)), url(/builder-assets/header-brand.png) center / cover no-repeat`, borderBottom: "2px solid rgba(200,168,78,0.4)" },
-    headerTop: { display: "flex", alignItems: "center", gap: "8px", padding: "8px 12px 10px" },
+    main: { position: "relative", zIndex: 2, display: "flex", flexDirection: "column", height: "100dvh" },
+    // paddingTop keeps the brand art clear of the notch now that
+    // viewport-fit=cover is on; the header background fills the strip above it.
+    header: { paddingTop: "env(safe-area-inset-top)", background: `linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.5)), url(/builder-assets/header-brand.png) center / cover no-repeat`, borderBottom: "2px solid rgba(200,168,78,0.4)" },
+    // 16px side gutter, matching `content` and `bar` — the screen used to run
+    // 12/14/16/28px at different heights, which read as the header and footer
+    // being crowded against the edge.
+    headerTop: { display: "flex", alignItems: "center", gap: "8px", padding: "8px 16px 10px" },
     backBtn: { width: "44px", height: "44px", borderRadius: "10px", cursor: "pointer", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)", color: "#a5d6a7", fontSize: "16px", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", flexShrink: 0 },
     pricePill: { display: "flex", alignItems: "baseline", gap: "1px", background: "linear-gradient(135deg, rgba(200,168,78,0.22), rgba(184,134,11,0.1))", border: "1px solid rgba(200,168,78,0.4)", padding: "4px 11px", borderRadius: "12px" },
     priceS: { fontSize: "10px", color: "#d4b84a", fontWeight: 600 },
     priceV: { fontSize: "20px", color: "#ffffff", fontWeight: 900, textShadow: "0 2px 8px rgba(200,168,78,0.5)" },
     content: { flex: 1, overflowY: "auto", overflowX: "hidden", padding: "12px 16px max(24px, env(safe-area-inset-bottom))", scrollbarWidth: "none" },
-    sumBowlWrap: { position: "relative", margin: "8px auto 18px", width: "100%", maxWidth: "320px", display: "flex", flexDirection: "column", alignItems: "center" },
+    sumBowlWrap: { position: "relative", margin: "8px auto 18px", width: "100%", maxWidth: "360px", display: "flex", flexDirection: "column", alignItems: "center" },
     sumBowlGlow: { position: "absolute", bottom: "20px", left: "50%", transform: "translateX(-50%)", width: "200px", height: "60px", borderRadius: "50%", background: "radial-gradient(ellipse, rgba(200,168,78,0.18) 0%, transparent 70%)", pointerEvents: "none", filter: "blur(8px)" },
-    sumBowl: { position: "relative", zIndex: 1, width: "280px", minHeight: "120px", padding: "14px 14px 10px", borderRadius: "16px 16px 50% 50% / 16px 16px 44% 44%", background: "linear-gradient(170deg, rgba(22,65,22,0.85), rgba(15,48,15,0.8))", border: "1px solid rgba(200,168,78,0.28)", boxShadow: "0 10px 36px rgba(0,0,0,0.5), 0 0 0 1px rgba(200,168,78,0.08), inset 0 2px 6px rgba(0,0,0,0.25)", display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" },
+    /*
+      The bowl is now artwork, so every CSS approximation of it — the gradient
+      fill, the faked border-radius bowl shape, the rim border and inset shadow
+      — is gone; the image carries all of it.
+
+      The padding places ingredients in the bowl's INTERIOR rather than over the
+      rim or the outer body. Measured off the art by scanning gold density down
+      the image: the top rim occupies 0-5% of the height and the front rim band
+      runs 58-68%, leaving 6-57% as usable interior. CSS percentage padding
+      resolves against WIDTH, so those figures are converted through the 0.52
+      aspect ratio — hence 3% / 23% rather than 6% / 43%.
+    */
+    /*
+      The single framed plaque: nutrition above, bowl below, one gold border.
+      Replaces the two separately-framed panels, which meant two borders and two
+      sets of corner filigree stacked down the screen.
+
+      Both regions are positioned slots inside it, so all the geometry lives in
+      one coordinate space measured off this one image.
+    */
+    panel: {
+        position: "relative", zIndex: 1,
+        width: "100%", maxWidth: "360px",
+        aspectRatio: "760 / 1035",
+        backgroundImage: "url(/builder-assets/summary-panel.webp)",
+        backgroundSize: "100% 100%",
+        backgroundRepeat: "no-repeat",
+        animation: "pFadeIn 0.5s ease 0.35s both",
+    },
+    // The plaque's interior measures x 8.2-91.4%, y 16-56%; inset a little from
+    // that so the content never touches the engraved border.
+    panelNut: {
+        position: "absolute", left: "11%", right: "11%", top: "21%", height: "33%",
+        display: "flex", flexDirection: "column", justifyContent: "center",
+    },
     sumBowlMeta: { marginTop: "10px", display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", fontWeight: 600, color: "rgba(255,255,255,0.5)", letterSpacing: "0.03em" },
-    bowlLayer: { display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "3px" },
-    comboBanner: { marginBottom: "14px", padding: "12px 14px", borderRadius: "14px", background: "linear-gradient(135deg, rgba(200,168,78,0.14) 0%, rgba(180,140,40,0.08) 100%)", border: "1.5px solid rgba(200,168,78,0.4)", boxShadow: "0 0 24px rgba(200,168,78,0.12), inset 0 1px 0 rgba(255,255,255,0.06)", animation: "pFadeIn 0.5s ease both" },
+    // 16px inner gutter + a smaller badge glyph (below): four bordered pills in
+    // a bordered box used to fill the row edge-to-edge with nothing to spare,
+    // which is what made it read as crowded.
+    // Back to a 16px gutter, matching every other row on this screen. The 20px
+    // was compensating for bordered pills landing on the panel edge; the
+    // emblems are free-standing art with their own visual margin, so the
+    // crowding it was fighting is gone.
+    comboBanner: { marginBottom: "14px", padding: "12px 16px", borderRadius: "14px", background: "linear-gradient(135deg, rgba(200,168,78,0.14) 0%, rgba(180,140,40,0.08) 100%)", border: "1.5px solid rgba(200,168,78,0.4)", boxShadow: "0 0 24px rgba(200,168,78,0.12), inset 0 1px 0 rgba(255,255,255,0.06)", animation: "pFadeIn 0.5s ease both" },
     comboBannerTitle: { fontSize: "10px", fontWeight: 800, color: "rgba(200,168,78,0.6)", letterSpacing: "0.06em", marginBottom: "8px" },
-    comboBannerRow: { display: "flex", gap: "8px", flexWrap: "wrap" },
+    // A fixed 6-across trophy wall. At this size (~38px on a 320px screen,
+    // ~56px on a large phone) the Hebrew baked into each emblem is NOT
+    // readable — that is the intent: the wall is scanned for shape and colour,
+    // the way a collection is. The title still reaches screen readers via alt.
+    comboBannerRow: { display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: "6px", justifyItems: "center" },
+    comboEmblem: { width: "100%", height: "auto", display: "block" },
     notesToggle: { width: "100%", margin: "12px 0", padding: "10px 12px", borderRadius: "12px", display: "flex", alignItems: "center", gap: "8px", background: "rgba(15,45,15,0.6)", backdropFilter: "blur(8px)", border: "1px solid rgba(200,168,78,0.15)", cursor: "pointer", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.45)", direction: "rtl", textAlign: "right" },
     notesInput: { width: "100%", padding: "8px 10px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.04)", color: "#e8f5e9", fontSize: "12px", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", outline: "none", direction: "rtl", resize: "vertical", minHeight: "60px" },
     sumPriceCard: { marginTop: "14px", padding: "14px 16px", borderRadius: "14px", background: "linear-gradient(145deg, rgba(15,45,15,0.9), rgba(20,55,20,0.85))", border: "1px solid rgba(200,168,78,0.25)", boxShadow: "0 4px 16px rgba(0,0,0,0.3)" },
@@ -765,7 +962,7 @@ const S = {
     sumTotal: { display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: "36px", fontWeight: 900, color: "#f0d060", textShadow: "0 0 24px rgba(200,168,78,0.55), 0 2px 8px rgba(200,168,78,0.3)", padding: "12px 0 2px", marginTop: "10px", borderTop: "1px solid rgba(200,168,78,0.2)" },
     bar: {
         display: "flex", flexDirection: "column", gap: "10px",
-        padding: "12px 14px 18px",
+        padding: "12px 16px 18px",
         background: `linear-gradient(rgba(0,0,0,0.72), rgba(0,0,0,0.68)), url(/builder-assets/footer-brand.png) center top / cover no-repeat`,
         borderTop: "2px solid rgba(200,168,78,0.4)",
         boxShadow: "0 -6px 28px rgba(0,0,0,0.55)",

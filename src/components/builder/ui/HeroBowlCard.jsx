@@ -275,7 +275,13 @@ export default function HeroBowlCard({ all, onRemove, comboBadges, lastAdd, anim
                                     padding: "3px 8px", borderRadius: "7px",
                                     background: "rgba(200,168,78,0.2)", border: "1px solid rgba(200,168,78,0.4)",
                                 }}>
-                                    <span style={{ fontSize: "10px" }}>{b.icon}</span>
+                                    {/* 14px, not 10px — nothing legible survives at 10px,
+                                        emoji or glyph. Same path/emoji branch used for
+                                        ingredient icons above, so dropping the stripped
+                                        glyph set in later needs no change here. */}
+                                    {b.icon && b.icon.startsWith("/")
+                                        ? <img src={b.icon} alt="" style={{ width: "14px", height: "14px", objectFit: "contain", display: "block" }} />
+                                        : <span style={{ fontSize: "14px" }}>{b.icon}</span>}
                                     <span style={{ fontSize: "10px", fontWeight: 800, color: "#f0d060" }}>{b.he}</span>
                                 </div>
                             ))}

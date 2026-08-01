@@ -19,7 +19,7 @@ export default function LoginPage() {
 
     return (
         <div style={{
-            minHeight: '100vh',
+            minHeight: '100dvh',
             background: 'url(/homepage-assets/BG_8K.webp) center top / cover no-repeat, linear-gradient(155deg, #030a03 0%, #071a07 30%, #0a200a 60%, #071a07 100%)',
             fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
             direction: 'rtl',

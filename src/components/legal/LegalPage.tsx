@@ -19,7 +19,7 @@ export const LEGAL_PAGES: { href: string; label: string }[] = [
 export default function LegalPage({ title, lastUpdated, children }: { title: string; lastUpdated: string; children: ReactNode }) {
     return (
         <div style={{
-            minHeight: '100vh',
+            minHeight: '100dvh',
             background: 'linear-gradient(155deg, #030a03 0%, #071a07 40%, #0a200a 70%, #071a07 100%)',
             fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
             direction: 'rtl', color: 'rgba(255,255,255,0.85)',
