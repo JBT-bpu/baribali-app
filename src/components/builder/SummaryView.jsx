@@ -31,8 +31,10 @@ function Icon({ src, size = "1.2em", style = {} }) {
   layer of the build, in the order the salad is assembled.
 
     row 0  ירקות     the base, widest, largest icons
-    row 1  חלבון     protein and grains
-    row 2  תוספות    sauces, crunch, finishing touches
+    row 1  תוספות    everything that goes on top — protein, sauces, extras
+
+  Two rows rather than three: with the artwork this shallow, a third row cost
+  every icon about a quarter of its size, and size is what makes them readable.
 
   No overlap, no rotation, nothing hidden behind anything else.
 
@@ -49,9 +51,8 @@ const ARC_BASE = 0.24;        // front rim at the far left/right
 const ARC_DEPTH = 0.40;       // extra depth at the centre
 
 const BOWL_ROWS = [
-    { y: 0.195, width: 0.86, maxSize: 13.0 },
-    { y: 0.360, width: 0.60, maxSize: 11.5 },
-    { y: 0.490, width: 0.36, maxSize: 10.0 },
+    { y: 0.215, width: 0.80, maxSize: 14.5 },
+    { y: 0.420, width: 0.46, maxSize: 13.0 },
 ];
 const BOWL_GAP = 1.5;         // % of bowl width, between icons when they fit
 // Each icon advances at least this fraction of its own width, so no ingredient
@@ -61,7 +62,7 @@ const BOWL_MIN_STEP = 0.62;
 const BOWL_TIERS = {
     veggies: 0, t_fillings: 0,
     protein: 1, t_protein: 1,
-    sauces: 2, finish: 2, upgrade: 2, t_sauces: 2, t_upgrade: 2, wrap: 2,
+    sauces: 1, finish: 1, upgrade: 1, t_sauces: 1, t_upgrade: 1, wrap: 1,
 };
 
 /** Falls back to tags for items rebuilt from a past order without step meta. */
@@ -69,9 +70,8 @@ function tierOf(item) {
     const s = item._meta?.stepId;
     if (s && s in BOWL_TIERS) return BOWL_TIERS[s];
     const t = item.tags || [];
-    if (t.includes("protein") || t.includes("grain")) return 1;
     if (t.some(x => ["base", "green", "fresh", "red", "orange", "purple", "yellow", "white", "brown"].includes(x))) return 0;
-    return 2;
+    return 1;
 }
 
 /**
@@ -208,7 +208,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     // Ingredients bucketed into the bowl's three rows, keeping the order they
     // were chosen in within each row.
     const bowlRows = useMemo(() => {
-        const rows = [[], [], []];
+        const rows = BOWL_ROWS.map(() => []);
         all.forEach(it => rows[tierOf(it)].push(it));
         return rows;
     }, [all]);
@@ -363,6 +363,10 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                     {/* Layered bowl — hero */}
                     <div style={S.sumBowlWrap}>
                         <div style={S.sumBowlGlow} />
+                        {/* Nutrition first, bowl below it — the bowl is the thing
+                            you linger on, so it sits closest to the ingredient list
+                            it summarises. */}
+                        <NutriStats all={all} />
                         <div style={S.sumBowl}>
                             {bowlRows.map((items, t) => {
                                 if (!items.length) return null;
@@ -399,7 +403,6 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                                 );
                             })}
                         </div>
-                        <NutriStats all={all} />
                         <div style={S.sumBowlMeta}>
                             <span>{all.length} מרכיבים</span>
                         </div>
@@ -691,7 +694,7 @@ function NutriStats({ all }) {
         <div style={S.nutBox}>
             {/* Kcal total */}
             <div style={{ textAlign: "center", marginBottom: "8px" }}>
-                <span style={{ fontSize: "26px", fontWeight: 900, color: "#ffffff", letterSpacing: "-0.5px" }}>
+                <span style={{ fontSize: "22px", fontWeight: 900, color: "#ffffff", letterSpacing: "-0.5px" }}>
                     ~{Math.round(totals.kcal)}
                 </span>
                 <span style={{ fontSize: "12px", fontWeight: 700, color: "rgba(255,255,255,0.38)", marginRight: "4px" }}> קק״ל</span>
@@ -706,7 +709,7 @@ function NutriStats({ all }) {
                         // the combo panel feel cramped. The tinted fill alone
                         // still separates the four macros.
                         flex: 1, background: s.bg,
-                        borderRadius: "10px", padding: "9px 2px 7px",
+                        borderRadius: "9px", padding: "6px 2px 5px",
                         display: "flex", flexDirection: "column",
                         alignItems: "center", gap: "2px", position: "relative",
                     }}>
@@ -715,7 +718,7 @@ function NutriStats({ all }) {
                                 {s.badge}
                             </div>
                         )}
-                        <span style={{ fontSize: "20px", fontWeight: 900, color: s.color, lineHeight: 1 }}>{s.val}</span>
+                        <span style={{ fontSize: "18px", fontWeight: 900, color: s.color, lineHeight: 1 }}>{s.val}</span>
                         <span style={{ fontSize: "9px", fontWeight: 800, color: s.color, opacity: 0.7, letterSpacing: "0.05em" }}>g</span>
                         <span style={{ fontSize: "10px", fontWeight: 700, color: "rgba(255,255,255,0.45)", lineHeight: 1.1 }}>{s.label}</span>
                     </div>
@@ -928,7 +931,9 @@ const S = {
       frame line does (measured: the line itself is only ~2%).
     */
     nutBox: {
-        width: "100%", marginTop: "10px",
+        // Smaller than the bowl and centred: it is a supporting panel now that
+        // it sits above the hero rather than beneath it.
+        width: "84%", maxWidth: "300px", margin: "0 auto 10px",
         aspectRatio: "800 / 512",
         backgroundImage: "url(/builder-assets/summary-nutbox.webp)",
         backgroundSize: "100% 100%",
