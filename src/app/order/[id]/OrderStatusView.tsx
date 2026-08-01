@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import GoldField from '@/components/ui/GoldField';
 import BariBadge from '@/components/ui/bari/BariBadge';
 import BariGlowBackground from '@/components/ui/bari/BariGlowBackground';
 import { fireGoldConfetti } from '@/lib/confetti';
+import { orderSizeLabel } from '@/lib/reorder';
 
 const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
 
@@ -17,6 +18,7 @@ interface Order {
     order_num: string;
     items: { id: string; he: string; icon: string; price: number }[];
     total: number;
+    size?: string | null;
     pickup_time: string | null;
     notes: string | null;
     status: OrderStatus;
@@ -36,17 +38,25 @@ function paymentLabel(payment: string | undefined): { text: string; owed: boolea
     }
 }
 
-const STATUS_STEPS: { key: OrderStatus; label: string; icon: string }[] = [
-    { key: 'waiting',   label: 'התקבלה',  icon: '📋' },
-    { key: 'preparing', label: 'בהכנה',   icon: '👨‍🍳' },
-    { key: 'ready',     label: 'מוכן!',   icon: '✅' },
-    { key: 'collected', label: 'נאסף',    icon: '🎉' },
+// `sub` is the one line that says what to DO. The "ready" state in particular
+// used to be a green tick and a cat, with nothing telling the customer to come
+// to the counter or that the order number is what identifies them there.
+const STATUS_STEPS: { key: OrderStatus; label: string; icon: string; sub: string }[] = [
+    { key: 'waiting',   label: 'התקבלה',  icon: '📋',   sub: 'ההזמנה שלכם התקבלה במטבח' },
+    { key: 'preparing', label: 'בהכנה',   icon: '👨‍🍳', sub: 'מכינים את הסלט שלכם עכשיו' },
+    { key: 'ready',     label: 'מוכן!',   icon: '✅',   sub: 'גשו לדלפק ואמרו את מספר ההזמנה' },
+    { key: 'collected', label: 'נאסף',    icon: '🎉',   sub: 'בתיאבון! נשמח לראותכם שוב' },
 ];
 
 /* ── Celebration Sound (Web Audio API) ── */
 function playCelebrationChime() {
+    let ac: AudioContext | undefined;
     try {
-        const ac = new (window.AudioContext || (window as any).webkitAudioContext)();
+        ac = new (window.AudioContext || (window as any).webkitAudioContext)();
+        // Arriving here from a payment redirect means no user gesture on this
+        // page yet, so the context starts suspended and would produce silence.
+        // Close it rather than leave one parked — browsers cap them at ~6.
+        if (ac.state === 'suspended') { ac.close().catch(() => {}); return; }
         const gain1 = ac.createGain();
         gain1.gain.setValueAtTime(0.18, ac.currentTime);
         gain1.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.15);
@@ -70,9 +80,10 @@ function playCelebrationChime() {
         osc2.stop(ac.currentTime + 0.38);
 
         // cleanup
-        setTimeout(() => ac.close(), 500);
+        setTimeout(() => ac?.close().catch(() => {}), 500);
     } catch {
         // Audio not supported — silently ignore
+        try { ac?.close(); } catch { /* already gone */ }
     }
 }
 
@@ -85,49 +96,72 @@ function fireHaptic() {
     }
 }
 
+/**
+ * Resolves a stored pickup_time to a Date. In practice it is always "HH:MM"
+ * (the slot ids the picker produces, and what the schema documents), but the
+ * full-datetime branch is kept — and an unparseable value now returns null
+ * rather than an Invalid Date, which used to render a "NaN:NaN" countdown.
+ */
+function pickupTarget(pickupTime: string | null): Date | null {
+    if (!pickupTime) return null;
+    if (/^\d{1,2}:\d{2}$/.test(pickupTime)) {
+        const [h, m] = pickupTime.split(':').map(Number);
+        if (h > 23 || m > 59) return null;
+        const t = new Date();
+        t.setHours(h, m, 0, 0);
+        return t;
+    }
+    const t = new Date(pickupTime);
+    return Number.isNaN(t.getTime()) ? null : t;
+}
+
+const hhmm = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+
 /* ── Countdown Hook ── */
-function useCountdown(pickupTime: string | null) {
+function useCountdown(pickupTime: string | null, frozen: boolean) {
+    const target = useMemo(() => pickupTarget(pickupTime), [pickupTime]);
     // Lazy initialiser: Date.now() as a bare argument re-evaluates on every
     // render (and is an impure call during render).
     const [now, setNow] = useState(() => Date.now());
 
+    // Only tick while there is something left to count down. Once the slot has
+    // arrived the readout is a static "now", and once the order is collected
+    // nothing about it can change again — either way a 1Hz re-render loop runs
+    // on a phone that is by then back in someone's pocket.
+    const ticking = !!target && !frozen && target.getTime() > now;
+
     useEffect(() => {
-        if (!pickupTime) return;
+        if (!ticking) return;
         const id = setInterval(() => setNow(Date.now()), 1000);
         return () => clearInterval(id);
-    }, [pickupTime]);
+    }, [ticking]);
 
-    if (!pickupTime) return null;
+    if (!target) return null;
 
-    // Parse pickup_time. It may be "HH:MM" or a full datetime string.
-    let target: Date;
-    if (/^\d{1,2}:\d{2}$/.test(pickupTime)) {
-        const [h, m] = pickupTime.split(':').map(Number);
-        target = new Date();
-        target.setHours(h, m, 0, 0);
-        // If the time already passed today, assume it's today (already past)
-    } else {
-        target = new Date(pickupTime);
-    }
-
+    // The clock time is the thing the customer actually planned around, and
+    // until now it appeared nowhere on this page: the only branch that rendered
+    // it was unreachable, because this hook returns null solely when there is
+    // no pickup time at all.
+    const clock = hhmm(target);
     const diffMs = target.getTime() - now;
 
-    if (diffMs <= 0) {
-        return { text: 'עכשיו!', urgent: false, arrived: true, diffMs: 0 };
-    }
+    if (diffMs <= 0) return { clock, text: 'עכשיו!', urgent: false, arrived: true };
 
     const totalSec = Math.floor(diffMs / 1000);
     const min = Math.floor(totalSec / 60);
     const sec = totalSec % 60;
-    const text = `${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')} נותרו`;
-    const urgent = totalSec < 120;
+    const text = `עוד ${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
 
-    return { text, urgent, arrived: false, diffMs };
+    return { clock, text, urgent: totalSec < 120, arrived: false };
 }
 
 export default function OrderStatusView({ id }: { id: string }) {
     const [order, setOrder] = useState<Order | null>(null);
     const [notFound, setNotFound] = useState(false);
+    // Set while we can't reach the API. Distinct from `notFound`, which now
+    // means only that the server said 404.
+    const [offline, setOffline] = useState(false);
+    const [settled, setSettled] = useState(false); // polling stopped for good
     const prevStatusRef = useRef<OrderStatus | null>(null);
     const [ringScale, setRingScale] = useState(false);
     const [labelSlide, setLabelSlide] = useState(false);
@@ -136,7 +170,7 @@ export default function OrderStatusView({ id }: { id: string }) {
     const [readyAnim, setReadyAnim] = useState<object | null>(null);
     useEffect(() => { fetch('/cat-salad-final.json').then(r => r.json()).then(setReadyAnim).catch(() => {}); }, []);
 
-    const countdown = useCountdown(order?.pickup_time ?? null);
+    const countdown = useCountdown(order?.pickup_time ?? null, order?.status === 'collected');
 
     // Celebration trigger
     const triggerCelebration = useCallback(() => {
@@ -159,36 +193,64 @@ export default function OrderStatusView({ id }: { id: string }) {
         // The order's UUID id acts as the capability token — no extra secret
         // needed to read it via /api/orders/[id].
         let cancelled = false;
-        let initial = true;
-        let interval: ReturnType<typeof setInterval> | undefined;
+        let stopped = false;   // terminal: the order is collected, or gone
+        let inFlight = false;
+        let timer: ReturnType<typeof setTimeout> | undefined;
 
-        const load = () => {
-            fetch(`/api/orders/${id}`)
-                .then(r => r.ok ? r.json() : null)
-                .then(data => {
-                    if (cancelled) return;
-                    if (!data) {
-                        if (initial) setNotFound(true);
-                        return;
-                    }
-                    const d = data as Order;
-                    setOrder(d);
-                    if (prevStatusRef.current === null) prevStatusRef.current = d.status;
-                    // 'collected' is terminal — nothing will change again. Without
-                    // this the page polled every 4s forever, so a tab left open
-                    // after pickup kept hitting the API all day.
-                    if (d.status === 'collected' && interval) {
-                        clearInterval(interval);
-                        interval = undefined;
-                    }
-                })
-                .catch(() => { if (!cancelled && initial) setNotFound(true); })
-                .finally(() => { initial = false; });
+        // Visible: 4s, so a kitchen "ready" lands almost at once for someone
+        // watching. Hidden: 20s — the tab-title flash below still needs polling
+        // to run in the background, but at 4s a page parked through an afternoon
+        // was making ~900 requests an hour to notice a single change.
+        const nextDelay = () => (document.hidden ? 20_000 : 4_000);
+
+        const schedule = () => {
+            if (stopped || cancelled) return;
+            timer = setTimeout(load, nextDelay());
         };
 
+        const load = async () => {
+            if (inFlight || stopped || cancelled) return;
+            inFlight = true;
+            try {
+                const res = await fetch(`/api/orders/${id}`);
+                if (cancelled) return;
+                // Only a 404 means the order genuinely isn't there. Every other
+                // failure — a 500, a rate limit, a dropped mobile connection on
+                // the way back from the payment page — used to land on the same
+                // screen, telling someone who had just paid that their order did
+                // not exist. Those are now retried instead.
+                if (res.status === 404) { stopped = true; setNotFound(true); return; }
+                if (!res.ok) throw new Error(String(res.status));
+                const d = (await res.json()) as Order;
+                if (cancelled) return;
+                setOffline(false);
+                setOrder(d);
+                if (prevStatusRef.current === null) prevStatusRef.current = d.status;
+                // 'collected' is terminal — nothing will change again.
+                if (d.status === 'collected') { stopped = true; setSettled(true); }
+            } catch {
+                if (!cancelled) setOffline(true);
+            } finally {
+                inFlight = false;
+                schedule();
+            }
+        };
+
+        // Coming back to the tab should show the current state immediately
+        // rather than sitting on stale data for the rest of a hidden interval.
+        const onVisibility = () => {
+            if (document.hidden || stopped || cancelled) return;
+            if (timer) clearTimeout(timer);
+            load();
+        };
+        document.addEventListener('visibilitychange', onVisibility);
+
         load();
-        interval = setInterval(load, 4000);
-        return () => { cancelled = true; if (interval) clearInterval(interval); };
+        return () => {
+            cancelled = true;
+            if (timer) clearTimeout(timer);
+            document.removeEventListener('visibilitychange', onVisibility);
+        };
     }, [id]);
 
     // Track status changes and fire effects
@@ -232,10 +294,16 @@ export default function OrderStatusView({ id }: { id: string }) {
     }, [order?.status]);
 
     if (notFound) return <NotFound />;
-    if (!order) return <Loading />;
+    if (!order) return <Loading offline={offline} />;
 
-    const currentStep = STATUS_STEPS.findIndex(s => s.key === order.status);
+    // Clamped: an unrecognised status made findIndex return -1, which rendered
+    // the status label as an empty string — a blank page where the state goes.
+    const stepIndex = STATUS_STEPS.findIndex(s => s.key === order.status);
+    const currentStep = stepIndex === -1 ? 0 : stepIndex;
+    const step = STATUS_STEPS[currentStep];
     const isReady = order.status === 'ready';
+    const isCollected = order.status === 'collected';
+    const bowl = orderSizeLabel(order.size);
 
     const ringStyle: React.CSSProperties = {
         ...P.ring,
@@ -267,32 +335,33 @@ export default function OrderStatusView({ id }: { id: string }) {
                 <div style={ringStyle}>
                     {isReady && readyAnim
                         ? <Lottie animationData={readyAnim} loop autoplay style={{ width: '84px', height: '84px' }} />
-                        : <div style={P.ringIcon}>{STATUS_STEPS[currentStep]?.icon ?? '📋'}</div>}
+                        : <div style={P.ringIcon}>{step.icon}</div>}
                 </div>
 
                 <div style={labelStyle}>
-                    {STATUS_STEPS[currentStep]?.label}
+                    {step.label}
+                </div>
+                <div style={{ ...P.statusSub, ...(isReady ? P.statusSubReady : {}) }}>
+                    {step.sub}
                 </div>
 
-                {/* Countdown */}
-                {order.pickup_time && countdown && (
-                    <div style={{
-                        ...P.pickupTimeCard,
-                        ...(countdown.arrived ? P.countdownArrived : {}),
-                        ...(countdown.urgent && !countdown.arrived ? P.countdownUrgent : {}),
-                    }}>
-                        {countdown.arrived ? (
-                            <span style={P.countdownNow}>עכשיו!</span>
-                        ) : (
-                            <>⏰ {countdown.text}</>
-                        )}
-                    </div>
-                )}
-
-                {/* Static pickup time when no countdown active */}
-                {order.pickup_time && !countdown && (
+                {/* Pickup time — the clock time first, since that is what the
+                    customer planned around, then how long is left. Once the
+                    order is collected the remaining-time half is dropped: it is
+                    frozen by then, and counting down to a collection that has
+                    already happened reads as a stuck page. */}
+                {countdown && (
                     <div style={P.pickupTimeCard}>
-                        ⏰ זמן איסוף: <strong>{order.pickup_time}</strong>
+                        <span>⏰ איסוף <strong style={P.pickupClock}>{countdown.clock}</strong></span>
+                        {!isCollected && <>
+                            <span style={P.pickupSep}>·</span>
+                            <span style={{
+                                ...(countdown.arrived ? { ...P.countdownArrived, ...P.countdownNow } : {}),
+                                ...(countdown.urgent && !countdown.arrived ? P.countdownUrgent : {}),
+                            }}>
+                                {countdown.text}
+                            </span>
+                        </>}
                     </div>
                 )}
 
@@ -317,7 +386,9 @@ export default function OrderStatusView({ id }: { id: string }) {
 
                 {/* Items */}
                 <div style={P.itemsCard}>
-                    <div style={P.itemsTitle}>הסלט שלכם</div>
+                    <div style={P.itemsTitle}>
+                        הסלט שלכם{bowl ? <span style={P.itemsBowl}> · {bowl}</span> : null}
+                    </div>
                     <div style={P.itemsRow}>
                         {order.items.map(it => (
                             <span key={it.id} style={P.itemChip} title={it.he}>
@@ -349,7 +420,17 @@ export default function OrderStatusView({ id }: { id: string }) {
                     })()}
                 </div>
 
-                <div style={P.footer}>מתרענן אוטומטית · לא צריך לרענן</div>
+                {/* The footer used to promise "refreshes automatically" even
+                    when the polling had stopped or was failing — the one moment
+                    that claim matters is exactly when it stopped being true. */}
+                <div style={{ ...P.footer, ...(offline ? P.footerOffline : {}) }}>
+                    {offline ? 'אין חיבור — מנסים שוב…'
+                        : settled ? 'ההזמנה הושלמה'
+                            : 'מתרענן אוטומטית · לא צריך לרענן'}
+                </div>
+
+                {/* Opened from a saved link this page had no way out of itself. */}
+                <Link href="/" style={P.homeLink}>← חזרה לתפריט</Link>
             </div>
 
             <style>{`
@@ -366,7 +447,7 @@ export default function OrderStatusView({ id }: { id: string }) {
 }
 
 /* ── Shimmer Loading State ── */
-function Loading() {
+function Loading({ offline }: { offline: boolean }) {
     return (
         <div style={{ ...P.root, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }}>
             <div style={P.shimmerWrap}>
@@ -377,6 +458,14 @@ function Loading() {
                 <div style={{ ...P.shimmerBar, width: '140px' }} />
                 <div style={{ ...P.shimmerBar, width: '100px' }} />
                 <div style={{ ...P.shimmerBar, width: '180px' }} />
+
+                {/* A first load that keeps failing is now named, and keeps
+                    retrying, instead of shimmering silently for ever. */}
+                {offline && (
+                    <div style={{ ...P.footer, ...P.footerOffline, marginTop: '4px', textAlign: 'center' }}>
+                        אין חיבור — מנסים שוב…
+                    </div>
+                )}
             </div>
 
             <style>{`
@@ -416,7 +505,12 @@ const P: Record<string, React.CSSProperties> = {
     ringIcon: { fontSize: '42px', lineHeight: 1 },
 
     statusLabel: { fontSize: '22px', fontWeight: 900, color: '#fff', animation: 'fadeUp 0.4s ease 0.15s both' },
-    pickupTimeCard: { fontSize: '14px', color: 'rgba(255,255,255,0.6)', fontWeight: 600, animation: 'fadeUp 0.4s ease 0.2s both', padding: '8px 18px', borderRadius: '999px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' },
+    statusSub: { fontSize: '13px', fontWeight: 600, color: 'rgba(255,255,255,0.5)', textAlign: 'center' as const, marginTop: '-8px', animation: 'fadeUp 0.4s ease 0.18s both' },
+    statusSubReady: { color: '#a5d6a7', fontSize: '14px', fontWeight: 800 },
+
+    pickupTimeCard: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: 'rgba(255,255,255,0.6)', fontWeight: 600, animation: 'fadeUp 0.4s ease 0.2s both', padding: '8px 18px', borderRadius: '999px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' },
+    pickupClock: { color: '#f0d060', fontWeight: 900 },
+    pickupSep: { color: 'rgba(255,255,255,0.25)' },
 
     countdownUrgent: { color: '#f0d060', fontWeight: 800, fontSize: '16px', animation: 'countdownPulse 1s ease-in-out infinite' },
     countdownArrived: { color: '#4caf50', fontWeight: 900, fontSize: '18px', animation: 'countdownGlow 1.5s ease-in-out infinite' },
@@ -433,6 +527,7 @@ const P: Record<string, React.CSSProperties> = {
 
     itemsCard: { width: '100%', padding: '16px', borderRadius: '16px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', animation: 'fadeUp 0.4s ease 0.3s both' },
     itemsTitle: { fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.3)', marginBottom: '10px', letterSpacing: '0.06em' },
+    itemsBowl: { color: 'rgba(240,208,96,0.65)', fontWeight: 800 },
     itemsRow: { display: 'flex', flexWrap: 'wrap', gap: '4px', fontSize: '24px', marginBottom: '8px' },
     itemChip: { lineHeight: 1.2 },
     itemNames: { fontSize: '12px', color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 },
@@ -440,6 +535,8 @@ const P: Record<string, React.CSSProperties> = {
     total: { fontSize: '20px', fontWeight: 900, color: '#f0d060', marginTop: '12px', textAlign: 'right' as const },
 
     footer: { fontSize: '11px', color: 'rgba(255,255,255,0.4)', fontWeight: 600, marginTop: '8px' },
+    footerOffline: { color: 'rgba(255,183,77,0.85)' },
+    homeLink: { fontSize: '13px', fontWeight: 700, color: 'rgba(240,208,96,0.75)', textDecoration: 'none', padding: '10px 20px', borderRadius: '999px', border: '1px solid rgba(200,168,78,0.28)', background: 'rgba(200,168,78,0.06)' },
 
     /* Shimmer loading */
     shimmerWrap: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' },

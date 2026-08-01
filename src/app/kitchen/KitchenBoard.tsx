@@ -3,8 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { isSupabaseConfigured } from '@/lib/supabase';
-import { SIZE_CONFIG } from '@/data/salad-data.js';
-import { sizeMlFromBase, detectOrderType } from '@/lib/reorder';
+import { orderSizeLabel } from '@/lib/reorder';
 import OrderTabs from './OrderTabs';
 import ActiveOrder from './ActiveOrder';
 import { type Order, type OrderStatus, byPickupThenReceived } from './types';
@@ -44,19 +43,6 @@ function playKitchenChime(ctx: AudioContext) {
         osc.start(t);
         osc.stop(t + 0.36);
     });
-}
-
-/**
- * Which bowl to reach for. `size` on an order is the BASE PRICE the customer
- * paid (54 / 59 / 72 / 42), not a size — printing it raw showed the cook "59",
- * which means nothing. Mapped back through the helpers the reorder flow uses.
- */
-function sizeLabel(size: string | null): string | null {
-    if (size === null || size === '') return null;
-    if (detectOrderType(size) === 'tortilla') return 'טורטייה';
-    const ml = sizeMlFromBase(size);
-    const cfg = ml ? (SIZE_CONFIG as Record<string, { label: string }>)[String(ml)] : null;
-    return cfg?.label ?? null;
 }
 
 const CHECK_KEY = 'bb-kitchen-checks';
@@ -395,7 +381,7 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
                         <ActiveOrder
                             key={active.id}
                             order={active}
-                            sizeLabel={sizeLabel(active.size)}
+                            sizeLabel={orderSizeLabel(active.size)}
                             onStatus={s => updateStatus(active.id, s)}
                             checked={checks[active.id] ?? []}
                             onToggleItem={itemId => toggleItem(active.id, itemId)}
