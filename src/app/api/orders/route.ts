@@ -83,7 +83,10 @@ export async function POST(req: NextRequest) {
                 size,
                 paymentStatus,
             });
-            return NextResponse.json({ id: order.id, orderNum: order.order_num, createdAt: order.created_at, demo: true, paymentFailed: paymentStatus === 'failed' });
+            // `paymentStatus` goes back so the confirmation screen can state what
+            // was actually recorded rather than re-deriving it client-side and
+            // risking telling someone they have paid when the order says otherwise.
+            return NextResponse.json({ id: order.id, orderNum: order.order_num, createdAt: order.created_at, demo: true, paymentStatus, paymentFailed: paymentStatus === 'failed' });
         }
 
         // Generate order number: BB-XXXX (4-digit, time-seeded)
@@ -122,7 +125,10 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Failed to create order' }, { status: 500 });
         }
 
-        return NextResponse.json({ id: data.id, orderNum: data.order_num, createdAt: data.created_at, payAtPickup });
+        return NextResponse.json({
+            id: data.id, orderNum: data.order_num, createdAt: data.created_at, payAtPickup,
+            paymentStatus: payAtPickup ? 'pay_at_pickup' : 'pending',
+        });
     } catch (err) {
         console.error('[POST /api/orders]', err);
         return NextResponse.json({ error: 'Failed to create order' }, { status: 500 });
