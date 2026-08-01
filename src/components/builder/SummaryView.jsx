@@ -808,55 +808,83 @@ function OrderedScreen({ total, all, pickupTime, orderNum, orderId, paymentStatu
         <>
             <div style={OS.root}>
                 <div style={OS.bg} />
-                <div style={OS.content}>
-                    <div style={OS.lottieWrap}>
-                        {animData && <Lottie animationData={animData} loop autoplay style={{ width: "100%", height: "100%" }} />}
+                <div style={OS.plaque}>
+                    {/* The frame is one piece of art cut at a SINGLE line, into a
+                        fixed top (arch, pedestal, divider), a 2px middle that
+                        stretches, and a fixed bottom. Because both seams fall on
+                        the same source row the gold rails stay continuous at any
+                        height. It is absolutely positioned so the content below
+                        — not the art — decides how tall the plaque is. */}
+                    <div style={OS.frame} aria-hidden="true">
+                        <div style={OS.frameTop} />
+                        <div style={OS.frameMid} />
+                        <div style={OS.frameBot} />
                     </div>
-                    <div style={OS.title}>בהכנה!</div>
-                    <div style={OS.subtitle}>מכינים את הסלט שלכם עכשיו 🐱</div>
-                    {orderNum && (
-                        <div style={{ marginTop: "14px", animation: "fadeUp 0.5s ease 0.35s both" }}>
-                            <BariBadge>הזמנה {orderNum}</BariBadge>
-                        </div>
-                    )}
-                    <div style={OS.price}>₪{total}</div>
-                    <div style={OS.meta}>{all.length} מרכיבים{pickupTime ? ` · איסוף: ${pickupTime}` : ' · מוכן בכ-8 דקות'}</div>
 
-                    {/* Whether money is still owed is the one thing this screen
-                        was silent about — someone paying at pickup got no
-                        reminder to bring any. */}
-                    {pay && (
-                        <div style={{ ...OS.payPill, ...(pay.owed ? OS.payOwed : OS.payDone) }}>
-                            <span>{pay.owed ? '💵' : '✓'}</span>
-                            <span>{pay.text}</span>
+                    <div style={OS.content}>
+                        {/* Sized so the cat comes to rest on the pedestal the
+                            art draws at 57–63% of the top band. */}
+                        <div style={OS.catZone}>
+                            <div style={OS.lottieWrap}>
+                                {animData && <Lottie animationData={animData} loop autoplay style={{ width: "100%", height: "100%" }} />}
+                            </div>
                         </div>
-                    )}
 
-                    {/* The badges earned on this bowl — the payoff for the
-                        collection, shown where it lands rather than left behind
-                        on the summary screen. */}
-                    {earned.length > 0 && (
-                        <div style={OS.badgeRow}>
-                            {earned.map((b, i) => (
-                                <img
-                                    key={b.id}
-                                    src={b.emblem}
-                                    alt={b.he}
-                                    style={{ ...OS.badgeArt, animation: `badgePop 0.5s cubic-bezier(0.34,1.5,0.64,1) ${0.6 + i * 0.09}s both` }}
-                                />
-                            ))}
+                        {/* Fixed-height and centred so this block always lands
+                            between the pedestal and the engraved divider,
+                            whatever the order number's width. */}
+                        <div style={OS.titleZone}>
+                            <div style={OS.title}>בהכנה!</div>
+                            <div style={OS.subtitle}>מכינים את הסלט שלכם עכשיו 🐱</div>
+                            {orderNum && (
+                                <div style={{ marginTop: "8px", animation: "fadeUp 0.5s ease 0.35s both" }}>
+                                    <BariBadge>הזמנה {orderNum}</BariBadge>
+                                </div>
+                            )}
                         </div>
-                    )}
 
-                    <div style={OS.divider} />
-                    {orderId && (
-                        <a href={`/order/${orderId}`} style={OS.trackBtn}>
-                            🔍 עקוב אחר ההזמנה
-                        </a>
-                    )}
-                    <BariButton variant="ghost" fullWidth onClick={onNewOrder} style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif", animation: "fadeUp 0.5s ease 0.75s both" }}>
-                        הזמנה חדשה ←
-                    </BariButton>
+                        {/* Everything below the engraved divider. This is the
+                            variable part, and it is what stretches the frame. */}
+                        <div style={OS.belowDivider}>
+                            <div style={OS.price}>₪{total}</div>
+                            <div style={OS.meta}>{all.length} מרכיבים{pickupTime ? ` · איסוף: ${pickupTime}` : ' · מוכן בכ-8 דקות'}</div>
+
+                            {/* Whether money is still owed is the one thing this
+                                screen was silent about — someone paying at
+                                pickup got no reminder to bring any. */}
+                            {pay && (
+                                <div style={{ ...OS.payPill, ...(pay.owed ? OS.payOwed : OS.payDone) }}>
+                                    <span>{pay.owed ? '💵' : '✓'}</span>
+                                    <span>{pay.text}</span>
+                                </div>
+                            )}
+
+                            {/* The badges earned on this bowl — the payoff for the
+                                collection, shown where it lands rather than left behind
+                                on the summary screen. */}
+                            {earned.length > 0 && (
+                                <div style={OS.badgeRow}>
+                                    {earned.map((b, i) => (
+                                        <img
+                                            key={b.id}
+                                            src={b.emblem}
+                                            alt={b.he}
+                                            style={{ ...OS.badgeArt, animation: `badgePop 0.5s cubic-bezier(0.34,1.5,0.64,1) ${0.6 + i * 0.09}s both` }}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+
+                            {orderId && (
+                                <a href={`/order/${orderId}`} style={OS.trackBtn}>
+                                    🔍 עקוב אחר ההזמנה
+                                </a>
+                            )}
+                            <BariButton variant="ghost" fullWidth onClick={onNewOrder} style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif", animation: "fadeUp 0.5s ease 0.75s both" }}>
+                                הזמנה חדשה ←
+                            </BariButton>
+                        </div>
+                    </div>
                 </div>
                 <style>{`
                     @keyframes ringPop { 0%{transform:scale(0.4);opacity:0} 55%{transform:scale(1.12)} 100%{transform:scale(1);opacity:1} }
@@ -876,7 +904,7 @@ function PaymentFailedScreen({ orderNum, onRetry }) {
     return (
         <div style={OS.root}>
             <div style={OS.bg} />
-            <div style={OS.content}>
+            <div style={OS.failContent}>
                 <div style={{ fontSize: "64px", animation: "ringPop 0.6s cubic-bezier(0.34,1.56,0.64,1) both" }}>❌</div>
                 <div style={{ ...OS.title, color: "#ef5350" }}>התשלום נכשל</div>
                 <div style={OS.subtitle}>לא הצלחנו לחייב את הכרטיס (מצב הדגמה)</div>
@@ -899,46 +927,103 @@ function PaymentFailedScreen({ orderNum, onRetry }) {
     );
 }
 
+/*
+  Confirmation screen, built inside the ornate plaque (design-assets/SumOrder/
+  SentDoneBG.png, keyed and cut into public/builder-assets/sent-frame-*.webp).
+
+  Every vertical position here is a FRACTION OF THE PLAQUE'S WIDTH, because that
+  is the only dimension both the art and the layout agree on: the frame's bands
+  are aspect-ratio boxes, so their heights follow the width, and CSS percentage
+  padding resolves against the inline size too. Heights are therefore expressed
+  as `aspectRatio: 1 / <fraction>` rather than percentages, which would resolve
+  against the parent's height and mean nothing here.
+
+  Measured off the source art (plaque bbox 914x1323, cut at row 1020):
+     top band      1.0689 * W        pedestal surface  0.5711 * W
+     bottom band   0.3786 * W        pedestal rim      0.6313 * W
+     side inset    0.0372 * W        divider ornament  0.9267 * W
+     the green interior stops 0.1368 * W above the plaque's bottom edge
+*/
 const OS = {
-    root: { position: "fixed", inset: 0, zIndex: 500, background: "linear-gradient(155deg, #030a03 0%, #071a07 30%, #0a200a 60%, #071a07 100%)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: "rtl", animation: "screenIn 0.55s ease both" },
-    bg: { position: "absolute", inset: 0, background: "radial-gradient(ellipse 80% 60% at 50% 40%, rgba(200,168,78,0.08) 0%, transparent 70%)", pointerEvents: "none" },
-    content: { position: "relative", zIndex: 1, textAlign: "center", padding: "20px" },
+    // Scrolls: the plaque grows with its content, and on a short screen (an SE,
+    // or a phone in landscape) it will be taller than the viewport. `margin:auto`
+    // on the child rather than `alignItems:center` — centring a flex item that
+    // overflows makes its top unreachable.
+    root: { position: "fixed", inset: 0, zIndex: 500, background: "linear-gradient(155deg, #030a03 0%, #071a07 30%, #0a200a 60%, #071a07 100%)", display: "flex", overflowY: "auto", overflowX: "hidden", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: "rtl", animation: "screenIn 0.55s ease both" },
+    bg: { position: "fixed", inset: 0, background: "radial-gradient(ellipse 80% 60% at 50% 40%, rgba(200,168,78,0.08) 0%, transparent 70%)", pointerEvents: "none" },
+
+    plaque: {
+        position: "relative", zIndex: 1,
+        width: "100%", maxWidth: "400px",
+        margin: "auto",
+        padding: "max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom))",
+        // border-box, or `width:100%` plus the padding would put the plaque 24px
+        // wider than the viewport and clip the gold rail on one side.
+        boxSizing: "border-box",
+    },
+    frame: { position: "absolute", inset: "max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom))", display: "flex", flexDirection: "column", pointerEvents: "none", filter: "drop-shadow(0 10px 40px rgba(0,0,0,0.55))" },
+    frameTop: { width: "100%", aspectRatio: "914 / 977", flexShrink: 0, backgroundImage: "url(/builder-assets/sent-frame-top.webp)", backgroundSize: "100% 100%", backgroundRepeat: "no-repeat" },
+    // The 2px slice, stretched. Its top row is the top band's last row and its
+    // bottom row is the bottom band's first, so both joins are continuous.
+    frameMid: { width: "100%", flex: 1, minHeight: 0, backgroundImage: "url(/builder-assets/sent-frame-mid.webp)", backgroundSize: "100% 100%", backgroundRepeat: "no-repeat" },
+    frameBot: { width: "100%", aspectRatio: "914 / 346", flexShrink: 0, backgroundImage: "url(/builder-assets/sent-frame-bot.webp)", backgroundSize: "100% 100%", backgroundRepeat: "no-repeat" },
+
+    content: { position: "relative", zIndex: 1, textAlign: "center", paddingBottom: "17%" },
+
+    // Ends just past the pedestal's front rim so the bowl rests on it rather
+    // than floating above it. catZone + titleZone == 0.927 W == the divider, so
+    // the two together exactly span pedestal to divider.
+    catZone: { width: "100%", aspectRatio: "1 / 0.65", display: "flex", alignItems: "flex-end", justifyContent: "center" },
     lottieWrap: {
-        width: "220px", height: "220px", margin: "0 auto 8px",
+        width: "66%", aspectRatio: "1",
         animation: "ringPop 0.6s cubic-bezier(0.34,1.56,0.64,1) both",
         filter: "drop-shadow(0 8px 32px rgba(200,168,78,0.25))",
     },
-    title: { fontSize: "28px", fontWeight: 900, color: "#ffffff", textShadow: "0 2px 8px rgba(0,0,0,0.5)", animation: "fadeUp 0.5s ease 0.3s both" },
-    subtitle: { fontSize: "14px", fontWeight: 600, color: "rgba(255,255,255,0.5)", marginTop: "6px", animation: "fadeUp 0.5s ease 0.4s both" },
+
+    // Pedestal rim (0.6313 W) to divider (0.9267 W), content centred in the gap.
+    // The type scales with the viewport because this box does: at a fixed 26px
+    // the title, subtitle and order number came to 89px against the 82px this
+    // zone gets on a 320px-wide phone, and the overflow would have run over the
+    // engraved divider.
+    titleZone: { width: "100%", aspectRatio: "1 / 0.277", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 12%" },
+    title: { fontSize: "clamp(20px, 6.4vw, 26px)", fontWeight: 900, color: "#ffffff", textShadow: "0 2px 8px rgba(0,0,0,0.5)", animation: "fadeUp 0.5s ease 0.3s both", lineHeight: 1.1 },
+    subtitle: { fontSize: "clamp(11px, 3.4vw, 13px)", fontWeight: 600, color: "rgba(255,255,255,0.55)", marginTop: "4px", animation: "fadeUp 0.5s ease 0.4s both" },
+
+    // Clears the engraved divider before the price starts.
+    belowDivider: { paddingTop: "6%", paddingLeft: "11%", paddingRight: "11%" },
     price: {
-        fontSize: "44px", fontWeight: 900, marginTop: "24px",
+        fontSize: "44px", fontWeight: 900,
         backgroundImage: "linear-gradient(135deg, #c8a832, #f0d060, #ffe066, #c8a832)",
         backgroundSize: "200% 200%",
         WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
         animation: "fadeUp 0.5s ease 0.5s both, goldShimmer 3s ease 1s infinite",
-        textShadow: "none",
+        textShadow: "none", lineHeight: 1.1,
     },
-    meta: { fontSize: "12px", color: "rgba(255,255,255,0.3)", marginTop: "8px", fontWeight: 600, animation: "fadeUp 0.5s ease 0.6s both" },
+    meta: { fontSize: "12px", color: "rgba(255,255,255,0.38)", marginTop: "6px", fontWeight: 600, animation: "fadeUp 0.5s ease 0.6s both" },
     payPill: {
         display: "inline-flex", alignItems: "center", gap: "7px",
         marginTop: "14px", padding: "8px 16px", borderRadius: "var(--radius-full)",
         fontSize: "13px", fontWeight: 800,
         animation: "fadeUp 0.5s ease 0.65s both",
     },
-    payOwed: { background: "rgba(255,183,77,0.14)", border: "1px solid rgba(255,183,77,0.45)", color: "#ffcc80" },
-    payDone: { background: "rgba(102,187,106,0.14)", border: "1px solid rgba(102,187,106,0.45)", color: "#a5d6a7" },
+    payOwed: { background: "rgba(255,183,77,0.16)", border: "1px solid rgba(255,183,77,0.45)", color: "#ffcc80" },
+    payDone: { background: "rgba(102,187,106,0.16)", border: "1px solid rgba(102,187,106,0.45)", color: "#a5d6a7" },
     badgeRow: {
         display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "6px",
-        marginTop: "16px", maxWidth: "300px",
+        marginTop: "16px", marginBottom: "4px",
     },
     // No pill behind them: the emblems carry their own gold frame, and a border
     // around a border is what made the summary panel feel cramped.
-    badgeArt: { width: "52px", height: "52px", objectFit: "contain", filter: "drop-shadow(0 3px 8px rgba(0,0,0,0.5))" },
+    badgeArt: { width: "50px", height: "50px", objectFit: "contain", filter: "drop-shadow(0 3px 8px rgba(0,0,0,0.5))" },
+    // The demo-mode payment-failure screen keeps the plain centred layout — it
+    // is a dead end with three elements, not something to dress in the plaque.
+    failContent: { position: "relative", zIndex: 1, textAlign: "center", padding: "20px", margin: "auto", maxWidth: "360px", width: "100%" },
     divider: { width: "60px", height: "1px", background: "linear-gradient(90deg, transparent, rgba(200,168,78,0.4), transparent)", margin: "24px auto" },
     trackBtn: {
         display: "block", width: "100%", padding: "12px 22px", borderRadius: "14px",
-        background: "rgba(200,168,78,0.08)", border: "1px solid rgba(200,168,78,0.25)",
-        color: "rgba(200,168,78,0.7)", fontSize: "13px", fontWeight: 700,
+        marginTop: "16px",
+        background: "rgba(200,168,78,0.10)", border: "1px solid rgba(200,168,78,0.30)",
+        color: "rgba(240,208,96,0.85)", fontSize: "13px", fontWeight: 700,
         fontFamily: "var(--font-heebo), 'Heebo', sans-serif", textDecoration: "none", textAlign: "center",
         animation: "fadeUp 0.5s ease 0.7s both", marginBottom: "10px",
     },
