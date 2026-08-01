@@ -1,4 +1,5 @@
 import { effectiveBase, effectiveSizePrice } from '@/lib/menuConfig';
+import { SIZE_CONFIG } from '@/data/salad-data.js';
 
 /**
  * "Order again" plumbing. A past order is a flat list of item ids plus a base
@@ -33,6 +34,19 @@ export function sizeMlFromBase(base: number | string | null | undefined): number
     if (!Number.isFinite(b)) return null;
     const ml = [750, 1000, 1500].find(m => effectiveSizePrice(m) === b);
     return ml ?? null;
+}
+
+/**
+ * What the customer (or the cook) should read for "which bowl is this".
+ * `size` on an order is the BASE PRICE paid (54 / 59 / 72 / 42), not a size, so
+ * showing it raw prints "59" — a number that means nothing to either of them.
+ */
+export function orderSizeLabel(size: number | string | null | undefined): string | null {
+    if (size === null || size === undefined || size === '') return null;
+    if (detectOrderType(size) === 'tortilla') return 'טורטייה';
+    const ml = sizeMlFromBase(size);
+    const cfg = ml ? (SIZE_CONFIG as Record<string, { label: string }>)[String(ml)] : null;
+    return cfg?.label ?? null;
 }
 
 /** The /build destination for reordering a past order. */

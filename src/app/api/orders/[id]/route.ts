@@ -18,8 +18,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         .from('orders')
         // payment_status is included so the customer can see whether anything is
         // still owed — with no gateway configured every order is pay-at-pickup,
-        // and nothing on the status page said so.
-        .select('id, order_num, items, total, pickup_time, notes, status, payment_status, created_at')
+        // and nothing on the status page said so. `size` (the base price paid)
+        // is what tells them which bowl this ticket is for.
+        .select('id, order_num, items, total, size, pickup_time, notes, status, payment_status, created_at')
         .eq('id', id)
         .single();
 
