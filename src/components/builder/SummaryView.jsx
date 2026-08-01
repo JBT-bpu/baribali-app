@@ -160,6 +160,9 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     const [paymentChoice, setPaymentChoice] = useState("pickup"); // 'now' | 'pickup' — demo mode only
     const [realOrderNum, setRealOrderNum] = useState(null);
     const [realOrderId, setRealOrderId] = useState(null);
+    // Whatever the server actually recorded — never inferred from the choice
+    // made on this screen.
+    const [realPaymentStatus, setRealPaymentStatus] = useState(null);
     const [paymentFailed, setPaymentFailed] = useState(false);
     const [failedOrderNum, setFailedOrderNum] = useState(null);
     const [promoInput, setPromoInput] = useState("");
@@ -174,6 +177,8 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     // customer would arrive to collect food nobody had been told to make.
     const outcomeRef = useRef(null); // null = pending | 'ok' | 'fail'
     const mixDoneRef = useRef(false);
+    // Animation over, server still hasn't answered.
+    const [stillSending, setStillSending] = useState(false);
     const [autoDiscount, setAutoDiscount] = useState(null); // standing "tag" discount for signed-in customers
 
     // Signed-in customers may have a standing discount assigned to their account
@@ -234,8 +239,15 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
 
     // Shows the confirmation only when the animation has finished *and* the
     // server accepted the order.
+    //
+    // If the animation finishes first, `stillSending` tells the overlay to stop
+    // claiming the order is ready and say it is still being sent — otherwise a
+    // slow request left the customer looking at a frozen "🎉 מוכן!" for as long
+    // as it took.
     const settle = useCallback(() => {
-        if (!mixDoneRef.current || outcomeRef.current === null) return;
+        if (!mixDoneRef.current) return;
+        if (outcomeRef.current === null) { setStillSending(true); return; }
+        setStillSending(false);
         setShowMixing(false);
         setSubmitting(false);
         if (outcomeRef.current === 'ok') setOrdered(true);
@@ -243,6 +255,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
 
     const failSubmit = useCallback((message) => {
         outcomeRef.current = 'fail';
+        setStillSending(false);
         setShowMixing(false);          // stop the animation rather than let it "complete"
         setSubmitting(false);
         setSubmitError(message);
@@ -262,12 +275,21 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
         if (navigator.vibrate) navigator.vibrate(isFailureTest ? [30, 40, 30] : [15, 40, 30]);
         if (!isFailureTest) setShowMixing(true);
 
+        // A hung request never rejects, so without this the customer sat on the
+        // mixing overlay indefinitely with no way out — a real outcome on a
+        // flaky mobile connection. 20s, then treat it as a failure they can
+        // retry. AbortController rather than AbortSignal.timeout for the wider
+        // browser floor. Declared out here so `catch` can clear it too.
+        const ctl = new AbortController();
+        const timeoutId = setTimeout(() => ctl.abort(), 20000);
+
         try {
             // Signed-in customers get the order linked to their account (order
             // history on /profile); guests order exactly the same without it.
             const token = await getAccessToken().catch(() => null);
             const res = await fetch('/api/orders', {
                 method: 'POST',
+                signal: ctl.signal,
                 headers: {
                     'Content-Type': 'application/json',
                     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -282,6 +304,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                     ...(DEMO_MODE ? { paymentChoice: choice } : {}),
                 }),
             });
+            clearTimeout(timeoutId);
             const data = await res.json().catch(() => null);
 
             if (!res.ok) {
@@ -308,6 +331,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
 
             if (data.orderNum) setRealOrderNum(data.orderNum);
             if (data.id) setRealOrderId(data.id);
+            if (data.paymentStatus) setRealPaymentStatus(data.paymentStatus);
 
             // Online payment only when a gateway is configured. Otherwise the
             // order is already pay-at-pickup (server set payAtPickup) — skip
@@ -331,13 +355,16 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
 
             outcomeRef.current = 'ok';
             settle();
-        } catch {
-            failSubmit("אין חיבור לרשת. בדקו את החיבור ונסו שוב.");
+        } catch (err) {
+            clearTimeout(timeoutId);
+            failSubmit(err?.name === 'AbortError'
+                ? "השליחה נמשכה זמן רב מדי. בדקו את החיבור ונסו שוב."
+                : "אין חיבור לרשת. בדקו את החיבור ונסו שוב.");
         }
     };
 
     if (paymentFailed) return <PaymentFailedScreen orderNum={failedOrderNum} onRetry={() => setPaymentFailed(false)} />;
-    if (ordered) return <OrderedScreen total={finalTotal} all={all} pickupTime={pickupTime} notes={notes} orderNum={realOrderNum} orderId={realOrderId} onNewOrder={onNewOrder || onBack} />;
+    if (ordered) return <OrderedScreen total={finalTotal} all={all} pickupTime={pickupTime} orderNum={realOrderNum} orderId={realOrderId} paymentStatus={realPaymentStatus} badges={comboBadges} onNewOrder={onNewOrder || onBack} />;
 
     return (
         <div style={S.root}>
@@ -347,6 +374,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                 <MixingAnimation
                     all={all}
                     total={finalTotal}
+                    stillSending={stillSending}
                     onComplete={() => { mixDoneRef.current = true; settle(); }}
                 />
             )}
@@ -746,10 +774,19 @@ function NutriStats({ all }) {
     );
 }
 
-const SHOP_WA = process.env.NEXT_PUBLIC_SHOP_WA_NUMBER || '972501234567';
+/** What the customer still owes, if anything. Mirrors the order-status page. */
+function confirmPayment(status) {
+    switch (status) {
+        case 'paid':
+        case 'paid_unverified': return { text: 'שולם ✓', owed: false };
+        case 'pay_at_pickup':   return { text: 'לתשלום באיסוף', owed: true };
+        case 'pending':         return { text: 'ממתין לתשלום', owed: true };
+        default:                return null;
+    }
+}
 
 // ─── Post-order confirmation screen ─────────────────────────
-function OrderedScreen({ total, all, pickupTime, notes, orderNum, orderId, onNewOrder }) {
+function OrderedScreen({ total, all, pickupTime, orderNum, orderId, paymentStatus, badges = [], onNewOrder }) {
     useEffect(() => {
         // Delayed so the burst punctuates this screen's arrival — firing on
         // mount collided with MixingAnimation's bloom peak that just ended,
@@ -763,14 +800,9 @@ function OrderedScreen({ total, all, pickupTime, notes, orderNum, orderId, onNew
     const [animData, setAnimData] = useState(null);
     useEffect(() => { fetch("/cat-salad-final.json").then(r => r.json()).then(setAnimData).catch(() => {}); }, []);
 
-    const waLink = useMemo(() => {
-        const items = all.map(i => i.he).join(', ');
-        const timeLine = pickupTime ? `⏰ איסוף: ${pickupTime}\n` : '';
-        const noteLine = notes ? `📝 ${notes}\n` : '';
-        const head = orderNum ? `🥗 *הזמנה ${orderNum}*` : '🥗 *הזמנה*';
-        const msg = `${head}\n${timeLine}💰 סה"כ: ₪${total}\n\n*מרכיבים:*\n${items}\n${noteLine}`;
-        return `https://wa.me/${SHOP_WA}?text=${encodeURIComponent(msg)}`;
-    }, [orderNum, all, total, pickupTime, notes]);
+    const pay = confirmPayment(paymentStatus);
+    // Only badges whose artwork exists; the rest would render a broken image.
+    const earned = badges.filter(b => b?.emblem).slice(0, 6);
 
     return (
         <>
@@ -789,11 +821,34 @@ function OrderedScreen({ total, all, pickupTime, notes, orderNum, orderId, onNew
                     )}
                     <div style={OS.price}>₪{total}</div>
                     <div style={OS.meta}>{all.length} מרכיבים{pickupTime ? ` · איסוף: ${pickupTime}` : ' · מוכן בכ-8 דקות'}</div>
+
+                    {/* Whether money is still owed is the one thing this screen
+                        was silent about — someone paying at pickup got no
+                        reminder to bring any. */}
+                    {pay && (
+                        <div style={{ ...OS.payPill, ...(pay.owed ? OS.payOwed : OS.payDone) }}>
+                            <span>{pay.owed ? '💵' : '✓'}</span>
+                            <span>{pay.text}</span>
+                        </div>
+                    )}
+
+                    {/* The badges earned on this bowl — the payoff for the
+                        collection, shown where it lands rather than left behind
+                        on the summary screen. */}
+                    {earned.length > 0 && (
+                        <div style={OS.badgeRow}>
+                            {earned.map((b, i) => (
+                                <img
+                                    key={b.id}
+                                    src={b.emblem}
+                                    alt={b.he}
+                                    style={{ ...OS.badgeArt, animation: `badgePop 0.5s cubic-bezier(0.34,1.5,0.64,1) ${0.6 + i * 0.09}s both` }}
+                                />
+                            ))}
+                        </div>
+                    )}
+
                     <div style={OS.divider} />
-                    <a href={waLink} target="_blank" rel="noopener noreferrer" style={OS.waBtn}>
-                        <span style={{ fontSize: "18px" }}>💬</span>
-                        <span>שלח לקופה ב-WhatsApp</span>
-                    </a>
                     {orderId && (
                         <a href={`/order/${orderId}`} style={OS.trackBtn}>
                             🔍 עקוב אחר ההזמנה
@@ -807,6 +862,7 @@ function OrderedScreen({ total, all, pickupTime, notes, orderNum, orderId, onNew
                     @keyframes ringPop { 0%{transform:scale(0.4);opacity:0} 55%{transform:scale(1.12)} 100%{transform:scale(1);opacity:1} }
                     @keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
                     @keyframes goldShimmer { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
+                    @keyframes badgePop { from{opacity:0;transform:scale(0.5) translateY(10px)} to{opacity:1;transform:none} }
                     @keyframes ringGlow { 0%,100%{box-shadow:0 0 30px rgba(200,168,78,0.4),0 0 60px rgba(200,168,78,0.15)} 50%{box-shadow:0 0 55px rgba(200,168,78,0.75),0 0 100px rgba(200,168,78,0.3)} }
                     @keyframes screenIn { from{opacity:0} to{opacity:1} }
                 `}</style>
@@ -863,17 +919,22 @@ const OS = {
         textShadow: "none",
     },
     meta: { fontSize: "12px", color: "rgba(255,255,255,0.3)", marginTop: "8px", fontWeight: 600, animation: "fadeUp 0.5s ease 0.6s both" },
-    divider: { width: "60px", height: "1px", background: "linear-gradient(90deg, transparent, rgba(200,168,78,0.4), transparent)", margin: "24px auto" },
-    waBtn: {
-        display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
-        width: "100%", padding: "14px 22px", borderRadius: "14px",
-        background: "rgba(37,211,102,0.12)", border: "1.5px solid rgba(37,211,102,0.35)",
-        color: "#4ddb80", fontSize: "15px", fontWeight: 800,
-        fontFamily: "var(--font-heebo), 'Heebo', sans-serif", textDecoration: "none",
-        boxShadow: "0 4px 16px rgba(37,211,102,0.12)",
+    payPill: {
+        display: "inline-flex", alignItems: "center", gap: "7px",
+        marginTop: "14px", padding: "8px 16px", borderRadius: "var(--radius-full)",
+        fontSize: "13px", fontWeight: 800,
         animation: "fadeUp 0.5s ease 0.65s both",
-        marginBottom: "10px",
     },
+    payOwed: { background: "rgba(255,183,77,0.14)", border: "1px solid rgba(255,183,77,0.45)", color: "#ffcc80" },
+    payDone: { background: "rgba(102,187,106,0.14)", border: "1px solid rgba(102,187,106,0.45)", color: "#a5d6a7" },
+    badgeRow: {
+        display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "6px",
+        marginTop: "16px", maxWidth: "300px",
+    },
+    // No pill behind them: the emblems carry their own gold frame, and a border
+    // around a border is what made the summary panel feel cramped.
+    badgeArt: { width: "52px", height: "52px", objectFit: "contain", filter: "drop-shadow(0 3px 8px rgba(0,0,0,0.5))" },
+    divider: { width: "60px", height: "1px", background: "linear-gradient(90deg, transparent, rgba(200,168,78,0.4), transparent)", margin: "24px auto" },
     trackBtn: {
         display: "block", width: "100%", padding: "12px 22px", borderRadius: "14px",
         background: "rgba(200,168,78,0.08)", border: "1px solid rgba(200,168,78,0.25)",
