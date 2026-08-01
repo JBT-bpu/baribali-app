@@ -55,9 +55,12 @@ const PANEL_AR = 760 / 1035;  // width / height
 const RIM_BASE = 0.69;        // front rim at the far left/right
 const RIM_DEPTH = 0.09;       // extra depth at the centre
 
+// Sat lower in the bowl than it needed to; the interior starts at 56.4% and
+// the base row's top edge was only reaching 58.6%, so both rows move up into
+// that headroom. This also buys the lower row more clearance from the rim.
 const BOWL_ROWS = [
-    { y: 0.645, width: 0.74, maxSize: 16.0 },
-    { y: 0.712, width: 0.46, maxSize: 12.5 },
+    { y: 0.625, width: 0.74, maxSize: 16.0 },
+    { y: 0.692, width: 0.46, maxSize: 12.5 },
 ];
 const BOWL_GAP = 1.5;         // % of bowl width, between icons when they fit
 // Each icon advances at least this fraction of its own width, so no ingredient
