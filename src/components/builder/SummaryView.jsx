@@ -174,6 +174,8 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     // customer would arrive to collect food nobody had been told to make.
     const outcomeRef = useRef(null); // null = pending | 'ok' | 'fail'
     const mixDoneRef = useRef(false);
+    // Animation over, server still hasn't answered.
+    const [stillSending, setStillSending] = useState(false);
     const [autoDiscount, setAutoDiscount] = useState(null); // standing "tag" discount for signed-in customers
 
     // Signed-in customers may have a standing discount assigned to their account
@@ -234,8 +236,15 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
 
     // Shows the confirmation only when the animation has finished *and* the
     // server accepted the order.
+    //
+    // If the animation finishes first, `stillSending` tells the overlay to stop
+    // claiming the order is ready and say it is still being sent — otherwise a
+    // slow request left the customer looking at a frozen "🎉 מוכן!" for as long
+    // as it took.
     const settle = useCallback(() => {
-        if (!mixDoneRef.current || outcomeRef.current === null) return;
+        if (!mixDoneRef.current) return;
+        if (outcomeRef.current === null) { setStillSending(true); return; }
+        setStillSending(false);
         setShowMixing(false);
         setSubmitting(false);
         if (outcomeRef.current === 'ok') setOrdered(true);
@@ -243,6 +252,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
 
     const failSubmit = useCallback((message) => {
         outcomeRef.current = 'fail';
+        setStillSending(false);
         setShowMixing(false);          // stop the animation rather than let it "complete"
         setSubmitting(false);
         setSubmitError(message);
@@ -262,12 +272,21 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
         if (navigator.vibrate) navigator.vibrate(isFailureTest ? [30, 40, 30] : [15, 40, 30]);
         if (!isFailureTest) setShowMixing(true);
 
+        // A hung request never rejects, so without this the customer sat on the
+        // mixing overlay indefinitely with no way out — a real outcome on a
+        // flaky mobile connection. 20s, then treat it as a failure they can
+        // retry. AbortController rather than AbortSignal.timeout for the wider
+        // browser floor. Declared out here so `catch` can clear it too.
+        const ctl = new AbortController();
+        const timeoutId = setTimeout(() => ctl.abort(), 20000);
+
         try {
             // Signed-in customers get the order linked to their account (order
             // history on /profile); guests order exactly the same without it.
             const token = await getAccessToken().catch(() => null);
             const res = await fetch('/api/orders', {
                 method: 'POST',
+                signal: ctl.signal,
                 headers: {
                     'Content-Type': 'application/json',
                     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -282,6 +301,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                     ...(DEMO_MODE ? { paymentChoice: choice } : {}),
                 }),
             });
+            clearTimeout(timeoutId);
             const data = await res.json().catch(() => null);
 
             if (!res.ok) {
@@ -331,8 +351,11 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
 
             outcomeRef.current = 'ok';
             settle();
-        } catch {
-            failSubmit("אין חיבור לרשת. בדקו את החיבור ונסו שוב.");
+        } catch (err) {
+            clearTimeout(timeoutId);
+            failSubmit(err?.name === 'AbortError'
+                ? "השליחה נמשכה זמן רב מדי. בדקו את החיבור ונסו שוב."
+                : "אין חיבור לרשת. בדקו את החיבור ונסו שוב.");
         }
     };
 
@@ -347,6 +370,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                 <MixingAnimation
                     all={all}
                     total={finalTotal}
+                    stillSending={stillSending}
                     onComplete={() => { mixDoneRef.current = true; settle(); }}
                 />
             )}
@@ -746,8 +770,6 @@ function NutriStats({ all }) {
     );
 }
 
-const SHOP_WA = process.env.NEXT_PUBLIC_SHOP_WA_NUMBER || '972501234567';
-
 // ─── Post-order confirmation screen ─────────────────────────
 function OrderedScreen({ total, all, pickupTime, notes, orderNum, orderId, onNewOrder }) {
     useEffect(() => {
@@ -762,15 +784,6 @@ function OrderedScreen({ total, all, pickupTime, notes, orderNum, orderId, onNew
     // plausible confirmation. The number is only ever the server's.
     const [animData, setAnimData] = useState(null);
     useEffect(() => { fetch("/cat-salad-final.json").then(r => r.json()).then(setAnimData).catch(() => {}); }, []);
-
-    const waLink = useMemo(() => {
-        const items = all.map(i => i.he).join(', ');
-        const timeLine = pickupTime ? `⏰ איסוף: ${pickupTime}\n` : '';
-        const noteLine = notes ? `📝 ${notes}\n` : '';
-        const head = orderNum ? `🥗 *הזמנה ${orderNum}*` : '🥗 *הזמנה*';
-        const msg = `${head}\n${timeLine}💰 סה"כ: ₪${total}\n\n*מרכיבים:*\n${items}\n${noteLine}`;
-        return `https://wa.me/${SHOP_WA}?text=${encodeURIComponent(msg)}`;
-    }, [orderNum, all, total, pickupTime, notes]);
 
     return (
         <>
@@ -790,10 +803,6 @@ function OrderedScreen({ total, all, pickupTime, notes, orderNum, orderId, onNew
                     <div style={OS.price}>₪{total}</div>
                     <div style={OS.meta}>{all.length} מרכיבים{pickupTime ? ` · איסוף: ${pickupTime}` : ' · מוכן בכ-8 דקות'}</div>
                     <div style={OS.divider} />
-                    <a href={waLink} target="_blank" rel="noopener noreferrer" style={OS.waBtn}>
-                        <span style={{ fontSize: "18px" }}>💬</span>
-                        <span>שלח לקופה ב-WhatsApp</span>
-                    </a>
                     {orderId && (
                         <a href={`/order/${orderId}`} style={OS.trackBtn}>
                             🔍 עקוב אחר ההזמנה
@@ -864,16 +873,6 @@ const OS = {
     },
     meta: { fontSize: "12px", color: "rgba(255,255,255,0.3)", marginTop: "8px", fontWeight: 600, animation: "fadeUp 0.5s ease 0.6s both" },
     divider: { width: "60px", height: "1px", background: "linear-gradient(90deg, transparent, rgba(200,168,78,0.4), transparent)", margin: "24px auto" },
-    waBtn: {
-        display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
-        width: "100%", padding: "14px 22px", borderRadius: "14px",
-        background: "rgba(37,211,102,0.12)", border: "1.5px solid rgba(37,211,102,0.35)",
-        color: "#4ddb80", fontSize: "15px", fontWeight: 800,
-        fontFamily: "var(--font-heebo), 'Heebo', sans-serif", textDecoration: "none",
-        boxShadow: "0 4px 16px rgba(37,211,102,0.12)",
-        animation: "fadeUp 0.5s ease 0.65s both",
-        marginBottom: "10px",
-    },
     trackBtn: {
         display: "block", width: "100%", padding: "12px 22px", borderRadius: "14px",
         background: "rgba(200,168,78,0.08)", border: "1px solid rgba(200,168,78,0.25)",

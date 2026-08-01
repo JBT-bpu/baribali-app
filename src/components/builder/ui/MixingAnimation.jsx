@@ -3,7 +3,13 @@ import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
 
-export default function MixingAnimation({ all, total, onComplete }) {
+/**
+ * The submit animation. `stillSending` is set by the caller when the animation
+ * has run its course but the server has not answered yet — without it the
+ * overlay sat on "🎉 מוכן!" while the order was still in flight, which is both
+ * a lie and indistinguishable from the app having frozen.
+ */
+export default function MixingAnimation({ all, total, onComplete, stillSending }) {
     const [phase, setPhase] = useState("drop"); // drop → glow → bloom
     const [bowlAnim, setBowlAnim] = useState(null);
     useEffect(() => { fetch("/cat-salad-bowl.json").then(r => r.json()).then(setBowlAnim).catch(() => {}); }, []);
@@ -108,8 +114,12 @@ export default function MixingAnimation({ all, total, onComplete }) {
 
                 {/* Label */}
                 <div style={{ ...S.label, marginTop: "8px" }}>
-                    {isBloom ? "🎉 מוכן!" : isGlow ? "כמעט מוכן" : "מכינים את הסלט שלכם"}
+                    {stillSending ? "עוד רגע — שולחים למטבח…"
+                        : isBloom ? "🎉 מוכן!"
+                            : isGlow ? "כמעט מוכן"
+                                : "מכינים את הסלט שלכם"}
                 </div>
+                {stillSending && <div style={S.stillDots} aria-live="polite" />}
             </div>
             <style>{KF}</style>
         </div>
@@ -117,10 +127,14 @@ export default function MixingAnimation({ all, total, onComplete }) {
 }
 
 // ─── Sounds ──────────────────────────────────────────────────
+// Both helpers close their context when done. They used to leak one per call —
+// two per order — and browsers cap concurrent AudioContexts at around six, so
+// after a few orders in one session the sounds simply stopped.
 function playChimeSound() {
+    let ctx;
     try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        if (ctx.state === "suspended") return;
+        ctx = new (window.AudioContext || window.webkitAudioContext)();
+        if (ctx.state === "suspended") { ctx.close(); return; }
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.connect(gain); gain.connect(ctx.destination);
@@ -130,13 +144,15 @@ function playChimeSound() {
         gain.gain.setValueAtTime(0.06, ctx.currentTime);
         gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.5);
         osc.start(); osc.stop(ctx.currentTime + 0.5);
-    } catch (e) {}
+        setTimeout(() => ctx.close().catch(() => {}), 700);
+    } catch { try { ctx?.close(); } catch { /* already gone */ } }
 }
 
 function playSuccessSound() {
+    let ctx;
     try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        if (ctx.state === "suspended") return;
+        ctx = new (window.AudioContext || window.webkitAudioContext)();
+        if (ctx.state === "suspended") { ctx.close(); return; }
         [[523.25, 0], [659.25, 0.08], [783.99, 0.16], [1046.5, 0.28]].forEach(([freq, delay]) => {
             const osc = ctx.createOscillator();
             const gain = ctx.createGain();
@@ -148,7 +164,8 @@ function playSuccessSound() {
             gain.gain.exponentialRampToValueAtTime(0.001, t + 0.7);
             osc.start(t); osc.stop(t + 0.7);
         });
-    } catch (e) {}
+        setTimeout(() => ctx.close().catch(() => {}), 1200);
+    } catch { try { ctx?.close(); } catch { /* already gone */ } }
 }
 
 // ─── Styles ──────────────────────────────────────────────────
@@ -180,10 +197,20 @@ const S = {
         animation: "pFadeIn 0.5s ease 0.3s both",
         transition: "color 0.3s ease",
     },
+    // A moving element while waiting: a frozen screen and a slow screen have to
+    // look different, or people start tapping the button again.
+    stillDots: {
+        marginTop: "12px", width: "34px", height: "3px", borderRadius: "2px",
+        background: "linear-gradient(90deg, transparent, rgba(200,168,78,0.9), transparent)",
+        backgroundSize: "200% 100%",
+        animation: "sendingSweep 1.1s ease-in-out infinite",
+    },
 };
 
 const KF = `
 @keyframes pFadeIn  { from{opacity:0} to{opacity:1} }
+
+@keyframes sendingSweep { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
 
 @keyframes ingredientDrop {
     0%   { opacity:0; transform:translateY(-140px) rotate(-15deg) scale(0.7); }
