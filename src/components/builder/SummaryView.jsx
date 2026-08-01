@@ -46,13 +46,18 @@ function Icon({ src, size = "1.2em", style = {} }) {
   row's lowest pixel clears the front-rim arc across its whole width — see
   ARC_* below, measured off the artwork.
 */
-const BOWL_AR = 1325 / 689;   // width / height
-const ARC_BASE = 0.24;        // front rim at the far left/right
-const ARC_DEPTH = 0.40;       // extra depth at the centre
+// One piece of art holds both the nutrition plaque and the bowl, so every
+// figure below is a fraction of THAT panel, measured off it directly:
+//   nutrition plaque interior   x 8.2-91.4%,  y 16-56%
+//   bowl interior begins        y 56.4%
+//   front rim                   ~78% at the centre, ~70% at the far edges
+const PANEL_AR = 760 / 1035;  // width / height
+const RIM_BASE = 0.69;        // front rim at the far left/right
+const RIM_DEPTH = 0.09;       // extra depth at the centre
 
 const BOWL_ROWS = [
-    { y: 0.215, width: 0.80, maxSize: 14.5 },
-    { y: 0.420, width: 0.46, maxSize: 13.0 },
+    { y: 0.645, width: 0.74, maxSize: 16.0 },
+    { y: 0.712, width: 0.46, maxSize: 12.5 },
 ];
 const BOWL_GAP = 1.5;         // % of bowl width, between icons when they fit
 // Each icon advances at least this fraction of its own width, so no ingredient
@@ -363,11 +368,11 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                     {/* Layered bowl — hero */}
                     <div style={S.sumBowlWrap}>
                         <div style={S.sumBowlGlow} />
-                        {/* Nutrition first, bowl below it — the bowl is the thing
-                            you linger on, so it sits closest to the ingredient list
-                            it summarises. */}
-                        <NutriStats all={all} />
-                        <div style={S.sumBowl}>
+                        {/* One piece of art: the nutrition plaque and the bowl are a
+                            single frame, so both live inside it as positioned slots
+                            rather than as two stacked panels with their own borders. */}
+                        <div style={S.panel}>
+                            <div style={S.panelNut}><NutriStats all={all} /></div>
                             {bowlRows.map((items, t) => {
                                 if (!items.length) return null;
                                 const row = BOWL_ROWS[t];
@@ -690,8 +695,10 @@ function NutriStats({ all }) {
     else if (totals.fb >= 10)                  msg = { text: "עשיר בסיבים תזונתיים! 🌿",    color: "#a080e0" };
     else if (totals.p >= 15 && totals.fb >= 6) msg = { text: "ארוחה מאוזנת ✨",             color: "#6abf69" };
 
+    // The frame around this now belongs to the panel art; this just fills the
+    // slot the panel positions it into.
     return (
-        <div style={S.nutBox}>
+        <div style={{ width: "100%", display: "flex", flexDirection: "column", justifyContent: "center" }}>
             {/* Kcal total */}
             <div style={{ textAlign: "center", marginBottom: "8px" }}>
                 <span style={{ fontSize: "22px", fontWeight: 900, color: "#ffffff", letterSpacing: "-0.5px" }}>
@@ -906,41 +913,28 @@ const S = {
       resolves against WIDTH, so those figures are converted through the 0.52
       aspect ratio — hence 3% / 23% rather than 6% / 43%.
     */
-    sumBowl: {
+    /*
+      The single framed plaque: nutrition above, bowl below, one gold border.
+      Replaces the two separately-framed panels, which meant two borders and two
+      sets of corner filigree stacked down the screen.
+
+      Both regions are positioned slots inside it, so all the geometry lives in
+      one coordinate space measured off this one image.
+    */
+    panel: {
         position: "relative", zIndex: 1,
         width: "100%", maxWidth: "360px",
-        aspectRatio: "1325 / 689",
-        backgroundImage: "url(/builder-assets/summary-bowl.webp)",
+        aspectRatio: "760 / 1035",
+        backgroundImage: "url(/builder-assets/summary-panel.webp)",
         backgroundSize: "100% 100%",
         backgroundRepeat: "no-repeat",
-        // Ingredients are absolutely positioned by bowlPlace(), so no padding
-        // or flex centring here — the scatter owns its own bounds.
-    },
-    /*
-      Ornate frame around the WHOLE nutrition block — kcal, the four macros and
-      the message — rather than around each macro card. The art is 1.56:1; four
-      cards side by side are ~1.1:1 each, so per-card framing would have
-      squashed the corner filigree badly and left no room inside at ~76px wide.
-
-      `minHeight` + the aspect ratio keep the frame at its native proportion,
-      and `backgroundSize: 100% 100%` lets it stretch a little when a long
-      message pushes the content taller, which is far less noticeable on a
-      rectangular frame than on the bowl.
-
-      Padding clears the corner flourishes, which reach further in than the thin
-      frame line does (measured: the line itself is only ~2%).
-    */
-    nutBox: {
-        // Smaller than the bowl and centred: it is a supporting panel now that
-        // it sits above the hero rather than beneath it.
-        width: "84%", maxWidth: "300px", margin: "0 auto 10px",
-        aspectRatio: "800 / 512",
-        backgroundImage: "url(/builder-assets/summary-nutbox.webp)",
-        backgroundSize: "100% 100%",
-        backgroundRepeat: "no-repeat",
-        padding: "5% 8%",
-        display: "flex", flexDirection: "column", justifyContent: "center",
         animation: "pFadeIn 0.5s ease 0.35s both",
+    },
+    // The plaque's interior measures x 8.2-91.4%, y 16-56%; inset a little from
+    // that so the content never touches the engraved border.
+    panelNut: {
+        position: "absolute", left: "11%", right: "11%", top: "21%", height: "33%",
+        display: "flex", flexDirection: "column", justifyContent: "center",
     },
     sumBowlMeta: { marginTop: "10px", display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", fontWeight: 600, color: "rgba(255,255,255,0.5)", letterSpacing: "0.03em" },
     // 16px inner gutter + a smaller badge glyph (below): four bordered pills in
