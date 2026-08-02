@@ -7,6 +7,9 @@
  * It imports the real constants (that is why plaqueGeometry.ts is a plain .ts
  * with no JSX) and checks the invariants the layout depends on but that nothing
  * in the type system can enforce.
+ *
+ * `scripts/` is excluded from tsconfig: Node's type stripper needs the explicit
+ * .ts extension on that import, which the app's bundler resolution rejects.
  */
 import { PLAQUE, pct } from '../src/components/ui/bari/plaqueGeometry.ts';
 
@@ -51,9 +54,17 @@ for (const W of WIDTHS) console.log(`     W=${W}  ->  ${(MIN_BODY * W).toFixed(0
 
 // Measured content heights, tallest viewport (the floor scales with W, the
 // content mostly does not, so the widest plaque is the worst case).
+const G = 14;    // status page bodyStack gap
+const items = (nameLines: number, notes = 0) =>
+    16 + 10 + 29 + 8 + nameLines * 18 + 12 + 30 + 6 + 27 + notes;   // title, icons, names, total, pay pill
 const fixtures: Record<string, number> = {
     'confirmation: badges + pay pill': 48 + 22 + 47 + 70 + 68 + 48,
     'confirmation: no badges, no pay': 48 + 22 + 68 + 48,
+    'status: 14 items + notes + countdown': 26 + G + 36 + G + 1 + G + items(3, 26) + G + 17 + G + 44,
+    'status: 1 item, no countdown, no notes': 26 + G + 1 + G + items(1) + G + 17 + G + 44,
+    // The old three-thin-bar skeleton was ~74px and would have overflowed the
+    // frame's fixed bands — this is the fixture that caught it.
+    'status: Loading skeleton': 14 + 16 + 46 + 16 + 14 + 16 + 40,
 };
 for (const [name, body] of Object.entries(fixtures)) {
     const need = MIN_BODY * Math.max(...WIDTHS);
@@ -66,12 +77,19 @@ for (const [name, body] of Object.entries(fixtures)) {
 // state overflows and runs over the engraved divider.
 head('5. Title zone fit at the narrowest width');
 const clamp = (lo: number, v: number, hi: number) => Math.max(lo, Math.min(v, hi));
-for (const [name, vw, titleFs, subFs, subLines] of [
-    ['confirmation (clamped type)', 320, clamp(20, 320 * 0.064, 26), clamp(11, 320 * 0.034, 13), 1],
-] as [string, number, number, number, number][]) {
+for (const [name, vw, titleFs, subFs, subLines, extra] of [
+    // Confirmation: clamped type, and the order-number badge lives in this zone.
+    ['confirmation (clamped type)', 320, clamp(20, 320 * 0.064, 26), clamp(11, 320 * 0.034, 13), 1, 8 + 26],
+    // Status page: fixed type, no badge (it moved to the body), sub may wrap.
+    ['status: waiting/preparing', 320, 22, 13, 2, 0],
+    ['status: ready (largest type)', 320, 28, 14, 2, 0],
+] as [string, number, number, number, number, number][]) {
     const W = Math.min(vw, PLAQUE.maxWidth) - 2 * PLAQUE.gutter;
     const zone = PLAQUE.titleZone * W;
-    const needs = titleFs * 1.1 + 4 + subFs * 1.5 * subLines + 8 + 26; // +badge
+    // Line heights as pinned in the components: 1.1 on the label, 1.3 on the
+    // status sub (1.5 on the confirmation's unpinned subtitle).
+    const lh = extra > 0 ? 1.5 : 1.3;
+    const needs = titleFs * 1.1 + 4 + subFs * lh * subLines + extra;
     ok(needs <= zone, `${name}: needs ${needs.toFixed(0)}px, zone is ${zone.toFixed(0)}px`);
 }
 

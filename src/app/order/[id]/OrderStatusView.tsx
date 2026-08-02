@@ -3,13 +3,21 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import GoldField from '@/components/ui/GoldField';
 import BariBadge from '@/components/ui/bari/BariBadge';
-import BariGlowBackground from '@/components/ui/bari/BariGlowBackground';
+import BariPlaque from '@/components/ui/bari/BariPlaque';
+import { PLAQUE } from '@/components/ui/bari/plaqueGeometry';
 import { fireGoldConfetti } from '@/lib/confetti';
 import { orderSizeLabel } from '@/lib/reorder';
 
 const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
+
+/**
+ * The status ring's footprint on the pedestal, as a fraction of the plaque's
+ * width. Not the cat's 0.66 — that would be a 242px bordered circle around a
+ * 42px glyph, mostly empty. 0.38 gives 112–143px across a 320–430 viewport,
+ * close to the old fixed 100px but scaling with the frame.
+ */
+const RING_WIDTH = 0.38;
 
 type OrderStatus = 'waiting' | 'preparing' | 'ready' | 'collected';
 
@@ -319,123 +327,110 @@ export default function OrderStatusView({ id }: { id: string }) {
             : {}),
     };
 
+    const pay = paymentLabel(order.payment_status);
+
     return (
         <div style={P.root}>
-            <BariGlowBackground />
-            <GoldField zIndex={0} />
+            <div style={P.bg} aria-hidden="true" />
 
-            <div style={P.content}>
-                {/* Header */}
-                <div style={P.logo}>🥗 BariBali</div>
-                <div style={{ animation: 'fadeUp 0.4s ease 0.05s both' }}>
-                    <BariBadge>{order.order_num}</BariBadge>
-                </div>
-
-                {/* Status ring — swaps in the celebratory cat animation once ready */}
-                <div style={ringStyle}>
-                    {isReady && readyAnim
-                        ? <Lottie animationData={readyAnim} loop autoplay style={{ width: '84px', height: '84px' }} />
-                        : <div style={P.ringIcon}>{step.icon}</div>}
-                </div>
-
-                <div style={labelStyle}>
-                    {step.label}
-                </div>
-                <div style={{ ...P.statusSub, ...(isReady ? P.statusSubReady : {}) }}>
-                    {step.sub}
-                </div>
-
-                {/* Pickup time — the clock time first, since that is what the
-                    customer planned around, then how long is left. Once the
-                    order is collected the remaining-time half is dropped: it is
-                    frozen by then, and counting down to a collection that has
-                    already happened reads as a stuck page. */}
-                {countdown && (
-                    <div style={P.pickupTimeCard}>
-                        <span>⏰ איסוף <strong style={P.pickupClock}>{countdown.clock}</strong></span>
-                        {!isCollected && <>
-                            <span style={P.pickupSep}>·</span>
-                            <span style={{
-                                ...(countdown.arrived ? { ...P.countdownArrived, ...P.countdownNow } : {}),
-                                ...(countdown.urgent && !countdown.arrived ? P.countdownUrgent : {}),
-                            }}>
-                                {countdown.text}
-                            </span>
-                        </>}
+            {/* When the order is ready the ring is replaced by the same cat that
+                appears on the confirmation screen, on the same pedestal — so the
+                customer sees a familiar object arrive at the moment their food
+                does. The footprint grows with it, which reads as a reveal rather
+                than a resize; and because the pedestal slot is a fixed-aspect
+                box, the swap cannot move anything below it. */}
+            <BariPlaque
+                pedestal={
+                    <div style={ringStyle}>
+                        {isReady && readyAnim
+                            ? <Lottie animationData={readyAnim} loop autoplay style={{ width: '84%', height: '84%' }} />
+                            : <div style={P.ringIcon}>{step.icon}</div>}
                     </div>
-                )}
-
-                {/* Progress bar — all 4 states, including "collected" */}
-                <div style={P.stepsRow}>
-                    {STATUS_STEPS.map((step, i) => (
-                        <div key={step.key} style={P.stepWrap}>
-                            <div style={{
-                                ...P.stepDot,
-                                ...(i <= currentStep ? P.stepDotDone : {}),
-                                ...(i === currentStep ? P.stepDotActive : {}),
-                            }}>
-                                {i < currentStep ? '✓' : step.icon}
-                            </div>
-                            <div style={{ ...P.stepLabel, ...(i === currentStep ? { color: '#fff', fontWeight: 800 } : {}) }}>
-                                {step.label}
-                            </div>
-                            {i < STATUS_STEPS.length - 1 && <div style={{ ...P.stepLine, ...(i < currentStep ? P.stepLineDone : {}) }} />}
+                }
+                pedestalWidth={isReady && readyAnim ? PLAQUE.pedestalArt : RING_WIDTH}
+                title={
+                    <>
+                        <div style={labelStyle}>{step.label}</div>
+                        <div style={{ ...P.statusSub, ...(isReady ? P.statusSubReady : {}) }}>
+                            {step.sub}
                         </div>
-                    ))}
-                </div>
+                    </>
+                }
+            >
+                <div style={P.bodyStack}>
+                    {/* The order number is what the customer says at the counter,
+                        so it takes the hero position under the divider that the
+                        price holds on the confirmation screen. */}
+                    <div style={{ animation: 'plaqueFadeUp 0.4s ease 0.05s both' }}>
+                        <BariBadge>{order.order_num}</BariBadge>
+                    </div>
 
-                {/* Items */}
-                <div style={P.itemsCard}>
-                    <div style={P.itemsTitle}>
-                        הסלט שלכם{bowl ? <span style={P.itemsBowl}> · {bowl}</span> : null}
-                    </div>
-                    <div style={P.itemsRow}>
-                        {order.items.map(it => (
-                            <span key={it.id} style={P.itemChip} title={it.he}>
-                                {it.icon && it.icon.startsWith('/')
-                                    ? <img src={it.icon} alt={it.he} style={{ width: '24px', height: '24px', objectFit: 'contain' }} />
-                                    : it.icon}
-                            </span>
-                        ))}
-                    </div>
-                    <div style={P.itemNames}>{order.items.map(i => i.he).join(' · ')}</div>
-                    {order.notes && <div style={P.notes}>📝 {order.notes}</div>}
-                    <div style={P.total}>₪{order.total}</div>
-                    {(() => {
-                        const pay = paymentLabel(order.payment_status);
-                        if (!pay) return null;
-                        return (
-                            <div style={{
-                                marginTop: '6px', display: 'inline-flex', alignItems: 'center', gap: '6px',
-                                padding: '5px 12px', borderRadius: 'var(--radius-full)',
-                                fontSize: '12px', fontWeight: 800,
-                                background: pay.owed ? 'rgba(255,183,77,0.14)' : 'rgba(102,187,106,0.14)',
-                                border: `1px solid ${pay.owed ? 'rgba(255,183,77,0.42)' : 'rgba(102,187,106,0.42)'}`,
-                                color: pay.owed ? '#ffcc80' : '#a5d6a7',
-                            }}>
+                    {/* Pickup time — the clock time first, since that is what the
+                        customer planned around, then how long is left. Once the
+                        order is collected the remaining-time half is dropped: it is
+                        frozen by then, and counting down to a collection that has
+                        already happened reads as a stuck page. */}
+                    {countdown && (
+                        <div style={P.pickupTimeCard}>
+                            <span>⏰ איסוף <strong style={P.pickupClock}>{countdown.clock}</strong></span>
+                            {!isCollected && <>
+                                <span style={P.pickupSep}>·</span>
+                                <span style={{
+                                    ...(countdown.arrived ? { ...P.countdownArrived, ...P.countdownNow } : {}),
+                                    ...(countdown.urgent && !countdown.arrived ? P.countdownUrgent : {}),
+                                }}>
+                                    {countdown.text}
+                                </span>
+                            </>}
+                        </div>
+                    )}
+
+                    <div style={P.hairline} />
+
+                    {/* No card chrome here any more: a bordered box inside a
+                        bordered frame is what made the summary panel feel
+                        cramped, and its own padding double-inset against the
+                        plaque's, costing the ingredient names a line. */}
+                    <div style={P.items}>
+                        <div style={P.itemsTitle}>
+                            הסלט שלכם{bowl ? <span style={P.itemsBowl}> · {bowl}</span> : null}
+                        </div>
+                        <div style={P.itemsRow}>
+                            {order.items.map(it => (
+                                <span key={it.id} style={P.itemChip} title={it.he}>
+                                    {it.icon && it.icon.startsWith('/')
+                                        ? <img src={it.icon} alt={it.he} style={{ width: '24px', height: '24px', objectFit: 'contain' }} />
+                                        : it.icon}
+                                </span>
+                            ))}
+                        </div>
+                        <div style={P.itemNames}>{order.items.map(i => i.he).join(' · ')}</div>
+                        {order.notes && <div style={P.notes}>📝 {order.notes}</div>}
+                        <div style={P.total}>₪{order.total}</div>
+                        {pay && (
+                            <div style={{ ...P.payPill, ...(pay.owed ? P.payOwed : P.payDone) }}>
                                 <span>{pay.owed ? '💳' : '✓'}</span>
                                 <span>{pay.text}</span>
                             </div>
-                        );
-                    })()}
-                </div>
+                        )}
+                    </div>
 
-                {/* The footer used to promise "refreshes automatically" even
-                    when the polling had stopped or was failing — the one moment
-                    that claim matters is exactly when it stopped being true. */}
-                <div style={{ ...P.footer, ...(offline ? P.footerOffline : {}) }}>
-                    {offline ? 'אין חיבור — מנסים שוב…'
-                        : settled ? 'ההזמנה הושלמה'
-                            : 'מתרענן אוטומטית · לא צריך לרענן'}
-                </div>
+                    {/* The footer used to promise "refreshes automatically" even
+                        when the polling had stopped or was failing — the one moment
+                        that claim matters is exactly when it stopped being true. */}
+                    <div style={{ ...P.footer, ...(offline ? P.footerOffline : {}) }}>
+                        {offline ? 'אין חיבור — מנסים שוב…'
+                            : settled ? 'ההזמנה הושלמה'
+                                : 'מתרענן אוטומטית · לא צריך לרענן'}
+                    </div>
 
-                {/* Opened from a saved link this page had no way out of itself. */}
-                <Link href="/" style={P.homeLink}>← חזרה לתפריט</Link>
-            </div>
+                    {/* Opened from a saved link this page had no way out of itself. */}
+                    <Link href="/" style={P.homeLink}>← חזרה לתפריט</Link>
+                </div>
+            </BariPlaque>
 
             <style>{`
                 @keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(76,175,80,0.4)} 50%{box-shadow:0 0 0 16px rgba(76,175,80,0)} }
-                @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
                 @keyframes statusSlideIn { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
                 @keyframes shimmerMove { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
                 @keyframes shimmerPulse { 0%,100%{opacity:0.4} 50%{opacity:0.15} }
@@ -446,27 +441,45 @@ export default function OrderStatusView({ id }: { id: string }) {
     );
 }
 
-/* ── Shimmer Loading State ── */
+/* ── Shimmer Loading State ──
+   Framed, so the plaque is already in place when the data lands and only the
+   interior swaps — and so the frame art starts downloading immediately. The
+   skeleton sits in the same slots the real content will: the circle where the
+   ring goes, at the ring's own width, so nothing above the body moves. */
 function Loading({ offline }: { offline: boolean }) {
     return (
-        <div style={{ ...P.root, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }}>
-            <div style={P.shimmerWrap}>
-                {/* Circle placeholder for status ring */}
-                <div style={P.shimmerCircle} />
+        <div style={P.root}>
+            <div style={P.bg} aria-hidden="true" />
 
-                {/* Shimmer text bars */}
-                <div style={{ ...P.shimmerBar, width: '140px' }} />
-                <div style={{ ...P.shimmerBar, width: '100px' }} />
-                <div style={{ ...P.shimmerBar, width: '180px' }} />
+            <BariPlaque
+                pedestal={<div style={P.shimmerCircle} />}
+                pedestalWidth={RING_WIDTH}
+                title={
+                    <>
+                        <div style={{ ...P.shimmerBar, width: '120px', height: '20px' }} />
+                        <div style={{ ...P.shimmerBar, width: '160px', marginTop: '10px' }} />
+                    </>
+                }
+            >
+                {/* This block must stay at least 0.2905 * plaque-width tall or the
+                    frame's fixed bands overflow and the bottom ornament renders
+                    outside the frame — see scripts/verify-plaque.ts. At 109px for
+                    the widest plaque, three thin bars were not enough. */}
+                <div style={{ ...P.bodyStack, gap: '16px' }}>
+                    <div style={{ ...P.shimmerBar, width: '140px' }} />
+                    <div style={{ ...P.shimmerBar, width: '100%', height: '46px', borderRadius: '10px' }} />
+                    <div style={{ ...P.shimmerBar, width: '180px' }} />
+                    <div style={{ ...P.shimmerBar, width: '100%', height: '40px', borderRadius: '10px' }} />
 
-                {/* A first load that keeps failing is now named, and keeps
-                    retrying, instead of shimmering silently for ever. */}
-                {offline && (
-                    <div style={{ ...P.footer, ...P.footerOffline, marginTop: '4px', textAlign: 'center' }}>
-                        אין חיבור — מנסים שוב…
-                    </div>
-                )}
-            </div>
+                    {/* A first load that keeps failing is now named, and keeps
+                        retrying, instead of shimmering silently for ever. */}
+                    {offline && (
+                        <div style={{ ...P.footer, ...P.footerOffline, textAlign: 'center' }}>
+                            אין חיבור — מנסים שוב…
+                        </div>
+                    )}
+                </div>
+            </BariPlaque>
 
             <style>{`
                 @keyframes shimmerMove { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
@@ -476,9 +489,13 @@ function Loading({ offline }: { offline: boolean }) {
     );
 }
 
+// Deliberately unframed, following the precedent set for the payment-failure
+// screen: a dead end with three elements, not something to dress in the plaque.
+// It also avoids pulling 250KB of frame art on a 404.
 function NotFound() {
     return (
-        <div style={{ ...P.root, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px' }}>
+        <div style={{ ...P.root, alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px' }}>
+            <div style={P.bg} aria-hidden="true" />
             <div style={{ fontSize: '48px' }}>🤔</div>
             <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '16px', fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }}>ההזמנה לא נמצאה</div>
             <Link href="/" style={{
@@ -495,20 +512,41 @@ function NotFound() {
 const shimmerGradient = 'linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.04) 75%)';
 
 const P: Record<string, React.CSSProperties> = {
-    root: { position: 'relative', minHeight: '100dvh', background: 'url(/homepage-assets/BG_8K.webp) center top / cover no-repeat, linear-gradient(155deg, #030a03 0%, #071a07 30%, #0a200a 60%, #071a07 100%)', fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: 'rtl', color: '#fff' },
-    content: { position: 'relative', zIndex: 1, maxWidth: '420px', margin: '0 auto', padding: '32px 16px 60px', paddingTop: 'max(32px, env(safe-area-inset-top))', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' },
+    // `min-height` + flex, NOT the confirmation screen's `position:fixed;
+    // overflow-y:auto`. On a normal page an inner scroll container stops mobile
+    // browser chrome auto-hiding and makes 100dvh meaningless. Because this is a
+    // minimum rather than a fixed height, the flex free space is zero once the
+    // plaque overflows, so `margin:auto` cannot strand its top off-screen.
+    root: { position: 'relative', minHeight: '100dvh', display: 'flex', background: '#030a03', fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: 'rtl', color: '#fff' },
+    // The glitter photo and the GoldField particle canvas are gone from this
+    // page: the plaque was designed against a flat, photo-free backdrop so its
+    // gold rails are the only detail on screen, and this is the one page people
+    // deliberately leave open — a permanent requestAnimationFrame particle loop
+    // is the last thing it needs. Fixed, not on the root: a 155deg gradient
+    // stretches over a document taller than the viewport, and
+    // `background-attachment: fixed` is unreliable on iOS Safari.
+    bg: { position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none', background: `${PLAQUE.glow}, ${PLAQUE.backdrop}` },
 
-    logo: { fontSize: '18px', fontWeight: 900, color: '#f0d060', letterSpacing: '0.04em', animation: 'fadeUp 0.4s ease both' },
+    // Scales with the plaque (see RING_WIDTH) — a fixed 100px circle inside a
+    // 238px-tall pedestal zone reads as a lost dot.
+    ring: { width: '100%', height: '100%', borderRadius: '50%', border: '3px solid rgba(200,168,78,0.5)', background: 'rgba(200,168,78,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.4s ease', animation: 'plaqueFadeUp 0.4s ease 0.1s both' },
+    ringReady: { border: '3px solid #4caf50', background: 'rgba(76,175,80,0.12)', animation: 'plaqueFadeUp 0.4s ease 0.1s both, pulse 1.5s ease-in-out 0.5s 3' },
+    // Clamped, not a percentage: a % font-size resolves against the parent's
+    // font-size, not its width, so it would not scale with the plaque at all.
+    ringIcon: { fontSize: 'clamp(38px, 13vw, 54px)', lineHeight: 1 },
 
-    ring: { width: '100px', height: '100px', borderRadius: '50%', border: '3px solid rgba(200,168,78,0.5)', background: 'rgba(200,168,78,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: '8px', transition: 'all 0.4s ease', animation: 'fadeUp 0.4s ease 0.1s both' },
-    ringReady: { border: '3px solid #4caf50', background: 'rgba(76,175,80,0.12)', animation: 'fadeUp 0.4s ease 0.1s both, pulse 1.5s ease-in-out 0.5s 3' },
-    ringIcon: { fontSize: '42px', lineHeight: 1 },
-
-    statusLabel: { fontSize: '22px', fontWeight: 900, color: '#fff', animation: 'fadeUp 0.4s ease 0.15s both' },
-    statusSub: { fontSize: '13px', fontWeight: 600, color: 'rgba(255,255,255,0.5)', textAlign: 'center' as const, marginTop: '-8px', animation: 'fadeUp 0.4s ease 0.18s both' },
+    // Line heights are pinned because the title zone scales with the plaque
+    // width while this type does not: at Heebo's default (~1.5) the ready state
+    // overflows the zone on a 320px phone and runs over the engraved divider.
+    statusLabel: { fontSize: '22px', fontWeight: 900, color: '#fff', lineHeight: 1.1, animation: 'plaqueFadeUp 0.4s ease 0.15s both' },
+    statusSub: { fontSize: '13px', fontWeight: 600, color: 'rgba(255,255,255,0.5)', textAlign: 'center' as const, lineHeight: 1.3, marginTop: '4px', animation: 'plaqueFadeUp 0.4s ease 0.18s both' },
     statusSubReady: { color: '#a5d6a7', fontSize: '14px', fontWeight: 800 },
 
-    pickupTimeCard: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: 'rgba(255,255,255,0.6)', fontWeight: 600, animation: 'fadeUp 0.4s ease 0.2s both', padding: '8px 18px', borderRadius: '999px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' },
+    // The body slot is a plain block in BariPlaque so margin-driven callers stay
+    // untouched; this page wants gap-based spacing, so it brings its own column.
+    bodyStack: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px' },
+
+    pickupTimeCard: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: 'rgba(255,255,255,0.6)', fontWeight: 600, animation: 'plaqueFadeUp 0.4s ease 0.2s both', padding: '8px 18px', borderRadius: '999px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' },
     pickupClock: { color: '#f0d060', fontWeight: 900 },
     pickupSep: { color: 'rgba(255,255,255,0.25)' },
 
@@ -516,32 +554,29 @@ const P: Record<string, React.CSSProperties> = {
     countdownArrived: { color: '#4caf50', fontWeight: 900, fontSize: '18px', animation: 'countdownGlow 1.5s ease-in-out infinite' },
     countdownNow: { textShadow: '0 0 12px rgba(76,175,80,0.7)' },
 
-    stepsRow: { display: 'flex', alignItems: 'flex-start', justifyContent: 'center', width: '100%', position: 'relative', marginTop: '8px', animation: 'fadeUp 0.4s ease 0.25s both' },
-    stepWrap: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', flex: 1, position: 'relative' },
-    stepDot: { width: '36px', height: '36px', borderRadius: '50%', border: '2px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', transition: 'all 0.3s ease' },
-    stepDotDone: { background: 'rgba(200,168,78,0.2)', border: '2px solid rgba(200,168,78,0.6)', color: '#f0d060' },
-    stepDotActive: { background: 'rgba(200,168,78,0.25)', border: '2px solid #f0d060', boxShadow: '0 0 16px rgba(200,168,78,0.3)' },
-    stepLabel: { fontSize: '10px', fontWeight: 700, color: 'rgba(255,255,255,0.5)', textAlign: 'center' as const },
-    stepLine: { position: 'absolute', top: '18px', right: '-50%', width: '100%', height: '2px', background: 'rgba(255,255,255,0.28)', zIndex: -1 },
-    stepLineDone: { background: 'rgba(200,168,78,0.5)' },
+    hairline: { width: '60px', height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,78,0.4), transparent)', flexShrink: 0 },
 
-    itemsCard: { width: '100%', padding: '16px', borderRadius: '16px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', animation: 'fadeUp 0.4s ease 0.3s both' },
+    items: { width: '100%', animation: 'plaqueFadeUp 0.4s ease 0.3s both' },
     itemsTitle: { fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.3)', marginBottom: '10px', letterSpacing: '0.06em' },
     itemsBowl: { color: 'rgba(240,208,96,0.65)', fontWeight: 800 },
-    itemsRow: { display: 'flex', flexWrap: 'wrap', gap: '4px', fontSize: '24px', marginBottom: '8px' },
+    itemsRow: { display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '4px', fontSize: '24px', marginBottom: '8px' },
     itemChip: { lineHeight: 1.2 },
     itemNames: { fontSize: '12px', color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 },
     notes: { fontSize: '12px', color: 'rgba(255,200,100,0.7)', marginTop: '8px', fontWeight: 600 },
-    total: { fontSize: '20px', fontWeight: 900, color: '#f0d060', marginTop: '12px', textAlign: 'right' as const },
+    total: { fontSize: '20px', fontWeight: 900, color: '#f0d060', marginTop: '12px' },
+    payPill: { marginTop: '6px', display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '5px 12px', borderRadius: 'var(--radius-full)', fontSize: '12px', fontWeight: 800 },
+    payOwed: { background: 'rgba(255,183,77,0.14)', border: '1px solid rgba(255,183,77,0.42)', color: '#ffcc80' },
+    payDone: { background: 'rgba(102,187,106,0.14)', border: '1px solid rgba(102,187,106,0.42)', color: '#a5d6a7' },
 
-    footer: { fontSize: '11px', color: 'rgba(255,255,255,0.4)', fontWeight: 600, marginTop: '8px' },
+    footer: { fontSize: '11px', color: 'rgba(255,255,255,0.4)', fontWeight: 600 },
     footerOffline: { color: 'rgba(255,183,77,0.85)' },
-    homeLink: { fontSize: '13px', fontWeight: 700, color: 'rgba(240,208,96,0.75)', textDecoration: 'none', padding: '10px 20px', borderRadius: '999px', border: '1px solid rgba(200,168,78,0.28)', background: 'rgba(200,168,78,0.06)' },
+    // Takes the shape and position the confirmation screen's terminal action
+    // has, and the plaque's 17% bottom padding is what clears it of the ornament.
+    homeLink: { display: 'block', width: '100%', padding: '12px 22px', borderRadius: '14px', fontSize: '13px', fontWeight: 700, color: 'rgba(240,208,96,0.85)', textDecoration: 'none', textAlign: 'center' as const, border: '1px solid rgba(200,168,78,0.30)', background: 'rgba(200,168,78,0.10)' },
 
     /* Shimmer loading */
-    shimmerWrap: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' },
     shimmerCircle: {
-        width: '100px', height: '100px', borderRadius: '50%',
+        width: '100%', height: '100%', borderRadius: '50%',
         background: shimmerGradient,
         backgroundSize: '200% 100%',
         animation: 'shimmerMove 0.85s linear infinite, shimmerPulse 1.4s ease-in-out infinite',
