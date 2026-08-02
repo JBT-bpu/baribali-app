@@ -13,11 +13,13 @@ const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
 
 /**
  * The status ring's footprint on the pedestal, as a fraction of the plaque's
- * width. Not the cat's 0.66 — that would be a 242px bordered circle around a
- * 42px glyph, mostly empty. 0.38 gives 112–143px across a 320–430 viewport,
- * close to the old fixed 100px but scaling with the frame.
+ * width. Not the cat's 0.66 — that would be a bordered circle around a 42px
+ * glyph, mostly empty. 0.33 gives 98–124px across a 320–430 viewport, sitting
+ * right around the old fixed 100px but scaling with the frame; it also puts the
+ * glyph back at ~0.42 of the ring's diameter, the proportion the fixed 100px /
+ * 42px pair had.
  */
-const RING_WIDTH = 0.38;
+const RING_WIDTH = 0.33;
 
 type OrderStatus = 'waiting' | 'preparing' | 'ready' | 'collected';
 
