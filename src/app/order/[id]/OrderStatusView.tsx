@@ -323,6 +323,8 @@ export default function OrderStatusView({ id }: { id: string }) {
             <GoldField zIndex={0} />
 
             <div style={P.board}>
+                <div style={P.boardArt} aria-hidden="true" />
+
                 {/* Order number — what the customer says at the counter. */}
                 <div style={{ ...slot(TRACK.nameplate.top, TRACK.nameplate.height, TRACK.nameplate.left, TRACK.nameplate.right), ...P.nameplate }}>
                     {order.order_num}
@@ -471,6 +473,8 @@ function Loading({ offline }: { offline: boolean }) {
             <GoldField zIndex={0} />
 
             <div style={P.board}>
+                <div style={P.boardArt} aria-hidden="true" />
+
                 <div style={{ ...P.heroRing }}>
                     <div style={P.shimmerCircle} />
                 </div>
@@ -546,12 +550,20 @@ const P: Record<string, React.CSSProperties> = {
         width: '100%', maxWidth: `${TRACK.maxWidth}px`,
         aspectRatio: TRACK.aspect,
         margin: 'auto',
+        animation: 'plaqueFadeUp 0.5s ease both',
+    },
+    // The artwork gets its own layer purely so the shadow can be a
+    // `drop-shadow`, which follows the tag's silhouette. As a `box-shadow` on
+    // the board itself it traced the DIV's rectangle — invisible back when the
+    // frame was opaque and filled its box, but a faint rounded rectangle around
+    // nothing once the art was keyed. The filter lives here, not on the board,
+    // so the medallion and rail icons don't each pick up a shadow too.
+    boardArt: {
+        position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none',
         backgroundImage: `url(${TRACK.art})`,
         backgroundSize: '100% 100%',
         backgroundRepeat: 'no-repeat',
-        borderRadius: '10px',
-        boxShadow: '0 10px 40px rgba(0,0,0,0.55)',
-        animation: 'plaqueFadeUp 0.5s ease both',
+        filter: 'drop-shadow(0 8px 22px rgba(0,0,0,0.55))',
     },
 
     // Type is sized in vw against the board's own width (which tracks the
