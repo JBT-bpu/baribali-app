@@ -165,7 +165,6 @@ export default function OrderStatusView({ id }: { id: string }) {
     // Set while we can't reach the API. Distinct from `notFound`, which now
     // means only that the server said 404.
     const [offline, setOffline] = useState(false);
-    const [settled, setSettled] = useState(false); // polling stopped for good
     const prevStatusRef = useRef<OrderStatus | null>(null);
     const [ringScale, setRingScale] = useState(false);
     const [labelSlide, setLabelSlide] = useState(false);
@@ -230,8 +229,9 @@ export default function OrderStatusView({ id }: { id: string }) {
                 setOffline(false);
                 setOrder(d);
                 if (prevStatusRef.current === null) prevStatusRef.current = d.status;
-                // 'collected' is terminal — nothing will change again.
-                if (d.status === 'collected') { stopped = true; setSettled(true); }
+                // 'collected' is terminal — nothing will change again. The UI
+                // says so via the step's own line, so no extra state is needed.
+                if (d.status === 'collected') stopped = true;
             } catch {
                 if (!cancelled) setOffline(true);
             } finally {
@@ -336,69 +336,67 @@ export default function OrderStatusView({ id }: { id: string }) {
                     <img key={step.key} src={step.medallion} alt="" style={P.medallion} />
                 </div>
 
-                <div style={{ ...slot(TRACK.labelBand.top, TRACK.labelBand.height), ...labelStyle }}>
-                    {step.label}
-                </div>
-
                 {/* The four circles the art draws, running RIGHT to LEFT — the
                     step order is in trackingArt's `centres`, so this just walks
                     the steps. Progress reads from the icons themselves: reached
                     steps are full colour, steps still to come are dimmed and
-                    desaturated, and the current one carries the glow. */}
+                    desaturated, and the current one carries the glow. This
+                    artwork leaves no room for labels under them, so the card
+                    names the current step instead. */}
                 {STATUS_STEPS.map((s, i) => {
                     const reached = i <= currentStep;
                     const active = i === currentStep;
                     return (
-                        <div key={s.key}>
-                            <div style={{
+                        <div
+                            key={s.key}
+                            title={s.rail}
+                            style={{
                                 ...P.railDot,
                                 left: xPct(TRACK.rail.centres[i] - TRACK.rail.size / 2),
                                 ...(active ? P.railActive : {}),
-                            }}>
-                                <img
-                                    src={s.railIcon}
-                                    alt=""
-                                    style={{ ...P.railImg, ...(reached ? {} : P.railImgPending) }}
-                                />
-                            </div>
-                            <div style={{
-                                ...P.railLabel,
-                                left: xPct(TRACK.rail.centres[i] - 0.10),
-                                ...(active ? P.railLabelActive : reached ? P.railLabelReached : {}),
-                            }}>
-                                {s.rail}
-                            </div>
+                            }}
+                        >
+                            <img
+                                src={s.railIcon}
+                                alt={s.rail}
+                                style={{ ...P.railImg, ...(reached ? {} : P.railImgPending) }}
+                            />
                         </div>
                     );
                 })}
 
-                {/* ── Inside the ornate card: two bands, split by the single
-                       engraved rule the art draws at 0.9989 W. ── */}
+                {/* ── The card: one open field carrying the whole order. Every
+                       row is clamped rather than allowed to grow, because the
+                       card is a fixed slot in the artwork. ── */}
+                <div style={{ ...slot(TRACK.card.top, TRACK.card.height, TRACK.card.left, TRACK.card.right), ...P.band }}>
+                    <div style={labelStyle}>{step.label}</div>
 
-                {/* Everything here is clamped rather than allowed to grow — the
-                    card is a fixed slot in the artwork, so a long ingredient list
-                    must be cut off instead of pushing the composition apart. */}
-                <div style={{ ...slot(TRACK.card.band1.top, TRACK.card.band1.height, TRACK.card.left, TRACK.card.right), ...P.band }}>
-                    <div style={{ ...P.statusSub, ...(isReady ? P.statusSubReady : {}) }}>{step.sub}</div>
-
-                    {/* Pickup time — the clock time first, since that is what the
-                        customer planned around, then how long is left. Once the
-                        order is collected the remaining half is dropped: it is
-                        frozen by then, and counting down to a collection that has
-                        already happened reads as a stuck page. */}
-                    {countdown && (
+                    {/* One line, priority-ordered, because the artwork has room
+                        for exactly one and these never all matter at once:
+                          1. a lost connection — nothing else is trustworthy
+                          2. "ready", the only state with something to DO
+                          3. the pickup time, which is what people planned around
+                        The clock leads the countdown, and the remaining-time half
+                        is dropped once collected, when it is frozen anyway. */}
+                    {offline ? (
+                        <div style={{ ...P.statusSub, ...P.statusSubOffline }}>
+                            <span style={{ ...P.liveDot, ...P.liveDotOffline }} /> אין חיבור — מנסים שוב…
+                        </div>
+                    ) : isReady ? (
+                        <div style={{ ...P.statusSub, ...P.statusSubReady }}>{step.sub}</div>
+                    ) : countdown && !isCollected ? (
                         <div style={P.pickupRow}>
                             <span>⏰ איסוף <strong style={P.pickupClock}>{countdown.clock}</strong></span>
-                            {!isCollected && <>
-                                <span style={P.pickupSep}>·</span>
-                                <span style={{
-                                    ...(countdown.arrived ? { ...P.countdownArrived, ...P.countdownNow } : {}),
-                                    ...(countdown.urgent && !countdown.arrived ? P.countdownUrgent : {}),
-                                }}>
-                                    {countdown.text}
-                                </span>
-                            </>}
+                            <span style={P.pickupSep}>·</span>
+                            <span style={{
+                                ...(countdown.arrived ? { ...P.countdownArrived, ...P.countdownNow } : {}),
+                                ...(countdown.urgent && !countdown.arrived ? P.countdownUrgent : {}),
+                            }}>
+                                {countdown.text}
+                            </span>
                         </div>
+                    ) : (
+                        <div style={P.statusSub}>{step.sub}</div>
                     )}
 
                     <div style={P.itemsRow}>
@@ -410,37 +408,32 @@ export default function OrderStatusView({ id }: { id: string }) {
                             </span>
                         ))}
                     </div>
-                    <div style={P.itemNames}>{order.items.map(i => i.he).join(' · ')}</div>
-                    {order.notes && <div style={P.notes}>📝 {order.notes}</div>}
-                </div>
 
-                {/* Below the rule: what was paid and what is still owed. The art
-                    no longer draws a pill here, so this is plain type. */}
-                <div style={{ ...slot(TRACK.card.band2.top, TRACK.card.band2.height, TRACK.card.left, TRACK.card.right), ...P.band, gap: '6px' }}>
-                    <div style={P.total}>
-                        ₪{order.total}{bowl ? <span style={P.bowlLabel}> · {bowl}</span> : null}
+                    {/* A note squeezes the names to one line rather than pushing
+                        the card open — both are the customer's own words, and
+                        seeing the note echoed back is worth more than a second
+                        line of ingredients they just chose. */}
+                    <div style={{ ...P.itemNames, WebkitLineClamp: order.notes ? 1 : 2 }}>
+                        {order.items.map(i => i.he).join(' · ')}
                     </div>
-                    {pay && (
-                        <div style={{ ...P.payPill, ...(pay.owed ? P.payOwed : P.payDone) }}>
-                            <span>{pay.owed ? '💳' : '✓'}</span>
-                            <span>{pay.text}</span>
-                        </div>
-                    )}
+                    {order.notes && <div style={P.notes}>📝 {order.notes}</div>}
+
+                    {/* Total and payment share a line — the card has room for
+                        five rows, not six. */}
+                    <div style={P.moneyRow}>
+                        <span style={P.total}>₪{order.total}</span>
+                        {bowl && <span style={P.bowlLabel}>· {bowl}</span>}
+                        {pay && (
+                            <span style={{ ...P.payTag, ...(pay.owed ? P.payOwed : P.payDone) }}>
+                                {pay.owed ? '💳' : '✓'} {pay.text}
+                            </span>
+                        )}
+                    </div>
                 </div>
 
                 {/* The footer used to promise "refreshes automatically" even when
                     the polling had stopped or was failing — the one moment that
                     claim matters is exactly when it stopped being true. */}
-                <div style={{ ...slot(TRACK.footer.top, TRACK.footer.height), ...P.footer, ...(offline ? P.footerOffline : {}) }}>
-                    {offline ? 'אין חיבור — מנסים שוב…'
-                        : settled ? 'ההזמנה הושלמה'
-                            : 'מתרענן אוטומטית · לא צריך לרענן'}
-                </div>
-
-                {/* The small circle bottom-left: a live indicator, so a page that
-                    is quietly still polling looks different from a stuck one. */}
-                <div style={{ ...P.statusDot, ...(offline ? P.statusDotOffline : settled ? P.statusDotSettled : {}) }} />
-
                 {/* Opened from a saved link this page had no way out of itself. */}
                 <Link
                     href="/"
@@ -481,20 +474,24 @@ function Loading({ offline }: { offline: boolean }) {
                 <div style={{ ...P.heroRing }}>
                     <div style={P.shimmerCircle} />
                 </div>
-                <div style={bar(TRACK.nameplate.top + 0.012, TRACK.nameplate.height - 0.024, 0.42, 1 - 0.58)} />
-                <div style={bar(TRACK.labelBand.top + 0.014, TRACK.labelBand.height - 0.028, 0.36, 1 - 0.64)} />
-                <div style={bar(TRACK.card.band1.top + 0.04, 0.026, 0.22, 1 - 0.78)} />
-                <div style={bar(TRACK.card.band1.top + 0.13, 0.026, 0.16, 1 - 0.84)} />
-                <div style={bar(TRACK.card.band1.top + 0.21, 0.026, 0.24, 1 - 0.76)} />
-                <div style={bar(TRACK.card.band2.top + 0.04, 0.032, 0.34, 1 - 0.66)} />
+                <div style={bar(TRACK.nameplate.top + 0.010, TRACK.nameplate.height - 0.020, 0.42, 1 - 0.58)} />
+                <div style={bar(TRACK.card.top + 0.035, 0.028, 0.36, 1 - 0.64)} />
+                <div style={bar(TRACK.card.top + 0.170, 0.028, 0.20, 1 - 0.80)} />
+                <div style={bar(TRACK.card.top + 0.240, 0.022, 0.26, 1 - 0.74)} />
+                <div style={bar(TRACK.card.top + 0.310, 0.030, 0.34, 1 - 0.66)} />
 
                 {/* A first load that keeps failing is named, and keeps retrying,
-                    instead of shimmering silently for ever. */}
+                    instead of shimmering silently for ever. It takes the card's
+                    second line — the same place the loaded page reports it. */}
                 {offline && (
-                    <div style={{ ...slot(TRACK.footer.top, TRACK.footer.height), ...P.footer, ...P.footerOffline }}>
-                        אין חיבור — מנסים שוב…
+                    <div style={{
+                        ...slot(TRACK.card.top + 0.090, 0.045, TRACK.card.left, TRACK.card.right),
+                        ...P.statusSub, ...P.statusSubOffline,
+                    }}>
+                        <span style={{ ...P.liveDot, ...P.liveDotOffline }} /> אין חיבור — מנסים שוב…
                     </div>
                 )}
+                {!offline && <div style={bar(TRACK.card.top + 0.100, 0.022, 0.24, 1 - 0.76)} />}
             </div>
 
             <style>{`
@@ -577,11 +574,7 @@ const P: Record<string, React.CSSProperties> = {
     // the img restarts the entrance on every status change.
     medallion: { width: '118%', height: '118%', objectFit: 'contain', flexShrink: 0, animation: 'medallionIn 0.5s cubic-bezier(0.34,1.5,0.64,1) both' },
 
-    // This, the rail labels and the footer sit over TRANSPARENT areas of the
-    // frame, so they land on whatever the page backdrop is doing — gold bokeh
-    // and sparkle. They need their own shadow to stay readable; the elements
-    // inside the frame's filled slots do not.
-    statusLabel: { display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'clamp(16px, 5.2vw, 21px)', fontWeight: 900, color: '#fff', lineHeight: 1.1, textShadow: '0 2px 10px rgba(0,0,0,0.85), 0 0 3px rgba(0,0,0,0.7)' },
+    statusLabel: { fontSize: 'clamp(14px, 4.4vw, 18px)', fontWeight: 900, color: '#fff', lineHeight: 1.15, textShadow: '0 1px 6px rgba(0,0,0,0.6)' },
     statusLabelReady: { color: '#8ee08e' },
 
     // Overlays the circles the art draws, which supply the gold rim — hence the
@@ -597,27 +590,19 @@ const P: Record<string, React.CSSProperties> = {
     railImg: { width: '86%', height: '86%', objectFit: 'contain', transition: 'opacity 0.35s ease, filter 0.35s ease' },
     // Steps still to come read as "not yet" without needing a second symbol.
     railImgPending: { opacity: 0.32, filter: 'grayscale(0.75) brightness(0.75)' },
-    railLabel: {
-        position: 'absolute',
-        top: yPct(TRACK.rail.labelTop), height: yPct(TRACK.rail.labelHeight), width: xPct(0.20),
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 'clamp(8px, 2.5vw, 10px)', fontWeight: 700, color: 'rgba(255,255,255,0.42)', textAlign: 'center' as const,
-        textShadow: '0 1px 6px rgba(0,0,0,0.9)', transition: 'color 0.35s ease',
-    },
-    railLabelReached: { color: 'rgba(255,255,255,0.72)' },
-    railLabelActive: { color: '#f0d060', fontWeight: 900 },
 
-    // Card bands: centred columns that never overflow their slot.
-    // Sizes are budgeted against band1's 0.3348 W for the worst case — 14
-    // ingredients, which wrap the icon row onto a second line. The clamp minima
-    // matter as much as the maxima: on a 320px phone the band shrinks to 98px
-    // while fixed floors would not, which is exactly where this first overflowed.
-    band: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '3px', overflow: 'hidden', padding: '0 4%' },
+    // The card is one fixed slot holding five rows, so the sizes below are
+    // budgeted against its 0.4043 W for the worst case: 14 ingredients wrapping
+    // the icon row to two lines, plus a note. The clamp MINIMA matter as much as
+    // the maxima — on a 320px phone the card shrinks with the art while fixed
+    // type floors would not, which is where this overflows first.
+    band: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '2px', overflow: 'hidden', padding: '0 3%' },
 
-    statusSub: { fontSize: 'clamp(8px, 3.0vw, 12px)', fontWeight: 600, color: 'rgba(255,255,255,0.62)', textAlign: 'center' as const, lineHeight: 1.3 },
+    statusSub: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', fontSize: 'clamp(8px, 3.0vw, 12px)', fontWeight: 600, color: 'rgba(255,255,255,0.62)', textAlign: 'center' as const, lineHeight: 1.25 },
     statusSubReady: { color: '#a5d6a7', fontWeight: 800 },
+    statusSubOffline: { color: '#ffc266', fontWeight: 700 },
 
-    pickupRow: { display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'clamp(8px, 3.1vw, 12px)', color: 'rgba(255,255,255,0.68)', fontWeight: 600 },
+    pickupRow: { display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'clamp(8px, 3.1vw, 12px)', color: 'rgba(255,255,255,0.68)', fontWeight: 600, lineHeight: 1.25 },
     pickupClock: { color: '#f0d060', fontWeight: 900 },
     pickupSep: { color: 'rgba(255,255,255,0.25)' },
 
@@ -634,41 +619,33 @@ const P: Record<string, React.CSSProperties> = {
     // Clamped: the card is a fixed slot in the artwork, so a long ingredient
     // list must be cut off rather than pushing the composition apart.
     itemNames: {
-        fontSize: 'clamp(8px, 2.7vw, 10px)', color: 'rgba(255,255,255,0.5)', lineHeight: 1.4, textAlign: 'center' as const,
+        fontSize: 'clamp(8px, 2.7vw, 10px)', color: 'rgba(255,255,255,0.5)', lineHeight: 1.35, textAlign: 'center' as const,
         display: '-webkit-box', WebkitBoxOrient: 'vertical' as unknown as undefined, WebkitLineClamp: 2, overflow: 'hidden',
     },
     notes: {
-        fontSize: 'clamp(8px, 2.7vw, 10px)', color: 'rgba(255,200,100,0.8)', fontWeight: 600, textAlign: 'center' as const,
+        fontSize: 'clamp(8px, 2.7vw, 10px)', color: 'rgba(255,200,100,0.85)', fontWeight: 600, textAlign: 'center' as const,
         display: '-webkit-box', WebkitBoxOrient: 'vertical' as unknown as undefined, WebkitLineClamp: 1, overflow: 'hidden',
     },
 
-    total: { fontSize: 'clamp(17px, 5.6vw, 23px)', fontWeight: 900, color: '#f0d060', lineHeight: 1.1 },
-    bowlLabel: { fontSize: 'clamp(9px, 2.9vw, 11px)', color: 'rgba(240,208,96,0.6)', fontWeight: 700 },
+    // Total, size and payment share one line — the card has room for five rows,
+    // not six.
+    moneyRow: { display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '6px', flexWrap: 'nowrap', lineHeight: 1.1 },
+    total: { fontSize: 'clamp(15px, 5.0vw, 20px)', fontWeight: 900, color: '#f0d060' },
+    bowlLabel: { fontSize: 'clamp(8px, 2.7vw, 10px)', color: 'rgba(240,208,96,0.6)', fontWeight: 700, whiteSpace: 'nowrap' },
+    payTag: { fontSize: 'clamp(8px, 2.9vw, 11px)', fontWeight: 800, whiteSpace: 'nowrap' },
+    payOwed: { color: '#ffd08a' },
+    payDone: { color: '#b6e6b6' },
 
-    // The art no longer draws a pill inside the card, so this brings its own —
-    // whether money is still owed needs to catch the eye, not read as caption.
-    payPill: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '4px 12px', borderRadius: 'var(--radius-full)', fontSize: 'clamp(10px, 3.2vw, 13px)', fontWeight: 800 },
-    payOwed: { background: 'rgba(255,183,77,0.16)', border: '1px solid rgba(255,183,77,0.45)', color: '#ffd08a' },
-    payDone: { background: 'rgba(102,187,106,0.16)', border: '1px solid rgba(102,187,106,0.45)', color: '#b6e6b6' },
+    footer: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: 'clamp(8px, 2.7vw, 11px)', color: 'rgba(255,255,255,0.62)', fontWeight: 600, textShadow: '0 1px 6px rgba(0,0,0,0.9)' },
 
-    footer: { display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'clamp(8px, 2.7vw, 11px)', color: 'rgba(255,255,255,0.62)', fontWeight: 600, textShadow: '0 1px 6px rgba(0,0,0,0.9)' },
-    footerOffline: { color: '#ffc266' },
-
-    // The small circle bottom-left in the art. Green and breathing while
-    // polling, amber when the connection is gone, steady gold once settled — so
-    // a page that is quietly working looks different from a stuck one.
-    statusDot: {
-        position: 'absolute',
-        top: yPct(TRACK.statusDot.top + TRACK.statusDot.size * 0.30),
-        height: yPct(TRACK.statusDot.size * 0.40),
-        left: xPct(TRACK.statusDot.left + TRACK.statusDot.size * 0.30),
-        width: xPct(TRACK.statusDot.size * 0.40),
-        borderRadius: '50%', background: '#7ed07e',
-        boxShadow: '0 0 8px rgba(126,208,126,0.9)',
+    // Green and breathing while polling, amber when the connection is gone,
+    // steady gold once collected.
+    liveDot: {
+        width: '6px', height: '6px', borderRadius: '50%', flexShrink: 0,
+        background: '#7ed07e', boxShadow: '0 0 6px rgba(126,208,126,0.9)',
         animation: 'livePulse 2s ease-in-out infinite',
     },
-    statusDotOffline: { background: '#ffb74d', boxShadow: '0 0 8px rgba(255,183,77,0.9)' },
-    statusDotSettled: { background: '#f0d060', boxShadow: '0 0 8px rgba(240,208,96,0.8)', animation: 'none' },
+    liveDotOffline: { background: '#ffb74d', boxShadow: '0 0 6px rgba(255,183,77,0.9)', animation: 'none' },
 
     // Sits on the green pill the art draws at the bottom.
     bottomPill: { display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'clamp(11px, 3.5vw, 14px)', fontWeight: 800, color: '#ffe9a8', textDecoration: 'none', letterSpacing: '0.02em' },
