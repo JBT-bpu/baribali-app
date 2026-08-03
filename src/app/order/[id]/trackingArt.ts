@@ -4,11 +4,16 @@
  *
  * Unlike the confirmation screen's frame, this is NOT a stretchable frame — it
  * is a fixed composition with a nameplate, a hero ring, a four-step rail, an
- * ornate items card and two pill buttons already drawn in place. So the box is
+ * ornate items card and a pill button already drawn in place. So the box is
  * locked to the art's aspect ratio and every element is positioned into the slot
  * the art drew for it. The consequence is that content cannot grow: anything
  * variable (the ingredient list, the notes) is clamped rather than allowed to
  * push the composition apart.
+ *
+ * The art is keyed: everything outside the frame and its filled slots is
+ * transparent, so the page's own background and particle field show THROUGH it.
+ * That is why this screen keeps the full site backdrop rather than the flat one
+ * the confirmation overlay uses.
  *
  * Positions are measured off the source (941x1672) and expressed as fractions of
  * the box's WIDTH, so they stay correct at any size. `yPct` converts them to the
@@ -35,44 +40,44 @@ export const TRACK = {
     art: '/builder-assets/track-bg.webp',
 
     /** Small pill at the top — the order number. */
-    nameplate: { top: f(155), height: f(215 - 155), left: f(376), right: 1 - f(563) },
+    nameplate: { top: f(166), height: f(214 - 166), left: f(383), right: 1 - f(556) },
 
-    /** The big ornate circle. Holds the current step's medallion. */
-    heroRing: { top: f(266), size: f(514 - 266) },
+    /**
+     * The green disc inside the big ornate ring. The medallion is deliberately
+     * drawn larger than this (see P.medallion) so its own gold rim lands on the
+     * drawn ring rather than sitting inside it as a second concentric circle.
+     */
+    heroRing: { top: f(281), size: f(489 - 281) },
 
     /** Between the ring and the engraved divider — the status label. */
-    labelBand: { top: f(514), height: f(570 - 514) },
+    labelBand: { top: f(505), height: f(568 - 505) },
 
     /** Four circles with an engraved connector already drawn between them. */
     rail: {
-        top: f(664), size: f(751 - 664),
-        centres: [f(167), f(365), f(573), f(774)] as const,
-        labelTop: f(756), labelHeight: f(810 - 756),
+        top: f(666), size: f(82),
+        centres: [f(165), f(367), f(573), f(774)] as const,
+        labelTop: f(756), labelHeight: f(812 - 756),
     },
 
     /**
-     * The ornate card. Two engraved dividers (measured at y=942 and y=1185) cut
-     * it into three bands, and a green pill is drawn at y 1260-1340. The bands
-     * are inset from those lines so nothing sits on top of the engraving.
+     * The ornate card. A single engraved divider at y=1187 cuts it in two. The
+     * bands are inset from the divider and from the card's own frame so nothing
+     * sits on top of the engraving.
      */
     card: {
-        left: f(86), right: 1 - f(854),
-        band1: { top: f(832), height: f(935 - 832) },    // status sub-line + pickup
-        band2: { top: f(952), height: f(1178 - 952) },   // ingredients + notes
-        band3: { top: f(1192), height: f(1252 - 1192) }, // total + bowl size
-        // Offset right rather than centred — that is the RTL start edge, and it
-        // is where the artwork actually draws it.
-        pill: { top: f(1260), height: f(1340 - 1260), left: f(433), right: 1 - f(800) },
+        left: f(100), right: 1 - f(838),
+        band1: { top: f(862), height: f(1172 - 862) },   // sub-line, pickup, ingredients
+        band2: { top: f(1202), height: f(1382 - 1202) }, // total, bowl size, payment
     },
 
-    /** Between the card and the bottom pill — the polling status line. */
-    footer: { top: f(1400), height: f(1435 - 1400) },
+    /** Between the card's lower rule and the bottom pill — the polling line. */
+    footer: { top: f(1418), height: f(1472 - 1418) },
 
     /** The bottom pill button — the way off the page. */
-    bottomPill: { top: f(1480), height: f(1560 - 1480), left: f(286), right: 1 - f(653) },
+    bottomPill: { top: f(1491), height: f(1589 - 1491), left: f(305), right: 1 - f(634) },
 
     /** Small circle bottom-left — the live/offline indicator. */
-    statusDot: { top: f(1490), size: f(1560 - 1490), left: f(99) },
+    statusDot: { top: f(1521), size: f(1591 - 1521), left: f(89) },
 
     maxWidth: 400,
     gutter: 12,

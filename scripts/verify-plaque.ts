@@ -12,6 +12,7 @@
  * .ts extension on that import, which the app's bundler resolution rejects.
  */
 import { PLAQUE, pct } from '../src/components/ui/bari/plaqueGeometry.ts';
+import { TRACK, TRACK_ASPECT_H } from '../src/app/order/[id]/trackingArt.ts';
 
 const WIDTHS = [296, 336, 366, 376];   // plaque widths at 320/360/390/430 viewports
 
@@ -115,5 +116,35 @@ for (const [name, got, want] of snapshot) {
     ok(got === want, `${name}: "${got}"${got === want ? '' : ` !== "${want}"`}`);
 }
 
-console.log(failed === 0 ? '\nAll plaque assertions passed.\n' : `\n${failed} FAILED\n`);
+// ── 7. Tracking board: the card's bands are fixed slots ──────────
+// This artwork is a composition, not a stretchable frame, so the content has to
+// fit the slot rather than the slot growing. The clamp MINIMA are what matter
+// here: on a 320px phone the band shrinks with the art while fixed type floors
+// do not, which is exactly where band 1 first overflowed.
+head('7. Tracking board — card bands hold their content');
+const cl = (lo: number, k: number, hi: number, vwPx: number) => clamp(lo, vwPx * k / 100, hi);
+for (const W of WIDTHS) {
+    const vwPx = W + 2 * TRACK.gutter;
+    // Worst case: 14 ingredients, so the icon row wraps to two lines.
+    const band1Needs =
+        cl(8, 3.0, 12, vwPx) * 1.3                 // status sub-line
+        + cl(8, 3.1, 12, vwPx) * 1.4               // pickup / countdown
+        + cl(12, 4.8, 19, vwPx) * 1.1 * 2 + 3      // two rows of icons
+        + cl(8, 2.7, 10, vwPx) * 1.4 * 2           // two clamped lines of names
+        + 3 * 3;                                   // gaps
+    ok(band1Needs <= TRACK.card.band1.height * W,
+        `W=${W}: band1 needs ${band1Needs.toFixed(0)}px, slot is ${(TRACK.card.band1.height * W).toFixed(0)}px`);
+
+    const band2Needs = cl(17, 5.6, 23, vwPx) * 1.1 + cl(10, 3.2, 13, vwPx) * 1.3 + 8 + 3;
+    ok(band2Needs <= TRACK.card.band2.height * W,
+        `W=${W}: band2 needs ${band2Needs.toFixed(0)}px, slot is ${(TRACK.card.band2.height * W).toFixed(0)}px`);
+}
+// The board is a fixed ratio, so its height is decided entirely by its width.
+for (const [vwPx, screenH] of [[320, 568], [390, 844]] as [number, number][]) {
+    const W = Math.min(vwPx, TRACK.maxWidth) - 2 * TRACK.gutter;
+    const h = W * TRACK_ASPECT_H;
+    ok(h < screenH, `${vwPx}x${screenH}: board is ${h.toFixed(0)}px, fits without scrolling`);
+}
+
+console.log(failed === 0 ? '\nAll assertions passed.\n' : `\n${failed} FAILED\n`);
 process.exit(failed === 0 ? 0 : 1);

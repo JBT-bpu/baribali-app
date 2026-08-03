@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import Link from 'next/link';
-import { PLAQUE } from '@/components/ui/bari/plaqueGeometry';
+import GoldField from '@/components/ui/GoldField';
+import BariGlowBackground from '@/components/ui/bari/BariGlowBackground';
 import { fireGoldConfetti } from '@/lib/confetti';
 import { orderSizeLabel } from '@/lib/reorder';
 import { TRACK, slot, xPct, yPct } from './trackingArt';
@@ -317,7 +318,8 @@ export default function OrderStatusView({ id }: { id: string }) {
 
     return (
         <div style={P.root}>
-            <div style={P.bg} aria-hidden="true" />
+            <BariGlowBackground />
+            <GoldField zIndex={0} />
 
             <div style={P.board}>
                 {/* Order number — what the customer says at the counter. */}
@@ -364,10 +366,15 @@ export default function OrderStatusView({ id }: { id: string }) {
                     );
                 })}
 
-                {/* ── Inside the ornate card ── */}
+                {/* ── Inside the ornate card: two bands, split by the single
+                       engraved rule the art draws at 0.9989 W. ── */}
 
+                {/* Everything here is clamped rather than allowed to grow — the
+                    card is a fixed slot in the artwork, so a long ingredient list
+                    must be cut off instead of pushing the composition apart. */}
                 <div style={{ ...slot(TRACK.card.band1.top, TRACK.card.band1.height, TRACK.card.left, TRACK.card.right), ...P.band }}>
                     <div style={{ ...P.statusSub, ...(isReady ? P.statusSubReady : {}) }}>{step.sub}</div>
+
                     {/* Pickup time — the clock time first, since that is what the
                         customer planned around, then how long is left. Once the
                         order is collected the remaining half is dropped: it is
@@ -387,12 +394,7 @@ export default function OrderStatusView({ id }: { id: string }) {
                             </>}
                         </div>
                     )}
-                </div>
 
-                {/* The card is a fixed slot in the artwork, so this cannot grow:
-                    the names and any note are line-clamped rather than allowed to
-                    push the composition apart. */}
-                <div style={{ ...slot(TRACK.card.band2.top, TRACK.card.band2.height, TRACK.card.left, TRACK.card.right), ...P.band }}>
                     <div style={P.itemsRow}>
                         {order.items.map(it => (
                             <span key={it.id} style={P.itemChip} title={it.he}>
@@ -406,22 +408,19 @@ export default function OrderStatusView({ id }: { id: string }) {
                     {order.notes && <div style={P.notes}>📝 {order.notes}</div>}
                 </div>
 
-                <div style={{ ...slot(TRACK.card.band3.top, TRACK.card.band3.height, TRACK.card.left, TRACK.card.right), ...P.band }}>
+                {/* Below the rule: what was paid and what is still owed. The art
+                    no longer draws a pill here, so this is plain type. */}
+                <div style={{ ...slot(TRACK.card.band2.top, TRACK.card.band2.height, TRACK.card.left, TRACK.card.right), ...P.band, gap: '6px' }}>
                     <div style={P.total}>
                         ₪{order.total}{bowl ? <span style={P.bowlLabel}> · {bowl}</span> : null}
                     </div>
+                    {pay && (
+                        <div style={{ ...P.payPill, ...(pay.owed ? P.payOwed : P.payDone) }}>
+                            <span>{pay.owed ? '💳' : '✓'}</span>
+                            <span>{pay.text}</span>
+                        </div>
+                    )}
                 </div>
-
-                {/* The green pill the art draws inside the card. */}
-                {pay && (
-                    <div style={{
-                        ...slot(TRACK.card.pill.top, TRACK.card.pill.height, TRACK.card.pill.left, TRACK.card.pill.right),
-                        ...P.payPill, ...(pay.owed ? P.payOwed : P.payDone),
-                    }}>
-                        <span>{pay.owed ? '💳' : '✓'}</span>
-                        <span>{pay.text}</span>
-                    </div>
-                )}
 
                 {/* The footer used to promise "refreshes automatically" even when
                     the polling had stopped or was failing — the one moment that
@@ -469,18 +468,19 @@ function Loading({ offline }: { offline: boolean }) {
     });
     return (
         <div style={P.root}>
-            <div style={P.bg} aria-hidden="true" />
+            <BariGlowBackground />
+            <GoldField zIndex={0} />
 
             <div style={P.board}>
                 <div style={{ ...P.heroRing }}>
                     <div style={P.shimmerCircle} />
                 </div>
                 <div style={bar(TRACK.nameplate.top + 0.012, TRACK.nameplate.height - 0.024, 0.42, 1 - 0.58)} />
-                <div style={bar(TRACK.labelBand.top + 0.012, TRACK.labelBand.height - 0.024, 0.36, 1 - 0.64)} />
-                <div style={bar(TRACK.card.band1.top + 0.03, 0.026, 0.22, 1 - 0.78)} />
-                <div style={bar(TRACK.card.band2.top + 0.05, 0.026, 0.16, 1 - 0.84)} />
-                <div style={bar(TRACK.card.band2.top + 0.10, 0.026, 0.24, 1 - 0.76)} />
-                <div style={bar(TRACK.card.band3.top + 0.01, 0.032, 0.34, 1 - 0.66)} />
+                <div style={bar(TRACK.labelBand.top + 0.014, TRACK.labelBand.height - 0.028, 0.36, 1 - 0.64)} />
+                <div style={bar(TRACK.card.band1.top + 0.04, 0.026, 0.22, 1 - 0.78)} />
+                <div style={bar(TRACK.card.band1.top + 0.13, 0.026, 0.16, 1 - 0.84)} />
+                <div style={bar(TRACK.card.band1.top + 0.21, 0.026, 0.24, 1 - 0.76)} />
+                <div style={bar(TRACK.card.band2.top + 0.04, 0.032, 0.34, 1 - 0.66)} />
 
                 {/* A first load that keeps failing is named, and keeps retrying,
                     instead of shimmering silently for ever. */}
@@ -506,7 +506,8 @@ function Loading({ offline }: { offline: boolean }) {
 function NotFound() {
     return (
         <div style={{ ...P.root, alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px' }}>
-            <div style={P.bg} aria-hidden="true" />
+            <BariGlowBackground />
+            <GoldField zIndex={0} />
             <div style={{ fontSize: '48px' }}>🤔</div>
             <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '16px', fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }}>ההזמנה לא נמצאה</div>
             <Link href="/" style={{
@@ -528,15 +529,11 @@ const P: Record<string, React.CSSProperties> = {
     // browser chrome auto-hiding and makes 100dvh meaningless. Because this is a
     // minimum rather than a fixed height, the flex free space is zero once the
     // plaque overflows, so `margin:auto` cannot strand its top off-screen.
-    root: { position: 'relative', minHeight: '100dvh', display: 'flex', background: '#030a03', fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: 'rtl', color: '#fff' },
-    // The glitter photo and the GoldField particle canvas are gone from this
-    // page: the plaque was designed against a flat, photo-free backdrop so its
-    // gold rails are the only detail on screen, and this is the one page people
-    // deliberately leave open — a permanent requestAnimationFrame particle loop
-    // is the last thing it needs. Fixed, not on the root: a 155deg gradient
-    // stretches over a document taller than the viewport, and
-    // `background-attachment: fixed` is unreliable on iOS Safari.
-    bg: { position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none', background: `${PLAQUE.glow}, ${PLAQUE.backdrop}` },
+    // The tracking artwork is keyed, so everything outside its frame and filled
+    // slots is transparent — the site's own backdrop and particle field are
+    // meant to show through it. Hence the full background here rather than the
+    // flat one the confirmation overlay uses.
+    root: { position: 'relative', minHeight: '100dvh', display: 'flex', background: 'url(/homepage-assets/BG_8K.webp) center top / cover no-repeat, linear-gradient(155deg, #030a03 0%, #071a07 30%, #0a200a 60%, #071a07 100%)', fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: 'rtl', color: '#fff' },
 
     // The artwork, locked to its own ratio. Everything below is absolutely
     // positioned into a slot the art already drew, so all the geometry lives in
@@ -574,8 +571,12 @@ const P: Record<string, React.CSSProperties> = {
     // the img restarts the entrance on every status change.
     medallion: { width: '118%', height: '118%', objectFit: 'contain', flexShrink: 0, animation: 'medallionIn 0.5s cubic-bezier(0.34,1.5,0.64,1) both' },
 
-    statusLabel: { display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'clamp(16px, 5.2vw, 21px)', fontWeight: 900, color: '#fff', lineHeight: 1.1, textShadow: '0 2px 8px rgba(0,0,0,0.5)' },
-    statusLabelReady: { color: '#7ed07e' },
+    // This, the rail labels and the footer sit over TRANSPARENT areas of the
+    // frame, so they land on whatever the page backdrop is doing — gold bokeh
+    // and sparkle. They need their own shadow to stay readable; the elements
+    // inside the frame's filled slots do not.
+    statusLabel: { display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'clamp(16px, 5.2vw, 21px)', fontWeight: 900, color: '#fff', lineHeight: 1.1, textShadow: '0 2px 10px rgba(0,0,0,0.85), 0 0 3px rgba(0,0,0,0.7)' },
+    statusLabelReady: { color: '#8ee08e' },
 
     // The rail circles the art draws are empty outlines; these overlay them.
     railDot: {
@@ -592,17 +593,22 @@ const P: Record<string, React.CSSProperties> = {
         position: 'absolute',
         top: yPct(TRACK.rail.labelTop), height: yPct(TRACK.rail.labelHeight), width: xPct(0.20),
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 'clamp(8px, 2.5vw, 10px)', fontWeight: 700, color: 'rgba(255,255,255,0.45)', textAlign: 'center' as const,
+        fontSize: 'clamp(8px, 2.5vw, 10px)', fontWeight: 700, color: 'rgba(255,255,255,0.6)', textAlign: 'center' as const,
+        textShadow: '0 1px 6px rgba(0,0,0,0.9)',
     },
     railLabelActive: { color: '#f0d060', fontWeight: 900 },
 
     // Card bands: centred columns that never overflow their slot.
-    band: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', overflow: 'hidden', padding: '0 4%' },
+    // Sizes are budgeted against band1's 0.3348 W for the worst case — 14
+    // ingredients, which wrap the icon row onto a second line. The clamp minima
+    // matter as much as the maxima: on a 320px phone the band shrinks to 98px
+    // while fixed floors would not, which is exactly where this first overflowed.
+    band: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '3px', overflow: 'hidden', padding: '0 4%' },
 
-    statusSub: { fontSize: 'clamp(10px, 3.2vw, 13px)', fontWeight: 600, color: 'rgba(255,255,255,0.6)', textAlign: 'center' as const, lineHeight: 1.3 },
+    statusSub: { fontSize: 'clamp(8px, 3.0vw, 12px)', fontWeight: 600, color: 'rgba(255,255,255,0.62)', textAlign: 'center' as const, lineHeight: 1.3 },
     statusSubReady: { color: '#a5d6a7', fontWeight: 800 },
 
-    pickupRow: { display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'clamp(10px, 3.3vw, 13px)', color: 'rgba(255,255,255,0.65)', fontWeight: 600 },
+    pickupRow: { display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'clamp(8px, 3.1vw, 12px)', color: 'rgba(255,255,255,0.68)', fontWeight: 600 },
     pickupClock: { color: '#f0d060', fontWeight: 900 },
     pickupSep: { color: 'rgba(255,255,255,0.25)' },
 
@@ -610,32 +616,34 @@ const P: Record<string, React.CSSProperties> = {
     countdownArrived: { color: '#7ed07e', fontWeight: 900, animation: 'countdownGlow 1.5s ease-in-out infinite' },
     countdownNow: { textShadow: '0 0 12px rgba(76,175,80,0.7)' },
 
-    itemsRow: { display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '3px', fontSize: 'clamp(16px, 5.2vw, 21px)', lineHeight: 1.1, maxHeight: '58%', overflow: 'hidden' },
+    // 14 ingredients do not fit one row inside the card, so the row wraps and is
+    // capped at two — beyond that the icons are cut off rather than the band
+    // overflowing and clipping the names underneath them.
+    itemsRow: { display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignContent: 'center', gap: '3px', fontSize: 'clamp(12px, 4.8vw, 19px)', lineHeight: 1.1, maxHeight: '2.4em', overflow: 'hidden' },
     itemChip: { lineHeight: 1.1 },
     itemImg: { width: '1em', height: '1em', objectFit: 'contain', display: 'block' },
     // Clamped: the card is a fixed slot in the artwork, so a long ingredient
     // list must be cut off rather than pushing the composition apart.
     itemNames: {
-        fontSize: 'clamp(9px, 2.9vw, 11px)', color: 'rgba(255,255,255,0.45)', lineHeight: 1.4, textAlign: 'center' as const,
+        fontSize: 'clamp(8px, 2.7vw, 10px)', color: 'rgba(255,255,255,0.5)', lineHeight: 1.4, textAlign: 'center' as const,
         display: '-webkit-box', WebkitBoxOrient: 'vertical' as unknown as undefined, WebkitLineClamp: 2, overflow: 'hidden',
     },
     notes: {
-        fontSize: 'clamp(9px, 2.8vw, 11px)', color: 'rgba(255,200,100,0.75)', fontWeight: 600, textAlign: 'center' as const,
+        fontSize: 'clamp(8px, 2.7vw, 10px)', color: 'rgba(255,200,100,0.8)', fontWeight: 600, textAlign: 'center' as const,
         display: '-webkit-box', WebkitBoxOrient: 'vertical' as unknown as undefined, WebkitLineClamp: 1, overflow: 'hidden',
     },
 
     total: { fontSize: 'clamp(17px, 5.6vw, 23px)', fontWeight: 900, color: '#f0d060', lineHeight: 1.1 },
     bowlLabel: { fontSize: 'clamp(9px, 2.9vw, 11px)', color: 'rgba(240,208,96,0.6)', fontWeight: 700 },
 
-    // Sits on the green pill the art draws inside the card, so it carries no
-    // background of its own — a pill on a pill is the border-inside-border
-    // problem the summary panel already taught us.
-    payPill: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: 'clamp(10px, 3.2vw, 13px)', fontWeight: 800 },
-    payOwed: { color: '#ffd08a' },
-    payDone: { color: '#b6e6b6' },
+    // The art no longer draws a pill inside the card, so this brings its own —
+    // whether money is still owed needs to catch the eye, not read as caption.
+    payPill: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '4px 12px', borderRadius: 'var(--radius-full)', fontSize: 'clamp(10px, 3.2vw, 13px)', fontWeight: 800 },
+    payOwed: { background: 'rgba(255,183,77,0.16)', border: '1px solid rgba(255,183,77,0.45)', color: '#ffd08a' },
+    payDone: { background: 'rgba(102,187,106,0.16)', border: '1px solid rgba(102,187,106,0.45)', color: '#b6e6b6' },
 
-    footer: { display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'clamp(8px, 2.7vw, 11px)', color: 'rgba(255,255,255,0.4)', fontWeight: 600 },
-    footerOffline: { color: 'rgba(255,183,77,0.85)' },
+    footer: { display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'clamp(8px, 2.7vw, 11px)', color: 'rgba(255,255,255,0.62)', fontWeight: 600, textShadow: '0 1px 6px rgba(0,0,0,0.9)' },
+    footerOffline: { color: '#ffc266' },
 
     // The small circle bottom-left in the art. Green and breathing while
     // polling, amber when the connection is gone, steady gold once settled — so
