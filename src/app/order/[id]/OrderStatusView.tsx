@@ -2,24 +2,10 @@
 
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import Link from 'next/link';
-import dynamic from 'next/dynamic';
-import BariBadge from '@/components/ui/bari/BariBadge';
-import BariPlaque from '@/components/ui/bari/BariPlaque';
 import { PLAQUE } from '@/components/ui/bari/plaqueGeometry';
 import { fireGoldConfetti } from '@/lib/confetti';
 import { orderSizeLabel } from '@/lib/reorder';
-
-const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
-
-/**
- * The status ring's footprint on the pedestal, as a fraction of the plaque's
- * width. Not the cat's 0.66 — that would be a bordered circle around a 42px
- * glyph, mostly empty. 0.33 gives 98–124px across a 320–430 viewport, sitting
- * right around the old fixed 100px but scaling with the frame; it also puts the
- * glyph back at ~0.42 of the ring's diameter, the proportion the fixed 100px /
- * 42px pair had.
- */
-const RING_WIDTH = 0.33;
+import { TRACK, slot, xPct, yPct } from './trackingArt';
 
 type OrderStatus = 'waiting' | 'preparing' | 'ready' | 'collected';
 
@@ -51,11 +37,17 @@ function paymentLabel(payment: string | undefined): { text: string; owed: boolea
 // `sub` is the one line that says what to DO. The "ready" state in particular
 // used to be a green tick and a cat, with nothing telling the customer to come
 // to the counter or that the order number is what identifies them there.
-const STATUS_STEPS: { key: OrderStatus; label: string; icon: string; sub: string }[] = [
-    { key: 'waiting',   label: 'התקבלה',  icon: '📋',   sub: 'ההזמנה שלכם התקבלה במטבח' },
-    { key: 'preparing', label: 'בהכנה',   icon: '👨‍🍳', sub: 'מכינים את הסלט שלכם עכשיו' },
-    { key: 'ready',     label: 'מוכן!',   icon: '✅',   sub: 'גשו לדלפק ואמרו את מספר ההזמנה' },
-    { key: 'collected', label: 'נאסף',    icon: '🎉',   sub: 'בתיאבון! נשמח לראותכם שוב' },
+//
+// `medallion` is the ornate art for that step. It is shown ONLY in the hero
+// ring, at ~96px: the art's four rail circles are 33px, and at that size the
+// clipboard, the bowl, the cloche and the bag are indistinguishable gold blobs.
+// The rail instead marks progress with fills and a tick, which is legible at any
+// size — so all four medallions get used, each where it can be read.
+const STATUS_STEPS: { key: OrderStatus; label: string; rail: string; medallion: string; sub: string }[] = [
+    { key: 'waiting',   label: 'התקבלה', rail: 'התקבלה', medallion: '/builder-assets/track-seen.webp',   sub: 'ההזמנה שלכם התקבלה במטבח' },
+    { key: 'preparing', label: 'בהכנה',  rail: 'בהכנה',  medallion: '/builder-assets/track-making.webp', sub: 'מכינים את הסלט שלכם עכשיו' },
+    { key: 'ready',     label: 'מוכן!',  rail: 'מוכן',   medallion: '/builder-assets/track-ready.webp',  sub: 'גשו לדלפק ואמרו את מספר ההזמנה' },
+    { key: 'collected', label: 'נאסף',   rail: 'נאסף',   medallion: '/builder-assets/track-picked.webp', sub: 'בתיאבון! נשמח לראותכם שוב' },
 ];
 
 /* ── Celebration Sound (Web Audio API) ── */
@@ -175,11 +167,11 @@ export default function OrderStatusView({ id }: { id: string }) {
     const prevStatusRef = useRef<OrderStatus | null>(null);
     const [ringScale, setRingScale] = useState(false);
     const [labelSlide, setLabelSlide] = useState(false);
-    // Same celebratory cat used in the order-confirmation screen — reused
-    // here rather than inventing a second animation for the "ready" moment.
-    const [readyAnim, setReadyAnim] = useState<object | null>(null);
-    useEffect(() => { fetch('/cat-salad-final.json').then(r => r.json()).then(setReadyAnim).catch(() => {}); }, []);
-
+    // The celebratory cat Lottie is gone from this page: the "ready" state now
+    // shows its own medallion, so all four of the step artworks get used and the
+    // set stays coherent. That also drops lottie-react and a JSON fetch from a
+    // route people deliberately leave open. The ready moment is still marked —
+    // confetti, chime, haptic and the ring pop all still fire.
     const countdown = useCountdown(order?.pickup_time ?? null, order?.status === 'collected');
 
     // Celebration trigger
@@ -315,18 +307,10 @@ export default function OrderStatusView({ id }: { id: string }) {
     const isCollected = order.status === 'collected';
     const bowl = orderSizeLabel(order.size);
 
-    const ringStyle: React.CSSProperties = {
-        ...P.ring,
-        ...(isReady ? P.ringReady : {}),
-        ...(ringScale ? { transform: 'scale(1.15)', transition: 'transform 0.2s cubic-bezier(0.34,1.56,0.64,1)' } : { transform: 'scale(1)', transition: 'transform 0.3s cubic-bezier(0.34,1.56,0.64,1)' }),
-    };
-
     const labelStyle: React.CSSProperties = {
         ...P.statusLabel,
-        ...(isReady ? { color: '#4caf50', fontSize: '28px' } : {}),
-        ...(labelSlide
-            ? { animation: 'statusSlideIn 0.45s ease both' }
-            : {}),
+        ...(isReady ? P.statusLabelReady : {}),
+        ...(labelSlide ? { animation: 'statusSlideIn 0.45s ease both' } : {}),
     };
 
     const pay = paymentLabel(order.payment_status);
@@ -335,45 +319,62 @@ export default function OrderStatusView({ id }: { id: string }) {
         <div style={P.root}>
             <div style={P.bg} aria-hidden="true" />
 
-            {/* When the order is ready the ring is replaced by the same cat that
-                appears on the confirmation screen, on the same pedestal — so the
-                customer sees a familiar object arrive at the moment their food
-                does. The footprint grows with it, which reads as a reveal rather
-                than a resize; and because the pedestal slot is a fixed-aspect
-                box, the swap cannot move anything below it. */}
-            <BariPlaque
-                pedestal={
-                    <div style={ringStyle}>
-                        {isReady && readyAnim
-                            ? <Lottie animationData={readyAnim} loop autoplay style={{ width: '84%', height: '84%' }} />
-                            : <div style={P.ringIcon}>{step.icon}</div>}
-                    </div>
-                }
-                pedestalWidth={isReady && readyAnim ? PLAQUE.pedestalArt : RING_WIDTH}
-                title={
-                    <>
-                        <div style={labelStyle}>{step.label}</div>
-                        <div style={{ ...P.statusSub, ...(isReady ? P.statusSubReady : {}) }}>
-                            {step.sub}
-                        </div>
-                    </>
-                }
-            >
-                <div style={P.bodyStack}>
-                    {/* The order number is what the customer says at the counter,
-                        so it takes the hero position under the divider that the
-                        price holds on the confirmation screen. */}
-                    <div style={{ animation: 'plaqueFadeUp 0.4s ease 0.05s both' }}>
-                        <BariBadge>{order.order_num}</BariBadge>
-                    </div>
+            <div style={P.board}>
+                {/* Order number — what the customer says at the counter. */}
+                <div style={{ ...slot(TRACK.nameplate.top, TRACK.nameplate.height, TRACK.nameplate.left, TRACK.nameplate.right), ...P.nameplate }}>
+                    {order.order_num}
+                </div>
 
+                {/* The hero ring. The medallion for the current step lives here
+                    and nowhere else — it is the only slot in the art big enough
+                    to read one. It changes as the order progresses, so the
+                    picture itself carries the state. */}
+                <div style={{ ...P.heroRing, ...(ringScale ? P.heroPop : undefined) }}>
+                    <img key={step.key} src={step.medallion} alt="" style={P.medallion} />
+                </div>
+
+                <div style={{ ...slot(TRACK.labelBand.top, TRACK.labelBand.height), ...labelStyle }}>
+                    {step.label}
+                </div>
+
+                {/* Four circles the art already drew. No medallions here: at 33px
+                    they are indistinguishable gold blobs. Progress reads from
+                    fill and a tick instead, which survives any size. */}
+                {STATUS_STEPS.map((s, i) => {
+                    const done = i < currentStep;
+                    const active = i === currentStep;
+                    return (
+                        <div key={s.key}>
+                            <div style={{
+                                ...P.railDot,
+                                left: xPct(TRACK.rail.centres[i] - TRACK.rail.size / 2),
+                                ...(done ? P.railDone : {}),
+                                ...(active ? P.railActive : {}),
+                            }}>
+                                {done ? '✓' : ''}
+                            </div>
+                            <div style={{
+                                ...P.railLabel,
+                                left: xPct(TRACK.rail.centres[i] - 0.10),
+                                ...(active ? P.railLabelActive : {}),
+                            }}>
+                                {s.rail}
+                            </div>
+                        </div>
+                    );
+                })}
+
+                {/* ── Inside the ornate card ── */}
+
+                <div style={{ ...slot(TRACK.card.band1.top, TRACK.card.band1.height, TRACK.card.left, TRACK.card.right), ...P.band }}>
+                    <div style={{ ...P.statusSub, ...(isReady ? P.statusSubReady : {}) }}>{step.sub}</div>
                     {/* Pickup time — the clock time first, since that is what the
                         customer planned around, then how long is left. Once the
-                        order is collected the remaining-time half is dropped: it is
+                        order is collected the remaining half is dropped: it is
                         frozen by then, and counting down to a collection that has
                         already happened reads as a stuck page. */}
                     {countdown && (
-                        <div style={P.pickupTimeCard}>
+                        <div style={P.pickupRow}>
                             <span>⏰ איסוף <strong style={P.pickupClock}>{countdown.clock}</strong></span>
                             {!isCollected && <>
                                 <span style={P.pickupSep}>·</span>
@@ -386,54 +387,69 @@ export default function OrderStatusView({ id }: { id: string }) {
                             </>}
                         </div>
                     )}
-
-                    <div style={P.hairline} />
-
-                    {/* No card chrome here any more: a bordered box inside a
-                        bordered frame is what made the summary panel feel
-                        cramped, and its own padding double-inset against the
-                        plaque's, costing the ingredient names a line. */}
-                    <div style={P.items}>
-                        <div style={P.itemsTitle}>
-                            הסלט שלכם{bowl ? <span style={P.itemsBowl}> · {bowl}</span> : null}
-                        </div>
-                        <div style={P.itemsRow}>
-                            {order.items.map(it => (
-                                <span key={it.id} style={P.itemChip} title={it.he}>
-                                    {it.icon && it.icon.startsWith('/')
-                                        ? <img src={it.icon} alt={it.he} style={{ width: '24px', height: '24px', objectFit: 'contain' }} />
-                                        : it.icon}
-                                </span>
-                            ))}
-                        </div>
-                        <div style={P.itemNames}>{order.items.map(i => i.he).join(' · ')}</div>
-                        {order.notes && <div style={P.notes}>📝 {order.notes}</div>}
-                        <div style={P.total}>₪{order.total}</div>
-                        {pay && (
-                            <div style={{ ...P.payPill, ...(pay.owed ? P.payOwed : P.payDone) }}>
-                                <span>{pay.owed ? '💳' : '✓'}</span>
-                                <span>{pay.text}</span>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* The footer used to promise "refreshes automatically" even
-                        when the polling had stopped or was failing — the one moment
-                        that claim matters is exactly when it stopped being true. */}
-                    <div style={{ ...P.footer, ...(offline ? P.footerOffline : {}) }}>
-                        {offline ? 'אין חיבור — מנסים שוב…'
-                            : settled ? 'ההזמנה הושלמה'
-                                : 'מתרענן אוטומטית · לא צריך לרענן'}
-                    </div>
-
-                    {/* Opened from a saved link this page had no way out of itself. */}
-                    <Link href="/" style={P.homeLink}>← חזרה לתפריט</Link>
                 </div>
-            </BariPlaque>
+
+                {/* The card is a fixed slot in the artwork, so this cannot grow:
+                    the names and any note are line-clamped rather than allowed to
+                    push the composition apart. */}
+                <div style={{ ...slot(TRACK.card.band2.top, TRACK.card.band2.height, TRACK.card.left, TRACK.card.right), ...P.band }}>
+                    <div style={P.itemsRow}>
+                        {order.items.map(it => (
+                            <span key={it.id} style={P.itemChip} title={it.he}>
+                                {it.icon && it.icon.startsWith('/')
+                                    ? <img src={it.icon} alt={it.he} style={P.itemImg} />
+                                    : it.icon}
+                            </span>
+                        ))}
+                    </div>
+                    <div style={P.itemNames}>{order.items.map(i => i.he).join(' · ')}</div>
+                    {order.notes && <div style={P.notes}>📝 {order.notes}</div>}
+                </div>
+
+                <div style={{ ...slot(TRACK.card.band3.top, TRACK.card.band3.height, TRACK.card.left, TRACK.card.right), ...P.band }}>
+                    <div style={P.total}>
+                        ₪{order.total}{bowl ? <span style={P.bowlLabel}> · {bowl}</span> : null}
+                    </div>
+                </div>
+
+                {/* The green pill the art draws inside the card. */}
+                {pay && (
+                    <div style={{
+                        ...slot(TRACK.card.pill.top, TRACK.card.pill.height, TRACK.card.pill.left, TRACK.card.pill.right),
+                        ...P.payPill, ...(pay.owed ? P.payOwed : P.payDone),
+                    }}>
+                        <span>{pay.owed ? '💳' : '✓'}</span>
+                        <span>{pay.text}</span>
+                    </div>
+                )}
+
+                {/* The footer used to promise "refreshes automatically" even when
+                    the polling had stopped or was failing — the one moment that
+                    claim matters is exactly when it stopped being true. */}
+                <div style={{ ...slot(TRACK.footer.top, TRACK.footer.height), ...P.footer, ...(offline ? P.footerOffline : {}) }}>
+                    {offline ? 'אין חיבור — מנסים שוב…'
+                        : settled ? 'ההזמנה הושלמה'
+                            : 'מתרענן אוטומטית · לא צריך לרענן'}
+                </div>
+
+                {/* The small circle bottom-left: a live indicator, so a page that
+                    is quietly still polling looks different from a stuck one. */}
+                <div style={{ ...P.statusDot, ...(offline ? P.statusDotOffline : settled ? P.statusDotSettled : {}) }} />
+
+                {/* Opened from a saved link this page had no way out of itself. */}
+                <Link
+                    href="/"
+                    style={{ ...slot(TRACK.bottomPill.top, TRACK.bottomPill.height, TRACK.bottomPill.left, TRACK.bottomPill.right), ...P.bottomPill }}
+                >
+                    ← חזרה לתפריט
+                </Link>
+            </div>
 
             <style>{`
-                @keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(76,175,80,0.4)} 50%{box-shadow:0 0 0 16px rgba(76,175,80,0)} }
-                @keyframes statusSlideIn { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+                @keyframes statusSlideIn { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+                @keyframes medallionIn { from{opacity:0;transform:scale(0.72) rotate(-6deg)} to{opacity:1;transform:none} }
+                @keyframes railPulse { 0%,100%{box-shadow:0 0 10px rgba(240,208,96,0.55)} 50%{box-shadow:0 0 20px rgba(240,208,96,0.95)} }
+                @keyframes livePulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.45;transform:scale(0.8)} }
                 @keyframes shimmerMove { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
                 @keyframes shimmerPulse { 0%,100%{opacity:0.4} 50%{opacity:0.15} }
                 @keyframes countdownPulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.7;transform:scale(1.04)} }
@@ -444,46 +460,39 @@ export default function OrderStatusView({ id }: { id: string }) {
 }
 
 /* ── Shimmer Loading State ──
-   Framed, so the plaque is already in place when the data lands and only the
-   interior swaps — and so the frame art starts downloading immediately. The
-   skeleton sits in the same slots the real content will: the circle where the
-   ring goes, at the ring's own width, so nothing above the body moves. */
+   Shows the board itself with shimmer in the slots, so the artwork is already
+   in place when the data lands and only the contents swap. Because every slot
+   is absolutely positioned, nothing moves at all on that transition. */
 function Loading({ offline }: { offline: boolean }) {
+    const bar = (top: number, height: number, left: number, right: number) => ({
+        ...slot(top, height, left, right), ...P.shimmerBar,
+    });
     return (
         <div style={P.root}>
             <div style={P.bg} aria-hidden="true" />
 
-            <BariPlaque
-                pedestal={<div style={P.shimmerCircle} />}
-                pedestalWidth={RING_WIDTH}
-                title={
-                    <>
-                        <div style={{ ...P.shimmerBar, width: '120px', height: '20px' }} />
-                        <div style={{ ...P.shimmerBar, width: '160px', marginTop: '10px' }} />
-                    </>
-                }
-            >
-                {/* This block must stay at least 0.2905 * plaque-width tall or the
-                    frame's fixed bands overflow and the bottom ornament renders
-                    outside the frame — see scripts/verify-plaque.ts. At 109px for
-                    the widest plaque, three thin bars were not enough. */}
-                <div style={{ ...P.bodyStack, gap: '16px' }}>
-                    <div style={{ ...P.shimmerBar, width: '140px' }} />
-                    <div style={{ ...P.shimmerBar, width: '100%', height: '46px', borderRadius: '10px' }} />
-                    <div style={{ ...P.shimmerBar, width: '180px' }} />
-                    <div style={{ ...P.shimmerBar, width: '100%', height: '40px', borderRadius: '10px' }} />
-
-                    {/* A first load that keeps failing is now named, and keeps
-                        retrying, instead of shimmering silently for ever. */}
-                    {offline && (
-                        <div style={{ ...P.footer, ...P.footerOffline, textAlign: 'center' }}>
-                            אין חיבור — מנסים שוב…
-                        </div>
-                    )}
+            <div style={P.board}>
+                <div style={{ ...P.heroRing }}>
+                    <div style={P.shimmerCircle} />
                 </div>
-            </BariPlaque>
+                <div style={bar(TRACK.nameplate.top + 0.012, TRACK.nameplate.height - 0.024, 0.42, 1 - 0.58)} />
+                <div style={bar(TRACK.labelBand.top + 0.012, TRACK.labelBand.height - 0.024, 0.36, 1 - 0.64)} />
+                <div style={bar(TRACK.card.band1.top + 0.03, 0.026, 0.22, 1 - 0.78)} />
+                <div style={bar(TRACK.card.band2.top + 0.05, 0.026, 0.16, 1 - 0.84)} />
+                <div style={bar(TRACK.card.band2.top + 0.10, 0.026, 0.24, 1 - 0.76)} />
+                <div style={bar(TRACK.card.band3.top + 0.01, 0.032, 0.34, 1 - 0.66)} />
+
+                {/* A first load that keeps failing is named, and keeps retrying,
+                    instead of shimmering silently for ever. */}
+                {offline && (
+                    <div style={{ ...slot(TRACK.footer.top, TRACK.footer.height), ...P.footer, ...P.footerOffline }}>
+                        אין חיבור — מנסים שוב…
+                    </div>
+                )}
+            </div>
 
             <style>{`
+                @keyframes plaqueFadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
                 @keyframes shimmerMove { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
                 @keyframes shimmerPulse { 0%,100%{opacity:0.4} 50%{opacity:0.15} }
             `}</style>
@@ -529,52 +538,123 @@ const P: Record<string, React.CSSProperties> = {
     // `background-attachment: fixed` is unreliable on iOS Safari.
     bg: { position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none', background: `${PLAQUE.glow}, ${PLAQUE.backdrop}` },
 
-    // Scales with the plaque (see RING_WIDTH) — a fixed 100px circle inside a
-    // 238px-tall pedestal zone reads as a lost dot.
-    ring: { width: '100%', height: '100%', borderRadius: '50%', border: '3px solid rgba(200,168,78,0.5)', background: 'rgba(200,168,78,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.4s ease', animation: 'plaqueFadeUp 0.4s ease 0.1s both' },
-    ringReady: { border: '3px solid #4caf50', background: 'rgba(76,175,80,0.12)', animation: 'plaqueFadeUp 0.4s ease 0.1s both, pulse 1.5s ease-in-out 0.5s 3' },
-    // Clamped, not a percentage: a % font-size resolves against the parent's
-    // font-size, not its width, so it would not scale with the plaque at all.
-    ringIcon: { fontSize: 'clamp(38px, 13vw, 54px)', lineHeight: 1 },
+    // The artwork, locked to its own ratio. Everything below is absolutely
+    // positioned into a slot the art already drew, so all the geometry lives in
+    // trackingArt.ts and none of it is guessed here.
+    board: {
+        position: 'relative', zIndex: 1,
+        width: '100%', maxWidth: `${TRACK.maxWidth}px`,
+        aspectRatio: TRACK.aspect,
+        margin: 'auto',
+        backgroundImage: `url(${TRACK.art})`,
+        backgroundSize: '100% 100%',
+        backgroundRepeat: 'no-repeat',
+        borderRadius: '10px',
+        boxShadow: '0 10px 40px rgba(0,0,0,0.55)',
+        animation: 'plaqueFadeUp 0.5s ease both',
+    },
 
-    // Line heights are pinned because the title zone scales with the plaque
-    // width while this type does not: at Heebo's default (~1.5) the ready state
-    // overflows the zone on a 320px phone and runs over the engraved divider.
-    statusLabel: { fontSize: '22px', fontWeight: 900, color: '#fff', lineHeight: 1.1, animation: 'plaqueFadeUp 0.4s ease 0.15s both' },
-    statusSub: { fontSize: '13px', fontWeight: 600, color: 'rgba(255,255,255,0.5)', textAlign: 'center' as const, lineHeight: 1.3, marginTop: '4px', animation: 'plaqueFadeUp 0.4s ease 0.18s both' },
-    statusSubReady: { color: '#a5d6a7', fontSize: '14px', fontWeight: 800 },
+    // Type is sized in vw against the board's own width (which tracks the
+    // viewport below its 400px cap) because every slot scales with the art while
+    // fixed px would not — the same trap the confirmation screen's title hit.
+    nameplate: { display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'clamp(10px, 3.1vw, 13px)', fontWeight: 900, color: '#f0d060', letterSpacing: '0.04em' },
 
-    // The body slot is a plain block in BariPlaque so margin-driven callers stay
-    // untouched; this page wants gap-based spacing, so it brings its own column.
-    bodyStack: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px' },
+    heroRing: {
+        position: 'absolute',
+        top: yPct(TRACK.heroRing.top), height: yPct(TRACK.heroRing.size),
+        left: xPct(0.5 - TRACK.heroRing.size / 2), width: xPct(TRACK.heroRing.size),
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        transition: 'transform 0.3s cubic-bezier(0.34,1.56,0.64,1)',
+    },
+    heroPop: { transform: 'scale(1.12)', transition: 'transform 0.2s cubic-bezier(0.34,1.56,0.64,1)' },
+    // Deliberately larger than the ring the art draws, so the medallion's own
+    // gold rim lands ON it and the two read as one object. Sized smaller they
+    // sit as two concentric rings with a gap, which looks like a mistake. It
+    // overflows the slot symmetrically because the parent centres it. `key` on
+    // the img restarts the entrance on every status change.
+    medallion: { width: '118%', height: '118%', objectFit: 'contain', flexShrink: 0, animation: 'medallionIn 0.5s cubic-bezier(0.34,1.5,0.64,1) both' },
 
-    pickupTimeCard: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: 'rgba(255,255,255,0.6)', fontWeight: 600, animation: 'plaqueFadeUp 0.4s ease 0.2s both', padding: '8px 18px', borderRadius: '999px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' },
+    statusLabel: { display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'clamp(16px, 5.2vw, 21px)', fontWeight: 900, color: '#fff', lineHeight: 1.1, textShadow: '0 2px 8px rgba(0,0,0,0.5)' },
+    statusLabelReady: { color: '#7ed07e' },
+
+    // The rail circles the art draws are empty outlines; these overlay them.
+    railDot: {
+        position: 'absolute',
+        top: yPct(TRACK.rail.top), height: yPct(TRACK.rail.size), width: xPct(TRACK.rail.size),
+        borderRadius: '50%',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 'clamp(11px, 3.6vw, 15px)', fontWeight: 900, color: '#0d2e0d',
+        transition: 'background 0.35s ease, box-shadow 0.35s ease',
+    },
+    railDone: { background: 'radial-gradient(circle at 40% 35%, #ffe066, #c8a832)', color: '#0d2e0d' },
+    railActive: { background: 'rgba(200,168,78,0.30)', boxShadow: '0 0 14px rgba(240,208,96,0.75)', animation: 'railPulse 1.8s ease-in-out infinite' },
+    railLabel: {
+        position: 'absolute',
+        top: yPct(TRACK.rail.labelTop), height: yPct(TRACK.rail.labelHeight), width: xPct(0.20),
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 'clamp(8px, 2.5vw, 10px)', fontWeight: 700, color: 'rgba(255,255,255,0.45)', textAlign: 'center' as const,
+    },
+    railLabelActive: { color: '#f0d060', fontWeight: 900 },
+
+    // Card bands: centred columns that never overflow their slot.
+    band: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', overflow: 'hidden', padding: '0 4%' },
+
+    statusSub: { fontSize: 'clamp(10px, 3.2vw, 13px)', fontWeight: 600, color: 'rgba(255,255,255,0.6)', textAlign: 'center' as const, lineHeight: 1.3 },
+    statusSubReady: { color: '#a5d6a7', fontWeight: 800 },
+
+    pickupRow: { display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'clamp(10px, 3.3vw, 13px)', color: 'rgba(255,255,255,0.65)', fontWeight: 600 },
     pickupClock: { color: '#f0d060', fontWeight: 900 },
     pickupSep: { color: 'rgba(255,255,255,0.25)' },
 
-    countdownUrgent: { color: '#f0d060', fontWeight: 800, fontSize: '16px', animation: 'countdownPulse 1s ease-in-out infinite' },
-    countdownArrived: { color: '#4caf50', fontWeight: 900, fontSize: '18px', animation: 'countdownGlow 1.5s ease-in-out infinite' },
+    countdownUrgent: { color: '#f0d060', fontWeight: 800, animation: 'countdownPulse 1s ease-in-out infinite' },
+    countdownArrived: { color: '#7ed07e', fontWeight: 900, animation: 'countdownGlow 1.5s ease-in-out infinite' },
     countdownNow: { textShadow: '0 0 12px rgba(76,175,80,0.7)' },
 
-    hairline: { width: '60px', height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,78,0.4), transparent)', flexShrink: 0 },
+    itemsRow: { display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '3px', fontSize: 'clamp(16px, 5.2vw, 21px)', lineHeight: 1.1, maxHeight: '58%', overflow: 'hidden' },
+    itemChip: { lineHeight: 1.1 },
+    itemImg: { width: '1em', height: '1em', objectFit: 'contain', display: 'block' },
+    // Clamped: the card is a fixed slot in the artwork, so a long ingredient
+    // list must be cut off rather than pushing the composition apart.
+    itemNames: {
+        fontSize: 'clamp(9px, 2.9vw, 11px)', color: 'rgba(255,255,255,0.45)', lineHeight: 1.4, textAlign: 'center' as const,
+        display: '-webkit-box', WebkitBoxOrient: 'vertical' as unknown as undefined, WebkitLineClamp: 2, overflow: 'hidden',
+    },
+    notes: {
+        fontSize: 'clamp(9px, 2.8vw, 11px)', color: 'rgba(255,200,100,0.75)', fontWeight: 600, textAlign: 'center' as const,
+        display: '-webkit-box', WebkitBoxOrient: 'vertical' as unknown as undefined, WebkitLineClamp: 1, overflow: 'hidden',
+    },
 
-    items: { width: '100%', animation: 'plaqueFadeUp 0.4s ease 0.3s both' },
-    itemsTitle: { fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.3)', marginBottom: '10px', letterSpacing: '0.06em' },
-    itemsBowl: { color: 'rgba(240,208,96,0.65)', fontWeight: 800 },
-    itemsRow: { display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '4px', fontSize: '24px', marginBottom: '8px' },
-    itemChip: { lineHeight: 1.2 },
-    itemNames: { fontSize: '12px', color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 },
-    notes: { fontSize: '12px', color: 'rgba(255,200,100,0.7)', marginTop: '8px', fontWeight: 600 },
-    total: { fontSize: '20px', fontWeight: 900, color: '#f0d060', marginTop: '12px' },
-    payPill: { marginTop: '6px', display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '5px 12px', borderRadius: 'var(--radius-full)', fontSize: '12px', fontWeight: 800 },
-    payOwed: { background: 'rgba(255,183,77,0.14)', border: '1px solid rgba(255,183,77,0.42)', color: '#ffcc80' },
-    payDone: { background: 'rgba(102,187,106,0.14)', border: '1px solid rgba(102,187,106,0.42)', color: '#a5d6a7' },
+    total: { fontSize: 'clamp(17px, 5.6vw, 23px)', fontWeight: 900, color: '#f0d060', lineHeight: 1.1 },
+    bowlLabel: { fontSize: 'clamp(9px, 2.9vw, 11px)', color: 'rgba(240,208,96,0.6)', fontWeight: 700 },
 
-    footer: { fontSize: '11px', color: 'rgba(255,255,255,0.4)', fontWeight: 600 },
+    // Sits on the green pill the art draws inside the card, so it carries no
+    // background of its own — a pill on a pill is the border-inside-border
+    // problem the summary panel already taught us.
+    payPill: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: 'clamp(10px, 3.2vw, 13px)', fontWeight: 800 },
+    payOwed: { color: '#ffd08a' },
+    payDone: { color: '#b6e6b6' },
+
+    footer: { display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'clamp(8px, 2.7vw, 11px)', color: 'rgba(255,255,255,0.4)', fontWeight: 600 },
     footerOffline: { color: 'rgba(255,183,77,0.85)' },
-    // Takes the shape and position the confirmation screen's terminal action
-    // has, and the plaque's 17% bottom padding is what clears it of the ornament.
-    homeLink: { display: 'block', width: '100%', padding: '12px 22px', borderRadius: '14px', fontSize: '13px', fontWeight: 700, color: 'rgba(240,208,96,0.85)', textDecoration: 'none', textAlign: 'center' as const, border: '1px solid rgba(200,168,78,0.30)', background: 'rgba(200,168,78,0.10)' },
+
+    // The small circle bottom-left in the art. Green and breathing while
+    // polling, amber when the connection is gone, steady gold once settled — so
+    // a page that is quietly working looks different from a stuck one.
+    statusDot: {
+        position: 'absolute',
+        top: yPct(TRACK.statusDot.top + TRACK.statusDot.size * 0.30),
+        height: yPct(TRACK.statusDot.size * 0.40),
+        left: xPct(TRACK.statusDot.left + TRACK.statusDot.size * 0.30),
+        width: xPct(TRACK.statusDot.size * 0.40),
+        borderRadius: '50%', background: '#7ed07e',
+        boxShadow: '0 0 8px rgba(126,208,126,0.9)',
+        animation: 'livePulse 2s ease-in-out infinite',
+    },
+    statusDotOffline: { background: '#ffb74d', boxShadow: '0 0 8px rgba(255,183,77,0.9)' },
+    statusDotSettled: { background: '#f0d060', boxShadow: '0 0 8px rgba(240,208,96,0.8)', animation: 'none' },
+
+    // Sits on the green pill the art draws at the bottom.
+    bottomPill: { display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'clamp(11px, 3.5vw, 14px)', fontWeight: 800, color: '#ffe9a8', textDecoration: 'none', letterSpacing: '0.02em' },
 
     /* Shimmer loading */
     shimmerCircle: {
