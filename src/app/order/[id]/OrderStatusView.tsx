@@ -39,16 +39,17 @@ function paymentLabel(payment: string | undefined): { text: string; owed: boolea
 // used to be a green tick and a cat, with nothing telling the customer to come
 // to the counter or that the order number is what identifies them there.
 //
-// `medallion` is the ornate art for that step. It is shown ONLY in the hero
-// ring, at ~96px: the art's four rail circles are 33px, and at that size the
-// clipboard, the bowl, the cloche and the bag are indistinguishable gold blobs.
-// The rail instead marks progress with fills and a tick, which is legible at any
-// size — so all four medallions get used, each where it can be read.
-const STATUS_STEPS: { key: OrderStatus; label: string; rail: string; medallion: string; sub: string }[] = [
-    { key: 'waiting',   label: 'התקבלה', rail: 'התקבלה', medallion: '/builder-assets/track-seen.webp',   sub: 'ההזמנה שלכם התקבלה במטבח' },
-    { key: 'preparing', label: 'בהכנה',  rail: 'בהכנה',  medallion: '/builder-assets/track-making.webp', sub: 'מכינים את הסלט שלכם עכשיו' },
-    { key: 'ready',     label: 'מוכן!',  rail: 'מוכן',   medallion: '/builder-assets/track-ready.webp',  sub: 'גשו לדלפק ואמרו את מספר ההזמנה' },
-    { key: 'collected', label: 'נאסף',   rail: 'נאסף',   medallion: '/builder-assets/track-picked.webp', sub: 'בתיאבון! נשמח לראותכם שוב' },
+// `medallion` is the full ornate art, for the hero ring at ~96px. `railIcon` is
+// the same art cropped to its inner disc, for the 32px rail circles: at that
+// size the ornate rim is what eats the space, and the full medallions are
+// indistinguishable gold blobs. Cropped to the subject — and with the artwork's
+// own circle supplying the rim — the clipboard, bowl, cloche and bag stay
+// telling at 32px.
+const STATUS_STEPS: { key: OrderStatus; label: string; rail: string; medallion: string; railIcon: string; sub: string }[] = [
+    { key: 'waiting',   label: 'התקבלה', rail: 'התקבלה', medallion: '/builder-assets/track-seen.webp',   railIcon: '/builder-assets/track-seen-sm.webp',   sub: 'ההזמנה שלכם התקבלה במטבח' },
+    { key: 'preparing', label: 'בהכנה',  rail: 'בהכנה',  medallion: '/builder-assets/track-making.webp', railIcon: '/builder-assets/track-making-sm.webp', sub: 'מכינים את הסלט שלכם עכשיו' },
+    { key: 'ready',     label: 'מוכן!',  rail: 'מוכן',   medallion: '/builder-assets/track-ready.webp',  railIcon: '/builder-assets/track-ready-sm.webp',  sub: 'גשו לדלפק ואמרו את מספר ההזמנה' },
+    { key: 'collected', label: 'נאסף',   rail: 'נאסף',   medallion: '/builder-assets/track-picked.webp', railIcon: '/builder-assets/track-picked-sm.webp', sub: 'בתיאבון! נשמח לראותכם שוב' },
 ];
 
 /* ── Celebration Sound (Web Audio API) ── */
@@ -339,26 +340,31 @@ export default function OrderStatusView({ id }: { id: string }) {
                     {step.label}
                 </div>
 
-                {/* Four circles the art already drew. No medallions here: at 33px
-                    they are indistinguishable gold blobs. Progress reads from
-                    fill and a tick instead, which survives any size. */}
+                {/* The four circles the art draws, running RIGHT to LEFT — the
+                    step order is in trackingArt's `centres`, so this just walks
+                    the steps. Progress reads from the icons themselves: reached
+                    steps are full colour, steps still to come are dimmed and
+                    desaturated, and the current one carries the glow. */}
                 {STATUS_STEPS.map((s, i) => {
-                    const done = i < currentStep;
+                    const reached = i <= currentStep;
                     const active = i === currentStep;
                     return (
                         <div key={s.key}>
                             <div style={{
                                 ...P.railDot,
                                 left: xPct(TRACK.rail.centres[i] - TRACK.rail.size / 2),
-                                ...(done ? P.railDone : {}),
                                 ...(active ? P.railActive : {}),
                             }}>
-                                {done ? '✓' : ''}
+                                <img
+                                    src={s.railIcon}
+                                    alt=""
+                                    style={{ ...P.railImg, ...(reached ? {} : P.railImgPending) }}
+                                />
                             </div>
                             <div style={{
                                 ...P.railLabel,
                                 left: xPct(TRACK.rail.centres[i] - 0.10),
-                                ...(active ? P.railLabelActive : {}),
+                                ...(active ? P.railLabelActive : reached ? P.railLabelReached : {}),
                             }}>
                                 {s.rail}
                             </div>
@@ -578,24 +584,27 @@ const P: Record<string, React.CSSProperties> = {
     statusLabel: { display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'clamp(16px, 5.2vw, 21px)', fontWeight: 900, color: '#fff', lineHeight: 1.1, textShadow: '0 2px 10px rgba(0,0,0,0.85), 0 0 3px rgba(0,0,0,0.7)' },
     statusLabelReady: { color: '#8ee08e' },
 
-    // The rail circles the art draws are empty outlines; these overlay them.
+    // Overlays the circles the art draws, which supply the gold rim — hence the
+    // cropped icons, which carry no rim of their own.
     railDot: {
         position: 'absolute',
         top: yPct(TRACK.rail.top), height: yPct(TRACK.rail.size), width: xPct(TRACK.rail.size),
         borderRadius: '50%',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 'clamp(11px, 3.6vw, 15px)', fontWeight: 900, color: '#0d2e0d',
-        transition: 'background 0.35s ease, box-shadow 0.35s ease',
+        transition: 'box-shadow 0.35s ease',
     },
-    railDone: { background: 'radial-gradient(circle at 40% 35%, #ffe066, #c8a832)', color: '#0d2e0d' },
-    railActive: { background: 'rgba(200,168,78,0.30)', boxShadow: '0 0 14px rgba(240,208,96,0.75)', animation: 'railPulse 1.8s ease-in-out infinite' },
+    railActive: { boxShadow: '0 0 14px rgba(240,208,96,0.75)', animation: 'railPulse 1.8s ease-in-out infinite' },
+    railImg: { width: '86%', height: '86%', objectFit: 'contain', transition: 'opacity 0.35s ease, filter 0.35s ease' },
+    // Steps still to come read as "not yet" without needing a second symbol.
+    railImgPending: { opacity: 0.32, filter: 'grayscale(0.75) brightness(0.75)' },
     railLabel: {
         position: 'absolute',
         top: yPct(TRACK.rail.labelTop), height: yPct(TRACK.rail.labelHeight), width: xPct(0.20),
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 'clamp(8px, 2.5vw, 10px)', fontWeight: 700, color: 'rgba(255,255,255,0.6)', textAlign: 'center' as const,
-        textShadow: '0 1px 6px rgba(0,0,0,0.9)',
+        fontSize: 'clamp(8px, 2.5vw, 10px)', fontWeight: 700, color: 'rgba(255,255,255,0.42)', textAlign: 'center' as const,
+        textShadow: '0 1px 6px rgba(0,0,0,0.9)', transition: 'color 0.35s ease',
     },
+    railLabelReached: { color: 'rgba(255,255,255,0.72)' },
     railLabelActive: { color: '#f0d060', fontWeight: 900 },
 
     // Card bands: centred columns that never overflow their slot.

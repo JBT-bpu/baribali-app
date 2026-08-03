@@ -139,6 +139,12 @@ for (const W of WIDTHS) {
     ok(band2Needs <= TRACK.card.band2.height * W,
         `W=${W}: band2 needs ${band2Needs.toFixed(0)}px, slot is ${(TRACK.card.band2.height * W).toFixed(0)}px`);
 }
+// This is a Hebrew-first app: step 1 sits on the RIGHT and progress runs
+// leftwards. The centres are stored in step order, so that means strictly
+// descending x. Easy to undo by accident when re-measuring off the artwork.
+ok(TRACK.rail.centres.every((c, i) => i === 0 || c < TRACK.rail.centres[i - 1]),
+    `rail runs right-to-left: ${TRACK.rail.centres.map(c => `${(c * 100).toFixed(0)}%`).join(' -> ')}`);
+
 // The board is a fixed ratio, so its height is decided entirely by its width.
 for (const [vwPx, screenH] of [[320, 568], [390, 844]] as [number, number][]) {
     const W = Math.min(vwPx, TRACK.maxWidth) - 2 * TRACK.gutter;

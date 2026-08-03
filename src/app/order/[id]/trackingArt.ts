@@ -52,10 +52,18 @@ export const TRACK = {
     /** Between the ring and the engraved divider — the status label. */
     labelBand: { top: f(505), height: f(568 - 505) },
 
-    /** Four circles with an engraved connector already drawn between them. */
+    /**
+     * Four circles with an engraved connector already drawn between them.
+     *
+     * The centres are listed RIGHT TO LEFT — this is a Hebrew-first app, so the
+     * first step belongs on the right and progress runs leftwards. Reversing the
+     * array here rather than at the render site means `centres[i]` is simply
+     * "where step i goes", and nothing downstream has to know about direction.
+     * (Measured left-to-right off the art as 165, 367, 573, 774.)
+     */
     rail: {
         top: f(666), size: f(82),
-        centres: [f(165), f(367), f(573), f(774)] as const,
+        centres: [f(774), f(573), f(367), f(165)] as const,
         labelTop: f(756), labelHeight: f(812 - 756),
     },
 
