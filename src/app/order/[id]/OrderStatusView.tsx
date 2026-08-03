@@ -574,7 +574,7 @@ const P: Record<string, React.CSSProperties> = {
     // the img restarts the entrance on every status change.
     medallion: { width: '118%', height: '118%', objectFit: 'contain', flexShrink: 0, animation: 'medallionIn 0.5s cubic-bezier(0.34,1.5,0.64,1) both' },
 
-    statusLabel: { fontSize: 'clamp(14px, 4.4vw, 18px)', fontWeight: 900, color: '#fff', lineHeight: 1.15, textShadow: '0 1px 6px rgba(0,0,0,0.6)' },
+    statusLabel: { fontSize: 'clamp(14px, 4.4vw, 18px)', fontWeight: 900, color: '#fff', lineHeight: 1.15, textShadow: '0 1px 4px rgba(0,0,0,0.8)' },
     statusLabelReady: { color: '#8ee08e' },
 
     // Overlays the circles the art draws, which supply the gold rim — hence the
@@ -598,11 +598,16 @@ const P: Record<string, React.CSSProperties> = {
     // type floors would not, which is where this overflows first.
     band: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '2px', overflow: 'hidden', padding: '0 3%' },
 
-    statusSub: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', fontSize: 'clamp(8px, 3.0vw, 12px)', fontWeight: 600, color: 'rgba(255,255,255,0.62)', textAlign: 'center' as const, lineHeight: 1.25 },
-    statusSubReady: { color: '#a5d6a7', fontWeight: 800 },
+    // The artwork's slots are a botanical texture, not flat green: median
+    // contrast for white text is ~11:1, but the brightest 1-3% of it (leaf
+    // highlights and gold flecks) is light enough that faint text landing on
+    // those pixels drops toward 2.5:1. Hence the lift in opacity and the shadow
+    // on every line inside the card.
+    statusSub: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', fontSize: 'clamp(8px, 3.0vw, 12px)', fontWeight: 600, color: 'rgba(255,255,255,0.78)', textAlign: 'center' as const, lineHeight: 1.25, textShadow: '0 1px 3px rgba(0,0,0,0.75)' },
+    statusSubReady: { color: '#b6e6b6', fontWeight: 800 },
     statusSubOffline: { color: '#ffc266', fontWeight: 700 },
 
-    pickupRow: { display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'clamp(8px, 3.1vw, 12px)', color: 'rgba(255,255,255,0.68)', fontWeight: 600, lineHeight: 1.25 },
+    pickupRow: { display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'clamp(8px, 3.1vw, 12px)', color: 'rgba(255,255,255,0.82)', fontWeight: 600, lineHeight: 1.25, textShadow: '0 1px 3px rgba(0,0,0,0.75)' },
     pickupClock: { color: '#f0d060', fontWeight: 900 },
     pickupSep: { color: 'rgba(255,255,255,0.25)' },
 
@@ -619,19 +624,21 @@ const P: Record<string, React.CSSProperties> = {
     // Clamped: the card is a fixed slot in the artwork, so a long ingredient
     // list must be cut off rather than pushing the composition apart.
     itemNames: {
-        fontSize: 'clamp(8px, 2.7vw, 10px)', color: 'rgba(255,255,255,0.5)', lineHeight: 1.35, textAlign: 'center' as const,
+        fontSize: 'clamp(8px, 2.7vw, 10px)', color: 'rgba(255,255,255,0.72)', lineHeight: 1.35, textAlign: 'center' as const,
+        textShadow: '0 1px 3px rgba(0,0,0,0.75)',
         display: '-webkit-box', WebkitBoxOrient: 'vertical' as unknown as undefined, WebkitLineClamp: 2, overflow: 'hidden',
     },
     notes: {
-        fontSize: 'clamp(8px, 2.7vw, 10px)', color: 'rgba(255,200,100,0.85)', fontWeight: 600, textAlign: 'center' as const,
+        fontSize: 'clamp(8px, 2.7vw, 10px)', color: 'rgba(255,205,120,0.95)', fontWeight: 600, textAlign: 'center' as const,
+        textShadow: '0 1px 3px rgba(0,0,0,0.75)',
         display: '-webkit-box', WebkitBoxOrient: 'vertical' as unknown as undefined, WebkitLineClamp: 1, overflow: 'hidden',
     },
 
     // Total, size and payment share one line — the card has room for five rows,
     // not six.
-    moneyRow: { display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '6px', flexWrap: 'nowrap', lineHeight: 1.1 },
+    moneyRow: { display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '6px', flexWrap: 'nowrap', lineHeight: 1.1, textShadow: '0 1px 3px rgba(0,0,0,0.75)' },
     total: { fontSize: 'clamp(15px, 5.0vw, 20px)', fontWeight: 900, color: '#f0d060' },
-    bowlLabel: { fontSize: 'clamp(8px, 2.7vw, 10px)', color: 'rgba(240,208,96,0.6)', fontWeight: 700, whiteSpace: 'nowrap' },
+    bowlLabel: { fontSize: 'clamp(8px, 2.7vw, 10px)', color: 'rgba(240,208,96,0.75)', fontWeight: 700, whiteSpace: 'nowrap' },
     payTag: { fontSize: 'clamp(8px, 2.9vw, 11px)', fontWeight: 800, whiteSpace: 'nowrap' },
     payOwed: { color: '#ffd08a' },
     payDone: { color: '#b6e6b6' },
