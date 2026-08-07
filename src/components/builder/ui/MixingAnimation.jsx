@@ -1,6 +1,11 @@
 'use client';
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
+import { usePrefersReducedMotion } from "../../../lib/motionHooks";
+// Choreography lives in its own .ts so the assertion harness can import it —
+// see mixingTiming.ts for what the old fixed layout got wrong and why the
+// stagger has to be a function of the ingredient count.
+import { MOUTH_Y, DROP_DUR, pourPlan } from "./mixingTiming";
 const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
 
 /**
@@ -12,6 +17,11 @@ const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
 export default function MixingAnimation({ all, total, onComplete, stillSending }) {
     const [phase, setPhase] = useState("drop"); // drop → glow → bloom
     const [bowlAnim, setBowlAnim] = useState(null);
+    // This is the most motion-heavy screen in the app — falling ingredients, a
+    // bloom flash, 26 rising embers, 8 rotating rays and a scaling bowl. The
+    // phase timing and onComplete are untouched by this, so the order flow is
+    // identical either way; only the spectacle is dropped.
+    const reducedMotion = usePrefersReducedMotion();
     useEffect(() => { fetch("/cat-salad-bowl.json").then(r => r.json()).then(setBowlAnim).catch(() => {}); }, []);
 
     useEffect(() => {
@@ -31,7 +41,10 @@ export default function MixingAnimation({ all, total, onComplete, stillSending }
         return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
     }, [onComplete]);
 
-    const items = all.slice(0, 10);
+    // No cap: every ingredient the customer chose gets shown. The stagger
+    // adapts instead — see pourPlan.
+    const items = all;
+    const plan = pourPlan(items.length);
     const isGlow  = phase === "glow" || phase === "bloom";
     const isBloom = phase === "bloom";
 
@@ -44,35 +57,17 @@ export default function MixingAnimation({ all, total, onComplete, stillSending }
 
     return (
         <div style={S.overlay}>
-            {/* Bloom flash */}
+            {/* Bloom flash. Suppressed under reduced motion — a full-screen
+                0-to-1 flash in 0.18s is the one thing here I would least want
+                to defend to someone with vestibular or photosensitivity. */}
             <div style={{
                 ...S.bloomFlash,
-                opacity: isBloom ? 1 : 0,
+                opacity: isBloom && !reducedMotion ? 1 : 0,
                 transition: isBloom ? "opacity 0.18s ease-out" : "opacity 0.5s ease-in",
             }} />
             <div style={S.ambientGlow} />
 
             <div style={S.container}>
-                {/* ── Ingredients (drop phase only) ── */}
-                <div style={{ position: "relative", width: "320px", height: "60px", margin: "0 auto", opacity: isGlow ? 0 : 1, transition: "opacity 0.45s ease", pointerEvents: "none" }}>
-                    {items.map((item, i) => {
-                        const col = i % 5;
-                        const leftPct = 8 + col * 18;
-                        return (
-                            <div key={item.id} style={{
-                                position: "absolute", top: 0, left: `${leftPct}%`,
-                                fontSize: "28px",
-                                filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.5))",
-                                animation: `ingredientDrop 0.65s cubic-bezier(0.22,1,0.36,1) ${i * 0.1}s both`,
-                            }}>
-                                {item.icon && item.icon.startsWith("/")
-                                    ? <img src={item.icon} alt="" style={{ width: "28px", height: "28px", objectFit: "contain" }} />
-                                    : item.icon}
-                            </div>
-                        );
-                    })}
-                </div>
-
                 {/* ── Single persistent Lottie bowl ── */}
                 <div style={{
                     position: "relative", width: "320px", height: "320px", margin: "0 auto",
@@ -81,12 +76,45 @@ export default function MixingAnimation({ all, total, onComplete, stillSending }
                         : isGlow
                             ? "drop-shadow(0 0 30px rgba(200,168,78,0.7)) drop-shadow(0 8px 20px rgba(0,0,0,0.4))"
                             : "drop-shadow(0 8px 24px rgba(0,0,0,0.5))",
-                    animation: isBloom ? "bowlBloom 0.55s cubic-bezier(0.34,1.56,0.64,1) both" : undefined,
+                    animation: isBloom && !reducedMotion ? "bowlBloom 0.55s cubic-bezier(0.34,1.56,0.64,1) both" : undefined,
                     transition: "filter 0.4s ease",
                 }}>
                     {bowlAnim && <Lottie animationData={bowlAnim} loop autoplay style={{ width: "100%", height: "100%" }} />}
 
+                    {/* ── Ingredients pouring in ──
+                        Each one is positioned AT the bowl's mouth and starts
+                        offset from it (--ex/--ey), so they converge and vanish
+                        into the bowl rather than queueing up above it. Same idea
+                        as the builder's own add animation, so the customer has
+                        seen this motion before. Because they arrive one at a
+                        time and disappear on arrival, any number of them can
+                        share the destination without colliding — which is what
+                        the old fixed five-column layout could not do. */}
+                    {!reducedMotion && (
+                        <div style={{ position: "absolute", inset: 0, opacity: isGlow ? 0 : 1, transition: "opacity 0.45s ease", pointerEvents: "none" }}>
+                            {items.map((item, i) => (
+                                <div key={`${item.id}-${i}`} style={{
+                                    position: "absolute",
+                                    left: "50%", top: `${MOUTH_Y * 100}%`,
+                                    marginLeft: "-16px", marginTop: "-16px",
+                                    width: "32px", height: "32px",
+                                    fontSize: "30px", lineHeight: 1,
+                                    filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.5))",
+                                    '--ex': `${plan[i].ex}px`,
+                                    '--ey': `${plan[i].ey}px`,
+                                    '--rot': `${plan[i].rot}deg`,
+                                    animation: `pourIntoBowl ${DROP_DUR}s cubic-bezier(0.34,1.2,0.64,1) ${plan[i].delay}s both`,
+                                }}>
+                                    {item.icon && item.icon.startsWith("/")
+                                        ? <img src={item.icon} alt="" style={{ width: "32px", height: "32px", objectFit: "contain", display: "block" }} />
+                                        : item.icon}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
                     {/* Embers — glow phase, layered on top of bowl */}
+                    {!reducedMotion && (
                     <div style={{ position: "absolute", inset: 0, opacity: isGlow ? 1 : 0, transition: "opacity 0.45s ease", pointerEvents: "none" }}>
                         {embers.map(e => (
                             <div key={e.id} style={{
@@ -110,6 +138,7 @@ export default function MixingAnimation({ all, total, onComplete, stillSending }
                             }} />
                         ))}
                     </div>
+                    )}
                 </div>
 
                 {/* Label */}
@@ -212,11 +241,11 @@ const KF = `
 
 @keyframes sendingSweep { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
 
-@keyframes ingredientDrop {
-    0%   { opacity:0; transform:translateY(-140px) rotate(-15deg) scale(0.7); }
-    70%  { transform:translateY(170px) rotate(5deg) scale(1.05); opacity:1; }
-    85%  { transform:translateY(160px) rotate(-2deg) scale(0.97); }
-    100% { transform:translateY(165px) rotate(0deg) scale(1); opacity:1; }
+@keyframes pourIntoBowl {
+    0%   { opacity:0; transform:translate(var(--ex),var(--ey)) scale(0.8) rotate(var(--rot)); }
+    15%  { opacity:1; }
+    70%  { opacity:1; transform:translate(0,0) scale(1.15) rotate(0deg); }
+    100% { opacity:0; transform:translate(0,0) scale(0.12) rotate(0deg); }
 }
 
 @keyframes bowlBloom {

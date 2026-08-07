@@ -3,6 +3,10 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
 import Tilt from "react-parallax-tilt";
 import { usePrefersReducedMotion } from "../../../lib/motionHooks";
+// Panel layout numbers live in their own .ts so the assertion harness can import
+// them — Node's type stripper has no JSX transform. See heroBowlGeometry.ts for
+// why the chip row is capped and what invariant that protects.
+import { PANEL } from "./heroBowlGeometry";
 const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
 
 const MAX          = 14;
@@ -41,7 +45,7 @@ const KF = `
 }
 `;
 
-export default function HeroBowlCard({ all, onRemove, comboBadges, lastAdd, animFile = "/cat-salad-bowl.json", freePlay = false, bowlTop = "24%", max = 14 }) {
+export default function HeroBowlCard({ all, onRemove, lastAdd, animFile = "/cat-salad-bowl.json", freePlay = false, bowlTop = "24%", max = 14 }) {
     const lottieRef      = useRef(null);
     const prevIdsRef     = useRef(null);   // null = not yet seeded
     const targetFrameRef = useRef(null);   // frame to stop at during playback
@@ -244,9 +248,15 @@ export default function HeroBowlCard({ all, onRemove, comboBadges, lastAdd, anim
                         {isEmpty ? "הקערה ריקה" : `${all.length} / ${max} מרכיבים`}
                     </div>
 
-                    {/* Ingredient chips — tap to remove */}
+                    {/* Ingredient chips — tap to remove. Not capped: a full bowl
+                        of 14 wraps to three rows, which still fits inside the
+                        ring's height at every width, so showing them all costs
+                        nothing and uses the column that would otherwise sit
+                        empty beside the ring. See heroBowlGeometry.ts — the fit
+                        is asserted, so raising the bowl cap will fail loudly
+                        rather than quietly growing the panel again. */}
                     {all.length > 0 && (
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: "3px" }}>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: `${PANEL.chipGap}px` }}>
                             {all.map(item => (
                                 <button key={item.id} onClick={() => onRemove(item.id)} style={{
                                     border: "1px solid rgba(255,255,255,0.1)",
@@ -259,31 +269,9 @@ export default function HeroBowlCard({ all, onRemove, comboBadges, lastAdd, anim
                                         ? "itemPop 0.3s cubic-bezier(0.34,1.56,0.64,1) both" : "none",
                                 }}>
                                     {item.icon && item.icon.startsWith("/")
-                                        ? <img src={item.icon} alt={item.he} style={{ width: "18px", height: "18px", objectFit: "contain" }} />
+                                        ? <img src={item.icon} alt={item.he} style={{ width: `${PANEL.chipIcon}px`, height: `${PANEL.chipIcon}px`, objectFit: "contain" }} />
                                         : item.icon}
                                 </button>
-                            ))}
-                        </div>
-                    )}
-
-                    {/* Combo badges */}
-                    {comboBadges.length > 0 && (
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: "3px" }}>
-                            {comboBadges.map(b => (
-                                <div key={b.id} style={{
-                                    display: "flex", alignItems: "center", gap: "4px",
-                                    padding: "3px 8px", borderRadius: "7px",
-                                    background: "rgba(200,168,78,0.2)", border: "1px solid rgba(200,168,78,0.4)",
-                                }}>
-                                    {/* 14px, not 10px — nothing legible survives at 10px,
-                                        emoji or glyph. Same path/emoji branch used for
-                                        ingredient icons above, so dropping the stripped
-                                        glyph set in later needs no change here. */}
-                                    {b.icon && b.icon.startsWith("/")
-                                        ? <img src={b.icon} alt="" style={{ width: "14px", height: "14px", objectFit: "contain", display: "block" }} />
-                                        : <span style={{ fontSize: "14px" }}>{b.icon}</span>}
-                                    <span style={{ fontSize: "10px", fontWeight: 800, color: "#f0d060" }}>{b.he}</span>
-                                </div>
                             ))}
                         </div>
                     )}

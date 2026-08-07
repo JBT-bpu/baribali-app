@@ -13,6 +13,8 @@
  */
 import { PLAQUE, pct } from '../src/components/ui/bari/plaqueGeometry.ts';
 import { TRACK, TRACK_ASPECT_H } from '../src/app/order/[id]/trackingArt.ts';
+import { PANEL, chipRows, chipsPerRow, panelHeight, statsColumnHeight, ringFor } from '../src/components/builder/ui/heroBowlGeometry.ts';
+import { GLOW_AT, pourPlan, pourEndsAt } from '../src/components/builder/ui/mixingTiming.ts';
 
 const WIDTHS = [296, 336, 366, 376];   // plaque widths at 320/360/390/430 viewports
 
@@ -149,6 +151,55 @@ for (const [vwPx, screenH] of [[320, 568], [390, 844]] as [number, number][]) {
     const W = Math.min(vwPx, TRACK.maxWidth) - 2 * TRACK.gutter;
     const h = W * TRACK_ASPECT_H;
     ok(h < screenH, `${vwPx}x${screenH}: board is ${h.toFixed(0)}px, fits without scrolling`);
+}
+
+// ── 8. Builder hero panel: the height must not depend on how full the bowl is ──
+// This is the whole point of the chip cap. The panel used to grow with every
+// ingredient and every earned badge — 196px empty, 264px at 13 items and 10
+// badges, ~370px worst case, against a 353px scroll region. Growing as the
+// customer succeeds is the bug; a constant height is the fix.
+head('8. Builder hero panel — height is independent of the bowl contents');
+const VIEWPORTS = [320, 360, 375, 390, 430];
+
+// The chips are deliberately NOT capped. What keeps the panel from growing is
+// that the ring is taller than a full bowl's worth of chips ever needs — so this
+// is the load-bearing assertion, not a nicety. Raising the bowl cap, enlarging
+// the chips or shrinking the ring all break it here rather than on someone's
+// phone.
+for (const vw of VIEWPORTS) {
+    const worst = statsColumnHeight(PANEL.maxItems, vw);
+    ok(worst <= ringFor(vw),
+        `vw=${vw}: a full bowl of ${PANEL.maxItems} needs ${chipRows(PANEL.maxItems, vw)} rows = ${worst}px, ring is ${ringFor(vw)}px (${chipsPerRow(vw)}/row)`);
+}
+
+for (const vw of VIEWPORTS) {
+    const heights = new Set<number>();
+    for (let n = 0; n <= PANEL.maxItems; n++) heights.add(panelHeight(vw, n));
+    ok(heights.size === 1,
+        `vw=${vw}: panel is ${[...heights][0]}px at every count 0..${PANEL.maxItems} (${heights.size} distinct height${heights.size === 1 ? '' : 's'})`);
+}
+
+console.log(`\n  panel height: ${panelHeight(390, 14)}px at 390px, ${panelHeight(320, 14)}px at 320px (was 264px typical / ~370px worst)`);
+console.log(`  headroom at a full bowl: ${ringFor(390) - statsColumnHeight(14, 390)}px spare at 390px, ${ringFor(320) - statsColumnHeight(14, 320)}px at 320px`);
+
+// ── 9. Mixing animation: every ingredient is shown, and lands in time ────────
+// The old layout gave five positions to ten icons — from the sixth onwards they
+// landed pixel-exactly on top of each other, so a 13-ingredient order animated
+// as five. Everything past the tenth was dropped outright, because a flat 0.1s
+// stagger would have run the last one 0.25s past the fade. Both are now
+// properties of the plan rather than things to remember.
+head('9. Mixing animation — all ingredients shown, all landed before the fade');
+for (const n of [1, 3, 5, 8, 10, 13, PANEL.maxItems]) {
+    const plan = pourPlan(n);
+    ok(plan.length === n, `${n} ingredients -> ${plan.length} rendered (nothing dropped)`);
+    ok(pourEndsAt(n) <= GLOW_AT,
+        `${n}: last lands at ${pourEndsAt(n).toFixed(2)}s, fade begins ${GLOW_AT}s`);
+    // They converge on one point, so what must differ is where they START.
+    ok(new Set(plan.map(p => p.ex)).size === n,
+        `${n}: ${new Set(plan.map(p => p.ex)).size}/${n} distinct start positions`);
+    // The fan has to be symmetric or the pour visibly leans to one side.
+    const exs = plan.map(p => p.ex);
+    ok(Math.abs(exs[0] + exs[n - 1]) <= 1, `${n}: fan is symmetric (${exs[0]}..${exs[n - 1]})`);
 }
 
 console.log(failed === 0 ? '\nAll assertions passed.\n' : `\n${failed} FAILED\n`);
