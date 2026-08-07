@@ -2,6 +2,9 @@
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { usePrefersReducedMotion } from "../../../lib/motionHooks";
+// The builder's 🔊 toggle governs this screen too. It did not used to: these are
+// the two loudest sounds in the app and they fired even when muted.
+import { isSoundOn } from "../../../lib/soundPref";
 // Choreography lives in its own .ts so the assertion harness can import it —
 // see mixingTiming.ts for what the old fixed layout got wrong and why the
 // stagger has to be a function of the ingredient count.
@@ -25,20 +28,32 @@ export default function MixingAnimation({ all, total, onComplete, stillSending }
     useEffect(() => { fetch("/cat-salad-bowl.json").then(r => r.json()).then(setBowlAnim).catch(() => {}); }, []);
 
     useEffect(() => {
-        const t1 = setTimeout(() => setPhase("glow"),  1700);
-        const t2 = setTimeout(() => setPhase("bloom"), 2900);
+        // Every timer is collected and cleared together. Two of them used to be
+        // fire-and-forget, so a FAILED order — which unmounts this overlay via
+        // failSubmit — still played the success arpeggio and buzzed the
+        // celebration haptic a second later, on top of the failure message.
+        const timers = [];
+        const at = (ms, fn) => timers.push(setTimeout(fn, ms));
+
+        at(1700, () => setPhase("glow"));
+        at(2900, () => setPhase("bloom"));
         // Fire onComplete while still fully visible at bloom peak.
         // OrderedScreen (z=500) cross-fades in on top — no gap, no double-fade.
-        const t3 = setTimeout(() => onComplete(),      3300);
+        at(3300, () => onComplete());
 
         if (navigator.vibrate) {
             navigator.vibrate([20, 80, 20]);
-            setTimeout(() => navigator.vibrate([40, 30, 80, 0, 120]), 2900);
+            at(2900, () => navigator.vibrate([40, 30, 80, 0, 120]));
         }
-        playChimeSound();
-        setTimeout(() => playSuccessSound(), 1700);
+        // Checked once, at the start: the toggle lives in the builder header and
+        // cannot be reached from here, so re-reading it mid-animation would only
+        // ever return the same answer.
+        if (isSoundOn()) {
+            playChimeSound();
+            at(1700, () => playSuccessSound());
+        }
 
-        return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+        return () => timers.forEach(clearTimeout);
     }, [onComplete]);
 
     // No cap: every ingredient the customer chose gets shown. The stagger

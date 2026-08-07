@@ -28,6 +28,7 @@ import BariButton from "../ui/bari/BariButton";
 import { useAnimatedNumber } from "../../lib/motionHooks";
 import { takeReorder } from "../../lib/reorder";
 import { effectiveItemPrice, effectiveBase, effectiveSizePrice } from "../../lib/menuConfig";
+import { isSoundOn, readSoundPref, setSoundPref } from "../../lib/soundPref";
 
 /*
   BariBali Builder — COMPLETE v3
@@ -69,15 +70,10 @@ function haptic(type) {
 let audioCtx = null;
 // Micro-sounds are opt-out: some people build a salad in public. The builder
 // header exposes a toggle that flips this and persists the choice.
-const SOUND_KEY = "bb-sound";
-let soundEnabled = null; // null = preference not read yet
-function setSoundEnabled(on) {
-  soundEnabled = on;
-  try { localStorage.setItem(SOUND_KEY, on ? "1" : "0"); } catch (e) { }
-}
-function readSoundPref() {
-  try { return localStorage.getItem(SOUND_KEY) !== "0"; } catch (e) { return true; }
-}
+//
+// The preference itself lives in lib/soundPref so the mixing screen can honour
+// it too — it used to be private to this file, which is why muting the builder
+// did nothing to the chime at the end.
 // Same opt-out shape as the sound preference: read once, guarded, and a failed
 // write just means the hint shows again rather than anything breaking.
 const HINT_KEY = "bb-hint-longpress";
@@ -88,10 +84,6 @@ function markHintSeen() {
   try { localStorage.setItem(HINT_KEY, "1"); } catch (e) { }
 }
 
-function isSoundOn() {
-  if (soundEnabled === null) soundEnabled = readSoundPref();
-  return soundEnabled;
-}
 function playSound(type) {
   if (!isSoundOn()) return;
   try {
@@ -317,7 +309,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
   const toggleSound = useCallback(() => {
     const nextOn = !soundOn;
     setSoundOn(nextOn);
-    setSoundEnabled(nextOn);
+    setSoundPref(nextOn);
     haptic("tap");
   }, [soundOn]);
   const [selectedSize, setSelectedSize] = useState(() => parseSizeParam(sizeParam));
@@ -1293,7 +1285,7 @@ const S = {
   priceS: { fontSize: "11px", color: "#d4b84a", fontWeight: 700 },
   priceV: { fontSize: "22px", color: "#ffffff", fontWeight: 900, textShadow: "0 2px 8px rgba(200,168,78,0.5)" },
   progressRow: { display: "flex", gap: "3px" },
-
+
   badgeFlash: { position: "fixed", top: "58px", left: "50%", transform: "translateX(-50%)", zIndex: 200, display: "flex", alignItems: "center", gap: "8px", padding: "8px 16px", borderRadius: "14px", background: "linear-gradient(135deg, rgba(8,22,8,0.97), rgba(13,40,13,0.97))", border: "2px solid rgba(200,168,78,0.5)", boxShadow: "0 4px 24px rgba(200,168,78,0.25), 0 0 40px rgba(200,168,78,0.1)", backdropFilter: "blur(16px)", animation: "flashIn 2.2s ease both" },
   badgeFlashTxt: { fontSize: "14px", fontWeight: 800, color: "#f0d060" },
   // Emblem variant: no background, no border — just the art, lifted off the
