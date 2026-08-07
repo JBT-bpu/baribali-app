@@ -13,7 +13,7 @@
  */
 import { PLAQUE, pct } from '../src/components/ui/bari/plaqueGeometry.ts';
 import { TRACK, TRACK_ASPECT_H } from '../src/app/order/[id]/trackingArt.ts';
-import { PANEL, chipsThatFit, panelHeight, statsColumnHeight, ringFor } from '../src/components/builder/ui/heroBowlGeometry.ts';
+import { PANEL, chipRows, chipsPerRow, panelHeight, statsColumnHeight, ringFor } from '../src/components/builder/ui/heroBowlGeometry.ts';
 
 const WIDTHS = [296, 336, 366, 376];   // plaque widths at 320/360/390/430 viewports
 
@@ -160,34 +160,26 @@ for (const [vwPx, screenH] of [[320, 568], [390, 844]] as [number, number][]) {
 head('8. Builder hero panel — height is independent of the bowl contents');
 const VIEWPORTS = [320, 360, 375, 390, 430];
 
+// The chips are deliberately NOT capped. What keeps the panel from growing is
+// that the ring is taller than a full bowl's worth of chips ever needs — so this
+// is the load-bearing assertion, not a nicety. Raising the bowl cap, enlarging
+// the chips or shrinking the ring all break it here rather than on someone's
+// phone.
 for (const vw of VIEWPORTS) {
-    // The overflow chip occupies a slot too, so the cap must leave room for it.
-    ok(PANEL.chipsPerRow + 1 <= chipsThatFit(vw),
-        `vw=${vw}: ${PANEL.chipsPerRow} chips + overflow fit one row (${chipsThatFit(vw)} slots available)`);
+    const worst = statsColumnHeight(PANEL.maxItems, vw);
+    ok(worst <= ringFor(vw),
+        `vw=${vw}: a full bowl of ${PANEL.maxItems} needs ${chipRows(PANEL.maxItems, vw)} rows = ${worst}px, ring is ${ringFor(vw)}px (${chipsPerRow(vw)}/row)`);
 }
 
 for (const vw of VIEWPORTS) {
     const heights = new Set<number>();
-    for (let n = 0; n <= 14; n++) heights.add(panelHeight(vw, n));
-    // An empty bowl has no chip row at all, so it is legitimately shorter; every
-    // NON-empty count must agree.
-    const nonEmpty = new Set<number>();
-    for (let n = 1; n <= 14; n++) nonEmpty.add(panelHeight(vw, n));
-    ok(nonEmpty.size === 1,
-        `vw=${vw}: panel is ${[...nonEmpty][0]}px at every count 1..14 (${nonEmpty.size} distinct height${nonEmpty.size === 1 ? '' : 's'})`);
-    ok([...heights].every(h => h === panelHeight(vw, 0)),
-        `vw=${vw}: the empty bowl is the same height too (${panelHeight(vw, 0)}px)`);
-}
-
-// The ring is what must dominate — if the stats column ever exceeds it, the
-// column is driving the height again and the cap has stopped working.
-for (const vw of VIEWPORTS) {
-    const worst = Math.max(...Array.from({ length: 15 }, (_, n) => statsColumnHeight(n)));
-    ok(worst <= ringFor(vw),
-        `vw=${vw}: tallest stats column ${worst}px <= ring ${ringFor(vw)}px, so the ring sets the height`);
+    for (let n = 0; n <= PANEL.maxItems; n++) heights.add(panelHeight(vw, n));
+    ok(heights.size === 1,
+        `vw=${vw}: panel is ${[...heights][0]}px at every count 0..${PANEL.maxItems} (${heights.size} distinct height${heights.size === 1 ? '' : 's'})`);
 }
 
 console.log(`\n  panel height: ${panelHeight(390, 14)}px at 390px, ${panelHeight(320, 14)}px at 320px (was 264px typical / ~370px worst)`);
+console.log(`  headroom at a full bowl: ${ringFor(390) - statsColumnHeight(14, 390)}px spare at 390px, ${ringFor(320) - statsColumnHeight(14, 320)}px at 320px`);
 
 console.log(failed === 0 ? '\nAll assertions passed.\n' : `\n${failed} FAILED\n`);
 process.exit(failed === 0 ? 0 : 1);

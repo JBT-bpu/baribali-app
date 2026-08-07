@@ -53,7 +53,6 @@ export default function HeroBowlCard({ all, onRemove, lastAdd, animFile = "/cat-
     const [dropKey, setDropKey]   = useState(null);
     const [firstPulse, setFirstPulse] = useState(false); // stronger ring flash on the very first ingredient
     const [bowlAnim, setBowlAnim] = useState(null);
-    const [chipsOpen, setChipsOpen] = useState(false);
     const [mounted, setMounted]   = useState(false);
     useEffect(() => { setMounted(true); }, []);
     useEffect(() => { fetch(animFile).then(r => r.json()).then(setBowlAnim).catch(() => {}); }, [animFile]);
@@ -249,13 +248,16 @@ export default function HeroBowlCard({ all, onRemove, lastAdd, animFile = "/cat-
                         {isEmpty ? "הקערה ריקה" : `${all.length} / ${max} מרכיבים`}
                     </div>
 
-                    {/* Ingredient chips — tap to remove.
-                        Capped to one row by default (see PANEL.chipsPerRow). The
-                        most RECENT ones are shown, so the chip that just popped
-                        in is always the visible one. */}
+                    {/* Ingredient chips — tap to remove. Not capped: a full bowl
+                        of 14 wraps to three rows, which still fits inside the
+                        ring's height at every width, so showing them all costs
+                        nothing and uses the column that would otherwise sit
+                        empty beside the ring. See heroBowlGeometry.ts — the fit
+                        is asserted, so raising the bowl cap will fail loudly
+                        rather than quietly growing the panel again. */}
                     {all.length > 0 && (
                         <div style={{ display: "flex", flexWrap: "wrap", gap: `${PANEL.chipGap}px` }}>
-                            {(chipsOpen ? all : all.slice(-PANEL.chipsPerRow)).map(item => (
+                            {all.map(item => (
                                 <button key={item.id} onClick={() => onRemove(item.id)} style={{
                                     border: "1px solid rgba(255,255,255,0.1)",
                                     background: "rgba(255,255,255,0.05)",
@@ -271,31 +273,6 @@ export default function HeroBowlCard({ all, onRemove, lastAdd, animFile = "/cat-
                                         : item.icon}
                                 </button>
                             ))}
-
-                            {/* Reveals the rest in place. Removal is never lost
-                                without it — tapping a selected ingredient card
-                                below toggles it off too — but items chosen in an
-                                earlier step aren't on screen any more, so this is
-                                the shortcut back to them. */}
-                            {all.length > PANEL.chipsPerRow && (
-                                <button
-                                    onClick={() => setChipsOpen(o => !o)}
-                                    aria-expanded={chipsOpen}
-                                    aria-label={chipsOpen ? "הסתרת המרכיבים" : `הצגת כל ${all.length} המרכיבים`}
-                                    style={{
-                                        border: "1px solid rgba(200,168,78,0.4)",
-                                        background: "rgba(200,168,78,0.16)",
-                                        borderRadius: "5px",
-                                        padding: "2px 6px",
-                                        minWidth: `${PANEL.chipW}px`, height: `${PANEL.chipW}px`,
-                                        fontSize: "11px", fontWeight: 800, lineHeight: 1,
-                                        color: "#f0d060", cursor: "pointer",
-                                        fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
-                                    }}
-                                >
-                                    {chipsOpen ? "−" : `+${all.length - PANEL.chipsPerRow}`}
-                                </button>
-                            )}
                         </div>
                     )}
                 </div>
