@@ -13,6 +13,7 @@
  */
 import { PLAQUE, pct } from '../src/components/ui/bari/plaqueGeometry.ts';
 import { TRACK, TRACK_ASPECT_H } from '../src/app/order/[id]/trackingArt.ts';
+import { PANEL, chipsThatFit, panelHeight, statsColumnHeight, ringFor } from '../src/components/builder/ui/heroBowlGeometry.ts';
 
 const WIDTHS = [296, 336, 366, 376];   // plaque widths at 320/360/390/430 viewports
 
@@ -150,6 +151,43 @@ for (const [vwPx, screenH] of [[320, 568], [390, 844]] as [number, number][]) {
     const h = W * TRACK_ASPECT_H;
     ok(h < screenH, `${vwPx}x${screenH}: board is ${h.toFixed(0)}px, fits without scrolling`);
 }
+
+// ── 8. Builder hero panel: the height must not depend on how full the bowl is ──
+// This is the whole point of the chip cap. The panel used to grow with every
+// ingredient and every earned badge — 196px empty, 264px at 13 items and 10
+// badges, ~370px worst case, against a 353px scroll region. Growing as the
+// customer succeeds is the bug; a constant height is the fix.
+head('8. Builder hero panel — height is independent of the bowl contents');
+const VIEWPORTS = [320, 360, 375, 390, 430];
+
+for (const vw of VIEWPORTS) {
+    // The overflow chip occupies a slot too, so the cap must leave room for it.
+    ok(PANEL.chipsPerRow + 1 <= chipsThatFit(vw),
+        `vw=${vw}: ${PANEL.chipsPerRow} chips + overflow fit one row (${chipsThatFit(vw)} slots available)`);
+}
+
+for (const vw of VIEWPORTS) {
+    const heights = new Set<number>();
+    for (let n = 0; n <= 14; n++) heights.add(panelHeight(vw, n));
+    // An empty bowl has no chip row at all, so it is legitimately shorter; every
+    // NON-empty count must agree.
+    const nonEmpty = new Set<number>();
+    for (let n = 1; n <= 14; n++) nonEmpty.add(panelHeight(vw, n));
+    ok(nonEmpty.size === 1,
+        `vw=${vw}: panel is ${[...nonEmpty][0]}px at every count 1..14 (${nonEmpty.size} distinct height${nonEmpty.size === 1 ? '' : 's'})`);
+    ok([...heights].every(h => h === panelHeight(vw, 0)),
+        `vw=${vw}: the empty bowl is the same height too (${panelHeight(vw, 0)}px)`);
+}
+
+// The ring is what must dominate — if the stats column ever exceeds it, the
+// column is driving the height again and the cap has stopped working.
+for (const vw of VIEWPORTS) {
+    const worst = Math.max(...Array.from({ length: 15 }, (_, n) => statsColumnHeight(n)));
+    ok(worst <= ringFor(vw),
+        `vw=${vw}: tallest stats column ${worst}px <= ring ${ringFor(vw)}px, so the ring sets the height`);
+}
+
+console.log(`\n  panel height: ${panelHeight(390, 14)}px at 390px, ${panelHeight(320, 14)}px at 320px (was 264px typical / ~370px worst)`);
 
 console.log(failed === 0 ? '\nAll assertions passed.\n' : `\n${failed} FAILED\n`);
 process.exit(failed === 0 ? 0 : 1);

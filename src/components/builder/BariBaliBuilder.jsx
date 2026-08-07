@@ -78,6 +78,16 @@ function setSoundEnabled(on) {
 function readSoundPref() {
   try { return localStorage.getItem(SOUND_KEY) !== "0"; } catch (e) { return true; }
 }
+// Same opt-out shape as the sound preference: read once, guarded, and a failed
+// write just means the hint shows again rather than anything breaking.
+const HINT_KEY = "bb-hint-longpress";
+function readHintSeen() {
+  try { return localStorage.getItem(HINT_KEY) === "1"; } catch (e) { return false; }
+}
+function markHintSeen() {
+  try { localStorage.setItem(HINT_KEY, "1"); } catch (e) { }
+}
+
 function isSoundOn() {
   if (soundEnabled === null) soundEnabled = readSoundPref();
   return soundEnabled;
@@ -313,7 +323,6 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
   const [selectedSize, setSelectedSize] = useState(() => parseSizeParam(sizeParam));
   const [sels, setSels] = useState({});
   const [lastAdd, setLastAdd] = useState(null);
-  const [lastRemove, setLastRemove] = useState(null);
   const [summary, setSummary] = useState(false);
   // "enter" fades the whole screen in on mount. Skipped when arriving from the
   // page transition — that slab fade is exactly what made the builder look like
@@ -326,11 +335,12 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
   const [detailCtx, setDetailCtx] = useState(null); // { item, stepId, maxPicks }
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [draftNotice, setDraftNotice] = useState(false);
-  const [showLongPressHint, setShowLongPressHint] = useState(true);
-  useEffect(() => {
-    const t = setTimeout(() => setShowLongPressHint(false), 15000);
-    return () => clearTimeout(t);
-  }, []);
+  // The long-press hint used to reappear on every single mount, forever —
+  // a returning customer on their twentieth order still lost 78px at the top of
+  // the list to instructions they learned months ago. Once dismissed, it stays
+  // dismissed. Lazy initialiser so the read happens once, not on every render.
+  const [showLongPressHint, setShowLongPressHint] = useState(() => !readHintSeen());
+  const dismissHint = useCallback(() => { setShowLongPressHint(false); markHintSeen(); }, []);
   const [priceFlash, setPriceFlash] = useState(null);
   const activeBase = isTortilla ? effectiveBase('tortilla') : (selectedSize ? effectiveSizePrice(selectedSize) : effectiveBase('salad'));
   const [prevPrice, setPrevPrice] = useState(activeBase);
@@ -348,12 +358,16 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
   const sgRefs = useRef([]);
 
   useEffect(() => { setTimeout(() => setAnim(null), 500); }, []);
+  // The one place the hint is raised. It used to fire on every return to step 0
+  // AND on every mount, with nothing remembering it had been read — so someone
+  // on their twentieth order still lost 78px at the top of the list to it. Now
+  // it appears until it has been seen once, and then never again.
   useEffect(() => {
-    if (step !== 0) return;
+    if (step !== 0 || readHintSeen()) return;
     setShowLongPressHint(true);
-    const t = setTimeout(() => setShowLongPressHint(false), 15000);
+    const t = setTimeout(dismissHint, 15000);
     return () => clearTimeout(t);
-  }, [step]);
+  }, [step, dismissHint]);
 
   // ─── Load a reorder, else the saved draft, on mount ───
   useEffect(() => {
@@ -597,7 +611,8 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
 
   // ─── Long-press for detail ───
   const onChipTouchStart = (item) => {
-    setShowLongPressHint(false);
+    // Touching an ingredient is proof enough that the hint has been read.
+    dismissHint();
     longPressRef.current = setTimeout(() => {
       setDetailCtx({ item, stepId: cur?.id, maxPicks: cur?.maxPicks }); haptic("tap");
     }, 500);
@@ -1001,14 +1016,17 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
           </div>
         </div>
 
-        {/* ── HERO BOWL CARD ── */}
+        {/* ── HERO BOWL CARD ──
+             No `comboBadges` here any more. Every badge already gets its own
+             88px emblem toast the moment it is earned, and the summary screen
+             shows the set again at the end — the panel row was a third surface
+             for the same thing, and the only one anywhere with no cap. It was
+             also the biggest reason the panel grew as the customer succeeded. */}
         <div style={rise(2) ?? undefined}>
           <HeroBowlCard
             all={all}
             onRemove={removeFromBowl}
-            comboBadges={comboBadges}
             lastAdd={lastAdd}
-            lastRemove={lastRemove}
             animFile={isTortilla ? "/mexican-burrito.json" : "/cat-salad-bowl.json"}
             freePlay={isTortilla}
             bowlTop={isTortilla ? "44%" : "24%"}
@@ -1049,9 +1067,19 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
         {/* ── CONTENT (directional slide) ── */}
         <div style={{ ...S.content, opacity: anim === "out" ? 0 : 1, transform: anim === "out" ? `translateX(${slideX})` : "translateX(0)", filter: anim === "out" ? "blur(3px)" : "blur(0px)", transition: "opacity 0.22s ease, transform 0.28s cubic-bezier(0.25,0.46,0.45,0.94), filter 0.22s ease", ...rise(1) }} ref={scrollRef} role="main" aria-label={`${cur.title} - בחרו מרכיבים`}>
 
-          {/* Long-press discovery hint — shows once on load, fades out */}
+          {/* Long-press discovery hint — shown until it has been read once.
+              Tappable: it sits at the top of the list taking 78px, so someone
+              who has already read it needs a way to clear it now rather than
+              waiting out the timer. */}
           {showLongPressHint && (
-            <div style={S.longPressHint}>
+            <div
+              style={S.longPressHint}
+              onClick={dismissHint}
+              role="button"
+              tabIndex={0}
+              aria-label="הבנתי, סגירת ההסבר"
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); dismissHint(); } }}
+            >
               <span style={{ fontSize: "32px", lineHeight: 1 }}>👆</span>
               <div>
                 <div style={{ fontSize: "13px", fontWeight: 900, color: "#f0d060", marginBottom: "2px" }}>למידע נוסף על הרכיב</div>
@@ -1248,7 +1276,6 @@ const S = {
   // with it. `100dvh` is the viewport as currently displayed.
   root: { position: "relative", width: "100%", maxWidth: "430px", minHeight: "100dvh", margin: "0 auto", overflow: "hidden", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: "rtl", color: "#ffffff" },
   bg: { position: "fixed", inset: 0, zIndex: 0, background: "url(/homepage-assets/BG_8K.webp) center center / cover no-repeat, #020a02", filter: "brightness(0.45)" },
-  bgRay: {},
   main: { position: "relative", zIndex: 2, display: "flex", flexDirection: "column", height: "100dvh" },
 
   // Every top-level row below uses the same 16px side gutter. This screen ran
@@ -1266,9 +1293,7 @@ const S = {
   priceS: { fontSize: "11px", color: "#d4b84a", fontWeight: 700 },
   priceV: { fontSize: "22px", color: "#ffffff", fontWeight: 900, textShadow: "0 2px 8px rgba(200,168,78,0.5)" },
   progressRow: { display: "flex", gap: "3px" },
-
-  badgePill: { display: "flex", alignItems: "center", gap: "4px", padding: "2px 8px", borderRadius: "8px", background: "rgba(200,168,78,0.25)", border: "1px solid rgba(200,168,78,0.45)" },
-  badgePillTxt: { fontSize: "10px", fontWeight: 800, color: "#f0d060", textShadow: "0 1px 2px rgba(0,0,0,0.5)" },
+
   badgeFlash: { position: "fixed", top: "58px", left: "50%", transform: "translateX(-50%)", zIndex: 200, display: "flex", alignItems: "center", gap: "8px", padding: "8px 16px", borderRadius: "14px", background: "linear-gradient(135deg, rgba(8,22,8,0.97), rgba(13,40,13,0.97))", border: "2px solid rgba(200,168,78,0.5)", boxShadow: "0 4px 24px rgba(200,168,78,0.25), 0 0 40px rgba(200,168,78,0.1)", backdropFilter: "blur(16px)", animation: "flashIn 2.2s ease both" },
   badgeFlashTxt: { fontSize: "14px", fontWeight: 800, color: "#f0d060" },
   // Emblem variant: no background, no border — just the art, lifted off the
@@ -1281,11 +1306,10 @@ const S = {
 
   anchorRow: { display: "flex", gap: "5px", padding: "6px 16px", overflowX: "auto", scrollbarWidth: "none", borderBottom: "1px solid rgba(200,168,78,0.3)", background: "rgba(0,0,0,0.55)", boxShadow: "inset 0 -1px 0 rgba(200,168,78,0.12)" },
   anchorTab: { padding: "5px 12px", borderRadius: "8px", border: "1px solid rgba(200,168,78,0.4)", background: "linear-gradient(145deg, rgba(18,52,18,0.95), rgba(12,36,12,0.92))", color: "rgba(255,255,255,0.8)", fontSize: "11px", fontWeight: 700, cursor: "pointer", flexShrink: 0, transition: "all 0.15s", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", textShadow: "0 1px 2px rgba(0,0,0,0.5)" },
-  anchorActive: { background: "linear-gradient(145deg, rgba(200,168,78,0.18), rgba(180,140,40,0.1))", borderColor: "rgba(200,168,78,0.45)", color: "#f0d060" },
 
   content: { flex: 1, overflowY: "auto", overflowX: "hidden", padding: "4px 16px", scrollbarWidth: "none" },
 
-  longPressHint: { display: "flex", alignItems: "center", gap: "12px", padding: "14px 16px", margin: "4px 0 10px", borderRadius: "16px", background: "linear-gradient(135deg, rgba(200,168,78,0.22), rgba(180,140,40,0.12))", border: "2px solid rgba(200,168,78,0.55)", boxShadow: "0 0 20px rgba(200,168,78,0.25), 0 4px 16px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08)", animation: "hintPop 15s ease both, hintGlow 1s ease-in-out infinite alternate", pointerEvents: "none" },
+  longPressHint: { display: "flex", alignItems: "center", gap: "12px", padding: "14px 16px", margin: "4px 0 10px", borderRadius: "16px", background: "linear-gradient(135deg, rgba(200,168,78,0.22), rgba(180,140,40,0.12))", border: "2px solid rgba(200,168,78,0.55)", boxShadow: "0 0 20px rgba(200,168,78,0.25), 0 4px 16px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08)", animation: "hintPop 15s ease both, hintGlow 1s ease-in-out infinite alternate", cursor: "pointer", WebkitTapHighlightColor: "transparent" },
   introCard: { display: "flex", alignItems: "center", gap: "8px", padding: "10px 12px", margin: "4px 0 8px", borderRadius: "12px", background: "linear-gradient(145deg, rgba(13,46,13,0.95), rgba(8,28,8,0.9))", border: "1px solid rgba(200,168,78,0.2)", boxShadow: "0 2px 10px rgba(0,0,0,0.4)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" },
   draftNotice: {
     display: "flex", alignItems: "center", gap: "8px",
