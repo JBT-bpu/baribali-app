@@ -32,16 +32,50 @@
 // ─── Stage clock ─────────────────────────────────────────────
 // Boundaries in seconds from mount. Every one is the END of its stage.
 
-/** Gold dust converges on the pedestal centre. */
-export const GATHER_AT = 1.0;
+/**
+ * Gold dust converges on the pedestal centre.
+ *
+ * Lengthened from 1.0s. The gather is the charge before the hit, and at one
+ * second flat there was no time to feel anything building — the motes barely
+ * cleared the rim before the flare took over. Everything after it shifted by the
+ * same 0.2s rather than being compressed.
+ */
+export const GATHER_AT = 1.2;
 /** Flare, shockwave, and the medallion strikes in. */
-export const STRIKE_AT = 1.2;
+export const STRIKE_AT = 1.4;
 /** The face resolves inside the ring. */
-export const FACE_AT = 1.7;
+export const FACE_AT = 1.9;
 /** Sheen sweeps the gold; the plaque frame fades in around it. */
-export const SHEEN_AT = 2.3;
+export const SHEEN_AT = 2.5;
 /** Content settles; hand off to the confirmation screen. */
-export const DONE_AT = 3.0;
+export const DONE_AT = 3.2;
+
+/**
+ * How hard the ambient GoldField is streaking when the screen opens.
+ *
+ * Signed and negative: GoldField's sweep drives the motes vertically and
+ * stretches them into trails as its magnitude rises, so the field arrives
+ * already rushing and decays (0.955/frame) to rest at almost exactly the strike.
+ * Reusing that field is why there is no second particle system here.
+ */
+export const FIELD_RUSH = -2.2;
+
+/**
+ * The ground both screens sit on.
+ *
+ * The house background — the same BG_8K plate over the same gradient that
+ * /home2, /login, /orders, /profile and the order-status board all use. The
+ * plaque's own `PLAQUE.backdrop` is deliberately flat and photo-free so the
+ * frame's gold rails are the only detail on screen, and that reasoning still
+ * holds for a plaque sitting alone; but the order-status board already carries
+ * this same frame over this same plate and the two screens are siblings, so a
+ * flat ground here made the confirmation the odd one out in its own flow.
+ *
+ * MUST be identical on both, like PLAQUE_TOP and PLAQUE_MARGIN — a background
+ * that changes at the swap is exactly the seam this sequence exists to remove.
+ */
+export const SEAL_BACKDROP =
+    'url(/homepage-assets/BG_8K.webp) center top / cover no-repeat, linear-gradient(155deg, #030a03 0%, #071a07 30%, #0a200a 60%, #071a07 100%)';
 
 export type SealStage = 'gather' | 'strike' | 'face' | 'sheen' | 'settle' | 'done';
 
@@ -150,10 +184,11 @@ export function dustPlan(count: number): DustMote[] {
         const delay = Number((((ABSORBED_BY - dur) * i) / Math.max(1, count - 1)).toFixed(3));
         return {
             angle: Number(((i * GOLDEN) % 360).toFixed(2)),
-            // Starts outside the medallion's 6em radius, so the motes fly in
-            // from off the disc rather than appearing on top of it.
-            distEm: Number((7.4 + (i % 4) * 1.05).toFixed(2)),
-            sizeEm: i % 3 === 0 ? 0.42 : i % 3 === 1 ? 0.3 : 0.2,
+            // Well outside the medallion's 6em radius — far enough that the
+            // motes cross real distance and read as being PULLED in, rather
+            // than appearing just off the rim and winking out.
+            distEm: Number((9 + (i % 5) * 1.9).toFixed(2)),
+            sizeEm: i % 3 === 0 ? 0.46 : i % 3 === 1 ? 0.32 : 0.22,
             delay,
             dur: Number(dur.toFixed(3)),
         };

@@ -139,7 +139,8 @@ import { findDiscount, discountAmount } from "../../lib/discounts";
 const headerImage = "/builder-assets/header-brand.png";
 import MixingAnimation from "./ui/MixingAnimation.jsx";
 import OrderSeal from "./ui/OrderSeal.jsx";
-import { SEAL_FOOTPRINT, PLAQUE_TOP, PLAQUE_MARGIN } from "./ui/sealTiming";
+import { SEAL_FOOTPRINT, PLAQUE_TOP, PLAQUE_MARGIN, SEAL_BACKDROP } from "./ui/sealTiming";
+import GoldField from "../ui/GoldField";
 import BariPanel from "../ui/bari/BariPanel";
 import BariButton from "../ui/bari/BariButton";
 import BariBadge from "../ui/bari/BariBadge";
@@ -814,6 +815,10 @@ export function OrderedScreen({ total, all, pickupTime, orderNum, orderId, payme
         <>
             <div style={OS.root}>
                 <div style={OS.bg} />
+                {/* The same field the sealing overlay leaves behind, at rest.
+                    No entrySweep here: the overlay's copy has already decayed to
+                    calm by the handoff, so this one has to open calm to match. */}
+                <GoldField zIndex={0} />
                 <BariPlaque
                     style={{ margin: PLAQUE_MARGIN }}
                     // The struck medallion, not a bare cat — this screen has to
@@ -941,7 +946,7 @@ const OS = {
     // second while the CONTENT dissolved underneath, which is what read as a
     // seam. The frame and the seal now simply continue; only the content
     // arrives, staggered below.
-    root: { position: "fixed", inset: 0, zIndex: 500, background: PLAQUE.backdrop, display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: PLAQUE_TOP, overflowY: "auto", overflowX: "hidden", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: "rtl" },
+    root: { position: "fixed", inset: 0, zIndex: 500, background: SEAL_BACKDROP, display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: PLAQUE_TOP, overflowY: "auto", overflowX: "hidden", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: "rtl" },
     bg: { position: "fixed", inset: 0, background: PLAQUE.glow, pointerEvents: "none" },
 
     // The seal's shadow. Its SIZE is the plaque's business — the pedestal slot

@@ -6,11 +6,13 @@ import { usePrefersReducedMotion } from "../../../lib/motionHooks";
 import { isSoundOn } from "../../../lib/soundPref";
 import BariPlaque from "../../ui/bari/BariPlaque";
 import { PLAQUE } from "../../ui/bari/plaqueGeometry";
+import BariGlowBackground from "../../ui/bari/BariGlowBackground";
+import GoldField from "../../ui/GoldField";
 import OrderSeal from "./OrderSeal.jsx";
 // Choreography lives in its own .ts so the assertion harness can import it —
 // see sealTiming.ts for the stage clock and for what the old ingredient pour
 // got wrong about the bowl artwork.
-import { STAGES, GATHER_AT, DONE_AT, SEAL_FOOTPRINT, PLAQUE_TOP, PLAQUE_MARGIN, stageAt } from "./sealTiming";
+import { STAGES, GATHER_AT, DONE_AT, SEAL_FOOTPRINT, PLAQUE_TOP, PLAQUE_MARGIN, FIELD_RUSH, SEAL_BACKDROP, stageAt } from "./sealTiming";
 
 /**
  * The post-order moment.
@@ -97,6 +99,21 @@ export default function MixingAnimation({ onComplete, stillSending }) {
 
     return (
         <div style={S.overlay}>
+            <BariGlowBackground />
+            {/* The ambient field arrives already streaking upward and decays to
+                rest at almost exactly the strike, so the whole screen is in
+                motion during the charge and still by the time the medallion
+                lands. Reusing this field rather than adding a second particle
+                system is also why the cost is one canvas, not two. */}
+            {/* Always mounted, like every other screen in the flow — dropping it
+                under reduced motion would make the field APPEAR at the handoff,
+                since the confirmation carries it too. Only the rush is dropped. */}
+            <GoldField zIndex={0} entrySweep={reducedMotion ? 0 : FIELD_RUSH} />
+
+            {/* Vignette closing in through the gather — it darkens the edges as
+                the dust is pulled inward, so the eye is funnelled to the point
+                the strike is about to happen at. Opens back up afterwards. */}
+            <div style={{ ...S.vignette, opacity: struck ? 0 : 1 }} />
             <div style={{ ...S.backdrop, opacity: struck ? 1 : 0.35 }} />
 
             <BariPlaque
@@ -206,7 +223,7 @@ const S = {
     // it, which is the only way the two screens can share a composition.
     overlay: {
         position: "fixed", inset: 0, zIndex: 400,
-        background: PLAQUE.backdrop,
+        background: SEAL_BACKDROP,
         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start",
         paddingTop: PLAQUE_TOP,
         animation: "plaqueScreenIn 0.3s ease",
@@ -218,6 +235,11 @@ const S = {
         position: "absolute", inset: 0, pointerEvents: "none",
         background: PLAQUE.glow,
         transition: "opacity 0.6s ease",
+    },
+    vignette: {
+        position: "absolute", inset: 0, pointerEvents: "none", zIndex: 1,
+        background: "radial-gradient(ellipse 55% 40% at 50% 38%, transparent 0%, rgba(0,0,0,0.45) 55%, rgba(0,0,0,0.82) 100%)",
+        transition: "opacity 0.7s ease",
     },
     // Outside the plaque, below it. Only ever appears when the server is slow,
     // and never disturbs the composition the confirmation is about to inherit.

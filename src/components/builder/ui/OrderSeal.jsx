@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
-import { dustPlan } from "./sealTiming";
+import { dustPlan, GATHER_AT } from "./sealTiming";
 const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
 
 /**
@@ -35,6 +35,20 @@ export default function OrderSeal({ stage, reducedMotion = false, dustCount = 26
 
     return (
         <div style={S.root}>
+            {/* ── The charge ──
+                A ring contracting onto the centre and a core brightening under
+                it, both landing exactly when the medallion strikes. Without
+                them the dust arrived at nothing: motes converged on empty space
+                and then, separately, a disc appeared. These give the gather
+                somewhere to converge TO, so the strike reads as the payoff of
+                the previous second rather than as a new event. */}
+            {!reducedMotion && stage === "gather" && (
+                <>
+                    <div style={{ ...S.chargeRing, animation: `sealChargeRing ${GATHER_AT}s cubic-bezier(0.55,0,0.85,0.35) both` }} aria-hidden="true" />
+                    <div style={{ ...S.chargeCore, animation: `sealChargeCore ${GATHER_AT}s cubic-bezier(0.7,0,0.9,0.4) both` }} aria-hidden="true" />
+                </>
+            )}
+
             {/* Gold dust spiralling in. Absorbed before the flare, never during —
                 see dustPlan: the delay is derived from each mote's flight time
                 so they all land by the same instant however long they take. */}
@@ -138,6 +152,21 @@ const S = {
         position: "absolute", inset: "-25%", opacity: 0, pointerEvents: "none",
         background: "radial-gradient(circle, rgba(255,244,214,0.95) 0%, rgba(240,208,96,0.55) 28%, rgba(200,168,78,0) 62%)",
     },
+    // Contracts from well outside the disc onto its rim, arriving as the
+    // medallion does. The opposite motion to sealShock, on purpose: one closes
+    // the charge, the other opens the impact.
+    chargeRing: {
+        position: "absolute", left: "50%", top: "50%",
+        width: "100%", height: "100%", marginLeft: "-50%", marginTop: "-50%",
+        borderRadius: "50%", border: "0.06em solid rgba(240,208,96,0.55)",
+        pointerEvents: "none",
+    },
+    chargeCore: {
+        position: "absolute", left: "50%", top: "50%",
+        width: "40%", height: "40%", marginLeft: "-20%", marginTop: "-20%",
+        borderRadius: "50%", pointerEvents: "none",
+        background: "radial-gradient(circle, rgba(255,248,224,0.95) 0%, rgba(240,208,96,0.6) 40%, rgba(200,168,78,0) 72%)",
+    },
     halo: {
         position: "absolute", inset: "-12%", borderRadius: "50%", pointerEvents: "none",
         background: "radial-gradient(circle, rgba(240,208,96,0.30) 0%, rgba(200,168,78,0.12) 45%, rgba(200,168,78,0) 70%)",
@@ -191,6 +220,22 @@ const KF = `
     18%  { opacity:1; }
     100% { opacity:0; transform: translate(-50%,-50%) rotate(var(--a)) translateX(0) rotate(calc(var(--a) * -1)) scale(0.25); }
 }
+/* The charge. Both ease-IN (slow, then rushing) so the last third of the gather
+   accelerates into the strike instead of arriving at a constant rate. */
+/* Starts at 2.1x, not 3.4x. The disc is half the plaque's width, so 3.4x is
+   wider than a 390px phone: the overlay clipped it and what reached the screen
+   was a stray arc across the background rather than a ring closing in. */
+@keyframes sealChargeRing {
+    0%   { opacity:0;    transform: scale(2.1); border-width:0.02em; }
+    30%  { opacity:0.7; }
+    100% { opacity:1;    transform: scale(1);   border-width:0.10em; }
+}
+@keyframes sealChargeCore {
+    0%   { opacity:0;    transform: scale(0.2); }
+    60%  { opacity:0.55; transform: scale(0.75); }
+    100% { opacity:1;    transform: scale(1.25); }
+}
+
 @keyframes sealStrike {
     0%   { opacity:0; transform: scale(1.75); }
     55%  { opacity:1; transform: scale(0.94); }
