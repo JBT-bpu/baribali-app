@@ -32,6 +32,13 @@ export interface BariPlaqueProps extends Omit<HTMLAttributes<HTMLDivElement>, 'c
     pedestalStyle?: CSSProperties;
     /** Merged onto the interior content column. */
     contentStyle?: CSSProperties;
+    /**
+     * Merged onto the frame artwork. Exists so the post-order sequence can hold
+     * the frame at `opacity: 0` and fade it in around the seal — the plaque
+     * ARRIVING rather than being cut to. Layout is unaffected either way: the
+     * frame is absolutely positioned, so hiding it never moves the content.
+     */
+    frameStyle?: CSSProperties;
 }
 
 export default function BariPlaque({
@@ -41,6 +48,7 @@ export default function BariPlaque({
     pedestalWidth = PLAQUE.pedestalArt,
     pedestalStyle,
     contentStyle,
+    frameStyle,
     className = '',
     style,
     ...rest
@@ -49,7 +57,7 @@ export default function BariPlaque({
         <div className={className} style={{ ...S.plaque, ...style }} {...rest}>
             <BariPlaqueKeyframes />
 
-            <div style={S.frame} aria-hidden="true">
+            <div style={{ ...S.frame, ...frameStyle }} aria-hidden="true">
                 <div style={S.frameTop} />
                 <div style={S.frameMid} />
                 <div style={S.frameBot} />

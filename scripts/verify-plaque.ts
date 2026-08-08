@@ -14,7 +14,10 @@
 import { PLAQUE, pct } from '../src/components/ui/bari/plaqueGeometry.ts';
 import { TRACK, TRACK_ASPECT_H } from '../src/app/order/[id]/trackingArt.ts';
 import { PANEL, chipRows, chipsPerRow, panelHeight, statsColumnHeight, ringFor } from '../src/components/builder/ui/heroBowlGeometry.ts';
-import { GLOW_AT, pourPlan, pourEndsAt } from '../src/components/builder/ui/mixingTiming.ts';
+import {
+    TIMED_STAGES, GATHER_AT, FACE_AT, CONTENT_FLOOR, REVEAL_DUR, SEAL_EM, SEAL_FOOTPRINT,
+    PLAQUE_TOP, PLAQUE_MARGIN, stageAt, dustPlan, moteArrivesAt,
+} from '../src/components/builder/ui/sealTiming.ts';
 
 const WIDTHS = [296, 336, 366, 376];   // plaque widths at 320/360/390/430 viewports
 
@@ -182,25 +185,95 @@ for (const vw of VIEWPORTS) {
 console.log(`\n  panel height: ${panelHeight(390, 14)}px at 390px, ${panelHeight(320, 14)}px at 320px (was 264px typical / ~370px worst)`);
 console.log(`  headroom at a full bowl: ${ringFor(390) - statsColumnHeight(14, 390)}px spare at 390px, ${ringFor(320) - statsColumnHeight(14, 320)}px at 320px`);
 
-// ── 9. Mixing animation: every ingredient is shown, and lands in time ────────
-// The old layout gave five positions to ten icons — from the sixth onwards they
-// landed pixel-exactly on top of each other, so a 13-ingredient order animated
-// as five. Everything past the tenth was dropped outright, because a flat 0.1s
-// stagger would have run the last one 0.25s past the fade. Both are now
-// properties of the plan rather than things to remember.
-head('9. Mixing animation — all ingredients shown, all landed before the fade');
-for (const n of [1, 3, 5, 8, 10, 13, PANEL.maxItems]) {
-    const plan = pourPlan(n);
-    ok(plan.length === n, `${n} ingredients -> ${plan.length} rendered (nothing dropped)`);
-    ok(pourEndsAt(n) <= GLOW_AT,
-        `${n}: last lands at ${pourEndsAt(n).toFixed(2)}s, fade begins ${GLOW_AT}s`);
-    // They converge on one point, so what must differ is where they START.
-    ok(new Set(plan.map(p => p.ex)).size === n,
-        `${n}: ${new Set(plan.map(p => p.ex)).size}/${n} distinct start positions`);
-    // The fan has to be symmetric or the pour visibly leans to one side.
-    const exs = plan.map(p => p.ex);
-    ok(Math.abs(exs[0] + exs[n - 1]) <= 1, `${n}: fan is symmetric (${exs[0]}..${exs[n - 1]})`);
+// ── 9. The seal's clock, and where it deliberately stops ────────────────────
+// The post-order moment used to be an ingredient pour into a bowl Lottie whose
+// artwork was never a fill (cat-salad-bowl.json is a TOSS LOOP — frame 0 and
+// frame 165 are the same settled bowl), and its length was inherited from that
+// animation and never justified: 3.2s of sequence plus 0.7s of growth, on every
+// order, most of it after the outcome was already decided.
+//
+// It is now timed only as far as the reveal. Past that the ORDER decides, which
+// is the only thing the length was ever really about.
+head('9. Seal clock — timed to the floor, then the order decides');
+let prevEnd = 0;
+for (const s of TIMED_STAGES) {
+    ok(s.end > prevEnd, `${s.name} ends at ${s.end}s, after the previous stage`);
+    // Each boundary must actually switch stage, or a stage is dead code.
+    ok(stageAt(s.end - 0.001) === s.name, `${s.name} is current just before ${s.end}s`);
+    ok(stageAt(s.end + 0.001) !== s.name, `${s.name} has ended just after ${s.end}s`);
+    prevEnd = s.end;
 }
+ok(stageAt(0) === 'gather', 'the sequence opens on the gather');
+// Past the clock it is waiting on the order — for one frame or for ten seconds.
+ok(stageAt(FACE_AT) === 'waiting', `past ${FACE_AT}s the screen is waiting on the order, not on a timer`);
+ok(stageAt(FACE_AT + 30) === 'waiting', 'still waiting 30s later — nothing times out into a confirmation');
+ok(CONTENT_FLOOR === FACE_AT, `the content floor (${CONTENT_FLOOR}s) is the end of the moment, not an arbitrary delay`);
+// The floor exists so the seal reads; below the strike it would be a flicker
+// behind a price.
+ok(CONTENT_FLOOR > GATHER_AT, `the floor (${CONTENT_FLOOR}s) is past the strike (${GATHER_AT}s)`);
+ok(REVEAL_DUR > 0 && REVEAL_DUR < 1, `the frame forms in ${REVEAL_DUR}s`);
+
+console.log(`\n  fast server: content at ${CONTENT_FLOOR}s. slow server: whenever it answers.`);
+console.log(`  (was a fixed 3.2s sequence + 0.7s growth, regardless)`);
+
+// ── 10. Converging dust ─────────────────────────────────────────────────────
+head('10. Dust — starts off the medallion, all absorbed before the strike');
+for (const n of [1, 8, 18, 26, 40]) {
+    const motes = dustPlan(n);
+    ok(motes.length === n, `${n} motes planned`);
+
+    // THE regression this protects. `dist` was once a bare number fed to
+    // translateX as a percentage — which resolves against the MOTE'S OWN width,
+    // not the medallion. A "2.6 radii out" mote started 13px from centre and the
+    // whole convergence collapsed into an undifferentiated blob.
+    const radius = SEAL_EM / 2;
+    ok(motes.every(m => m.distEm > radius),
+        `${n}: every mote starts beyond the ${radius}em radius (min ${Math.min(...motes.map(m => m.distEm))}em)`);
+
+    // Nothing may still be in flight when the medallion strikes.
+    const last = Math.max(...motes.map(moteArrivesAt));
+    ok(last <= GATHER_AT, `${n}: last mote absorbed at ${last}s, strike at ${GATHER_AT}s`);
+
+    // An even angular division reads as a bicycle wheel once the motes are big
+    // enough to see individually; the golden angle is what avoids spokes.
+    if (n > 2) {
+        const sorted = motes.map(m => m.angle).sort((a, b) => a - b);
+        const gaps = sorted.slice(1).map((a, i) => a - sorted[i]);
+        const even = 360 / n;
+        ok(new Set(motes.map(m => m.angle)).size === n, `${n}: no two motes share an angle`);
+        ok(Math.max(...gaps) - Math.min(...gaps) > even * 0.15,
+            `${n}: angles are irregular, not spoked (gap spread ${(Math.max(...gaps) - Math.min(...gaps)).toFixed(1)}°)`);
+    }
+}
+
+// ── 11. The seal sits on the plaque's pedestal ──────────────────────────────
+// The confirmation screen renders this same seal at this same footprint, so the
+// handoff between the two is invisible. If they ever disagree, the moment the
+// sequence is built around becomes a jump in scale.
+head('11. Seal footprint — fits the arch and rests on the pedestal');
+ok(SEAL_FOOTPRINT < PLAQUE.pedestalArt,
+    `seal ${SEAL_FOOTPRINT}W is smaller than the ${PLAQUE.pedestalArt}W default (a full-bleed disc at that size pokes through the arch)`);
+// Bottom-aligned in the pedestal zone, so its top is zone - footprint from the
+// plaque's top. Negative would mean it overflows above the frame.
+const sealTop = PLAQUE.pedestalZone - SEAL_FOOTPRINT;
+ok(sealTop > 0, `seal top at ${sealTop.toFixed(3)}W is inside the frame`);
+ok(PLAQUE.pedestalZone > PLAQUE.pedestalSurface,
+    `the disc's base (${PLAQUE.pedestalZone}W) is below the pedestal surface (${PLAQUE.pedestalSurface}W) — it rests on it`);
+ok(sealTop < PLAQUE.pedestalSurface,
+    `the disc stands proud of the pedestal rather than sitting behind it`);
+
+// The seal's SCREEN position has to survive the handoff. Both screens anchor to
+// PLAQUE_TOP, and both must override BariPlaque's own `margin: auto` — an auto
+// margin beats the flex container's align-items, so the plaque keeps centring
+// and the taller confirmation puts its pedestal 80px higher. Measured at 79px
+// of jump before this was pinned; 0px after.
+ok(/^0\s/.test(PLAQUE_MARGIN),
+    `the shared plaque margin pins the top ("${PLAQUE_MARGIN}") instead of centring`);
+ok(PLAQUE_MARGIN.trim().split(/\s+/).length >= 2 && PLAQUE_MARGIN.includes('auto'),
+    `it still centres horizontally ("${PLAQUE_MARGIN}")`);
+ok(/^\d+(\.\d+)?(vh|px|rem|em)$/.test(PLAQUE_TOP), `both screens start the plaque at ${PLAQUE_TOP}`);
+
+console.log(`\n  moment: ${TIMED_STAGES.map(s => `${s.name} ${s.end}s`).join(' → ')} → content when the order lands`);
 
 console.log(failed === 0 ? '\nAll assertions passed.\n' : `\n${failed} FAILED\n`);
 process.exit(failed === 0 ? 0 : 1);
