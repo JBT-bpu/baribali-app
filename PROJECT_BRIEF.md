@@ -198,14 +198,23 @@ Git history is authoritative for exact detail — commit messages are descriptiv
 8. **Enable leaked-password protection** in Supabase Auth (checks against HaveIBeenPwned). Flagged by the security advisor; one toggle in the dashboard. Low urgency while sign-in is Google-first.
 9. **Payment goes digital-only** once Hyp is live (owner: expected 2026-08-09). Pay-at-pickup stays working until that is confirmed — the switch should be one flag, not a rewrite. When it lands, `paid_unverified` becomes the state of *every* order, so the kitchen's "לאמת בקופה" pill and the webhook-verification gap both get more serious.
 10. **Consider a database-level guard on `payment_status`** after Hyp lands, so it cannot reach `paid` except through a verified path. The RLS fix closes the door from outside; this would mean a bug in one server route can't hand out free food either.
-11. **`/home2` has no closed banner** — a customer can build a whole salad and only meet the closed state at checkout. The order is correctly refused (409), but the disappointment lands late.
+11. ~~`/home2` has no closed banner~~ — **done** (`feat/kitchen-board`). The landing carries a notice, the summary honours the live override rather than only the bundled schedule, the order button is disabled with a reason on a confirmed-closed answer, and a 409's written Hebrew reason now reaches the customer instead of being replaced with "try again".
 
 **Two unmerged branches as of 2026-08-08** (both verified, neither pushed):
 `feat/mixing-animation` (6 commits) replaces the post-order mixing animation with
 a struck-medallion seal that becomes the confirmation in place; `feat/kitchen-board`
-(5 commits) covers the kitchen fixes, opening hours and the RLS fix. **The RLS and
-`shop_state` changes are already live in the production database** — only the code
-is unmerged.
+(7 commits) covers the kitchen fixes, opening hours, the customer-facing closed
+state and the RLS fix. **The RLS and `shop_state` changes are already live in the
+production database** — only the code is unmerged.
+
+**They merge cleanly** — checked, not assumed. Both rewrite parts of
+`SummaryView.jsx` (the seal branch folded `OrderedScreen` into `OrderSealScreen`
+and replaced the `settle()`/`mixDoneRef` machinery with a single `acceptedOrder`
+state; the kitchen branch changed the pickup picker, the submit error handling
+and the CTA), but they touch different regions. Verified on a throwaway local
+branch on 2026-08-08: no conflicts, and on the merged tree `npx tsc --noEmit`
+clean, lint 0 errors / 14 warnings, `npm run build` compiled, and both assertion
+harnesses passing. Either order works.
 
 ## 10. Improvement backlog (not started, no priority commitment)
 
