@@ -26,6 +26,11 @@ export default function OrderSeal({ stage, reducedMotion = false, dustCount = 26
     const struck = stage !== "gather";
     const faced = stage === "face" || stage === "sheen" || stage === "settle" || stage === "done";
     const sheening = stage === "sheen" || stage === "settle" || stage === "done";
+    // Struck metal should keep catching the light. Once the face is in, the
+    // bezel turns slowly and the halo breathes — forever, including on the
+    // confirmation screen, which is where the seal spends most of its life. A
+    // static disc under a looping cat read as a still image with a GIF in it.
+    const alive = faced && !reducedMotion;
     const dust = reducedMotion ? [] : dustPlan(dustCount);
 
     return (
@@ -65,6 +70,13 @@ export default function OrderSeal({ stage, reducedMotion = false, dustCount = 26
                 animation: !reducedMotion && struck ? "sealFlare 0.7s ease-out both" : undefined,
             }} aria-hidden="true" />
 
+            {/* Breathing halo. Its own element rather than a filter on the disc:
+                the disc already owns a transform (sealStrike), and CSS cannot
+                stack two animations on one transform. */}
+            {alive && (
+                <div style={{ ...S.halo, animation: "sealBreathe 4.5s ease-in-out infinite" }} aria-hidden="true" />
+            )}
+
             {/* ── The medallion ── */}
             <div style={{
                 ...S.disc,
@@ -72,7 +84,10 @@ export default function OrderSeal({ stage, reducedMotion = false, dustCount = 26
                 animation: !reducedMotion && struck ? "sealStrike 0.55s cubic-bezier(0.2,1.5,0.4,1) both" : undefined,
                 transition: reducedMotion ? "opacity 0.35s ease" : undefined,
             }}>
-                <div style={S.rim} />
+                {/* Rotating the conic gradient walks its highlight around the
+                    bezel — the way a real coin catches light as it tilts. Slow
+                    enough (18s) to register as alive, not as spinning. */}
+                <div style={{ ...S.rim, animation: alive ? "sealRimTurn 18s linear infinite" : undefined }} />
                 <div style={S.bevel} />
 
                 {/* The face. Fades up inside the ring rather than arriving with
@@ -122,6 +137,10 @@ const S = {
     flare: {
         position: "absolute", inset: "-25%", opacity: 0, pointerEvents: "none",
         background: "radial-gradient(circle, rgba(255,244,214,0.95) 0%, rgba(240,208,96,0.55) 28%, rgba(200,168,78,0) 62%)",
+    },
+    halo: {
+        position: "absolute", inset: "-12%", borderRadius: "50%", pointerEvents: "none",
+        background: "radial-gradient(circle, rgba(240,208,96,0.30) 0%, rgba(200,168,78,0.12) 45%, rgba(200,168,78,0) 70%)",
     },
     disc: {
         position: "relative", width: "100%", height: "100%", borderRadius: "50%",
@@ -191,6 +210,14 @@ const KF = `
     25%  { opacity:1; }
     100% { opacity:0; transform: translateX(120%); }
 }
+/* The two that never stop. Transform and opacity only, so they stay on the
+   compositor and cost nothing while the confirmation screen sits open. */
+@keyframes sealRimTurn { to { transform: rotate(360deg); } }
+@keyframes sealBreathe {
+    0%,100% { opacity:0.45; transform: scale(1); }
+    50%     { opacity:0.95; transform: scale(1.055); }
+}
+
 /* Lives here rather than in MixingAnimation because this block is the one that
    gets hoisted into <head>; a page-local <style> would be shadowable. */
 @keyframes sealSendingSweep { 0%{background-position:200% 0} 100%{background-position:-200% 0} }

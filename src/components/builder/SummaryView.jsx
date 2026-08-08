@@ -374,7 +374,6 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
 
             {showMixing && (
                 <MixingAnimation
-                    all={all}
                     stillSending={stillSending}
                     onComplete={() => { mixDoneRef.current = true; settle(); }}
                 />
@@ -787,6 +786,10 @@ function confirmPayment(status) {
 }
 
 // ─── Post-order confirmation screen ─────────────────────────
+/** One entrance, one stagger unit. Every element on the confirmation uses it so
+ *  the arrival reads as a single wave rather than a set of unrelated fades. */
+const RISE = "plaqueFadeUp 0.45s cubic-bezier(0.2,0.9,0.3,1)";
+
 // Exported for /dev/mixing only. The whole design of this screen rests on it
 // opening at exactly the composition MixingAnimation closes on, and there is no
 // other way to check that: placing a real order to look at it would write to the
@@ -823,10 +826,13 @@ export function OrderedScreen({ total, all, pickupTime, orderNum, orderId, payme
                     pedestalStyle={OS.catArt}
                     title={
                         <>
-                            <div style={OS.title}>בהכנה!</div>
-                            <div style={OS.subtitle}>מכינים את הסלט שלכם עכשיו 🐱</div>
+                            {/* Staggered, because this is the arrival. The
+                                sealing overlay left this zone empty, so nothing
+                                here replaces anything — it all simply appears. */}
+                            <div style={{ ...OS.title, animation: `${RISE} 0s both` }}>בהכנה!</div>
+                            <div style={{ ...OS.subtitle, animation: `${RISE} 0.08s both` }}>מכינים את הסלט שלכם עכשיו 🐱</div>
                             {orderNum && (
-                                <div style={{ marginTop: "8px", animation: "plaqueFadeUp 0.5s ease 0.35s both" }}>
+                                <div style={{ marginTop: "8px", animation: `${RISE} 0.18s both` }}>
                                     <BariBadge>הזמנה {orderNum}</BariBadge>
                                 </div>
                             )}
@@ -835,14 +841,14 @@ export function OrderedScreen({ total, all, pickupTime, orderNum, orderId, payme
                 >
                     {/* Everything below the engraved divider. This is the
                         variable part, and it is what stretches the frame. */}
-                    <div style={OS.price}>₪{total}</div>
-                    <div style={OS.meta}>{all.length} מרכיבים{pickupTime ? ` · איסוף: ${pickupTime}` : ' · מוכן בכ-8 דקות'}</div>
+                    <div style={{ ...OS.price, animation: `${RISE} 0.26s both` }}>₪{total}</div>
+                    <div style={{ ...OS.meta, animation: `${RISE} 0.34s both` }}>{all.length} מרכיבים{pickupTime ? ` · איסוף: ${pickupTime}` : ' · מוכן בכ-8 דקות'}</div>
 
                     {/* Whether money is still owed is the one thing this
                         screen was silent about — someone paying at
                         pickup got no reminder to bring any. */}
                     {pay && (
-                        <div style={{ ...OS.payPill, ...(pay.owed ? OS.payOwed : OS.payDone) }}>
+                        <div style={{ ...OS.payPill, ...(pay.owed ? OS.payOwed : OS.payDone), animation: `${RISE} 0.42s both` }}>
                             <span>{pay.owed ? '💵' : '✓'}</span>
                             <span>{pay.text}</span>
                         </div>
@@ -865,7 +871,7 @@ export function OrderedScreen({ total, all, pickupTime, orderNum, orderId, payme
                     )}
 
                     {orderId && (
-                        <a href={`/order/${orderId}`} style={OS.trackBtn}>
+                        <a href={`/order/${orderId}`} style={{ ...OS.trackBtn, animation: `${RISE} 0.62s both` }}>
                             🔍 עקוב אחר ההזמנה
                         </a>
                     )}
@@ -928,7 +934,14 @@ const OS = {
     // alignItems/paddingTop must match MixingAnimation's overlay exactly — see
     // PLAQUE_TOP. This screen and the sealing overlay share a composition, and
     // the seal jumps 80px at the handoff if either one centres instead.
-    root: { position: "fixed", inset: 0, zIndex: 500, background: PLAQUE.backdrop, display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: PLAQUE_TOP, overflowY: "auto", overflowX: "hidden", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: "rtl", animation: "plaqueScreenIn 0.55s ease both" },
+    // NO screen-level fade. This screen is only ever reached from the sealing
+    // overlay (settle() is the sole caller of setOrdered), and it opens on that
+    // overlay's exact composition — backdrop, frame, seal, all pinned. Fading
+    // the whole thing in was fading an identical picture over itself for half a
+    // second while the CONTENT dissolved underneath, which is what read as a
+    // seam. The frame and the seal now simply continue; only the content
+    // arrives, staggered below.
+    root: { position: "fixed", inset: 0, zIndex: 500, background: PLAQUE.backdrop, display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: PLAQUE_TOP, overflowY: "auto", overflowX: "hidden", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: "rtl" },
     bg: { position: "fixed", inset: 0, background: PLAQUE.glow, pointerEvents: "none" },
 
     // The seal's shadow. Its SIZE is the plaque's business — the pedestal slot

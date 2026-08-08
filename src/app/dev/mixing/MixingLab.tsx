@@ -16,8 +16,10 @@ import { STAGES, DONE_AT } from '../../../components/builder/ui/sealTiming';
  * points at REAL Supabase, so "just place one" would write to the live orders
  * table and light up the kitchen board.
  *
- * Two modes. "Play" runs the real component end to end. "Scrub" freezes each
+ * Three modes. "Play" runs the real component end to end. "Scrub" freezes each
  * stage side by side, which is the only way to actually judge a 200ms strike.
+ * "Handoff" runs the real gate through to the real confirmation screen — the
+ * seal must not move by a pixel when it flips.
  */
 
 const STAGE_NAMES = ['gather', 'strike', 'face', 'sheen', 'settle'] as const;
@@ -69,27 +71,27 @@ export default function MixingLab() {
                 handedOff
                     ? <OrderedScreen total={68} all={items} pickupTime="12:30" orderNum="BB-1042"
                         orderId={null} paymentStatus="pending" badges={[]} onNewOrder={() => { }} />
-                    : <MixingAnimation key={run} all={items} onComplete={onComplete} stillSending={sending} />
+                    : <MixingAnimation key={run} onComplete={onComplete} stillSending={sending} />
             ) : mode === 'play' ? (
                 // Keyed on `run` so each click is a genuine remount — every timer
                 // in the sequence is scheduled from mount.
-                <MixingAnimation key={run} all={items} onComplete={onComplete} stillSending={sending} />
+                <MixingAnimation key={run} onComplete={onComplete} stillSending={sending} />
             ) : (
                 <div style={S.grid}>
                     {STAGE_NAMES.map(stage => {
                         const formed = stage === 'sheen' || stage === 'settle';
-                        const settled = stage === 'settle';
                         return (
+                            // No title, no body — production leaves the plaque's
+                            // interior empty right up to the handoff, and a
+                            // preview that fakes content there would hide the
+                            // one thing worth checking.
                             <div key={stage} style={S.cell}>
                                 <div style={S.plaqueBox}>
                                     <BariPlaque
                                         pedestal={<div style={sealFont}><OrderSeal stage={stage} /></div>}
                                         pedestalWidth={SEAL_FOOTPRINT}
                                         frameStyle={{ opacity: formed ? 1 : 0 }}
-                                        title={<div style={{ ...S.fakeTitle, opacity: settled ? 1 : 0 }}>ההזמנה נחתמה</div>}
-                                    >
-                                        <div style={{ ...S.fakeMeta, opacity: settled ? 1 : 0 }}>8 מרכיבים · מכינים עכשיו</div>
-                                    </BariPlaque>
+                                    />
                                 </div>
                                 <div style={S.cap}>{stage}</div>
                             </div>
@@ -129,9 +131,4 @@ const S: Record<string, React.CSSProperties> = {
     cell: { width: '210px' },
     plaqueBox: { width: '210px', direction: 'rtl' },
     cap: { textAlign: 'center', fontSize: '11px', color: '#f0d060', marginTop: '4px' },
-    fakeTitle: {
-        fontFamily: "var(--font-display), 'Secular One', sans-serif",
-        fontSize: '13px', lineHeight: 1.25, color: '#f0d060', transition: 'opacity 0.3s',
-    },
-    fakeMeta: { fontSize: '9px', color: 'rgba(232,245,233,0.75)', transition: 'opacity 0.3s' },
 };

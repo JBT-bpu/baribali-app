@@ -16,9 +16,18 @@ import { STAGES, GATHER_AT, DONE_AT, SEAL_FOOTPRINT, PLAQUE_TOP, PLAQUE_MARGIN, 
  * The post-order moment.
  *
  * This is the confirmation screen ARRIVING, not a separate animation played
- * before it. The plaque, the pedestal and the cat are the same components in
- * the same geometry the confirmation uses, so when OrderedScreen takes over
- * there is nothing to cross-fade — only the seal's gold ring fades out.
+ * before it. The backdrop, the plaque frame and the seal are the same
+ * components at the same geometry OrderedScreen uses, and this screen leaves
+ * the plaque's interior EMPTY — so the swap adds content and changes nothing.
+ * Neither screen fades as a whole. Three things make that hold, and all three
+ * were found by measuring rather than by looking:
+ *
+ *   - both anchor the plaque at PLAQUE_TOP instead of centring, because the
+ *     confirmation's is taller and centring moved the seal 79px;
+ *   - both override BariPlaque's `margin: auto`, because an auto margin beats
+ *     the flex container's align-items;
+ *   - this screen renders no title and no body, because two different Hebrew
+ *     strings dissolving through each other is what the seam actually was.
  *
  * The app used to celebrate twice inside half a second: this overlay bloomed at
  * 2.9s, cut hard to the plaque, and fired confetti 450ms later. Two payoffs that
@@ -29,7 +38,11 @@ import { STAGES, GATHER_AT, DONE_AT, SEAL_FOOTPRINT, PLAQUE_TOP, PLAQUE_MARGIN, 
  * confirmation while the order was still in flight, which is both a lie and
  * indistinguishable from the app having frozen.
  */
-export default function MixingAnimation({ all, onComplete, stillSending }) {
+// No `all`, and no `total`. The seal is about the order being accepted, not
+// about what is in it — the ingredients have already had three surfaces. Both
+// props were left destructured and unread once the pour went; dead props are
+// how a component starts pretending to depend on things it does not.
+export default function MixingAnimation({ onComplete, stillSending }) {
     const [stage, setStage] = useState("gather");
     // Falling gold dust, a flare, a shockwave and a struck medallion — this is
     // still the most motion-heavy screen in the app. The stage clock and
@@ -46,9 +59,9 @@ export default function MixingAnimation({ all, onComplete, stillSending }) {
         const at = (seconds, fn) => timers.push(setTimeout(fn, seconds * 1000));
 
         for (const s of STAGES) at(s.end, () => setStage(stageAt(s.end + 0.001)));
-        // Fire onComplete at the settle, while the plaque is fully formed and
-        // fully visible. OrderedScreen (z=500) cross-fades in on top of an
-        // identical composition — no gap, no double-fade, no jump.
+        // Fire onComplete once the frame's 0.55s fade has finished, so the
+        // plaque is at full opacity when OrderedScreen (z=500) takes over with
+        // its own frame at full opacity. Handing off mid-fade would snap.
         at(DONE_AT, () => onComplete());
 
         if (navigator.vibrate) {
@@ -69,8 +82,6 @@ export default function MixingAnimation({ all, onComplete, stillSending }) {
 
     const struck = stage !== "gather";
     const formed = stage === "sheen" || stage === "settle" || stage === "done";
-    const settled = stage === "settle" || stage === "done";
-    const count = all.length;
 
     // The seal is sized in `em` off this font-size, so it fills the pedestal
     // square at every width without a media query. cqw would be tidier but the
@@ -105,17 +116,22 @@ export default function MixingAnimation({ all, onComplete, stillSending }) {
                         ? "opacity 0.4s ease"
                         : "opacity 0.55s ease, transform 0.55s cubic-bezier(0.2,0.9,0.3,1)",
                 }}
-                title={
-                    <div style={{ ...S.title, opacity: settled ? 1 : 0 }}>
-                        {stillSending ? "עוד רגע — שולחים למטבח…" : "ההזמנה נחתמה"}
-                    </div>
-                }
-            >
-                <div style={{ ...S.body, opacity: settled ? 1 : 0 }}>
-                    <div style={S.meta}>{count} מרכיבים · מכינים עכשיו</div>
-                    {stillSending && <div style={S.stillDots} aria-live="polite" />}
+            />
+
+            {/* NOTHING inside the plaque. It used to carry its own title and a
+                line of meta, which meant that at the handoff two DIFFERENT
+                Hebrew strings cross-dissolved in the same box — "ההזמנה נחתמה"
+                ghosting through "בהכנה!" — while the confirmation faded in over
+                it. That was the seam: not the frame, not the seal, the words.
+                Now the swap only ever ADDS content, and there is nothing to
+                dissolve. The wait message lives outside the frame for the same
+                reason: it must not change the plaque's insides. */}
+            {stillSending && (
+                <div style={S.waiting} aria-live="polite">
+                    <span>עוד רגע — שולחים למטבח…</span>
+                    <div style={S.stillDots} />
                 </div>
-            </BariPlaque>
+            )}
         </div>
     );
 }
@@ -191,7 +207,7 @@ const S = {
     overlay: {
         position: "fixed", inset: 0, zIndex: 400,
         background: PLAQUE.backdrop,
-        display: "flex", alignItems: "flex-start", justifyContent: "center",
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start",
         paddingTop: PLAQUE_TOP,
         animation: "plaqueScreenIn 0.3s ease",
         fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: "rtl",
@@ -203,16 +219,13 @@ const S = {
         background: PLAQUE.glow,
         transition: "opacity 0.6s ease",
     },
-    title: {
-        fontFamily: "var(--font-display), 'Secular One', sans-serif",
-        fontSize: "22px", lineHeight: 1.25, color: "#f0d060",
-        textShadow: "0 2px 8px rgba(0,0,0,0.65)",
-        transition: "opacity 0.45s ease",
-    },
-    body: { transition: "opacity 0.45s ease 0.1s" },
-    meta: {
+    // Outside the plaque, below it. Only ever appears when the server is slow,
+    // and never disturbs the composition the confirmation is about to inherit.
+    waiting: {
+        marginTop: "18px", textAlign: "center",
         fontSize: "13px", lineHeight: 1.4, color: "rgba(232,245,233,0.75)",
         textShadow: "0 1px 4px rgba(0,0,0,0.6)",
+        animation: "plaqueFadeUp 0.4s ease both",
     },
     // A moving element while waiting: a frozen screen and a slow screen have to
     // look different, or people start tapping the button again.
