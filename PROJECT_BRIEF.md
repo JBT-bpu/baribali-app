@@ -97,7 +97,37 @@ create table orders (
 
 `paid_unverified`: the payment webhook has no cryptographic signature verification configured yet, so webhook-confirmed payments land here instead of `paid`; the kitchen board treats it the same as `pay_at_pickup` (human confirms at pickup).
 
-RLS: anon/publishable client can insert but not read orders (confirmed via live testing) — all reads/writes beyond insert go through API routes using the service-role client.
+`shop_state` table (added 2026-08-08) — the live open/closed override:
+
+```sql
+create table shop_state (
+  id         smallint primary key default 1 check (id = 1),   -- single row
+  override   text check (override in ('open','closed')),      -- null = follow the schedule
+  note       text,
+  updated_at timestamptz not null default now()
+);
+```
+
+The regular week (9:00–16:00, Friday to 14:00, Saturday closed) is **config in
+code** — `src/lib/shopHours.ts` — because it changes rarely. This table is the
+other half: "we are closed right now", toggled from the kitchen board via
+`/api/shop`, taking effect immediately without a deploy. Every read falls back
+to the schedule if the table is unreachable, so a broken read can never close a
+shop that is standing open.
+
+**RLS (corrected 2026-08-08).** All three public tables now have RLS enabled and
+**no policies**, so anon and authenticated get nothing from any of them; every
+read and write goes through API routes using the service-role client.
+
+This section previously claimed *"anon can insert but not read orders (confirmed
+via live testing)"* and described that as correct. It was not. `orders` carried
+`INSERT TO public WITH CHECK (true)`, and the anon key is public by design — it
+ships in the browser bundle — so anyone could POST straight to
+`/rest/v1/orders` with any `total`, `status` and `payment_status`, bypassing the
+server-side price recomputation, the price-mismatch check, the rate limiter and
+opening hours in one request. The policy was dropped (`supabase/002_orders_rls.sql`);
+re-probing with the anon key now returns 42501. **The lesson worth keeping: the
+brief's reassurance is what stopped anyone looking again.**
 
 ## 6. Recent history (condensed changelog)
 
@@ -130,7 +160,9 @@ Git history is authoritative for exact detail — commit messages are descriptiv
 - Server-side price recomputation (can't tamper with order total)
 - Payment webhook can't blindly mark orders `paid` (`paid_unverified` + amount/state checks)
 - Real Hyp Pay SIGN/VERIFY (server-side, cryptographically checked) replacing the earlier placeholder
-- Supabase RLS confirmed correct via live testing (anon can insert, cannot read)
+- **Supabase RLS actually locked down (2026-08-08)** — all three public tables have RLS enabled with **no policies**; anon and authenticated get nothing. This replaces an earlier entry that called the configuration correct: `orders` had a permissive `INSERT TO public` policy, and since the anon key ships in the browser bundle, anyone could create orders directly against PostgREST with any total and `payment_status: 'paid'`, bypassing every control in `POST /api/orders`. Verified before and after with the anon key (22P02 → 42501).
+- **Opening hours are enforced server-side (2026-08-08)** — `pickup_time` previously went from the request body into the database unread, so an order could be placed at 3am for 4am and would be on the kitchen board when staff arrived. `POST /api/orders` now rejects orders placed while closed or for a time outside hours (409). 571 assertions in `scripts/verify-hours.ts`, most of them checking that every slot the picker offers is one the server accepts.
+- **`paid_unverified` is now visually distinct on the kitchen board** — it used to render identically to a verified `paid` (same text, same green tick), so the "staff confirm at pickup" compensating control had no surface anywhere. It is now an amber "שולם — לאמת בקופה". This matters more once payment is digital-only, when every order on the board is unverified.
 - `user_id` on orders is server-verified from a Bearer token, never client-claimed
 - **`/kitchen` has real access control**: a server-only shared staff password (`KITCHEN_PASSWORD`) exchanged for an httpOnly, HMAC-signed session cookie. The server component gates the page before any board markup ships; the order API routes verify the same cookie. Replaces the old `NEXT_PUBLIC_` header "secret" that shipped in the browser bundle. Unset = board runs open (local/demo); **set on Vercel in production** — verified live: `/kitchen` serves the login screen and `/api/kitchen/orders` returns 401 to anonymous requests.
 - **Rate limiting** (`src/lib/rateLimit.ts`) on orders (12/min), payment-create (12/min), slots (40/min), kitchen-login (8/min) — 429 + Retry-After. In-memory/per-process (approximate on serverless); webhook intentionally unthrottled so gateway callbacks aren't dropped.
@@ -163,6 +195,17 @@ Git history is authoritative for exact detail — commit messages are descriptiv
 5. Hyp Pay **production** credentials (`HYP_MASOF`/`HYP_KEY`/`HYP_PASSP`) — integration built + tested against error paths; live credentials not yet arrived.
 6. Delete the local `google/client_secret_*.json` file (gitignored, no longer needed — Supabase has the values).
 7. Menu/navigation restructure (with an outside AI) — see `MENU_FLOW_BRIEF.md` / `MENU_RESTRUCTURE_REPLY.md`. Phase-1 "order again" is now **done**; remaining phase-1 (welcome-screen softening, nav dedup, dead-route cleanup) and the separately-planned builder-UI unification are not yet built.
+8. **Enable leaked-password protection** in Supabase Auth (checks against HaveIBeenPwned). Flagged by the security advisor; one toggle in the dashboard. Low urgency while sign-in is Google-first.
+9. **Payment goes digital-only** once Hyp is live (owner: expected 2026-08-09). Pay-at-pickup stays working until that is confirmed — the switch should be one flag, not a rewrite. When it lands, `paid_unverified` becomes the state of *every* order, so the kitchen's "לאמת בקופה" pill and the webhook-verification gap both get more serious.
+10. **Consider a database-level guard on `payment_status`** after Hyp lands, so it cannot reach `paid` except through a verified path. The RLS fix closes the door from outside; this would mean a bug in one server route can't hand out free food either.
+11. **`/home2` has no closed banner** — a customer can build a whole salad and only meet the closed state at checkout. The order is correctly refused (409), but the disappointment lands late.
+
+**Two unmerged branches as of 2026-08-08** (both verified, neither pushed):
+`feat/mixing-animation` (6 commits) replaces the post-order mixing animation with
+a struck-medallion seal that becomes the confirmation in place; `feat/kitchen-board`
+(5 commits) covers the kitchen fixes, opening hours and the RLS fix. **The RLS and
+`shop_state` changes are already live in the production database** — only the code
+is unmerged.
 
 ## 10. Improvement backlog (not started, no priority commitment)
 
