@@ -1,7 +1,7 @@
 'use client';
 
 import { groupByZone, type ZoneId } from '@/lib/orderZones';
-import { type Order, type OrderStatus, urgencyOf, minutesUntilPickup, paymentLabel } from './types';
+import { type Order, type OrderStatus, type PayTone, urgencyOf, minutesUntilPickup, paymentLabel } from './types';
 
 /**
  * The order the worker is on.
@@ -16,6 +16,35 @@ import { type Order, type OrderStatus, urgencyOf, minutesUntilPickup, paymentLab
 
 /** Wide-side zones (the bulk of the assembly) vs the fixed side column. */
 const MAIN_ZONES: ZoneId[] = ['base', 'protein', 'other'];
+
+/**
+ * Chip size scales DOWN with the number of ingredients, not up.
+ *
+ * The board is wall-mounted and read at arm's length or further, and most
+ * orders are short — a 4-ingredient ticket was using about a sixth of a
+ * 1920×1200 screen and leaving ~650px of empty black below it. The wasted space
+ * was on the one element where a misread costs a remade salad.
+ *
+ * So the space gets spent on whichever order is actually open: few ingredients,
+ * very large chips; a full bowl, still comfortably larger than before (the old
+ * fixed size was 56px tall with 17px names, which is the `sm` tier here and now
+ * only applies to the side column). Tiers rather than a fluid scale because the
+ * result has to be predictable — staff learn the size of a thing.
+ */
+type ChipTier = 'sm' | 'md' | 'lg' | 'xl';
+
+export function chipTier(itemCount: number): ChipTier {
+    if (itemCount <= 5) return 'xl';
+    if (itemCount <= 9) return 'lg';
+    return 'md';
+}
+
+const CHIP: Record<ChipTier, { minHeight: number; icon: number; name: number; padX: number; gap: number }> = {
+    sm: { minHeight: 52, icon: 26, name: 17, padX: 12, gap: 8 },
+    md: { minHeight: 74, icon: 38, name: 21, padX: 16, gap: 10 },
+    lg: { minHeight: 92, icon: 48, name: 25, padX: 20, gap: 12 },
+    xl: { minHeight: 116, icon: 60, name: 30, padX: 24, gap: 14 },
+};
 
 export default function ActiveOrder({
     order, sizeLabel, onStatus, checked, onToggleItem,
@@ -36,33 +65,47 @@ export default function ActiveOrder({
     const pay = paymentLabel(order.payment_status);
     const doneCount = order.items.filter(i => checked.includes(i.id)).length;
 
-    const renderZone = (g: { zone: { id: ZoneId; title: string }; items: Order['items'] }, big: boolean) => (
-        <section key={g.zone.id} style={S.zone}>
-            <div style={S.zoneTitle}>
-                <span>{g.zone.title}</span>
-                <span style={S.zoneCount}>{g.items.length}</span>
-            </div>
-            <div style={S.chips}>
-                {g.items.map(it => {
-                    const done = checked.includes(it.id);
-                    return (
-                        <button
-                            key={it.id}
-                            type="button"
-                            onClick={() => onToggleItem(it.id)}
-                            style={{ ...S.chip, ...(big ? S.chipBig : {}), ...(done ? S.chipDone : {}) }}
-                        >
-                            {it.icon?.startsWith('/')
-                                ? <img src={it.icon} alt="" style={{ width: big ? '34px' : '26px', height: big ? '34px' : '26px', objectFit: 'contain' }} />
-                                : <span style={{ fontSize: big ? '26px' : '20px' }}>{it.icon}</span>}
-                            <span style={S.chipName}>{it.he}</span>
-                            {done && <span style={S.chipTick}>✓</span>}
-                        </button>
-                    );
-                })}
-            </div>
-        </section>
-    );
+    // The main column's size comes from the WHOLE order, not from the zone —
+    // otherwise a 2-item sauce zone would render huge next to a 10-item veg one.
+    const mainTier = chipTier(order.items.length);
+
+    const renderZone = (g: { zone: { id: ZoneId; title: string }; items: Order['items'] }, tier: ChipTier) => {
+        const c = CHIP[tier];
+        return (
+            <section key={g.zone.id} style={S.zone}>
+                <div style={S.zoneTitle}>
+                    <span>{g.zone.title}</span>
+                    <span style={S.zoneCount}>{g.items.length}</span>
+                </div>
+                <div style={{ ...S.chips, gap: `${c.gap}px` }}>
+                    {g.items.map(it => {
+                        const done = checked.includes(it.id);
+                        return (
+                            <button
+                                key={it.id}
+                                type="button"
+                                aria-pressed={done}
+                                onClick={() => onToggleItem(it.id)}
+                                style={{
+                                    ...S.chip,
+                                    minHeight: `${c.minHeight}px`,
+                                    padding: `${Math.round(c.minHeight * 0.14)}px ${c.padX}px`,
+                                    gap: `${Math.round(c.gap * 0.9)}px`,
+                                    ...(done ? S.chipDone : {}),
+                                }}
+                            >
+                                {it.icon?.startsWith('/')
+                                    ? <img src={it.icon} alt="" style={{ width: `${c.icon}px`, height: `${c.icon}px`, objectFit: 'contain' }} />
+                                    : <span style={{ fontSize: `${c.icon}px`, lineHeight: 1 }}>{it.icon}</span>}
+                                <span style={{ ...S.chipName, fontSize: `${c.name}px` }}>{it.he}</span>
+                                {done && <span style={{ ...S.chipTick, fontSize: `${Math.round(c.name * 0.9)}px` }}>✓</span>}
+                            </button>
+                        );
+                    })}
+                </div>
+            </section>
+        );
+    };
 
     // ── Not accepted yet: one decision, made large ──
     if (order.status === 'waiting') {
@@ -87,8 +130,8 @@ export default function ActiveOrder({
                         {sizeLabel && <span style={S.fact}>🥣 {sizeLabel}</span>}
                         <span style={S.fact}>{order.items.length} מרכיבים</span>
                         {pay && (
-                            <span style={{ ...S.fact, ...(pay.owed ? S.payOwed : S.payDone) }}>
-                                {pay.owed ? '💳' : '✓'} {pay.text}
+                            <span style={{ ...S.fact, ...PAY_TONE[pay.tone] }}>
+                                {PAY_GLYPH[pay.tone]} {pay.text}
                             </span>
                         )}
                     </div>
@@ -138,8 +181,8 @@ export default function ActiveOrder({
                         </span>
                     )}
                     {pay && (
-                        <span style={{ ...S.payPill, ...(pay.owed ? S.payOwed : S.payDone) }}>
-                            {pay.owed ? '💳' : '✓'} {pay.text}
+                        <span style={{ ...S.payPill, ...PAY_TONE[pay.tone] }}>
+                            {PAY_GLYPH[pay.tone]} {pay.text}
                         </span>
                     )}
                 </div>
@@ -155,10 +198,12 @@ export default function ActiveOrder({
 
             <div className="kitchen-active-body" style={S.body}>
                 <div style={S.mainCol}>
-                    {main.length > 0 ? main.map(g => renderZone(g, true)) : <div style={S.empty}>אין מרכיבים</div>}
+                    {main.length > 0 ? main.map(g => renderZone(g, mainTier)) : <div style={S.empty}>אין מרכיבים</div>}
                 </div>
                 <div style={S.sideCol}>
-                    {side.map(g => renderZone(g, false))}
+                    {/* One tier down: sauces and finishes are fewer and the
+                        column is narrower, and they are not what gets confused. */}
+                    {side.map(g => renderZone(g, mainTier === 'xl' ? 'lg' : mainTier === 'lg' ? 'md' : 'sm'))}
                     <div style={S.bowl}>
                         <span style={S.bowlLabel}>קערה</span>
                         <span style={S.bowlValue}>{sizeLabel ?? '—'}</span>
@@ -183,6 +228,21 @@ export default function ActiveOrder({
         </div>
     );
 }
+
+/**
+ * Three tones, and `verify` is amber on purpose.
+ *
+ * It is not "money owed", so it must not read as owed — but it is also not
+ * finished, so it must not read green either. Amber is the difference between
+ * "hand it over" and "hand it over after you have checked the register", which
+ * is the entire compensating control for an unverifiable payment webhook.
+ */
+const PAY_TONE: Record<PayTone, React.CSSProperties> = {
+    settled: { background: 'rgba(102,187,106,0.14)', border: '1px solid rgba(102,187,106,0.45)', color: '#a5d6a7' },
+    verify: { background: 'rgba(255,183,77,0.18)', border: '1px solid rgba(255,183,77,0.7)', color: '#ffd699' },
+    owed: { background: 'rgba(255,183,77,0.16)', border: '1px solid rgba(255,183,77,0.5)', color: '#ffcc80' },
+};
+const PAY_GLYPH: Record<PayTone, string> = { settled: '✓', verify: '🔍', owed: '💳' };
 
 const S: Record<string, React.CSSProperties> = {
     // ── Accept screen ──
@@ -235,8 +295,6 @@ const S: Record<string, React.CSSProperties> = {
     headMins: { fontSize: '15px', fontWeight: 700, color: 'rgba(255,255,255,0.55)' },
     headLate: { fontSize: '15px', fontWeight: 900, color: '#ff8a80' },
     payPill: { padding: '6px 12px', borderRadius: '999px', fontSize: '14px', fontWeight: 800 },
-    payOwed: { background: 'rgba(255,183,77,0.16)', border: '1px solid rgba(255,183,77,0.5)', color: '#ffcc80' },
-    payDone: { background: 'rgba(102,187,106,0.14)', border: '1px solid rgba(102,187,106,0.45)', color: '#a5d6a7' },
     notes: {
         display: 'flex', alignItems: 'center', gap: '12px',
         padding: '12px 16px', borderRadius: '12px',
@@ -244,11 +302,21 @@ const S: Record<string, React.CSSProperties> = {
         color: '#ffd7d5', fontSize: '19px', fontWeight: 800, lineHeight: 1.4,
     },
     body: { display: 'flex', gap: '12px', flex: 1, minHeight: 0, alignItems: 'stretch' },
-    mainCol: { flex: '0 0 64%', display: 'flex', flexDirection: 'column', gap: '10px', minWidth: 0, overflowY: 'auto' },
-    sideCol: { flex: 1, display: 'flex', flexDirection: 'column', gap: '10px', minWidth: 0, overflowY: 'auto' },
+    // 'safe center': the columns CENTRE their cards when the order is short and
+    // fall back to top-aligned the moment it overflows. Plain 'center' with
+    // overflow makes the top of a tall order unreachable, which on a 14-item
+    // ticket would hide the first ingredients.
+    //
+    // Letting the zone CARDS stretch instead was the first attempt and it was
+    // worse: a one-item zone got the same height as a ten-item one, so the
+    // board went from empty space below the cards to empty space inside them.
+    mainCol: { flex: '0 0 64%', display: 'flex', flexDirection: 'column', justifyContent: 'safe center', gap: '10px', minWidth: 0, overflowY: 'auto' },
+    sideCol: { flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'safe center', gap: '10px', minWidth: 0, overflowY: 'auto' },
     zone: {
-        background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
-        borderRadius: '12px', padding: '10px 12px',
+        display: 'flex', flexDirection: 'column',
+        flex: '0 0 auto',
+        background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)',
+        borderRadius: '14px', padding: '12px 14px',
     },
     zoneTitle: {
         display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px',
@@ -258,24 +326,27 @@ const S: Record<string, React.CSSProperties> = {
         minWidth: '24px', padding: '1px 8px', borderRadius: '999px', textAlign: 'center',
         background: 'rgba(255,255,255,0.12)', fontSize: '13px', fontWeight: 900,
     },
-    chips: { display: 'flex', flexWrap: 'wrap', gap: '8px' },
+    // Centred in whatever height the zone ended up with.
+    chips: { display: 'flex', flexWrap: 'wrap' },
     chip: {
-        position: 'relative', display: 'flex', alignItems: 'center', gap: '8px',
-        padding: '8px 12px', minHeight: '48px', borderRadius: '10px', cursor: 'pointer',
-        background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.14)',
+        position: 'relative', display: 'flex', alignItems: 'center',
+        borderRadius: '12px', cursor: 'pointer',
+        background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.16)',
         color: '#fff', fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
     },
-    chipBig: { minHeight: '56px', padding: '10px 14px' },
     chipDone: { background: 'rgba(76,175,80,0.18)', borderColor: 'rgba(76,175,80,0.5)', opacity: 0.7 },
-    chipName: { fontSize: '17px', fontWeight: 800 },
-    chipTick: { fontSize: '15px', fontWeight: 900, color: '#a5d6a7' },
+    chipName: { fontWeight: 800, whiteSpace: 'nowrap' },
+    chipTick: { fontWeight: 900, color: '#a5d6a7' },
+    // The vessel to reach for, given the room to be unmissable — it is the one
+    // thing on this screen that cannot be corrected after the fact.
     bowl: {
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '10px 14px', borderRadius: '12px',
-        background: 'rgba(240,200,80,0.1)', border: '1px solid rgba(240,200,80,0.35)',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '6px',
+        flex: '0 0 auto', minHeight: '150px', padding: '18px',
+        borderRadius: '14px',
+        background: 'rgba(240,200,80,0.10)', border: '1px solid rgba(240,200,80,0.38)',
     },
-    bowlLabel: { fontSize: '14px', fontWeight: 800, color: 'rgba(255,255,255,0.6)' },
-    bowlValue: { fontSize: '20px', fontWeight: 900, color: 'var(--color-gold-light)' },
+    bowlLabel: { fontSize: '15px', fontWeight: 800, color: 'rgba(255,255,255,0.55)', letterSpacing: '0.04em' },
+    bowlValue: { fontSize: 'clamp(28px, 3.4vw, 52px)', fontWeight: 900, color: 'var(--color-gold-light)', lineHeight: 1 },
     empty: { padding: '30px', textAlign: 'center', color: 'rgba(255,255,255,0.3)' },
     actions: { display: 'flex', gap: '10px' },
     primaryBtn: {

@@ -63,7 +63,20 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
     const [loadError, setLoadError] = useState(false);
     const [lastOk, setLastOk] = useState<Date | null>(null);
     const [actionError, setActionError] = useState<string | null>(null);
-    const [undo, setUndo] = useState<{ id: string; orderNum: string } | null>(null);
+    /**
+     * The last reversible action. `to` is the status the undo restores.
+     *
+     * It used to cover only `collected`, which is the action with the SMALLEST
+     * consequence — the order leaves the board and nobody outside the kitchen
+     * notices. "מוכן לאיסוף" had no undo at all, and that is the one the
+     * customer sees: it flips their order-status page to "ready" and tells them
+     * to come. A mis-tap during a rush sent someone to the counter for food that
+     * was still being made, and there was no way back to `preparing` from the
+     * board at all.
+     */
+    const [undo, setUndo] = useState<{ id: string; orderNum: string; to: OrderStatus; label: string } | null>(null);
+    const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    useEffect(() => () => { if (undoTimer.current) clearTimeout(undoTimer.current); }, []);
 
     // The order in the worker's hands. Never reassigned by incoming data.
     const [activeId, setActiveId] = useState<string | null>(null);
@@ -207,9 +220,25 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
     }, [onUnauthorized]);
 
     useEffect(() => { loadOrders(); }, [loadOrders]);
+    // 4s while the board is on screen, 20s when it is not, and an immediate
+    // fetch the moment it comes back. The wall tablet is always visible so this
+    // changes nothing there; it matters when the board is open on someone's
+    // phone in a pocket, which was ~10,800 requests a shift. Browsers already
+    // throttle background timers, so the old fixed 4s was not really 4s anyway —
+    // this just makes the behaviour something we chose.
     useEffect(() => {
-        const id = setInterval(loadOrders, 4000);
-        return () => clearInterval(id);
+        let id: ReturnType<typeof setInterval>;
+        const start = () => {
+            clearInterval(id);
+            id = setInterval(loadOrders, document.visibilityState === 'visible' ? 4000 : 20000);
+        };
+        const onVisibility = () => {
+            if (document.visibilityState === 'visible') loadOrders();
+            start();
+        };
+        start();
+        document.addEventListener('visibilitychange', onVisibility);
+        return () => { clearInterval(id); document.removeEventListener('visibilitychange', onVisibility); };
     }, [loadOrders]);
 
     const toggleItem = useCallback((orderId: string, itemId: string) => {
@@ -227,12 +256,24 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
         setNewIds(prev => prev.filter(n => n !== id));
         const previous = ordersRef.current.find(o => o.id === id)?.status;
 
-        // Collected orders leave the board entirely, so a fat-finger during a
-        // rush was unrecoverable without database access.
+        // Both of the one-way actions get an undo, restoring the status they
+        // came from. 30s rather than 20: noticing "that was the wrong ticket"
+        // takes longer than noticing a mis-tap, and the bar costs one row.
+        const num = ordersRef.current.find(o => o.id === id)?.order_num ?? '';
+        if (status === 'collected' || status === 'ready') {
+            if (undoTimer.current) clearTimeout(undoTimer.current);
+            setUndo({
+                id,
+                orderNum: num,
+                to: status === 'collected' ? 'ready' : (previous ?? 'preparing'),
+                label: status === 'collected' ? 'סומנה כנמסרה' : 'סומנה כמוכנה — הלקוח קיבל הודעה',
+            });
+            undoTimer.current = setTimeout(() => setUndo(u => (u?.id === id ? null : u)), 30000);
+        }
+
+        // Collected orders leave the board entirely, so the worker needs
+        // somewhere to land.
         if (status === 'collected') {
-            const num = ordersRef.current.find(o => o.id === id)?.order_num ?? '';
-            setUndo({ id, orderNum: num });
-            setTimeout(() => setUndo(u => (u?.id === id ? null : u)), 20000);
             const rest = ordersRef.current.filter(o => o.id !== id);
             setActiveId(rest.length ? rest[0].id : null);
         }
@@ -328,10 +369,16 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
             {/* Alerts */}
             {undo && (
                 <div style={K.undoBar} role="status">
-                    <span>הזמנה {undo.orderNum} סומנה כנמסרה</span>
+                    <span>הזמנה {undo.orderNum} {undo.label}</span>
                     <button type="button" style={K.undoBtn}
-                        onClick={() => { const u = undo; setUndo(null); updateStatus(u.id, 'ready'); }}>
-                        ↩ החזר ללוח
+                        onClick={() => {
+                            const u = undo;
+                            setUndo(null);
+                            if (undoTimer.current) clearTimeout(undoTimer.current);
+                            setActiveId(u.id);      // put it back in the worker's hands
+                            updateStatus(u.id, u.to);
+                        }}>
+                        ↩ בטל
                     </button>
                 </div>
             )}
@@ -400,7 +447,25 @@ const K: Record<string, React.CSSProperties> = {
         // grew with the order instead of scrolling inside it — a long order
         // pushed the מוכן button off the bottom of the tablet, unreachable.
         // A definite height makes the inner `overflow-y: auto` actually work.
-        height: '100dvh', background: '#0a0a0a',
+        height: '100dvh',
+        // ── The BariBali ground, deliberately quiet ──
+        // Deep house green instead of flat black, with the damask motif at 5%
+        // and a soft gold pool near the top. NO photograph, no particles, no
+        // motion: this is a surface people scan under time pressure, and detail
+        // behind text is exactly what costs accuracy. The brand should be
+        // recognisable from across the room and invisible at reading distance.
+        backgroundColor: '#050f06',
+        // Layer order is top-first. The scrim is near-uniform on purpose: a
+        // gradient that reached full opacity at the bottom made the motif fade
+        // out down the screen, which reads as a smudge rather than as a texture.
+        backgroundImage: [
+            'radial-gradient(ellipse 70% 45% at 50% 0%, rgba(200,168,78,0.10) 0%, transparent 70%)',
+            'linear-gradient(180deg, rgba(7,20,8,0.93) 0%, rgba(4,12,5,0.95) 100%)',
+            'url(/kitchen-assets/motif.webp)',
+        ].join(', '),
+        backgroundSize: 'cover, cover, 560px auto',
+        backgroundRepeat: 'no-repeat, no-repeat, repeat',
+        backgroundBlendMode: 'normal, normal, normal',
         fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: 'rtl',
         color: '#fff', display: 'flex', flexDirection: 'column',
     },
