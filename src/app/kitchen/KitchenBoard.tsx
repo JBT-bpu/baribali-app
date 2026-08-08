@@ -7,6 +7,7 @@ import { orderSizeLabel } from '@/lib/reorder';
 import OrderTabs from './OrderTabs';
 import ActiveOrder from './ActiveOrder';
 import { type Order, type OrderStatus, byPickupThenReceived } from './types';
+import { type ShopStatus } from '@/lib/shopHours';
 
 /**
  * The staff board: the whole queue visible as tabs, one order worked on at a
@@ -107,6 +108,43 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
     const knownIdsRef = useRef<Set<string>>(new Set());
     const seededRef = useRef(false);
     const audioCtxRef = useRef<AudioContext | null>(null);
+
+    // ── Shop open/closed ──
+    // Staff-operated because staff are the ones who know. The schedule
+    // (9:00–16:00) runs by itself; this is for the day it does not apply.
+    const [shop, setShop] = useState<ShopStatus | null>(null);
+    const [shopBusy, setShopBusy] = useState(false);
+
+    const loadShop = useCallback(async () => {
+        try {
+            const res = await fetch('/api/shop');
+            if (res.ok) setShop(await res.json());
+        } catch { /* the board's own error banner covers connectivity */ }
+    }, []);
+
+    const setOverride = useCallback(async (override: 'open' | 'closed' | null) => {
+        setShopBusy(true);
+        try {
+            const res = await fetch('/api/shop', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ override }),
+            });
+            if (res.ok) { setShop(await res.json()); setActionError(null); }
+            else {
+                // Never let a failed close look like a successful one — someone
+                // who taps "closed" and sees nothing will walk away believing it.
+                const data = await res.json().catch(() => null);
+                setActionError(data?.error ?? 'לא הצלחנו לעדכן את מצב החנות');
+                setTimeout(() => setActionError(null), 8000);
+            }
+        } catch {
+            setActionError('לא הצלחנו לעדכן את מצב החנות');
+            setTimeout(() => setActionError(null), 8000);
+        } finally {
+            setShopBusy(false);
+        }
+    }, []);
 
     const onUnauthorized = useCallback(() => { if (authEnabled) router.refresh(); }, [authEnabled, router]);
     const logout = useCallback(async () => {
@@ -210,6 +248,12 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
                 if (arrivals.length > 0) setNewIds(prev => [...new Set([...prev, ...arrivals])]);
                 knownIdsRef.current = new Set(ids);
             }
+            // Ridden along with the order poll rather than given its own effect
+            // and interval. Two reasons: the board then notices a shop closed
+            // from ANOTHER device (the owner's phone) within one poll, and it
+            // avoids a second synchronous setState-in-effect, which the repo's
+            // lint baseline does not have room for.
+            loadShop();
         } catch {
             // A dropped connection used to throw out of here, silently freezing
             // the board (and sticking the first load on "loading" forever).
@@ -217,7 +261,7 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
         } finally {
             setLoading(false);
         }
-    }, [onUnauthorized]);
+    }, [onUnauthorized, loadShop]);
 
     useEffect(() => { loadOrders(); }, [loadOrders]);
     // 4s while the board is on screen, 20s when it is not, and an immediate
@@ -362,9 +406,51 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
                             </button>
                         </>
                     )}
+                    {/* One control, two states, and it always says what IS —
+                        never what tapping it would do. A button labelled
+                        "close" that means "you are closed" is how someone
+                        closes a shop they meant to open. */}
+                    {shop && (
+                        <button
+                            type="button"
+                            onClick={() => setOverride(shop.open ? 'closed' : null)}
+                            disabled={shopBusy}
+                            style={{ ...K.headerBtn, ...(shop.open ? K.shopOpen : K.shopShut), opacity: shopBusy ? 0.5 : 1 }}
+                            title={shop.opensAt ? `שעות היום ${shop.opensAt}–${shop.closesAt}` : 'סגור היום'}
+                        >
+                            {shop.open
+                                ? (shop.reason === 'override_open' ? '🟢 פתוח (ידני) · סגור' : '🟢 פתוח · סגור עכשיו')
+                                : (shop.reason === 'override_closed' ? '🔴 סגור ידנית · פתח' : '🔴 סגור · פתח ידנית')}
+                        </button>
+                    )}
                     {authEnabled && <button type="button" style={K.headerBtn} onClick={logout}>🔒 יציאה</button>}
                 </div>
             </div>
+
+            {/* Closed is a state the whole board should show, not a small pill:
+                a worker glancing over must not have to read a button to know
+                that nothing new is coming in. */}
+            {shop && !shop.open && (
+                <div style={K.closedBar} role="status">
+                    <span style={{ fontSize: '20px' }}>🔴</span>
+                    <div>
+                        <div style={{ fontWeight: 900 }}>
+                            {shop.reason === 'override_closed' ? 'החנות סגורה להזמנות (ידנית)' : 'החנות סגורה להזמנות'}
+                        </div>
+                        <div style={{ fontSize: '13px', opacity: 0.85, marginTop: '2px' }}>
+                            {shop.reason === 'closed_day' ? 'היום לא פעיל'
+                                : shop.opensAt ? `שעות הפעילות ${shop.opensAt}–${shop.closesAt}` : ''}
+                            {' · הזמנות קיימות ממשיכות כרגיל'}
+                        </div>
+                    </div>
+                    {shop.reason === 'override_closed' && (
+                        <button type="button" style={{ ...K.undoBtn, marginInlineStart: 'auto' }}
+                            disabled={shopBusy} onClick={() => setOverride(null)}>
+                            פתח מחדש
+                        </button>
+                    )}
+                </div>
+            )}
 
             {/* Alerts */}
             {undo && (
@@ -493,6 +579,14 @@ const K: Record<string, React.CSSProperties> = {
     },
     simBtn: {
         background: 'rgba(156,39,176,0.18)', border: '1px solid rgba(186,104,200,0.55)', color: '#e1bee7',
+    },
+    shopOpen: { background: 'rgba(76,175,80,0.16)', border: '1px solid rgba(76,175,80,0.55)', color: '#c8f7c9' },
+    shopShut: { background: 'rgba(229,57,53,0.18)', border: '1px solid rgba(229,57,53,0.6)', color: '#ff9a97' },
+    closedBar: {
+        display: 'flex', alignItems: 'center', gap: '12px',
+        margin: '10px 16px', padding: '14px 16px', borderRadius: '12px',
+        background: 'rgba(229,57,53,0.12)', border: '1px solid rgba(229,57,53,0.45)',
+        color: '#ffb3b0', fontSize: '15px', lineHeight: 1.4, flexShrink: 0,
     },
     loadingMsg: { padding: '60px', textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: '16px' },
     emptyMsg: { padding: '80px', textAlign: 'center', color: 'var(--color-green-accent)', fontSize: '18px', fontWeight: 700 },

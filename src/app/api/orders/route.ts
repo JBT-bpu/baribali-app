@@ -6,6 +6,8 @@ import { enforceRateLimit } from '@/lib/rateLimit';
 import { isPaymentConfigured } from '@/lib/payment';
 import { findDiscount, discountAmount } from '@/lib/discounts';
 import { getCustomerDiscount } from '@/lib/customerTags';
+import { shopStatus, checkPickup } from '@/lib/shopHours';
+import { readShopState } from '@/lib/shopState';
 
 /**
  * If the request carries a valid Supabase access token, returns the
@@ -44,6 +46,39 @@ export async function POST(req: NextRequest) {
         const computed = computeOrderTotal(items, size);
         if (!computed.valid) {
             return NextResponse.json({ error: 'Invalid order items or size' }, { status: 400 });
+        }
+
+        // ── Is the shop actually open, and is that a real pickup time? ──
+        //
+        // Until now `pickupTime` went from the request body straight into the
+        // database, unread. Nothing stopped an order being placed at 3am for
+        // 4am — it would sit on the kitchen board when staff arrived, because
+        // the board filters on the created-today date and nothing else. Opening
+        // hours are worth nothing if only the UI believes in them.
+        //
+        // The shop's state is checked here rather than trusted from the client
+        // for the same reason the total is recomputed here.
+        const now = new Date();
+        const shop = shopStatus(now, (await readShopState()).override);
+        if (!shop.open) {
+            return NextResponse.json({
+                error: shop.reason === 'override_closed'
+                    ? 'הזמנות סגורות כרגע. נסו שוב מאוחר יותר.'
+                    : shop.opensAt
+                        ? `אנחנו סגורים כרגע. פתוח ${shop.opensAt}–${shop.closesAt}.`
+                        : 'אנחנו סגורים היום.',
+                shopClosed: true,
+            }, { status: 409 });
+        }
+
+        const badPickup = checkPickup(pickupTime, now);
+        if (badPickup) {
+            return NextResponse.json({
+                error: badPickup === 'in_the_past'
+                    ? 'שעת האיסוף שנבחרה כבר עברה. בחרו שעה חדשה.'
+                    : `שעת האיסוף אינה בשעות הפעילות (${shop.opensAt}–${shop.closesAt}).`,
+                pickupRejected: badPickup,
+            }, { status: 409 });
         }
 
         // Resolve the signed-in user up front (guests → null, no network call).

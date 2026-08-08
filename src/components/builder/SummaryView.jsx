@@ -109,30 +109,38 @@ function bowlRowLayout(row, count) {
 }
 
 // ─── Pickup slot generator ─────────────────────────────────────
+/**
+ * Now a thin wrapper over lib/shopHours, which is also what the SERVER checks
+ * against. It used to carry the opening hours itself, as four hard-coded
+ * comparisons — `day === 6`, `h >= 16`, `sh >= 21`, `day === 5 && sh >= 16` —
+ * that no other part of the app could see. Three separate constants had to
+ * agree, one of them (21:00) had nothing to do with the shop's real hours, and
+ * the server validated none of it: a pickup time went from the request body
+ * straight into the database.
+ *
+ * Returns null rather than an empty array when there is nothing available,
+ * because the callers already treat null as "closed".
+ */
+const DAY_HE = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+
+/**
+ * Why there are no slots, in words that are true.
+ *
+ * This used to be the fixed string "המסעדה סגורה כרגע · נפתח מחדש ביום ראשון",
+ * which is right on a Saturday and wrong every other time it showed — at 08:00
+ * on a Monday the shop reopens in an hour, and the app was telling people to
+ * come back in six days.
+ */
+function closedMessage(now) {
+    const next = nextOpen(now);
+    if (!next) return 'המסעדה סגורה כרגע';
+    if (next.inDays === 0) return `נפתח היום בשעה ${toHHMM(next.at)}`;
+    if (next.inDays === 1) return `סגור להיום · נפתח מחר בשעה ${toHHMM(next.at)}`;
+    return `סגור כרגע · נפתח ביום ${DAY_HE[next.day]} בשעה ${toHHMM(next.at)}`;
+}
+
 function generatePickupSlots() {
-    const now = new Date();
-    const day = now.getDay(); // 0=Sun 5=Fri 6=Sat
-    const h = now.getHours();
-    const m = now.getMinutes();
-
-    if (day === 6) return null; // Saturday — closed
-    if (day === 5 && h >= 16) return null; // Friday eve (Shabbat) — closed
-
-    const isPeak = (h === 11 && m >= 45) || h === 12 || h === 13 || (h === 14 && m <= 30);
-    const lead = isPeak ? 25 : 15;
-
-    const firstMin = Math.ceil((h * 60 + m + lead) / 5) * 5;
-    const slots = [];
-    for (let i = 0; i < 12; i++) {
-        const totalMins = firstMin + i * 5;
-        const sh = Math.floor(totalMins / 60);
-        const sm = totalMins % 60;
-        if (sh >= 21) break;
-        if (day === 5 && sh >= 16) break;
-        const label = `${String(sh).padStart(2, '0')}:${String(sm).padStart(2, '0')}`;
-        const isPeak = (sh === 11 && sm >= 45) || sh === 12 || sh === 13 || (sh === 14 && sm <= 30);
-        slots.push({ id: label, label, isPeak });
-    }
+    const slots = pickupSlots(new Date());
     return slots.length ? slots : null;
 }
 import { STEPS, NUTRI, BASE } from "../../data/salad-data.js"; // NUTRI used in bowl calorie total
@@ -148,6 +156,7 @@ import BariPlaque, { BariPlaqueKeyframes } from "../ui/bari/BariPlaque";
 import { PLAQUE } from "../ui/bari/plaqueGeometry";
 import { isSupabaseConfigured } from "../../lib/supabase";
 import { getAccessToken } from "../../lib/auth";
+import { pickupSlots, nextOpen, toHHMM } from "../../lib/shopHours";
 
 const DEMO_MODE = !isSupabaseConfigured();
 
@@ -1112,7 +1121,7 @@ function PickupTimePicker({ value, onChange }) {
         return (
             <div style={PT.box}>
                 <div style={PT.title}>⏰ זמן איסוף</div>
-                <div style={PT.closedMsg}>המסעדה סגורה כרגע · נפתח מחדש ביום ראשון</div>
+                <div style={PT.closedMsg}>{closedMessage(new Date())}</div>
             </div>
         );
     }
