@@ -178,6 +178,66 @@ export function nextOpen(now: Date): { inDays: number; day: number; at: Minutes 
     return null;
 }
 
+// ─── Saying it in words ──────────────────────────────────────
+
+/**
+ * The closed message lives here, next to the state it describes, rather than in
+ * whichever component happens to show it. It was previously a local function in
+ * SummaryView, which meant the landing page had no way to say the same thing and
+ * the harness had no way to check it. It is derived purely from the status and
+ * the clock, so it can be asserted like anything else here.
+ */
+export const DAY_HE = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+
+/** Just the "when we open again" half. Null when no day of the week has hours. */
+export function reopenLine(now: Date): string | null {
+    const next = nextOpen(now);
+    if (!next) return null;
+    if (next.inDays === 0) return `נפתח היום בשעה ${toHHMM(next.at)}`;
+    if (next.inDays === 1) return `נפתח מחר בשעה ${toHHMM(next.at)}`;
+    return `נפתח ביום ${DAY_HE[next.day]} בשעה ${toHHMM(next.at)}`;
+}
+
+/**
+ * Why we are closed, in words that are true. Empty string when open.
+ *
+ * A manual "closed" override deliberately does NOT promise a reopening time.
+ * `nextOpen` would happily answer — staff who close at 11:00 on a Monday would
+ * have the app tell customers "נפתח מחר", because today's opening has passed —
+ * but the override is lifted by hand, so nobody knows when it ends. Better to
+ * say nothing than to name an hour we invented. If staff left a note, that note
+ * is the most accurate thing available, so it is what shows.
+ */
+export function closedMessage(status: ShopStatus, now: Date): string {
+    if (status.open) return '';
+    if (status.reason === 'override_closed') {
+        return status.note ? `סגור כרגע · ${status.note}` : 'סגור כרגע · נחזור בקרוב';
+    }
+    const when = reopenLine(now);
+    return when ? `סגור כרגע · ${when}` : 'המסעדה סגורה כרגע';
+}
+
+/**
+ * What to show where the pickup-slot chips would be, when there are none.
+ *
+ * Covers the case `closedMessage` cannot: the shop is genuinely OPEN, but it is
+ * 15:55 and every remaining slot falls past closing once the kitchen's lead time
+ * is added. "Closed" would be a lie, and an empty string — which is what
+ * `closedMessage` correctly returns for an open shop — leaves the customer
+ * staring at a heading with nothing under it.
+ */
+export function noPickupMessage(status: ShopStatus, now: Date): string {
+    if (!status.open) return closedMessage(status, now);
+    // Staff have forced the shop open outside its scheduled hours. The slot grid
+    // is built from WEEK and so has nothing to offer, but the order still goes
+    // through with no pickup time (checkPickup allows that; the kitchen shows
+    // "ללא שעת איסוף"). Saying "we open tomorrow" over a live order button would
+    // have the screen contradicting itself.
+    if (status.reason === 'override_open') return 'פתוח כרגע · שעת האיסוף תתואם בקופה';
+    const when = reopenLine(now);
+    return when ? `אין שעות איסוף פנויות · ${when}` : 'אין שעות איסוף פנויות כרגע';
+}
+
 /**
  * Whether an order for `pickup` may be accepted at `now`.
  *

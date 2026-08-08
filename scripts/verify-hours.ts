@@ -14,6 +14,7 @@
 import {
     WEEK, hm, toHHMM, parseHHMM, hoursFor, withinHours, isPeak,
     pickupSlots, checkPickup, shopStatus, nextOpen, LEAD_NORMAL, LEAD_PEAK, LATE_SUBMIT_GRACE,
+    closedMessage, reopenLine, noPickupMessage,
 } from '../src/lib/shopHours.ts';
 
 let failed = 0;
@@ -134,6 +135,68 @@ for (const day of [0, 1, 2, 3, 4, 5]) {
             ok(verdict === null, `${DAY_NAME[day]} ${toHHMM(hm(hour, 20))} -> slot ${slot.id} accepted${verdict ? ` (got ${verdict})` : ''}`);
         }
     }
+}
+
+// ── 7. The words the customer reads ─────────────────────────────────────────
+// Copy is derived from the same state as the rules, so it can be wrong in the
+// same measurable ways. The message this replaces was the fixed string "נפתח
+// מחדש ביום ראשון" — right on a Saturday, wrong every other time it appeared.
+head('7. The closed message says something true');
+{
+    const closed = (now: Date) => closedMessage(shopStatus(now), now);
+
+    // Never silent when there is nothing to sell.
+    for (const day of [0, 1, 2, 3, 4, 5, 6]) {
+        for (const hour of [3, 7, 8, 12, 17, 22]) {
+            const now = at(day, hour);
+            const status = shopStatus(now);
+            const msg = noPickupMessage(status, now);
+            ok(msg.length > 0, `${DAY_NAME[day]} ${hour}:00 -> a message exists ("${msg}")`);
+            if (status.open) {
+                ok(closed(now) === '', `${DAY_NAME[day]} ${hour}:00 open -> closedMessage is empty`);
+            }
+        }
+    }
+
+    // The specific bug: do not send a Monday-morning customer away for six days.
+    const monEarly = closed(at(1, 8));
+    ok(monEarly.includes('היום') && monEarly.includes('09:00'), `Mon 08:00 -> "today at 09:00" ("${monEarly}")`);
+    ok(!monEarly.includes('ראשון'), 'Mon 08:00 -> does not name Sunday');
+
+    const monLate = closed(at(1, 18));
+    ok(monLate.includes('מחר'), `Mon 18:00 -> "tomorrow" ("${monLate}")`);
+
+    // Friday evening skips Saturday.
+    const friLate = closed(at(5, 18));
+    ok(friLate.includes('ראשון'), `Fri 18:00 -> names Sunday ("${friLate}")`);
+    ok(reopenLine(at(6, 12))?.includes('מחר') === true, 'Sat noon -> "tomorrow"');
+
+    // A manual override must not invent a reopening time — nobody knows one.
+    const overNote = closedMessage(shopStatus(at(1, 11), 'closed', 'נגמר העוף'), at(1, 11));
+    ok(overNote.includes('נגמר העוף'), `override with a note shows the note ("${overNote}")`);
+    ok(!overNote.includes('מחר') && !overNote.includes('היום'), 'override does not promise a time');
+    const overBare = closedMessage(shopStatus(at(1, 11), 'closed'), at(1, 11));
+    ok(overBare.length > 0 && !overBare.includes('09:00'), `bare override stays vague ("${overBare}")`);
+
+    // Open-but-no-slots: "closed" would be a lie, silence would be worse.
+    const lateOpen = at(1, 15, 55);
+    ok(shopStatus(lateOpen).open, 'Mon 15:55 is still open');
+    ok(pickupSlots(lateOpen).length === 0, 'Mon 15:55 has no offerable slots');
+    const lateMsg = noPickupMessage(shopStatus(lateOpen), lateOpen);
+    ok(lateMsg.includes('אין שעות איסוף'), `Mon 15:55 -> "no slots", not "closed" ("${lateMsg}")`);
+    ok(!lateMsg.startsWith('סגור'), 'Mon 15:55 -> does not claim the shop is closed');
+
+    // Forced open outside hours: the order button is live (shopStatus says open,
+    // and checkPickup accepts an unset pickup time) while the slot grid, built
+    // from WEEK, has nothing. The screen must not argue with itself.
+    const forced = at(6, 12); // Saturday — closed on every schedule
+    const forcedStatus = shopStatus(forced, 'open');
+    ok(forcedStatus.open, 'Sat noon with override "open" -> open');
+    ok(pickupSlots(forced).length === 0, 'Sat noon has no schedule slots to offer');
+    ok(checkPickup(null, forced) === null, 'an unset pickup time is still acceptable');
+    const forcedMsg = noPickupMessage(forcedStatus, forced);
+    ok(forcedMsg.includes('פתוח'), `forced open -> says open ("${forcedMsg}")`);
+    ok(!forcedMsg.includes('נפתח מחר'), 'forced open -> does not tell them to come back tomorrow');
 }
 
 console.log(`\n  week: ${Object.entries(WEEK).map(([d, h]) =>
