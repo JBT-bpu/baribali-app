@@ -49,15 +49,26 @@ function playKitchenChime(ctx: AudioContext) {
 const CHECK_KEY = 'bb-kitchen-checks';
 
 /**
- * The board's ground: the owner's 16:9 brand plate, blurred and darkened.
+ * The board's ground: the owner's 16:9 brand plate, darkened. Sharp, not
+ * blurred — and it turns out that costs nothing.
  *
- * Three treatments exist in public/kitchen-assets — bg-a (quietest), bg (this
- * one), bg-b (boldest) — because the right amount of brand on a work surface is
- * a judgement, not a fact. Measured behind the working area, after the scrim:
- * all three sit at a mean luminance of ~14/255, so white text is comfortable on
- * any of them. What differs is how much the ground VARIES (spread 7.0 / 9.9 /
- * 12.6 on a 0-255 scale), and therefore how much it pulls at the eye — which is
- * an attention question, not a legibility one.
+ * The blur was there to stop the artwork competing with text. Measuring it,
+ * darkening does that job on its own: the unblurred plate at 30% brightness
+ * varies LESS behind the working area than the blurred one did at 40%
+ * (spread 9.2 against 9.9). The blur was buying softness that the exposure had
+ * already paid for.
+ *
+ * Three treatments in public/kitchen-assets, because how much brand belongs on
+ * a work surface is a judgement rather than a fact. Behind the working area,
+ * after the scrim, on a 0-255 scale:
+ *
+ *     bg-a  22% bright   mean 13.0   spread  6.9   quietest
+ *     bg    30% bright   mean 13.7   spread  9.2   default
+ *     bg-b  42% bright   mean 14.8   spread 12.7   boldest
+ *
+ * All three sit near mean 14, so white text is comfortable on any of them —
+ * what differs is how much the ground pulls at the eye, which is an attention
+ * question, not a legibility one. ?bg=a / ?bg=b switch live.
  */
 const KITCHEN_BG = '/kitchen-assets/bg.webp';
 
