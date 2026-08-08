@@ -13,6 +13,8 @@ import { BariButton, BariModal, BariGlowBackground, BariBottomNav } from '@/comp
 import { usePrefersReducedMotion } from '@/lib/motionHooks';
 import { useUser, avatarUrl, getAccessToken } from '@/lib/auth';
 import { buildReorderHref, stashReorder } from '@/lib/reorder';
+import { useShopStatus } from '@/lib/useShopStatus';
+import { reopenLine } from '@/lib/shopHours';
 
 // The product pick is the hero-select roster (HeroSelector); choosing the salad
 // hero opens the shared SizePicker overlay (also used by the builder).
@@ -65,11 +67,49 @@ function ReorderStrip({ order, onReorder }: { order: HistoryOrder; onReorder: ()
     );
 }
 
+// ─── "We're closed" notice ─────────────────────────────────────────────────────
+// The closed state used to reach the customer for the first time at checkout —
+// after they had picked a size, walked five ingredient steps and reviewed a
+// total. The server refuses the order correctly (409 from POST /api/orders), but
+// finding out there is nothing to buy is not something to learn at the till.
+//
+// It informs, it does not gate: the roster stays live and the builder still
+// opens. Someone browsing tomorrow's lunch at 22:00 should still see the food.
+function ClosedNotice({ headline, detail }: { headline: string; detail: string }) {
+    return (
+        <div
+            role="status"
+            style={{
+                width: '100%', maxWidth: '360px',
+                display: 'flex', alignItems: 'center', gap: '10px',
+                padding: '9px 13px', borderRadius: '16px',
+                // Warm amber, not red: being shut at 22:00 is information, not an
+                // error, and nothing here is the customer's fault to fix.
+                background: 'linear-gradient(135deg, rgba(196,132,44,0.20), rgba(120,74,20,0.10))',
+                border: '1px solid rgba(232,170,70,0.38)',
+                backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+                boxShadow: '0 4px 18px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.05)',
+                fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: 'rtl',
+                animation: 'labelIn 0.45s ease both',
+            }}
+        >
+            <span style={{ fontSize: '19px', flexShrink: 0 }} aria-hidden>🕒</span>
+            <div style={{ flex: 1, minWidth: 0, textAlign: 'right' }}>
+                <div style={{ fontSize: '13px', fontWeight: 800, color: '#f2c46a' }}>{headline}</div>
+                <div style={{ fontSize: '11.5px', fontWeight: 600, color: 'rgba(255,255,255,0.6)', lineHeight: 1.45 }}>
+                    {detail}
+                </div>
+            </div>
+        </div>
+    );
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function HomeV2() {
     const router = useRouter();
     const { user } = useUser();
     const reducedMotion = usePrefersReducedMotion();
+    const shop = useShopStatus();
 
     // ── Screen state ──
     const [sizePicker, setSizePicker] = useState(false);
@@ -137,6 +177,14 @@ export default function HomeV2() {
     if (!ready) return <div style={{ minHeight: '100dvh', background: '#020a02' }} />;
 
     const avatar = user ? avatarUrl(user) : null;
+
+    // Only once /api/shop has answered. The bundled schedule cannot see a staff
+    // override in EITHER direction, so announcing early risks telling someone
+    // standing outside an open shop that it is shut.
+    const showClosed = !shop.loading && !shop.open;
+    const closedDetail = shop.reason === 'override_closed'
+        ? (shop.note ?? 'נחזור בקרוב')
+        : (reopenLine(new Date()) ?? 'נעדכן על שעות הפתיחה בקרוב');
 
     return (
         <div style={{
@@ -207,6 +255,7 @@ export default function HomeV2() {
                 gap: '10px', padding: '4px 16px 0',
                 animation: 'pageIn 0.7s cubic-bezier(0.34,1.15,0.64,1) 0.08s both',
             }}>
+                {showClosed && <ClosedNotice headline="המטבח סגור כרגע" detail={closedDetail} />}
                 {user && lastOrder && <ReorderStrip order={lastOrder} onReorder={reorderLast} />}
                 <HeroSelector onChooseSalad={() => setSizePicker(true)} onNudge={(dir) => { nudgeRef.current = dir * 26; }} onActiveChange={setHeroIdx} />
             </div>

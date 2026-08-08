@@ -109,30 +109,20 @@ function bowlRowLayout(row, count) {
 }
 
 // ─── Pickup slot generator ─────────────────────────────────────
+/**
+ * Now a thin wrapper over lib/shopHours, which is also what the SERVER checks
+ * against. It used to carry the opening hours itself, as four hard-coded
+ * comparisons — `day === 6`, `h >= 16`, `sh >= 21`, `day === 5 && sh >= 16` —
+ * that no other part of the app could see. Three separate constants had to
+ * agree, one of them (21:00) had nothing to do with the shop's real hours, and
+ * the server validated none of it: a pickup time went from the request body
+ * straight into the database.
+ *
+ * Returns null rather than an empty array when there is nothing available,
+ * because the callers already treat null as "closed".
+ */
 function generatePickupSlots() {
-    const now = new Date();
-    const day = now.getDay(); // 0=Sun 5=Fri 6=Sat
-    const h = now.getHours();
-    const m = now.getMinutes();
-
-    if (day === 6) return null; // Saturday — closed
-    if (day === 5 && h >= 16) return null; // Friday eve (Shabbat) — closed
-
-    const isPeak = (h === 11 && m >= 45) || h === 12 || h === 13 || (h === 14 && m <= 30);
-    const lead = isPeak ? 25 : 15;
-
-    const firstMin = Math.ceil((h * 60 + m + lead) / 5) * 5;
-    const slots = [];
-    for (let i = 0; i < 12; i++) {
-        const totalMins = firstMin + i * 5;
-        const sh = Math.floor(totalMins / 60);
-        const sm = totalMins % 60;
-        if (sh >= 21) break;
-        if (day === 5 && sh >= 16) break;
-        const label = `${String(sh).padStart(2, '0')}:${String(sm).padStart(2, '0')}`;
-        const isPeak = (sh === 11 && sm >= 45) || sh === 12 || sh === 13 || (sh === 14 && sm <= 30);
-        slots.push({ id: label, label, isPeak });
-    }
+    const slots = pickupSlots(new Date());
     return slots.length ? slots : null;
 }
 import { STEPS, NUTRI, BASE } from "../../data/salad-data.js"; // NUTRI used in bowl calorie total
@@ -148,10 +138,15 @@ import BariPlaque, { BariPlaqueKeyframes } from "../ui/bari/BariPlaque";
 import { PLAQUE } from "../ui/bari/plaqueGeometry";
 import { isSupabaseConfigured } from "../../lib/supabase";
 import { getAccessToken } from "../../lib/auth";
+import { pickupSlots, noPickupMessage } from "../../lib/shopHours";
+import { useShopStatus } from "../../lib/useShopStatus";
 
 const DEMO_MODE = !isSupabaseConfigured();
 
 export default function SummaryView({ sels, total, all, comboBadges, notes, setNotes, onBack, onEdit, onNewOrder, base = BASE, sizeLabel = null }) {
+    // Schedule + the live staff override. The server checks this again at POST
+    // /api/orders and is the authority; this is so the screen stops pretending.
+    const shop = useShopStatus();
     const [showMixing, setShowMixing] = useState(false);
     const [ordered, setOrdered] = useState(false);
     const [notesError, setNotesError] = useState("");
@@ -213,6 +208,8 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     const effectiveDiscount = typedAmount > autoAmount ? appliedDiscount : autoDiscount;
     const discAmount = Math.max(autoAmount, typedAmount);
     const finalTotal = total - discAmount;
+    // Confirmed-closed: we heard back from the server and it said no.
+    const shopBlocked = shop.live && !shop.open;
     const applyPromo = () => {
         const d = findDiscount(promoInput);
         setAppliedDiscount(d);
@@ -310,10 +307,21 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
             const data = await res.json().catch(() => null);
 
             if (!res.ok) {
+                // A 409 is a deliberate, explainable refusal — the shop is
+                // closed, or the pickup time has passed — and the server writes
+                // that reason in Hebrew for the customer. It used to be
+                // discarded here in favour of "לא הצלחנו לשלוח את ההזמנה. נסו
+                // שוב", which turned "we open at 09:00" into advice to retry
+                // something that could not succeed until morning.
+                //
+                // Only 409. Other failures are not customer-actionable and
+                // their messages are not written to be read by one.
                 failSubmit(
-                    res.status === 429
-                        ? "נשלחו יותר מדי הזמנות. נסו שוב בעוד רגע."
-                        : "לא הצלחנו לשלוח את ההזמנה. נסו שוב."
+                    res.status === 409 && typeof data?.error === 'string'
+                        ? data.error
+                        : res.status === 429
+                            ? "נשלחו יותר מדי הזמנות. נסו שוב בעוד רגע."
+                            : "לא הצלחנו לשלוח את ההזמנה. נסו שוב."
                 );
                 return;
             }
@@ -575,7 +583,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                     </BariModal>
 
                     {/* Pickup time picker */}
-                    <PickupTimePicker value={pickupTime} onChange={setPickupTime} />
+                    <PickupTimePicker value={pickupTime} onChange={setPickupTime} shop={shop} />
 
                     {/* Price breakdown */}
                     <BariPanel style={{ marginTop: "14px", padding: "14px 16px" }}>
@@ -676,15 +684,20 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                             <span>{submitError}</span>
                         </div>
                     )}
-                    {/* CTA */}
+                    {/* CTA
+                        Blocked only on a LIVE answer that says closed. A failed
+                        /api/shop leaves `live` false and the button enabled: a
+                        dropped request must never be able to turn a customer
+                        away from an open shop, and the server refuses for real
+                        anyway — now with a message they can read. */}
                     <BariButton
                         variant="primary"
                         fullWidth
-                        disabled={submitting}
-                        style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif", opacity: submitting ? 0.6 : 1 }}
+                        disabled={submitting || shopBlocked}
+                        style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif", opacity: (submitting || shopBlocked) ? 0.6 : 1 }}
                         onClick={() => submitOrder()}
                     >
-                        <span>{submitting ? "שולח…" : submitError ? "נסו שוב" : "שלח הזמנה"}</span>
+                        <span>{shopBlocked ? "סגור כרגע" : submitting ? "שולח…" : submitError ? "נסו שוב" : "שלח הזמנה"}</span>
                         <span style={S.orderBtnPrice}>₪{finalTotal}</span>
                     </BariButton>
                     {/* Consent disclosure — links open the legal docs before ordering */}
@@ -1081,7 +1094,7 @@ const S = {
 };
 
 // ─── Pickup time picker ────────────────────────────────────────
-function PickupTimePicker({ value, onChange }) {
+function PickupTimePicker({ value, onChange, shop }) {
     const localSlots = useMemo(() => generatePickupSlots(), []);
     const [liveSlots, setLiveSlots] = useState(null); // null = loading
 
@@ -1108,11 +1121,16 @@ function PickupTimePicker({ value, onChange }) {
         }));
     }, [localSlots, liveSlots]);
 
-    if (slots === null) {
+    // Two different ways to have nothing to offer, and only one of them is the
+    // schedule. `generatePickupSlots` reads WEEK, which is in the bundle and
+    // knows nothing about staff having closed the shop twenty minutes ago — so
+    // the override has to be consulted separately or the picker cheerfully
+    // offers times for a shop with its shutters down.
+    if (slots === null || !shop.open) {
         return (
             <div style={PT.box}>
                 <div style={PT.title}>⏰ זמן איסוף</div>
-                <div style={PT.closedMsg}>המסעדה סגורה כרגע · נפתח מחדש ביום ראשון</div>
+                <div style={PT.closedMsg}>{noPickupMessage(shop, new Date())}</div>
             </div>
         );
     }
@@ -1162,7 +1180,12 @@ const PT = {
     row: { display: "flex", gap: "8px", overflowX: "auto", paddingBottom: "2px", scrollbarWidth: "none", WebkitOverflowScrolling: "touch" },
     chip: { flexShrink: 0, padding: "8px 16px", borderRadius: "10px", border: "1px solid rgba(200,168,78,0.22)", background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.5)", fontSize: "13px", fontWeight: 700, fontFamily: "var(--font-heebo), 'Heebo', sans-serif", cursor: "pointer", transition: "all 0.15s" },
     chipActive: { background: "linear-gradient(135deg, rgba(200,168,78,0.28), rgba(200,168,78,0.12))", border: "1px solid var(--color-gold-deep)", color: "var(--color-gold-light)", boxShadow: "var(--shadow-gold-glow)" },
-    closedMsg: { fontSize: "12px", color: "rgba(255,255,255,0.35)", fontWeight: 600 },
+    // Was rgba(255,255,255,0.35) — a footnote weight, from when this was a
+    // passing remark under a heading. It is now the reason the order button is
+    // dead, so it is the one thing on the screen the customer most needs to
+    // read. Amber, matching the landing page's notice, so the two closed states
+    // are recognisably the same message.
+    closedMsg: { fontSize: "12.5px", color: "#f2c46a", fontWeight: 700, lineHeight: 1.5 },
     peakDot: { display: "inline-block", width: "5px", height: "5px", borderRadius: "50%", background: "#e57373", marginRight: "4px", verticalAlign: "middle", flexShrink: 0 },
     chipFull: { opacity: 0.3, cursor: "not-allowed", border: "1px solid rgba(255,255,255,0.06)" },
     fullTag: { fontSize: "10px", fontWeight: 800, color: "#e57373", marginRight: "4px", letterSpacing: "0.04em" },

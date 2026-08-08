@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { type Order, urgencyOf, URGENCY_COLOR } from './types';
 
 /**
@@ -28,8 +29,36 @@ export default function OrderTabs({
     onSelect: (id: string) => void;
     newIds: string[];
 }) {
+    const stripRef = useRef<HTMLDivElement>(null);
+    const activeRef = useRef<HTMLButtonElement>(null);
+
+    /**
+     * Keep the order in the worker's hands ON SCREEN.
+     *
+     * Tabs shrink to a 130px floor and then the strip scrolls, so past a dozen
+     * orders it overflows. Arrivals RE-SORT the strip (by pickup time), which
+     * means the active tab could slide out of view on its own — during a rush,
+     * which is exactly when it must not. KitchenBoard's focus rule protects
+     * which order is active; nothing protected whether you could see it.
+     *
+     * Depends on the id ORDER, not just activeId, so a re-sort re-checks.
+     */
+    const order = orders.map(o => o.id).join(',');
+    useEffect(() => {
+        const strip = stripRef.current;
+        const tab = activeRef.current;
+        if (!strip || !tab) return;
+        const s = strip.getBoundingClientRect();
+        const t = tab.getBoundingClientRect();
+        // Only scroll when it is actually out of view: an unconditional
+        // scrollIntoView on every 4s poll would fight a worker mid-scroll.
+        if (t.left < s.left || t.right > s.right) {
+            tab.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+        }
+    }, [activeId, order]);
+
     return (
-        <div style={S.strip} role="tablist" aria-label="הזמנות פתוחות">
+        <div ref={stripRef} style={S.strip} role="tablist" aria-label="הזמנות פתוחות">
             {orders.map(o => {
                 const active = o.id === activeId;
                 const { level, lateBy } = urgencyOf(o.pickup_time);
@@ -40,6 +69,7 @@ export default function OrderTabs({
                 return (
                     <button
                         key={o.id}
+                        ref={active ? activeRef : undefined}
                         role="tab"
                         aria-selected={active}
                         onClick={() => onSelect(o.id)}

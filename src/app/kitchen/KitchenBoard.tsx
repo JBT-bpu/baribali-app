@@ -7,6 +7,7 @@ import { orderSizeLabel } from '@/lib/reorder';
 import OrderTabs from './OrderTabs';
 import ActiveOrder from './ActiveOrder';
 import { type Order, type OrderStatus, byPickupThenReceived } from './types';
+import { type ShopStatus } from '@/lib/shopHours';
 
 /**
  * The staff board: the whole queue visible as tabs, one order worked on at a
@@ -47,6 +48,30 @@ function playKitchenChime(ctx: AudioContext) {
 
 const CHECK_KEY = 'bb-kitchen-checks';
 
+/**
+ * The board's ground: the owner's 16:9 brand plate, darkened. Sharp, not
+ * blurred — and it turns out that costs nothing.
+ *
+ * The blur was there to stop the artwork competing with text. Measuring it,
+ * darkening does that job on its own: the unblurred plate at 30% brightness
+ * varies LESS behind the working area than the blurred one did at 40%
+ * (spread 9.2 against 9.9). The blur was buying softness that the exposure had
+ * already paid for.
+ *
+ * Three treatments in public/kitchen-assets, because how much brand belongs on
+ * a work surface is a judgement rather than a fact. Behind the working area,
+ * after the scrim, on a 0-255 scale:
+ *
+ *     bg-a  22% bright   mean 13.0   spread  6.9   quietest
+ *     bg    30% bright   mean 13.7   spread  9.2   default
+ *     bg-b  42% bright   mean 14.8   spread 12.7   boldest
+ *
+ * All three sit near mean 14, so white text is comfortable on any of them —
+ * what differs is how much the ground pulls at the eye, which is an attention
+ * question, not a legibility one. ?bg=a / ?bg=b switch live.
+ */
+const KITCHEN_BG = '/kitchen-assets/bg.webp';
+
 function loadMap<T>(key: string): Record<string, T> {
     try { return JSON.parse(localStorage.getItem(key) || '{}'); } catch { return {}; }
 }
@@ -63,7 +88,20 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
     const [loadError, setLoadError] = useState(false);
     const [lastOk, setLastOk] = useState<Date | null>(null);
     const [actionError, setActionError] = useState<string | null>(null);
-    const [undo, setUndo] = useState<{ id: string; orderNum: string } | null>(null);
+    /**
+     * The last reversible action. `to` is the status the undo restores.
+     *
+     * It used to cover only `collected`, which is the action with the SMALLEST
+     * consequence — the order leaves the board and nobody outside the kitchen
+     * notices. "מוכן לאיסוף" had no undo at all, and that is the one the
+     * customer sees: it flips their order-status page to "ready" and tells them
+     * to come. A mis-tap during a rush sent someone to the counter for food that
+     * was still being made, and there was no way back to `preparing` from the
+     * board at all.
+     */
+    const [undo, setUndo] = useState<{ id: string; orderNum: string; to: OrderStatus; label: string } | null>(null);
+    const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    useEffect(() => () => { if (undoTimer.current) clearTimeout(undoTimer.current); }, []);
 
     // The order in the worker's hands. Never reassigned by incoming data.
     const [activeId, setActiveId] = useState<string | null>(null);
@@ -83,7 +121,11 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
     // accept screen and the focus rule can all be exercised for real. Hidden
     // unless the page is opened with ?sim=1: a button that injects six orders
     // must not be one stray tap away during service.
-    const simOn = useSearchParams().get('sim') === '1';
+    const params = useSearchParams();
+    const simOn = params.get('sim') === '1';
+    // ?bg=a (quietest) / ?bg=b (boldest) for judging against real tickets.
+    const bgVariant = params.get('bg');
+    const bgUrl = bgVariant === 'a' || bgVariant === 'b' ? `/kitchen-assets/bg-${bgVariant}.webp` : KITCHEN_BG;
     const [simLeft, setSimLeft] = useState(0);
     const simTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     useEffect(() => () => { if (simTimer.current) clearTimeout(simTimer.current); }, []);
@@ -94,6 +136,43 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
     const knownIdsRef = useRef<Set<string>>(new Set());
     const seededRef = useRef(false);
     const audioCtxRef = useRef<AudioContext | null>(null);
+
+    // ── Shop open/closed ──
+    // Staff-operated because staff are the ones who know. The schedule
+    // (9:00–16:00) runs by itself; this is for the day it does not apply.
+    const [shop, setShop] = useState<ShopStatus | null>(null);
+    const [shopBusy, setShopBusy] = useState(false);
+
+    const loadShop = useCallback(async () => {
+        try {
+            const res = await fetch('/api/shop');
+            if (res.ok) setShop(await res.json());
+        } catch { /* the board's own error banner covers connectivity */ }
+    }, []);
+
+    const setOverride = useCallback(async (override: 'open' | 'closed' | null) => {
+        setShopBusy(true);
+        try {
+            const res = await fetch('/api/shop', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ override }),
+            });
+            if (res.ok) { setShop(await res.json()); setActionError(null); }
+            else {
+                // Never let a failed close look like a successful one — someone
+                // who taps "closed" and sees nothing will walk away believing it.
+                const data = await res.json().catch(() => null);
+                setActionError(data?.error ?? 'לא הצלחנו לעדכן את מצב החנות');
+                setTimeout(() => setActionError(null), 8000);
+            }
+        } catch {
+            setActionError('לא הצלחנו לעדכן את מצב החנות');
+            setTimeout(() => setActionError(null), 8000);
+        } finally {
+            setShopBusy(false);
+        }
+    }, []);
 
     const onUnauthorized = useCallback(() => { if (authEnabled) router.refresh(); }, [authEnabled, router]);
     const logout = useCallback(async () => {
@@ -197,6 +276,12 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
                 if (arrivals.length > 0) setNewIds(prev => [...new Set([...prev, ...arrivals])]);
                 knownIdsRef.current = new Set(ids);
             }
+            // Ridden along with the order poll rather than given its own effect
+            // and interval. Two reasons: the board then notices a shop closed
+            // from ANOTHER device (the owner's phone) within one poll, and it
+            // avoids a second synchronous setState-in-effect, which the repo's
+            // lint baseline does not have room for.
+            loadShop();
         } catch {
             // A dropped connection used to throw out of here, silently freezing
             // the board (and sticking the first load on "loading" forever).
@@ -204,12 +289,28 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
         } finally {
             setLoading(false);
         }
-    }, [onUnauthorized]);
+    }, [onUnauthorized, loadShop]);
 
     useEffect(() => { loadOrders(); }, [loadOrders]);
+    // 4s while the board is on screen, 20s when it is not, and an immediate
+    // fetch the moment it comes back. The wall tablet is always visible so this
+    // changes nothing there; it matters when the board is open on someone's
+    // phone in a pocket, which was ~10,800 requests a shift. Browsers already
+    // throttle background timers, so the old fixed 4s was not really 4s anyway —
+    // this just makes the behaviour something we chose.
     useEffect(() => {
-        const id = setInterval(loadOrders, 4000);
-        return () => clearInterval(id);
+        let id: ReturnType<typeof setInterval>;
+        const start = () => {
+            clearInterval(id);
+            id = setInterval(loadOrders, document.visibilityState === 'visible' ? 4000 : 20000);
+        };
+        const onVisibility = () => {
+            if (document.visibilityState === 'visible') loadOrders();
+            start();
+        };
+        start();
+        document.addEventListener('visibilitychange', onVisibility);
+        return () => { clearInterval(id); document.removeEventListener('visibilitychange', onVisibility); };
     }, [loadOrders]);
 
     const toggleItem = useCallback((orderId: string, itemId: string) => {
@@ -227,12 +328,24 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
         setNewIds(prev => prev.filter(n => n !== id));
         const previous = ordersRef.current.find(o => o.id === id)?.status;
 
-        // Collected orders leave the board entirely, so a fat-finger during a
-        // rush was unrecoverable without database access.
+        // Both of the one-way actions get an undo, restoring the status they
+        // came from. 30s rather than 20: noticing "that was the wrong ticket"
+        // takes longer than noticing a mis-tap, and the bar costs one row.
+        const num = ordersRef.current.find(o => o.id === id)?.order_num ?? '';
+        if (status === 'collected' || status === 'ready') {
+            if (undoTimer.current) clearTimeout(undoTimer.current);
+            setUndo({
+                id,
+                orderNum: num,
+                to: status === 'collected' ? 'ready' : (previous ?? 'preparing'),
+                label: status === 'collected' ? 'סומנה כנמסרה' : 'סומנה כמוכנה — הלקוח קיבל הודעה',
+            });
+            undoTimer.current = setTimeout(() => setUndo(u => (u?.id === id ? null : u)), 30000);
+        }
+
+        // Collected orders leave the board entirely, so the worker needs
+        // somewhere to land.
         if (status === 'collected') {
-            const num = ordersRef.current.find(o => o.id === id)?.order_num ?? '';
-            setUndo({ id, orderNum: num });
-            setTimeout(() => setUndo(u => (u?.id === id ? null : u)), 20000);
             const rest = ordersRef.current.filter(o => o.id !== id);
             setActiveId(rest.length ? rest[0].id : null);
         }
@@ -282,7 +395,7 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
     const active = orders.find(o => o.id === activeId) ?? null;
 
     return (
-        <div style={K.root}>
+        <div style={{ ...K.root, backgroundImage: (K.root.backgroundImage as string).replace(KITCHEN_BG, bgUrl) }}>
             <style>{`
                 /* Built for a wall tablet in landscape; stacks if it ever isn't. */
                 @media (max-width: 760px) {
@@ -321,17 +434,65 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
                             </button>
                         </>
                     )}
+                    {/* One control, two states, and it always says what IS —
+                        never what tapping it would do. A button labelled
+                        "close" that means "you are closed" is how someone
+                        closes a shop they meant to open. */}
+                    {shop && (
+                        <button
+                            type="button"
+                            onClick={() => setOverride(shop.open ? 'closed' : null)}
+                            disabled={shopBusy}
+                            style={{ ...K.headerBtn, ...(shop.open ? K.shopOpen : K.shopShut), opacity: shopBusy ? 0.5 : 1 }}
+                            title={shop.opensAt ? `שעות היום ${shop.opensAt}–${shop.closesAt}` : 'סגור היום'}
+                        >
+                            {shop.open
+                                ? (shop.reason === 'override_open' ? '🟢 פתוח (ידני) · סגור' : '🟢 פתוח · סגור עכשיו')
+                                : (shop.reason === 'override_closed' ? '🔴 סגור ידנית · פתח' : '🔴 סגור · פתח ידנית')}
+                        </button>
+                    )}
                     {authEnabled && <button type="button" style={K.headerBtn} onClick={logout}>🔒 יציאה</button>}
                 </div>
             </div>
 
+            {/* Closed is a state the whole board should show, not a small pill:
+                a worker glancing over must not have to read a button to know
+                that nothing new is coming in. */}
+            {shop && !shop.open && (
+                <div style={K.closedBar} role="status">
+                    <span style={{ fontSize: '20px' }}>🔴</span>
+                    <div>
+                        <div style={{ fontWeight: 900 }}>
+                            {shop.reason === 'override_closed' ? 'החנות סגורה להזמנות (ידנית)' : 'החנות סגורה להזמנות'}
+                        </div>
+                        <div style={{ fontSize: '13px', opacity: 0.85, marginTop: '2px' }}>
+                            {shop.reason === 'closed_day' ? 'היום לא פעיל'
+                                : shop.opensAt ? `שעות הפעילות ${shop.opensAt}–${shop.closesAt}` : ''}
+                            {' · הזמנות קיימות ממשיכות כרגיל'}
+                        </div>
+                    </div>
+                    {shop.reason === 'override_closed' && (
+                        <button type="button" style={{ ...K.undoBtn, marginInlineStart: 'auto' }}
+                            disabled={shopBusy} onClick={() => setOverride(null)}>
+                            פתח מחדש
+                        </button>
+                    )}
+                </div>
+            )}
+
             {/* Alerts */}
             {undo && (
                 <div style={K.undoBar} role="status">
-                    <span>הזמנה {undo.orderNum} סומנה כנמסרה</span>
+                    <span>הזמנה {undo.orderNum} {undo.label}</span>
                     <button type="button" style={K.undoBtn}
-                        onClick={() => { const u = undo; setUndo(null); updateStatus(u.id, 'ready'); }}>
-                        ↩ החזר ללוח
+                        onClick={() => {
+                            const u = undo;
+                            setUndo(null);
+                            if (undoTimer.current) clearTimeout(undoTimer.current);
+                            setActiveId(u.id);      // put it back in the worker's hands
+                            updateStatus(u.id, u.to);
+                        }}>
+                        ↩ בטל
                     </button>
                 </div>
             )}
@@ -400,7 +561,28 @@ const K: Record<string, React.CSSProperties> = {
         // grew with the order instead of scrolling inside it — a long order
         // pushed the מוכן button off the bottom of the tablet, unreachable.
         // A definite height makes the inner `overflow-y: auto` actually work.
-        height: '100dvh', background: '#0a0a0a',
+        height: '100dvh',
+        // ── The BariBali ground ──
+        // The owner's 16:9 brand plate, which happens to match the wall
+        // tablet's aspect exactly. It is a photographic image with a bright
+        // gold logo dead centre — i.e. directly behind the order header and the
+        // ingredient chips — so it is blurred and darkened hard before it gets
+        // anywhere near this screen. What survives is the shape of the brand,
+        // not detail that competes with text someone is reading under time
+        // pressure. The panels above it stay opaque for the same reason.
+        backgroundColor: '#050f06',
+        // Layer order is top-first: gold pool, near-uniform scrim, then the
+        // plate. The scrim is uniform on purpose — a gradient that reached full
+        // opacity at the bottom made the image fade out down the screen, which
+        // reads as a smudge rather than as a ground.
+        backgroundImage: [
+            'radial-gradient(ellipse 70% 45% at 50% 0%, rgba(200,168,78,0.08) 0%, transparent 70%)',
+            'linear-gradient(180deg, rgba(6,18,7,0.80) 0%, rgba(4,12,5,0.86) 100%)',
+            `url(${KITCHEN_BG})`,
+        ].join(', '),
+        backgroundSize: 'cover, cover, cover',
+        backgroundPosition: 'center, center, center',
+        backgroundRepeat: 'no-repeat, no-repeat, no-repeat',
         fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: 'rtl',
         color: '#fff', display: 'flex', flexDirection: 'column',
     },
@@ -428,6 +610,14 @@ const K: Record<string, React.CSSProperties> = {
     },
     simBtn: {
         background: 'rgba(156,39,176,0.18)', border: '1px solid rgba(186,104,200,0.55)', color: '#e1bee7',
+    },
+    shopOpen: { background: 'rgba(76,175,80,0.16)', border: '1px solid rgba(76,175,80,0.55)', color: '#c8f7c9' },
+    shopShut: { background: 'rgba(229,57,53,0.18)', border: '1px solid rgba(229,57,53,0.6)', color: '#ff9a97' },
+    closedBar: {
+        display: 'flex', alignItems: 'center', gap: '12px',
+        margin: '10px 16px', padding: '14px 16px', borderRadius: '12px',
+        background: 'rgba(229,57,53,0.12)', border: '1px solid rgba(229,57,53,0.45)',
+        color: '#ffb3b0', fontSize: '15px', lineHeight: 1.4, flexShrink: 0,
     },
     loadingMsg: { padding: '60px', textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: '16px' },
     emptyMsg: { padding: '80px', textAlign: 'center', color: 'var(--color-green-accent)', fontSize: '18px', fontWeight: 700 },
