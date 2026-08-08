@@ -1,31 +1,41 @@
 'use client';
-import { useState, useEffect } from "react";
-import dynamic from "next/dynamic";
+import { useState, useEffect, useMemo } from "react";
 import { usePrefersReducedMotion } from "../../../lib/motionHooks";
 // The builder's 🔊 toggle governs this screen too. It did not used to: these are
 // the two loudest sounds in the app and they fired even when muted.
 import { isSoundOn } from "../../../lib/soundPref";
+import BariPlaque from "../../ui/bari/BariPlaque";
+import { PLAQUE } from "../../ui/bari/plaqueGeometry";
+import OrderSeal from "./OrderSeal.jsx";
 // Choreography lives in its own .ts so the assertion harness can import it —
-// see mixingTiming.ts for what the old fixed layout got wrong and why the
-// stagger has to be a function of the ingredient count.
-import { MOUTH_Y, DROP_DUR, pourPlan } from "./mixingTiming";
-const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
+// see sealTiming.ts for the stage clock and for what the old ingredient pour
+// got wrong about the bowl artwork.
+import { STAGES, GATHER_AT, DONE_AT, SEAL_FOOTPRINT, PLAQUE_TOP, PLAQUE_MARGIN, stageAt } from "./sealTiming";
 
 /**
- * The submit animation. `stillSending` is set by the caller when the animation
- * has run its course but the server has not answered yet — without it the
- * overlay sat on "🎉 מוכן!" while the order was still in flight, which is both
- * a lie and indistinguishable from the app having frozen.
+ * The post-order moment.
+ *
+ * This is the confirmation screen ARRIVING, not a separate animation played
+ * before it. The plaque, the pedestal and the cat are the same components in
+ * the same geometry the confirmation uses, so when OrderedScreen takes over
+ * there is nothing to cross-fade — only the seal's gold ring fades out.
+ *
+ * The app used to celebrate twice inside half a second: this overlay bloomed at
+ * 2.9s, cut hard to the plaque, and fired confetti 450ms later. Two payoffs that
+ * close blur into one.
+ *
+ * `stillSending` is set by the caller when the sequence has run its course but
+ * the server has not answered yet — without it the overlay sat on a finished
+ * confirmation while the order was still in flight, which is both a lie and
+ * indistinguishable from the app having frozen.
  */
-export default function MixingAnimation({ all, total, onComplete, stillSending }) {
-    const [phase, setPhase] = useState("drop"); // drop → glow → bloom
-    const [bowlAnim, setBowlAnim] = useState(null);
-    // This is the most motion-heavy screen in the app — falling ingredients, a
-    // bloom flash, 26 rising embers, 8 rotating rays and a scaling bowl. The
-    // phase timing and onComplete are untouched by this, so the order flow is
-    // identical either way; only the spectacle is dropped.
+export default function MixingAnimation({ all, onComplete, stillSending }) {
+    const [stage, setStage] = useState("gather");
+    // Falling gold dust, a flare, a shockwave and a struck medallion — this is
+    // still the most motion-heavy screen in the app. The stage clock and
+    // onComplete are untouched by the preference, so the order flow is identical
+    // either way; only the spectacle is dropped.
     const reducedMotion = usePrefersReducedMotion();
-    useEffect(() => { fetch("/cat-salad-bowl.json").then(r => r.json()).then(setBowlAnim).catch(() => {}); }, []);
 
     useEffect(() => {
         // Every timer is collected and cleared together. Two of them used to be
@@ -33,139 +43,79 @@ export default function MixingAnimation({ all, total, onComplete, stillSending }
         // failSubmit — still played the success arpeggio and buzzed the
         // celebration haptic a second later, on top of the failure message.
         const timers = [];
-        const at = (ms, fn) => timers.push(setTimeout(fn, ms));
+        const at = (seconds, fn) => timers.push(setTimeout(fn, seconds * 1000));
 
-        at(1700, () => setPhase("glow"));
-        at(2900, () => setPhase("bloom"));
-        // Fire onComplete while still fully visible at bloom peak.
-        // OrderedScreen (z=500) cross-fades in on top — no gap, no double-fade.
-        at(3300, () => onComplete());
+        for (const s of STAGES) at(s.end, () => setStage(stageAt(s.end + 0.001)));
+        // Fire onComplete at the settle, while the plaque is fully formed and
+        // fully visible. OrderedScreen (z=500) cross-fades in on top of an
+        // identical composition — no gap, no double-fade, no jump.
+        at(DONE_AT, () => onComplete());
 
         if (navigator.vibrate) {
-            navigator.vibrate([20, 80, 20]);
-            at(2900, () => navigator.vibrate([40, 30, 80, 0, 120]));
+            // A tick as the dust gathers, then the strike itself.
+            navigator.vibrate(12);
+            at(GATHER_AT, () => navigator.vibrate([30, 40, 90]));
         }
         // Checked once, at the start: the toggle lives in the builder header and
-        // cannot be reached from here, so re-reading it mid-animation would only
+        // cannot be reached from here, so re-reading it mid-sequence would only
         // ever return the same answer.
         if (isSoundOn()) {
-            playChimeSound();
-            at(1700, () => playSuccessSound());
+            at(GATHER_AT - 0.55, () => playGatherSound());
+            at(GATHER_AT, () => playStrikeSound());
         }
 
         return () => timers.forEach(clearTimeout);
     }, [onComplete]);
 
-    // No cap: every ingredient the customer chose gets shown. The stagger
-    // adapts instead — see pourPlan.
-    const items = all;
-    const plan = pourPlan(items.length);
-    const isGlow  = phase === "glow" || phase === "bloom";
-    const isBloom = phase === "bloom";
+    const struck = stage !== "gather";
+    const formed = stage === "sheen" || stage === "settle" || stage === "done";
+    const settled = stage === "settle" || stage === "done";
+    const count = all.length;
 
-    const embers = Array.from({ length: 26 }, (_, i) => ({
-        id: i, left: 12 + (i % 11) * 7,
-        delay: (i * 0.06).toFixed(2),
-        dur: (1.0 + (i % 4) * 0.2).toFixed(1),
-        size: i % 3 === 0 ? "10px" : i % 3 === 1 ? "7px" : "4px",
-    }));
+    // The seal is sized in `em` off this font-size, so it fills the pedestal
+    // square at every width without a media query. cqw would be tidier but the
+    // pedestal slot is not a container, and making it one would change how the
+    // confirmation screen lays out.
+    // width/height 100% is load-bearing, not tidiness: BariPlaque's pedestal
+    // wrapper is an aspect-ratio box, so a bare inline-styled div inside it has
+    // no height and the seal collapses to nothing.
+    const sealFont = useMemo(() => ({
+        width: "100%", height: "100%",
+        fontSize: `calc(min(100vw, ${PLAQUE.maxWidth}px) * ${SEAL_FOOTPRINT} / 12)`,
+    }), []);
 
     return (
         <div style={S.overlay}>
-            {/* Bloom flash. Suppressed under reduced motion — a full-screen
-                0-to-1 flash in 0.18s is the one thing here I would least want
-                to defend to someone with vestibular or photosensitivity. */}
-            <div style={{
-                ...S.bloomFlash,
-                opacity: isBloom && !reducedMotion ? 1 : 0,
-                transition: isBloom ? "opacity 0.18s ease-out" : "opacity 0.5s ease-in",
-            }} />
-            <div style={S.ambientGlow} />
+            <div style={{ ...S.backdrop, opacity: struck ? 1 : 0.35 }} />
 
-            <div style={S.container}>
-                {/* ── Single persistent Lottie bowl ── */}
-                <div style={{
-                    position: "relative", width: "320px", height: "320px", margin: "0 auto",
-                    filter: isBloom
-                        ? "drop-shadow(0 0 50px rgba(240,208,96,0.95)) drop-shadow(0 0 20px rgba(200,168,78,0.8))"
-                        : isGlow
-                            ? "drop-shadow(0 0 30px rgba(200,168,78,0.7)) drop-shadow(0 8px 20px rgba(0,0,0,0.4))"
-                            : "drop-shadow(0 8px 24px rgba(0,0,0,0.5))",
-                    animation: isBloom && !reducedMotion ? "bowlBloom 0.55s cubic-bezier(0.34,1.56,0.64,1) both" : undefined,
-                    transition: "filter 0.4s ease",
-                }}>
-                    {bowlAnim && <Lottie animationData={bowlAnim} loop autoplay style={{ width: "100%", height: "100%" }} />}
-
-                    {/* ── Ingredients pouring in ──
-                        Each one is positioned AT the bowl's mouth and starts
-                        offset from it (--ex/--ey), so they converge and vanish
-                        into the bowl rather than queueing up above it. Same idea
-                        as the builder's own add animation, so the customer has
-                        seen this motion before. Because they arrive one at a
-                        time and disappear on arrival, any number of them can
-                        share the destination without colliding — which is what
-                        the old fixed five-column layout could not do. */}
-                    {!reducedMotion && (
-                        <div style={{ position: "absolute", inset: 0, opacity: isGlow ? 0 : 1, transition: "opacity 0.45s ease", pointerEvents: "none" }}>
-                            {items.map((item, i) => (
-                                <div key={`${item.id}-${i}`} style={{
-                                    position: "absolute",
-                                    left: "50%", top: `${MOUTH_Y * 100}%`,
-                                    marginLeft: "-16px", marginTop: "-16px",
-                                    width: "32px", height: "32px",
-                                    fontSize: "30px", lineHeight: 1,
-                                    filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.5))",
-                                    '--ex': `${plan[i].ex}px`,
-                                    '--ey': `${plan[i].ey}px`,
-                                    '--rot': `${plan[i].rot}deg`,
-                                    animation: `pourIntoBowl ${DROP_DUR}s cubic-bezier(0.34,1.2,0.64,1) ${plan[i].delay}s both`,
-                                }}>
-                                    {item.icon && item.icon.startsWith("/")
-                                        ? <img src={item.icon} alt="" style={{ width: "32px", height: "32px", objectFit: "contain", display: "block" }} />
-                                        : item.icon}
-                                </div>
-                            ))}
-                        </div>
-                    )}
-
-                    {/* Embers — glow phase, layered on top of bowl */}
-                    {!reducedMotion && (
-                    <div style={{ position: "absolute", inset: 0, opacity: isGlow ? 1 : 0, transition: "opacity 0.45s ease", pointerEvents: "none" }}>
-                        {embers.map(e => (
-                            <div key={e.id} style={{
-                                position: "absolute", bottom: "20%", left: `${e.left}%`,
-                                width: e.size, height: e.size, borderRadius: "50%",
-                                background: "radial-gradient(circle, #ffe080, #c8a832)",
-                                boxShadow: "0 0 6px rgba(200,168,78,0.9)",
-                                animation: `emberRise ${e.dur}s ease-in ${e.delay}s infinite`,
-                            }} />
-                        ))}
-                        {/* Rays — bloom only */}
-                        {isBloom && Array.from({ length: 8 }, (_, i) => (
-                            <div key={i} style={{
-                                position: "absolute", bottom: "20%", left: "50%",
-                                width: "2px", height: "55px", marginLeft: "-1px",
-                                transformOrigin: "50% 100%",
-                                background: "linear-gradient(to top, rgba(240,208,96,0.8), transparent)",
-                                borderRadius: "1px",
-                                '--r': `${i * 45}deg`,
-                                animation: `rayBurst 0.55s cubic-bezier(0.34,1.2,0.64,1) ${i * 0.03}s both`,
-                            }} />
-                        ))}
+            <BariPlaque
+                style={{ margin: PLAQUE_MARGIN }}
+                pedestal={<div style={sealFont}><OrderSeal stage={stage} reducedMotion={reducedMotion} /></div>}
+                // Smaller than the default 0.66. That default suits the cat
+                // Lottie, which carries a wide transparent margin; a full-bleed
+                // disc at the same footprint pokes out through the arch.
+                pedestalWidth={SEAL_FOOTPRINT}
+                // The frame is what turns the seal into the confirmation. It
+                // fades in around the medallion instead of the whole screen
+                // being replaced.
+                frameStyle={{
+                    opacity: formed ? 1 : 0,
+                    transform: formed ? "scale(1)" : "scale(0.965)",
+                    transition: reducedMotion
+                        ? "opacity 0.4s ease"
+                        : "opacity 0.55s ease, transform 0.55s cubic-bezier(0.2,0.9,0.3,1)",
+                }}
+                title={
+                    <div style={{ ...S.title, opacity: settled ? 1 : 0 }}>
+                        {stillSending ? "עוד רגע — שולחים למטבח…" : "ההזמנה נחתמה"}
                     </div>
-                    )}
+                }
+            >
+                <div style={{ ...S.body, opacity: settled ? 1 : 0 }}>
+                    <div style={S.meta}>{count} מרכיבים · מכינים עכשיו</div>
+                    {stillSending && <div style={S.stillDots} aria-live="polite" />}
                 </div>
-
-                {/* Label */}
-                <div style={{ ...S.label, marginTop: "8px" }}>
-                    {stillSending ? "עוד רגע — שולחים למטבח…"
-                        : isBloom ? "🎉 מוכן!"
-                            : isGlow ? "כמעט מוכן"
-                                : "מכינים את הסלט שלכם"}
-                </div>
-                {stillSending && <div style={S.stillDots} aria-live="polite" />}
-            </div>
-            <style>{KF}</style>
+            </BariPlaque>
         </div>
     );
 }
@@ -174,7 +124,9 @@ export default function MixingAnimation({ all, total, onComplete, stillSending }
 // Both helpers close their context when done. They used to leak one per call —
 // two per order — and browsers cap concurrent AudioContexts at around six, so
 // after a few orders in one session the sounds simply stopped.
-function playChimeSound() {
+
+/** A rising shimmer under the gathering dust. */
+function playGatherSound() {
     let ctx;
     try {
         ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -183,103 +135,91 @@ function playChimeSound() {
         const gain = ctx.createGain();
         osc.connect(gain); gain.connect(ctx.destination);
         osc.type = "sine";
-        osc.frequency.setValueAtTime(660, ctx.currentTime);
-        osc.frequency.linearRampToValueAtTime(880, ctx.currentTime + 0.3);
-        gain.gain.setValueAtTime(0.06, ctx.currentTime);
-        gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.5);
-        osc.start(); osc.stop(ctx.currentTime + 0.5);
-        setTimeout(() => ctx.close().catch(() => {}), 700);
+        osc.frequency.setValueAtTime(420, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(1180, ctx.currentTime + 0.5);
+        gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.05, ctx.currentTime + 0.42);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.55);
+        osc.start(); osc.stop(ctx.currentTime + 0.56);
+        setTimeout(() => ctx.close().catch(() => { }), 800);
     } catch { try { ctx?.close(); } catch { /* already gone */ } }
 }
 
-function playSuccessSound() {
+/** The strike: a struck-metal chime over a short body thump. */
+function playStrikeSound() {
     let ctx;
     try {
         ctx = new (window.AudioContext || window.webkitAudioContext)();
         if (ctx.state === "suspended") { ctx.close(); return; }
-        [[523.25, 0], [659.25, 0.08], [783.99, 0.16], [1046.5, 0.28]].forEach(([freq, delay]) => {
+        const t = ctx.currentTime;
+
+        const thump = ctx.createOscillator();
+        const thumpGain = ctx.createGain();
+        thump.connect(thumpGain); thumpGain.connect(ctx.destination);
+        thump.type = "sine";
+        thump.frequency.setValueAtTime(160, t);
+        thump.frequency.exponentialRampToValueAtTime(48, t + 0.16);
+        thumpGain.gain.setValueAtTime(0.12, t);
+        thumpGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+        thump.start(t); thump.stop(t + 0.23);
+
+        // A bell is its partials; a single sine reads as a beep.
+        [[784, 0.06], [1174.7, 0.04], [1568, 0.028]].forEach(([freq, peak]) => {
             const osc = ctx.createOscillator();
             const gain = ctx.createGain();
             osc.connect(gain); gain.connect(ctx.destination);
             osc.type = "sine";
-            const t = ctx.currentTime + delay;
-            osc.frequency.setValueAtTime(freq, t);
-            gain.gain.setValueAtTime(0.08, t);
-            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.7);
-            osc.start(t); osc.stop(t + 0.7);
+            osc.frequency.setValueAtTime(freq, t + 0.02);
+            gain.gain.setValueAtTime(peak, t + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.0001, t + 1.15);
+            osc.start(t + 0.02); osc.stop(t + 1.2);
         });
-        setTimeout(() => ctx.close().catch(() => {}), 1200);
+        setTimeout(() => ctx.close().catch(() => { }), 1500);
     } catch { try { ctx?.close(); } catch { /* already gone */ } }
 }
 
 // ─── Styles ──────────────────────────────────────────────────
 const S = {
+    // TOP-anchored, not centred, and OrderedScreen matches it exactly.
+    //
+    // Both screens used to centre their plaque vertically. But the confirmation's
+    // plaque is taller — it carries the price, pickup time, payment pill, badges
+    // and buttons — so centring put its pedestal 80px higher than this one's, and
+    // the seal visibly JUMPED at the handoff. Anchoring both to the same top
+    // offset makes the seal's position independent of how much content follows
+    // it, which is the only way the two screens can share a composition.
     overlay: {
         position: "fixed", inset: 0, zIndex: 400,
-        background: "linear-gradient(160deg, #020802 0%, #061206 40%, #091809 70%, #061206 100%)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        animation: "pFadeIn 0.3s ease",
+        background: PLAQUE.backdrop,
+        display: "flex", alignItems: "flex-start", justifyContent: "center",
+        paddingTop: PLAQUE_TOP,
+        animation: "plaqueScreenIn 0.3s ease",
         fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: "rtl",
+        overflow: "hidden",
     },
-    bloomFlash: {
-        position: "absolute", inset: 0, pointerEvents: "none", zIndex: 0,
-        background: "radial-gradient(ellipse 70% 55% at 50% 48%, rgba(240,208,96,0.28) 0%, rgba(200,168,78,0.08) 50%, transparent 75%)",
-    },
-    ambientGlow: {
+    // Held down until the strike so the flare has something to bloom against.
+    backdrop: {
         position: "absolute", inset: 0, pointerEvents: "none",
-        background: "radial-gradient(ellipse 65% 45% at 50% 45%, rgba(200,168,78,0.07) 0%, transparent 70%)",
+        background: PLAQUE.glow,
+        transition: "opacity 0.6s ease",
     },
-    container: {
-        position: "relative", zIndex: 1,
-        width: "100%", maxWidth: "380px", padding: "0 20px 20px",
-        display: "flex", flexDirection: "column", alignItems: "center",
+    title: {
+        fontFamily: "var(--font-display), 'Secular One', sans-serif",
+        fontSize: "22px", lineHeight: 1.25, color: "#f0d060",
+        textShadow: "0 2px 8px rgba(0,0,0,0.65)",
+        transition: "opacity 0.45s ease",
     },
-    label: {
-        marginTop: "24px", fontSize: "14px", fontWeight: 700,
-        color: "rgba(200,168,78,0.75)", letterSpacing: "0.04em",
+    body: { transition: "opacity 0.45s ease 0.1s" },
+    meta: {
+        fontSize: "13px", lineHeight: 1.4, color: "rgba(232,245,233,0.75)",
         textShadow: "0 1px 4px rgba(0,0,0,0.6)",
-        animation: "pFadeIn 0.5s ease 0.3s both",
-        transition: "color 0.3s ease",
     },
     // A moving element while waiting: a frozen screen and a slow screen have to
     // look different, or people start tapping the button again.
     stillDots: {
-        marginTop: "12px", width: "34px", height: "3px", borderRadius: "2px",
+        margin: "10px auto 0", width: "34px", height: "3px", borderRadius: "2px",
         background: "linear-gradient(90deg, transparent, rgba(200,168,78,0.9), transparent)",
         backgroundSize: "200% 100%",
-        animation: "sendingSweep 1.1s ease-in-out infinite",
+        animation: "sealSendingSweep 1.1s ease-in-out infinite",
     },
 };
-
-const KF = `
-@keyframes pFadeIn  { from{opacity:0} to{opacity:1} }
-
-@keyframes sendingSweep { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
-
-@keyframes pourIntoBowl {
-    0%   { opacity:0; transform:translate(var(--ex),var(--ey)) scale(0.8) rotate(var(--rot)); }
-    15%  { opacity:1; }
-    70%  { opacity:1; transform:translate(0,0) scale(1.15) rotate(0deg); }
-    100% { opacity:0; transform:translate(0,0) scale(0.12) rotate(0deg); }
-}
-
-@keyframes bowlBloom {
-    0%   { transform:scale(0.95); }
-    55%  { transform:scale(1.15); }
-    100% { transform:scale(1.07); }
-}
-
-@keyframes emberRise {
-    0%   { transform:translateY(0) scale(1); opacity:0.9; }
-    60%  { opacity:0.6; transform:translateY(-90px) scale(0.65) translateX(6px); }
-    100% { transform:translateY(-180px) scale(0.15) translateX(-4px); opacity:0; }
-}
-
-@keyframes rayBurst {
-    0%   { opacity:0; transform:rotate(var(--r,0deg)) scaleY(0); }
-    55%  { opacity:0.85; transform:rotate(var(--r,0deg)) scaleY(1.15); }
-    100% { opacity:0.45; transform:rotate(var(--r,0deg)) scaleY(1); }
-}
-
-* { -webkit-tap-highlight-color:transparent; box-sizing:border-box; }
-`;

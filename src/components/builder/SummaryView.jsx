@@ -1,8 +1,6 @@
 'use client';
 import { useCallback, useMemo, useRef, useState, useEffect } from "react";
-import dynamic from "next/dynamic";
 import { fireGoldConfetti } from "../../lib/confetti";
-const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
 
 function Icon({ src, size = "1.2em", style = {} }) {
     if (src && src.startsWith("/")) {
@@ -140,6 +138,8 @@ import { effectiveItemPrice } from "../../lib/menuConfig";
 import { findDiscount, discountAmount } from "../../lib/discounts";
 const headerImage = "/builder-assets/header-brand.png";
 import MixingAnimation from "./ui/MixingAnimation.jsx";
+import OrderSeal from "./ui/OrderSeal.jsx";
+import { SEAL_FOOTPRINT, PLAQUE_TOP, PLAQUE_MARGIN } from "./ui/sealTiming";
 import BariPanel from "../ui/bari/BariPanel";
 import BariButton from "../ui/bari/BariButton";
 import BariBadge from "../ui/bari/BariBadge";
@@ -375,7 +375,6 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
             {showMixing && (
                 <MixingAnimation
                     all={all}
-                    total={finalTotal}
                     stillSending={stillSending}
                     onComplete={() => { mixDoneRef.current = true; settle(); }}
                 />
@@ -788,19 +787,21 @@ function confirmPayment(status) {
 }
 
 // ─── Post-order confirmation screen ─────────────────────────
-function OrderedScreen({ total, all, pickupTime, orderNum, orderId, paymentStatus, badges = [], onNewOrder }) {
+// Exported for /dev/mixing only. The whole design of this screen rests on it
+// opening at exactly the composition MixingAnimation closes on, and there is no
+// other way to check that: placing a real order to look at it would write to the
+// live orders table (this machine's .env.local is pointed at real Supabase).
+export function OrderedScreen({ total, all, pickupTime, orderNum, orderId, paymentStatus, badges = [], onNewOrder }) {
     useEffect(() => {
-        // Delayed so the burst punctuates this screen's arrival — firing on
-        // mount collided with MixingAnimation's bloom peak that just ended,
-        // blurring two celebration moments into one.
-        const t = setTimeout(() => fireGoldConfetti(), 450);
-        return () => clearTimeout(t);
+        // Fires immediately now, not on a 450ms delay. The delay existed to
+        // separate this burst from MixingAnimation's bloom, which was a second
+        // celebration half a second earlier; there is only one now, and the
+        // confetti is its punctuation rather than a competing peak.
+        fireGoldConfetti();
     }, []);
     // No invented order number: this screen used to fall back to a client-side
     // `BB-xxxx`, which meant a failed order could still show the customer a
     // plausible confirmation. The number is only ever the server's.
-    const [animData, setAnimData] = useState(null);
-    useEffect(() => { fetch("/cat-salad-final.json").then(r => r.json()).then(setAnimData).catch(() => {}); }, []);
 
     const pay = confirmPayment(paymentStatus);
     // Only badges whose artwork exists; the rest would render a broken image.
@@ -811,7 +812,14 @@ function OrderedScreen({ total, all, pickupTime, orderNum, orderId, paymentStatu
             <div style={OS.root}>
                 <div style={OS.bg} />
                 <BariPlaque
-                    pedestal={animData && <Lottie animationData={animData} loop autoplay style={{ width: "100%", height: "100%" }} />}
+                    style={{ margin: PLAQUE_MARGIN }}
+                    // The struck medallion, not a bare cat — this screen has to
+                    // OPEN on exactly the composition MixingAnimation closed on,
+                    // or the handoff reads as a cut and the whole point of the
+                    // sequence (one continuous moment) is lost. Same component,
+                    // same footprint, same stage.
+                    pedestal={<div style={OS.sealBox}><OrderSeal stage="done" /></div>}
+                    pedestalWidth={SEAL_FOOTPRINT}
                     pedestalStyle={OS.catArt}
                     title={
                         <>
@@ -917,15 +925,21 @@ const OS = {
     // or a phone in landscape) it will be taller than the viewport. `margin:auto`
     // on the child rather than `alignItems:center` — centring a flex item that
     // overflows makes its top unreachable.
-    root: { position: "fixed", inset: 0, zIndex: 500, background: PLAQUE.backdrop, display: "flex", overflowY: "auto", overflowX: "hidden", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: "rtl", animation: "plaqueScreenIn 0.55s ease both" },
+    // alignItems/paddingTop must match MixingAnimation's overlay exactly — see
+    // PLAQUE_TOP. This screen and the sealing overlay share a composition, and
+    // the seal jumps 80px at the handoff if either one centres instead.
+    root: { position: "fixed", inset: 0, zIndex: 500, background: PLAQUE.backdrop, display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: PLAQUE_TOP, overflowY: "auto", overflowX: "hidden", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: "rtl", animation: "plaqueScreenIn 0.55s ease both" },
     bg: { position: "fixed", inset: 0, background: PLAQUE.glow, pointerEvents: "none" },
 
-    // The cat's entrance and shadow. Its SIZE is the plaque's business — the
-    // pedestal slot places it — so only the treatment lives here.
-    catArt: {
-        animation: "plaqueRingPop 0.6s cubic-bezier(0.34,1.56,0.64,1) both",
-        filter: "drop-shadow(0 8px 32px rgba(200,168,78,0.25))",
-    },
+    // The seal's shadow. Its SIZE is the plaque's business — the pedestal slot
+    // places it — so only the treatment lives here.
+    //
+    // No entrance animation. There used to be a plaqueRingPop here, from when
+    // this screen was cut to and the cat had to arrive; now MixingAnimation has
+    // already struck the medallion in this exact spot, and re-popping it would
+    // make the seam it is meant to hide.
+    catArt: { filter: "drop-shadow(0 8px 32px rgba(200,168,78,0.25))" },
+    sealBox: { width: "100%", height: "100%", fontSize: `calc(min(100vw, ${PLAQUE.maxWidth}px) * ${SEAL_FOOTPRINT} / 12)` },
 
     // The type scales with the viewport because the title zone does: at a fixed
     // 26px the title, subtitle and order number came to 89px against the 82px
