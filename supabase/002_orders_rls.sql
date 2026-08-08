@@ -1,0 +1,42 @@
+-- Remove the permissive anon INSERT policy on orders.
+--
+-- APPLIED 2026-08-08. Kept here as the record of what was changed and why.
+--
+-- THE HOLE
+--
+-- `public.orders` carried exactly one policy:
+--
+--     INSERT ... TO public WITH CHECK (true)
+--
+-- and `anon` holds the INSERT grant. The anon key is public by design — it
+-- ships inside the browser bundle as NEXT_PUBLIC_SUPABASE_ANON_KEY. So anyone
+-- who viewed source on the live site could POST straight to
+-- /rest/v1/orders with any total, any status and any payment_status.
+--
+-- That bypassed, in one request: the server-side price recomputation
+-- (lib/pricing.ts computeOrderTotal), the price-mismatch check, the in-memory
+-- rate limiter, and the opening-hours enforcement — none of which exist
+-- anywhere except inside POST /api/orders. Setting payment_status to 'paid'
+-- would have put a free order on the kitchen board looking legitimate, which
+-- matters more once payment is digital-only and 'paid' is the only signal
+-- standing between an order and handing over food.
+--
+-- Confirmed reachable before the fix without creating a row: an insert with a
+-- deliberately non-integer `total` came back 22P02 (invalid input syntax for
+-- type integer) rather than an RLS error, i.e. it passed the policy and failed
+-- at the column. After the fix the same request returns 42501, "new row
+-- violates row-level security policy".
+--
+-- WHY DROPPING IT IS SAFE
+--
+-- Every write to `orders` in the application — all fifteen `.from('orders')`
+-- call sites — lives under src/app/api/ and uses supabaseAdmin (service role),
+-- which bypasses RLS entirely. The browser-side anon client is used ONLY for
+-- auth (src/lib/auth.ts) and never touches table data. The policy was a
+-- leftover from before POST /api/orders existed.
+--
+-- Result: all three public tables now have RLS enabled and NO policies, so
+-- anon and authenticated get nothing. Orders can be created only through the
+-- API route, where the price is recomputed and the hours are checked.
+
+drop policy if exists "insert orders" on public.orders;
