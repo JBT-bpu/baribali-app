@@ -95,4 +95,15 @@ export const PLAQUE_KEYFRAMES = `
 @keyframes plaqueRingPop     { 0%{transform:scale(0.4);opacity:0} 55%{transform:scale(1.12)} 100%{transform:scale(1);opacity:1} }
 @keyframes plaqueGoldShimmer { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
 @keyframes plaqueBadgePop    { from{opacity:0;transform:scale(0.5) translateY(10px)} to{opacity:1;transform:none} }
+
+/* Grows a body slot from nothing to its natural height without anyone having to
+   know what that height is. 0fr -> 1fr on a grid row is the only way to animate
+   to auto; the child needs overflow:hidden and min-height:0 or it spills out of
+   the collapsed row. (No backticks in here — this block is a template literal.)
+
+   This exists because the confirmation's content has layout height the instant
+   it mounts, even while its opacity is still animating in — so the plaque
+   snapped 178px taller at the handoff and the bottom ornament slammed down.
+   The seal was pinned; the frame around it was not. */
+@keyframes plaqueBodyGrow    { from{grid-template-rows:0fr} to{grid-template-rows:1fr} }
 `;

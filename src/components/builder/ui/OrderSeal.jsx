@@ -17,10 +17,27 @@ const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
  * shows in the same slot — so when the plaque takes over there is nothing to
  * cross-fade. The ring fades and the composition underneath is already correct.
  */
+/**
+ * The parsed animation, kept for the life of the tab.
+ *
+ * The confirmation screen mounts a SECOND OrderSeal the instant the sealing
+ * overlay unmounts, and re-fetching meant re-parsing 234KB of JSON on the single
+ * most expensive frame in the flow — the same frame that rebuilds the GoldField
+ * canvas and starts the plaque growing. Frames were being dropped there (52ms
+ * and 32ms gaps against a 16ms budget), which is what the handoff actually
+ * looked like: not a snap, a stutter. The HTTP cache does not help; the cost is
+ * the parse, not the transfer.
+ */
+let catAnimCache = null;
+
 export default function OrderSeal({ stage, reducedMotion = false, dustCount = 26 }) {
-    const [catAnim, setCatAnim] = useState(null);
+    const [catAnim, setCatAnim] = useState(catAnimCache);
     useEffect(() => {
-        fetch("/cat-salad-final.json").then(r => r.json()).then(setCatAnim).catch(() => { });
+        if (catAnimCache) return;
+        fetch("/cat-salad-final.json")
+            .then(r => r.json())
+            .then(d => { catAnimCache = d; setCatAnim(d); })
+            .catch(() => { });
     }, []);
 
     const struck = stage !== "gather";

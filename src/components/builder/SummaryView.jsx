@@ -797,11 +797,13 @@ const RISE = "plaqueFadeUp 0.45s cubic-bezier(0.2,0.9,0.3,1)";
 // live orders table (this machine's .env.local is pointed at real Supabase).
 export function OrderedScreen({ total, all, pickupTime, orderNum, orderId, paymentStatus, badges = [], onNewOrder }) {
     useEffect(() => {
-        // Fires immediately now, not on a 450ms delay. The delay existed to
-        // separate this burst from MixingAnimation's bloom, which was a second
-        // celebration half a second earlier; there is only one now, and the
-        // confetti is its punctuation rather than a competing peak.
-        fireGoldConfetti();
+        // Held back until the plaque has finished growing. Not for pacing this
+        // time — canvas-confetti spins up its own canvas and rAF loop, and doing
+        // that on the mount frame put it alongside a GoldField rebuild and the
+        // start of the growth animation. That frame was already over budget.
+        // It lands as punctuation on a settled plaque instead.
+        const t = setTimeout(() => fireGoldConfetti(), 620);
+        return () => clearTimeout(t);
     }, []);
     // No invented order number: this screen used to fall back to a client-side
     // `BB-xxxx`, which meant a failed order could still show the customer a
@@ -845,7 +847,13 @@ export function OrderedScreen({ total, all, pickupTime, orderNum, orderId, payme
                     }
                 >
                     {/* Everything below the engraved divider. This is the
-                        variable part, and it is what stretches the frame. */}
+                        variable part, and it is what stretches the frame — so
+                        it grows in rather than appearing at full height. The
+                        sealing overlay's plaque is exactly this frame with an
+                        empty body; starting collapsed means the two match at the
+                        swap and the frame opens from there. */}
+                    <div style={OS.grower}>
+                        <div style={OS.growerInner}>
                     <div style={{ ...OS.price, animation: `${RISE} 0.26s both` }}>₪{total}</div>
                     <div style={{ ...OS.meta, animation: `${RISE} 0.34s both` }}>{all.length} מרכיבים{pickupTime ? ` · איסוף: ${pickupTime}` : ' · מוכן בכ-8 דקות'}</div>
 
@@ -883,6 +891,8 @@ export function OrderedScreen({ total, all, pickupTime, orderNum, orderId, payme
                     <BariButton variant="ghost" fullWidth onClick={onNewOrder} style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif", animation: "plaqueFadeUp 0.5s ease 0.75s both" }}>
                         הזמנה חדשה ←
                     </BariButton>
+                        </div>
+                    </div>
                 </BariPlaque>
             </div>
         </>
@@ -958,6 +968,21 @@ const OS = {
     // make the seam it is meant to hide.
     catArt: { filter: "drop-shadow(0 8px 32px rgba(200,168,78,0.25))" },
     sealBox: { width: "100%", height: "100%", fontSize: `calc(min(100vw, ${PLAQUE.maxWidth}px) * ${SEAL_FOOTPRINT} / 12)` },
+
+    // The frame opening. Slightly slower than the content's rise so the plaque
+    // is still growing as the words land, rather than finishing first and
+    // leaving them to appear into a static box.
+    // The 0.12s delay is the point of this, not decoration. Mounting this screen
+    // rebuilds the GoldField canvas and constructs a fresh Lottie (~200 SVG
+    // nodes for the cat), and that frame runs well over budget — measured at a
+    // 67ms gap. Starting a LAYOUT animation on the same frame meant the growth's
+    // first step was a 62px lurch. Delayed, the expensive frame happens while
+    // nothing is moving, so the stall lands on a still image and the growth
+    // itself runs clean.
+    grower: { display: "grid", gridTemplateRows: "1fr", animation: "plaqueBodyGrow 0.6s cubic-bezier(0.2,0.9,0.3,1) 0.12s both" },
+    // overflow/min-height are not optional: without them the content ignores the
+    // collapsed row and the growth animates nothing.
+    growerInner: { overflow: "hidden", minHeight: 0 },
 
     // The type scales with the viewport because the title zone does: at a fixed
     // 26px the title, subtitle and order number came to 89px against the 82px
