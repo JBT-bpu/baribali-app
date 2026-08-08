@@ -48,6 +48,19 @@ function playKitchenChime(ctx: AudioContext) {
 
 const CHECK_KEY = 'bb-kitchen-checks';
 
+/**
+ * The board's ground: the owner's 16:9 brand plate, blurred and darkened.
+ *
+ * Three treatments exist in public/kitchen-assets — bg-a (quietest), bg (this
+ * one), bg-b (boldest) — because the right amount of brand on a work surface is
+ * a judgement, not a fact. Measured behind the working area, after the scrim:
+ * all three sit at a mean luminance of ~14/255, so white text is comfortable on
+ * any of them. What differs is how much the ground VARIES (spread 7.0 / 9.9 /
+ * 12.6 on a 0-255 scale), and therefore how much it pulls at the eye — which is
+ * an attention question, not a legibility one.
+ */
+const KITCHEN_BG = '/kitchen-assets/bg.webp';
+
 function loadMap<T>(key: string): Record<string, T> {
     try { return JSON.parse(localStorage.getItem(key) || '{}'); } catch { return {}; }
 }
@@ -97,7 +110,11 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
     // accept screen and the focus rule can all be exercised for real. Hidden
     // unless the page is opened with ?sim=1: a button that injects six orders
     // must not be one stray tap away during service.
-    const simOn = useSearchParams().get('sim') === '1';
+    const params = useSearchParams();
+    const simOn = params.get('sim') === '1';
+    // ?bg=a (quietest) / ?bg=b (boldest) for judging against real tickets.
+    const bgVariant = params.get('bg');
+    const bgUrl = bgVariant === 'a' || bgVariant === 'b' ? `/kitchen-assets/bg-${bgVariant}.webp` : KITCHEN_BG;
     const [simLeft, setSimLeft] = useState(0);
     const simTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     useEffect(() => () => { if (simTimer.current) clearTimeout(simTimer.current); }, []);
@@ -367,7 +384,7 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
     const active = orders.find(o => o.id === activeId) ?? null;
 
     return (
-        <div style={K.root}>
+        <div style={{ ...K.root, backgroundImage: (K.root.backgroundImage as string).replace(KITCHEN_BG, bgUrl) }}>
             <style>{`
                 /* Built for a wall tablet in landscape; stacks if it ever isn't. */
                 @media (max-width: 760px) {
@@ -534,24 +551,27 @@ const K: Record<string, React.CSSProperties> = {
         // pushed the מוכן button off the bottom of the tablet, unreachable.
         // A definite height makes the inner `overflow-y: auto` actually work.
         height: '100dvh',
-        // ── The BariBali ground, deliberately quiet ──
-        // Deep house green instead of flat black, with the damask motif at 5%
-        // and a soft gold pool near the top. NO photograph, no particles, no
-        // motion: this is a surface people scan under time pressure, and detail
-        // behind text is exactly what costs accuracy. The brand should be
-        // recognisable from across the room and invisible at reading distance.
+        // ── The BariBali ground ──
+        // The owner's 16:9 brand plate, which happens to match the wall
+        // tablet's aspect exactly. It is a photographic image with a bright
+        // gold logo dead centre — i.e. directly behind the order header and the
+        // ingredient chips — so it is blurred and darkened hard before it gets
+        // anywhere near this screen. What survives is the shape of the brand,
+        // not detail that competes with text someone is reading under time
+        // pressure. The panels above it stay opaque for the same reason.
         backgroundColor: '#050f06',
-        // Layer order is top-first. The scrim is near-uniform on purpose: a
-        // gradient that reached full opacity at the bottom made the motif fade
-        // out down the screen, which reads as a smudge rather than as a texture.
+        // Layer order is top-first: gold pool, near-uniform scrim, then the
+        // plate. The scrim is uniform on purpose — a gradient that reached full
+        // opacity at the bottom made the image fade out down the screen, which
+        // reads as a smudge rather than as a ground.
         backgroundImage: [
-            'radial-gradient(ellipse 70% 45% at 50% 0%, rgba(200,168,78,0.10) 0%, transparent 70%)',
-            'linear-gradient(180deg, rgba(7,20,8,0.93) 0%, rgba(4,12,5,0.95) 100%)',
-            'url(/kitchen-assets/motif.webp)',
+            'radial-gradient(ellipse 70% 45% at 50% 0%, rgba(200,168,78,0.08) 0%, transparent 70%)',
+            'linear-gradient(180deg, rgba(6,18,7,0.80) 0%, rgba(4,12,5,0.86) 100%)',
+            `url(${KITCHEN_BG})`,
         ].join(', '),
-        backgroundSize: 'cover, cover, 560px auto',
-        backgroundRepeat: 'no-repeat, no-repeat, repeat',
-        backgroundBlendMode: 'normal, normal, normal',
+        backgroundSize: 'cover, cover, cover',
+        backgroundPosition: 'center, center, center',
+        backgroundRepeat: 'no-repeat, no-repeat, no-repeat',
         fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: 'rtl',
         color: '#fff', display: 'flex', flexDirection: 'column',
     },
