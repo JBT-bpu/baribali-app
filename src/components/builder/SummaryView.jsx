@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useMemo, useRef, useState, useEffect } from "react";
+import { useCallback, useMemo, useState, useEffect } from "react";
 import { fireGoldConfetti } from "../../lib/confetti";
 
 function Icon({ src, size = "1.2em", style = {} }) {
@@ -137,10 +137,7 @@ import { STEPS, NUTRI, BASE } from "../../data/salad-data.js"; // NUTRI used in 
 import { effectiveItemPrice } from "../../lib/menuConfig";
 import { findDiscount, discountAmount } from "../../lib/discounts";
 const headerImage = "/builder-assets/header-brand.png";
-import MixingAnimation from "./ui/MixingAnimation.jsx";
-import OrderSeal from "./ui/OrderSeal.jsx";
-import { SEAL_FOOTPRINT, PLAQUE_TOP, PLAQUE_MARGIN, SEAL_BACKDROP } from "./ui/sealTiming";
-import GoldField from "../ui/GoldField";
+import OrderSealScreen from "./ui/OrderSealScreen.jsx";
 import BariPanel from "../ui/bari/BariPanel";
 import BariButton from "../ui/bari/BariButton";
 import BariBadge from "../ui/bari/BariBadge";
@@ -154,18 +151,27 @@ const DEMO_MODE = !isSupabaseConfigured();
 
 export default function SummaryView({ sels, total, all, comboBadges, notes, setNotes, onBack, onEdit, onNewOrder, base = BASE, sizeLabel = null }) {
     const [showMixing, setShowMixing] = useState(false);
-    const [ordered, setOrdered] = useState(false);
     const [notesError, setNotesError] = useState("");
     const [notesOpen, setNotesOpen] = useState(false);
     const [notesFocused, setNotesFocused] = useState(false);
     const [highlightedStep, setHighlightedStep] = useState(null);
     const [pickupTime, setPickupTime] = useState(() => generatePickupSlots()?.[0]?.id ?? null);
     const [paymentChoice, setPaymentChoice] = useState("pickup"); // 'now' | 'pickup' — demo mode only
-    const [realOrderNum, setRealOrderNum] = useState(null);
-    const [realOrderId, setRealOrderId] = useState(null);
-    // Whatever the server actually recorded — never inferred from the choice
-    // made on this screen.
-    const [realPaymentStatus, setRealPaymentStatus] = useState(null);
+    /**
+     * The accepted order — null until the server says it recorded one.
+     *
+     * THIS IS THE GATE. The seal screen renders nothing about the order unless
+     * this is non-null, and it is set on exactly one line below: after the
+     * response came back ok, was not a payment failure, and carried an id or an
+     * order number. A failed or unrecorded order cannot produce a confirmation
+     * because there is no data to build one from.
+     *
+     * It replaces an `ordered` boolean coordinated with two refs against the
+     * animation's completion. Same guarantee, but carried by the data instead of
+     * by three pieces of state agreeing with each other — and the contents are
+     * whatever the SERVER recorded, never what was chosen on this screen.
+     */
+    const [acceptedOrder, setAcceptedOrder] = useState(null);
     const [paymentFailed, setPaymentFailed] = useState(false);
     const [failedOrderNum, setFailedOrderNum] = useState(null);
     const [promoInput, setPromoInput] = useState("");
@@ -173,15 +179,6 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     const [promoError, setPromoError] = useState("");
     const [submitting, setSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState("");
-    // The confirmation screen may only appear once BOTH the mixing animation has
-    // finished AND the server has actually accepted the order. Previously the
-    // animation's completion alone flipped to "ordered", so a failed request
-    // still showed a confirmation (with a fabricated order number) and the
-    // customer would arrive to collect food nobody had been told to make.
-    const outcomeRef = useRef(null); // null = pending | 'ok' | 'fail'
-    const mixDoneRef = useRef(false);
-    // Animation over, server still hasn't answered.
-    const [stillSending, setStillSending] = useState(false);
     const [autoDiscount, setAutoDiscount] = useState(null); // standing "tag" discount for signed-in customers
 
     // Signed-in customers may have a standing discount assigned to their account
@@ -240,26 +237,8 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     };
 
 
-    // Shows the confirmation only when the animation has finished *and* the
-    // server accepted the order.
-    //
-    // If the animation finishes first, `stillSending` tells the overlay to stop
-    // claiming the order is ready and say it is still being sent — otherwise a
-    // slow request left the customer looking at a frozen "🎉 מוכן!" for as long
-    // as it took.
-    const settle = useCallback(() => {
-        if (!mixDoneRef.current) return;
-        if (outcomeRef.current === null) { setStillSending(true); return; }
-        setStillSending(false);
-        setShowMixing(false);
-        setSubmitting(false);
-        if (outcomeRef.current === 'ok') setOrdered(true);
-    }, []);
-
     const failSubmit = useCallback((message) => {
-        outcomeRef.current = 'fail';
-        setStillSending(false);
-        setShowMixing(false);          // stop the animation rather than let it "complete"
+        setShowMixing(false);          // stop the sequence rather than let it "complete"
         setSubmitting(false);
         setSubmitError(message);
         navigator.vibrate?.([30, 40, 30]);
@@ -271,10 +250,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
         const isFailureTest = choice === "fail";
         setSubmitting(true);
         setSubmitError("");
-        outcomeRef.current = null;
-        // The failure-test path shows no animation, so there is nothing to wait
-        // for — treat the "animation done" gate as already satisfied.
-        mixDoneRef.current = isFailureTest;
+        setAcceptedOrder(null);
         if (navigator.vibrate) navigator.vibrate(isFailureTest ? [30, 40, 30] : [15, 40, 30]);
         if (!isFailureTest) setShowMixing(true);
 
@@ -332,10 +308,6 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                 return;
             }
 
-            if (data.orderNum) setRealOrderNum(data.orderNum);
-            if (data.id) setRealOrderId(data.id);
-            if (data.paymentStatus) setRealPaymentStatus(data.paymentStatus);
-
             // Online payment only when a gateway is configured. Otherwise the
             // order is already pay-at-pickup (server set payAtPickup) — skip
             // the redirect and let the confirmation screen show.
@@ -347,7 +319,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                 }).then(r => r.ok ? r.json() : null).catch(() => null);
                 if (payRes?.paymentUrl) {
                     window.location.href = payRes.paymentUrl;
-                    return; // leaving the page — don't settle
+                    return; // leaving the page — never accept the order here
                 }
                 // The order exists but we can't reach the gateway; it is on the
                 // board as pending, so send them to its status page rather than
@@ -356,8 +328,22 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                 return;
             }
 
-            outcomeRef.current = 'ok';
-            settle();
+            // THE ONE PLACE an order becomes "accepted". Everything above either
+            // returned or threw; reaching here means the server responded ok,
+            // did not report a payment failure, and recorded an id or an order
+            // number. Only the server's values go in — `total` is `finalTotal`
+            // because that is what was submitted and re-derived server-side, and
+            // the rest is read straight off the response.
+            setSubmitting(false);
+            setAcceptedOrder({
+                total: finalTotal,
+                items: all.length,
+                pickupTime,
+                orderNum: data.orderNum ?? null,
+                orderId: data.id ?? null,
+                paymentStatus: data.paymentStatus ?? null,
+                badges: comboBadges,
+            });
         } catch (err) {
             clearTimeout(timeoutId);
             failSubmit(err?.name === 'AbortError'
@@ -367,17 +353,16 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     };
 
     if (paymentFailed) return <PaymentFailedScreen orderNum={failedOrderNum} onRetry={() => setPaymentFailed(false)} />;
-    if (ordered) return <OrderedScreen total={finalTotal} all={all} pickupTime={pickupTime} orderNum={realOrderNum} orderId={realOrderId} paymentStatus={realPaymentStatus} badges={comboBadges} onNewOrder={onNewOrder || onBack} />;
 
     return (
         <div style={S.root}>
             <div style={S.bg} /><div style={S.bgRay} />
 
+            {/* Seals the order and then becomes the confirmation in place — one
+                component, so there is no handoff to get wrong. It renders
+                nothing about the order until `order` is non-null. */}
             {showMixing && (
-                <MixingAnimation
-                    stillSending={stillSending}
-                    onComplete={() => { mixDoneRef.current = true; settle(); }}
-                />
+                <OrderSealScreen order={acceptedOrder} onNewOrder={onNewOrder || onBack} />
             )}
 
             <div style={S.main}>
@@ -775,130 +760,6 @@ function NutriStats({ all }) {
     );
 }
 
-/** What the customer still owes, if anything. Mirrors the order-status page. */
-function confirmPayment(status) {
-    switch (status) {
-        case 'paid':
-        case 'paid_unverified': return { text: 'שולם ✓', owed: false };
-        case 'pay_at_pickup':   return { text: 'לתשלום באיסוף', owed: true };
-        case 'pending':         return { text: 'ממתין לתשלום', owed: true };
-        default:                return null;
-    }
-}
-
-// ─── Post-order confirmation screen ─────────────────────────
-/** One entrance, one stagger unit. Every element on the confirmation uses it so
- *  the arrival reads as a single wave rather than a set of unrelated fades. */
-const RISE = "plaqueFadeUp 0.45s cubic-bezier(0.2,0.9,0.3,1)";
-
-// Exported for /dev/mixing only. The whole design of this screen rests on it
-// opening at exactly the composition MixingAnimation closes on, and there is no
-// other way to check that: placing a real order to look at it would write to the
-// live orders table (this machine's .env.local is pointed at real Supabase).
-export function OrderedScreen({ total, all, pickupTime, orderNum, orderId, paymentStatus, badges = [], onNewOrder }) {
-    useEffect(() => {
-        // Held back until the plaque has finished growing. Not for pacing this
-        // time — canvas-confetti spins up its own canvas and rAF loop, and doing
-        // that on the mount frame put it alongside a GoldField rebuild and the
-        // start of the growth animation. That frame was already over budget.
-        // It lands as punctuation on a settled plaque instead.
-        const t = setTimeout(() => fireGoldConfetti(), 620);
-        return () => clearTimeout(t);
-    }, []);
-    // No invented order number: this screen used to fall back to a client-side
-    // `BB-xxxx`, which meant a failed order could still show the customer a
-    // plausible confirmation. The number is only ever the server's.
-
-    const pay = confirmPayment(paymentStatus);
-    // Only badges whose artwork exists; the rest would render a broken image.
-    const earned = badges.filter(b => b?.emblem).slice(0, 6);
-
-    return (
-        <>
-            <div style={OS.root}>
-                <div style={OS.bg} />
-                {/* The same field the sealing overlay leaves behind, at rest.
-                    No entrySweep here: the overlay's copy has already decayed to
-                    calm by the handoff, so this one has to open calm to match. */}
-                <GoldField zIndex={0} />
-                <BariPlaque
-                    style={{ margin: PLAQUE_MARGIN }}
-                    // The struck medallion, not a bare cat — this screen has to
-                    // OPEN on exactly the composition MixingAnimation closed on,
-                    // or the handoff reads as a cut and the whole point of the
-                    // sequence (one continuous moment) is lost. Same component,
-                    // same footprint, same stage.
-                    pedestal={<div style={OS.sealBox}><OrderSeal stage="done" /></div>}
-                    pedestalWidth={SEAL_FOOTPRINT}
-                    pedestalStyle={OS.catArt}
-                    title={
-                        <>
-                            {/* Staggered, because this is the arrival. The
-                                sealing overlay left this zone empty, so nothing
-                                here replaces anything — it all simply appears. */}
-                            <div style={{ ...OS.title, animation: `${RISE} 0s both` }}>בהכנה!</div>
-                            <div style={{ ...OS.subtitle, animation: `${RISE} 0.08s both` }}>מכינים את הסלט שלכם עכשיו 🐱</div>
-                            {orderNum && (
-                                <div style={{ marginTop: "8px", animation: `${RISE} 0.18s both` }}>
-                                    <BariBadge>הזמנה {orderNum}</BariBadge>
-                                </div>
-                            )}
-                        </>
-                    }
-                >
-                    {/* Everything below the engraved divider. This is the
-                        variable part, and it is what stretches the frame — so
-                        it grows in rather than appearing at full height. The
-                        sealing overlay's plaque is exactly this frame with an
-                        empty body; starting collapsed means the two match at the
-                        swap and the frame opens from there. */}
-                    <div style={OS.grower}>
-                        <div style={OS.growerInner}>
-                    <div style={{ ...OS.price, animation: `${RISE} 0.26s both` }}>₪{total}</div>
-                    <div style={{ ...OS.meta, animation: `${RISE} 0.34s both` }}>{all.length} מרכיבים{pickupTime ? ` · איסוף: ${pickupTime}` : ' · מוכן בכ-8 דקות'}</div>
-
-                    {/* Whether money is still owed is the one thing this
-                        screen was silent about — someone paying at
-                        pickup got no reminder to bring any. */}
-                    {pay && (
-                        <div style={{ ...OS.payPill, ...(pay.owed ? OS.payOwed : OS.payDone), animation: `${RISE} 0.42s both` }}>
-                            <span>{pay.owed ? '💵' : '✓'}</span>
-                            <span>{pay.text}</span>
-                        </div>
-                    )}
-
-                    {/* The badges earned on this bowl — the payoff for the
-                        collection, shown where it lands rather than left behind
-                        on the summary screen. */}
-                    {earned.length > 0 && (
-                        <div style={OS.badgeRow}>
-                            {earned.map((b, i) => (
-                                <img
-                                    key={b.id}
-                                    src={b.emblem}
-                                    alt={b.he}
-                                    style={{ ...OS.badgeArt, animation: `plaqueBadgePop 0.5s cubic-bezier(0.34,1.5,0.64,1) ${0.6 + i * 0.09}s both` }}
-                                />
-                            ))}
-                        </div>
-                    )}
-
-                    {orderId && (
-                        <a href={`/order/${orderId}`} style={{ ...OS.trackBtn, animation: `${RISE} 0.62s both` }}>
-                            🔍 עקוב אחר ההזמנה
-                        </a>
-                    )}
-                    <BariButton variant="ghost" fullWidth onClick={onNewOrder} style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif", animation: "plaqueFadeUp 0.5s ease 0.75s both" }}>
-                        הזמנה חדשה ←
-                    </BariButton>
-                        </div>
-                    </div>
-                </BariPlaque>
-            </div>
-        </>
-    );
-}
-
 // ─── Simulated payment-failure screen (demo mode only) ──────────
 function PaymentFailedScreen({ orderNum, onRetry }) {
     return (
@@ -942,91 +803,18 @@ function PaymentFailedScreen({ orderNum, onRetry }) {
      the green interior stops 0.1368 * W above the plaque's bottom edge
 */
 const OS = {
-    // Scrolls: the plaque grows with its content, and on a short screen (an SE,
-    // or a phone in landscape) it will be taller than the viewport. `margin:auto`
-    // on the child rather than `alignItems:center` — centring a flex item that
-    // overflows makes its top unreachable.
-    // alignItems/paddingTop must match MixingAnimation's overlay exactly — see
-    // PLAQUE_TOP. This screen and the sealing overlay share a composition, and
-    // the seal jumps 80px at the handoff if either one centres instead.
-    // NO screen-level fade. This screen is only ever reached from the sealing
-    // overlay (settle() is the sole caller of setOrdered), and it opens on that
-    // overlay's exact composition — backdrop, frame, seal, all pinned. Fading
-    // the whole thing in was fading an identical picture over itself for half a
-    // second while the CONTENT dissolved underneath, which is what read as a
-    // seam. The frame and the seal now simply continue; only the content
-    // arrives, staggered below.
-    root: { position: "fixed", inset: 0, zIndex: 500, background: SEAL_BACKDROP, display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: PLAQUE_TOP, overflowY: "auto", overflowX: "hidden", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: "rtl" },
-    bg: { position: "fixed", inset: 0, background: PLAQUE.glow, pointerEvents: "none" },
-
-    // The seal's shadow. Its SIZE is the plaque's business — the pedestal slot
-    // places it — so only the treatment lives here.
-    //
-    // No entrance animation. There used to be a plaqueRingPop here, from when
-    // this screen was cut to and the cat had to arrive; now MixingAnimation has
-    // already struck the medallion in this exact spot, and re-popping it would
-    // make the seam it is meant to hide.
-    catArt: { filter: "drop-shadow(0 8px 32px rgba(200,168,78,0.25))" },
-    sealBox: { width: "100%", height: "100%", fontSize: `calc(min(100vw, ${PLAQUE.maxWidth}px) * ${SEAL_FOOTPRINT} / 12)` },
-
-    // The frame opening. Slightly slower than the content's rise so the plaque
-    // is still growing as the words land, rather than finishing first and
-    // leaving them to appear into a static box.
-    // The 0.12s delay is the point of this, not decoration. Mounting this screen
-    // rebuilds the GoldField canvas and constructs a fresh Lottie (~200 SVG
-    // nodes for the cat), and that frame runs well over budget — measured at a
-    // 67ms gap. Starting a LAYOUT animation on the same frame meant the growth's
-    // first step was a 62px lurch. Delayed, the expensive frame happens while
-    // nothing is moving, so the stall lands on a still image and the growth
-    // itself runs clean.
-    grower: { display: "grid", gridTemplateRows: "1fr", animation: "plaqueBodyGrow 0.6s cubic-bezier(0.2,0.9,0.3,1) 0.12s both" },
-    // overflow/min-height are not optional: without them the content ignores the
-    // collapsed row and the growth animates nothing.
-    growerInner: { overflow: "hidden", minHeight: 0 },
-
-    // The type scales with the viewport because the title zone does: at a fixed
-    // 26px the title, subtitle and order number came to 89px against the 82px
-    // that zone gets on a 320px-wide phone, and the overflow would have run over
-    // the engraved divider.
-    title: { fontSize: "clamp(20px, 6.4vw, 26px)", fontWeight: 900, color: "#ffffff", textShadow: "0 2px 8px rgba(0,0,0,0.5)", animation: "plaqueFadeUp 0.5s ease 0.3s both", lineHeight: 1.1 },
-    subtitle: { fontSize: "clamp(11px, 3.4vw, 13px)", fontWeight: 600, color: "rgba(255,255,255,0.55)", marginTop: "4px", animation: "plaqueFadeUp 0.5s ease 0.4s both" },
-
-    price: {
-        fontSize: "44px", fontWeight: 900,
-        backgroundImage: "linear-gradient(135deg, #c8a832, #f0d060, #ffe066, #c8a832)",
-        backgroundSize: "200% 200%",
-        WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-        animation: "plaqueFadeUp 0.5s ease 0.5s both, plaqueGoldShimmer 3s ease 1s infinite",
-        textShadow: "none", lineHeight: 1.1,
-    },
-    meta: { fontSize: "12px", color: "rgba(255,255,255,0.38)", marginTop: "6px", fontWeight: 600, animation: "plaqueFadeUp 0.5s ease 0.6s both" },
-    payPill: {
-        display: "inline-flex", alignItems: "center", gap: "7px",
-        marginTop: "14px", padding: "8px 16px", borderRadius: "var(--radius-full)",
-        fontSize: "13px", fontWeight: 800,
-        animation: "plaqueFadeUp 0.5s ease 0.65s both",
-    },
-    payOwed: { background: "rgba(255,183,77,0.16)", border: "1px solid rgba(255,183,77,0.45)", color: "#ffcc80" },
-    payDone: { background: "rgba(102,187,106,0.16)", border: "1px solid rgba(102,187,106,0.45)", color: "#a5d6a7" },
-    badgeRow: {
-        display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "6px",
-        marginTop: "16px", marginBottom: "4px",
-    },
-    // No pill behind them: the emblems carry their own gold frame, and a border
-    // around a border is what made the summary panel feel cramped.
-    badgeArt: { width: "50px", height: "50px", objectFit: "contain", filter: "drop-shadow(0 3px 8px rgba(0,0,0,0.5))" },
-    // The demo-mode payment-failure screen keeps the plain centred layout — it
-    // is a dead end with three elements, not something to dress in the plaque.
-    failContent: { position: "relative", zIndex: 1, textAlign: "center", padding: "20px", margin: "auto", maxWidth: "360px", width: "100%" },
-    divider: { width: "60px", height: "1px", background: "linear-gradient(90deg, transparent, rgba(200,168,78,0.4), transparent)", margin: "24px auto" },
-    trackBtn: {
-        display: "block", width: "100%", padding: "12px 22px", borderRadius: "14px",
-        marginTop: "16px",
-        background: "rgba(200,168,78,0.10)", border: "1px solid rgba(200,168,78,0.30)",
-        color: "rgba(240,208,96,0.85)", fontSize: "13px", fontWeight: 700,
-        fontFamily: "var(--font-heebo), 'Heebo', sans-serif", textDecoration: "none", textAlign: "center",
-        animation: "plaqueFadeUp 0.5s ease 0.7s both", marginBottom: "10px",
-    },
+    // Everything the CONFIRMATION used to need moved to OrderSealScreen with it.
+    // What is left is the demo-mode payment-failure screen: a dead end with
+    // three elements, deliberately NOT dressed in the plaque — it borrows the
+    // plaque's animation names and nothing else.
+    root: { position: 'fixed', inset: 0, zIndex: 500, background: PLAQUE.backdrop, display: 'flex', overflowY: 'auto', overflowX: 'hidden', fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: 'rtl', animation: 'plaqueScreenIn 0.55s ease both' },
+    bg: { position: 'fixed', inset: 0, background: PLAQUE.glow, pointerEvents: 'none' },
+    failContent: { position: 'relative', zIndex: 1, textAlign: 'center', padding: '20px', margin: 'auto', maxWidth: '360px', width: '100%' },
+    // Scales with the viewport: at a fixed 26px this overflowed its box on a
+    // 320px phone.
+    title: { fontSize: 'clamp(20px, 6.4vw, 26px)', fontWeight: 900, color: '#ffffff', textShadow: '0 2px 8px rgba(0,0,0,0.5)', animation: 'plaqueFadeUp 0.5s ease 0.3s both', lineHeight: 1.1 },
+    subtitle: { fontSize: 'clamp(11px, 3.4vw, 13px)', fontWeight: 600, color: 'rgba(255,255,255,0.55)', marginTop: '4px', animation: 'plaqueFadeUp 0.5s ease 0.4s both' },
+    divider: { width: '60px', height: '1px', background: 'linear-gradient(90deg, transparent, rgba(200,168,78,0.4), transparent)', margin: '24px auto' },
 };
 
 const S = {

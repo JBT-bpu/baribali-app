@@ -40,9 +40,13 @@ export default function OrderSeal({ stage, reducedMotion = false, dustCount = 26
             .catch(() => { });
     }, []);
 
+    // The stages past `face` are no longer on a clock — `waiting` is the server
+    // taking its time, `revealed` is the content having landed. Both are "the
+    // medallion is struck and the cat is in it", so both keep the face.
     const struck = stage !== "gather";
-    const faced = stage === "face" || stage === "sheen" || stage === "settle" || stage === "done";
-    const sheening = stage === "sheen" || stage === "settle" || stage === "done";
+    const faced = stage === "face" || stage === "waiting" || stage === "revealed";
+    // The sheen sweeps once, as the frame forms around the seal.
+    const sheening = stage === "revealed";
     // Struck metal should keep catching the light. Once the face is in, the
     // bezel turns slowly and the halo breathes — forever, including on the
     // confirmation screen, which is where the seal spends most of its life. A
@@ -280,7 +284,7 @@ const KF = `
     50%     { opacity:0.95; transform: scale(1.055); }
 }
 
-/* Lives here rather than in MixingAnimation because this block is the one that
+/* Lives here rather than in OrderSealScreen because this block is the one that
    gets hoisted into <head>; a page-local <style> would be shadowable. */
 @keyframes sealSendingSweep { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
 `;

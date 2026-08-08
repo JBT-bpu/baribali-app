@@ -43,12 +43,29 @@
 export const GATHER_AT = 1.2;
 /** Flare, shockwave, and the medallion strikes in. */
 export const STRIKE_AT = 1.4;
-/** The face resolves inside the ring. */
+/**
+ * The face resolves inside the ring — and the clock stops here.
+ *
+ * Everything past this point used to be on a timer too: a sheen at 2.5s, a
+ * settle at 3.2s, then a handoff to a second screen that grew for another
+ * 0.7s. Roughly two seconds of dressing on a decision that had already been
+ * made, paid on every order including a regular's twentieth.
+ *
+ * None of it was load-bearing. The order request has a 20s timeout and the
+ * confirmation may only appear once the server has accepted, so the sequence
+ * could never have been "long enough" to guarantee anything — a slow request
+ * always had to be waited out separately. The length was inherited from the
+ * animation this replaced, and never justified.
+ *
+ * So the tail is driven by the ORDER now, not the clock: the moment reads to
+ * here, and the content appears as soon as the server has answered. Fast
+ * network, that is right here at 1.9s. Slow network, the seal holds and
+ * shimmers for exactly as long as it has to.
+ */
 export const FACE_AT = 1.9;
-/** Sheen sweeps the gold; the plaque frame fades in around it. */
-export const SHEEN_AT = 2.5;
-/** Content settles; hand off to the confirmation screen. */
-export const DONE_AT = 3.2;
+
+/** How long the frame takes to form around the seal once the order lands. */
+export const REVEAL_DUR = 0.6;
 
 /**
  * How hard the ambient GoldField is streaking when the screen opens.
@@ -77,7 +94,13 @@ export const FIELD_RUSH = -2.2;
 export const SEAL_BACKDROP =
     'url(/homepage-assets/BG_8K.webp) center top / cover no-repeat, linear-gradient(155deg, #030a03 0%, #071a07 30%, #0a200a 60%, #071a07 100%)';
 
-export type SealStage = 'gather' | 'strike' | 'face' | 'sheen' | 'settle' | 'done';
+/**
+ * `waiting` and `revealed` are not on the clock — they depend on the order.
+ * The screen reaches the end of `face` and then either reveals (the server has
+ * answered) or waits (it has not), which is the whole point: the sequence is
+ * exactly as long as the thing it is covering.
+ */
+export type SealStage = 'gather' | 'strike' | 'face' | 'waiting' | 'revealed';
 
 /**
  * The medallion's footprint, as a fraction of the plaque's width.
@@ -90,29 +113,34 @@ export type SealStage = 'gather' | 'strike' | 'face' | 'sheen' | 'settle' | 'don
  */
 export const SEAL_FOOTPRINT = 0.5;
 
-/** The ordered boundaries, for iteration and assertions. */
-export const STAGES: { name: SealStage; end: number }[] = [
+/** The boundaries that are actually on a clock. Nothing after `face` is. */
+export const TIMED_STAGES: { name: SealStage; end: number }[] = [
     { name: 'gather', end: GATHER_AT },
     { name: 'strike', end: STRIKE_AT },
     { name: 'face', end: FACE_AT },
-    { name: 'sheen', end: SHEEN_AT },
-    { name: 'settle', end: DONE_AT },
 ];
 
+/**
+ * The stage at time `t`, for the timed portion only.
+ *
+ * Returns `waiting` past the end — the honest default, because at that point
+ * the screen genuinely is waiting on the order. Whether it stays there for one
+ * frame or four seconds is the network's business, not this function's.
+ */
 export function stageAt(t: number): SealStage {
-    for (const s of STAGES) if (t < s.end) return s.name;
-    return 'done';
+    for (const s of TIMED_STAGES) if (t < s.end) return s.name;
+    return 'waiting';
 }
 
 /**
- * The earliest the plaque may be considered "arrived".
+ * The floor: the earliest the content may appear, however fast the server is.
  *
- * The overlay is also cover for the POST that creates the order. If the server
- * has not answered by here the sequence holds at the sheen and shimmers rather
- * than showing a finished confirmation for an order that does not exist yet —
- * the same guarantee the old `stillSending` gave, at a nicer place to wait.
+ * Not a delay for its own sake — it is how long the seal takes to mean
+ * anything. The dust has to gather, the medallion has to land, and the cat has
+ * to read before it is covered by a price. Below this the moment is a flicker
+ * behind text.
  */
-export const HOLD_AT = SHEEN_AT;
+export const CONTENT_FLOOR = FACE_AT;
 
 // ─── Converging dust ─────────────────────────────────────────
 

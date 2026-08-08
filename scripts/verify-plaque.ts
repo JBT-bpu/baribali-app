@@ -15,7 +15,7 @@ import { PLAQUE, pct } from '../src/components/ui/bari/plaqueGeometry.ts';
 import { TRACK, TRACK_ASPECT_H } from '../src/app/order/[id]/trackingArt.ts';
 import { PANEL, chipRows, chipsPerRow, panelHeight, statsColumnHeight, ringFor } from '../src/components/builder/ui/heroBowlGeometry.ts';
 import {
-    STAGES, GATHER_AT, DONE_AT, HOLD_AT, SEAL_EM, SEAL_FOOTPRINT,
+    TIMED_STAGES, GATHER_AT, FACE_AT, CONTENT_FLOOR, REVEAL_DUR, SEAL_EM, SEAL_FOOTPRINT,
     PLAQUE_TOP, PLAQUE_MARGIN, stageAt, dustPlan, moteArrivesAt,
 } from '../src/components/builder/ui/sealTiming.ts';
 
@@ -185,16 +185,18 @@ for (const vw of VIEWPORTS) {
 console.log(`\n  panel height: ${panelHeight(390, 14)}px at 390px, ${panelHeight(320, 14)}px at 320px (was 264px typical / ~370px worst)`);
 console.log(`  headroom at a full bowl: ${ringFor(390) - statsColumnHeight(14, 390)}px spare at 390px, ${ringFor(320) - statsColumnHeight(14, 320)}px at 320px`);
 
-// ── 9. The seal's stage clock ───────────────────────────────────────────────
-// The post-order moment used to be an ingredient pour into a bowl Lottie, with
-// the phase times hardcoded in the component while the pour window lived in the
-// timing module — the same constant in two places and two units. Worse, the
-// bowl artwork was never a fill: cat-salad-bowl.json is a TOSS LOOP whose frame
-// 0 and frame 165 are the same settled bowl, so no amount of syncing the
-// playhead to the ingredients could make it read as filling up.
-head('9. Seal stage clock — ordered, and every stage reachable');
+// ── 9. The seal's clock, and where it deliberately stops ────────────────────
+// The post-order moment used to be an ingredient pour into a bowl Lottie whose
+// artwork was never a fill (cat-salad-bowl.json is a TOSS LOOP — frame 0 and
+// frame 165 are the same settled bowl), and its length was inherited from that
+// animation and never justified: 3.2s of sequence plus 0.7s of growth, on every
+// order, most of it after the outcome was already decided.
+//
+// It is now timed only as far as the reveal. Past that the ORDER decides, which
+// is the only thing the length was ever really about.
+head('9. Seal clock — timed to the floor, then the order decides');
 let prevEnd = 0;
-for (const s of STAGES) {
+for (const s of TIMED_STAGES) {
     ok(s.end > prevEnd, `${s.name} ends at ${s.end}s, after the previous stage`);
     // Each boundary must actually switch stage, or a stage is dead code.
     ok(stageAt(s.end - 0.001) === s.name, `${s.name} is current just before ${s.end}s`);
@@ -202,11 +204,17 @@ for (const s of STAGES) {
     prevEnd = s.end;
 }
 ok(stageAt(0) === 'gather', 'the sequence opens on the gather');
-ok(stageAt(DONE_AT) === 'done', `it is done at ${DONE_AT}s`);
-ok(HOLD_AT < DONE_AT, `a slow order can hold at ${HOLD_AT}s, before the handoff`);
-// The overlay is also cover for the POST that creates the order. Too short and
-// every order on a real phone network falls through to the holding state.
-ok(DONE_AT >= 2.5, `runs ${DONE_AT}s — enough to cover the order request`);
+// Past the clock it is waiting on the order — for one frame or for ten seconds.
+ok(stageAt(FACE_AT) === 'waiting', `past ${FACE_AT}s the screen is waiting on the order, not on a timer`);
+ok(stageAt(FACE_AT + 30) === 'waiting', 'still waiting 30s later — nothing times out into a confirmation');
+ok(CONTENT_FLOOR === FACE_AT, `the content floor (${CONTENT_FLOOR}s) is the end of the moment, not an arbitrary delay`);
+// The floor exists so the seal reads; below the strike it would be a flicker
+// behind a price.
+ok(CONTENT_FLOOR > GATHER_AT, `the floor (${CONTENT_FLOOR}s) is past the strike (${GATHER_AT}s)`);
+ok(REVEAL_DUR > 0 && REVEAL_DUR < 1, `the frame forms in ${REVEAL_DUR}s`);
+
+console.log(`\n  fast server: content at ${CONTENT_FLOOR}s. slow server: whenever it answers.`);
+console.log(`  (was a fixed 3.2s sequence + 0.7s growth, regardless)`);
 
 // ── 10. Converging dust ─────────────────────────────────────────────────────
 head('10. Dust — starts off the medallion, all absorbed before the strike');
@@ -265,7 +273,7 @@ ok(PLAQUE_MARGIN.trim().split(/\s+/).length >= 2 && PLAQUE_MARGIN.includes('auto
     `it still centres horizontally ("${PLAQUE_MARGIN}")`);
 ok(/^\d+(\.\d+)?(vh|px|rem|em)$/.test(PLAQUE_TOP), `both screens start the plaque at ${PLAQUE_TOP}`);
 
-console.log(`\n  moment: ${STAGES.map(s => `${s.name} ${s.end}s`).join(' → ')} → handoff ${DONE_AT}s`);
+console.log(`\n  moment: ${TIMED_STAGES.map(s => `${s.name} ${s.end}s`).join(' → ')} → content when the order lands`);
 
 console.log(failed === 0 ? '\nAll assertions passed.\n' : `\n${failed} FAILED\n`);
 process.exit(failed === 0 ? 0 : 1);
