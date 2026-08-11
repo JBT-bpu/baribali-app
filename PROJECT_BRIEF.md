@@ -108,12 +108,26 @@ create table shop_state (
 );
 ```
 
-The regular week (9:00–16:00, Friday to 14:00, Saturday closed) is **config in
-code** — `src/lib/shopHours.ts` — because it changes rarely. This table is the
-other half: "we are closed right now", toggled from the kitchen board via
-`/api/shop`, taking effect immediately without a deploy. Every read falls back
-to the schedule if the table is unreachable, so a broken read can never close a
-shop that is standing open.
+The regular week — **five trading days, Sunday to Thursday, 9:00–16:00**
+(owner's decision 2026-08-11; Friday previously traded to 14:00 and is now shut
+with Saturday) — is **config in code**, `src/lib/shopHours.ts`, because it
+changes rarely. This table is the other half: "we are closed right now",
+toggled from the kitchen board via `/api/shop`, taking effect immediately
+without a deploy. Every read falls back to the schedule if the table is
+unreachable, so a broken read can never close a shop that is standing open.
+
+**No pre-ordering** (same decision): orders are taken during trading hours only.
+`pickupSlots` clamps its first slot to opening time, which looks like pre-order
+support but is unreachable while the rule holds — it is kept so the pure
+function never names a time before the shop opens. Section 9 of
+`scripts/verify-hours.ts` holds the rule against that misreading.
+
+**All times are Israel time, derived via `Intl` and never read off the process
+clock** (`shopParts`). Vercel's functions run in UTC — three hours behind Israel
+in summer — so `now.getHours()` had the shop refusing every order from 09:00 to
+12:00 and accepting them until 19:00. In the browser the same call read the
+customer's own timezone. Fixed 2026-08-11; the harness now builds its fixtures
+as real Israel instants so it can catch a recurrence on any machine.
 
 **RLS (corrected 2026-08-08).** All three public tables now have RLS enabled and
 **no policies**, so anon and authenticated get nothing from any of them; every

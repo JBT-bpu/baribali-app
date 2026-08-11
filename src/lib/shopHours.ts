@@ -93,18 +93,22 @@ export const toHHMM = (mins: Minutes): string =>
 /**
  * The regular week. 0 = Sunday … 6 = Saturday.
  *
- * Default 9:00–16:00, which is what the owner asked for. Friday closes early
- * and Saturday is closed — the previous rules, which were buried as magic
- * numbers inside the pickup-slot generator in a view component (`day === 6`,
- * `h >= 16`, `sh >= 21`, three different constants that had to agree).
+ * FIVE TRADING DAYS, Sunday to Thursday, 9:00–16:00 — the owner's decision
+ * (2026-08-11). Friday used to trade until 14:00, an early close before
+ * Shabbat; it is now shut with Saturday.
+ *
+ * These were previously magic numbers buried in a pickup-slot generator inside
+ * a view component (`day === 6`, `h >= 16`, `sh >= 21` — three constants that
+ * had to agree and one that had nothing to do with the shop's real hours). One
+ * table now, read by the customer's slot list AND by the server.
  */
 export const WEEK: Record<number, DayHours> = {
     0: { open: hm(9), close: hm(16) },   // Sunday
     1: { open: hm(9), close: hm(16) },
     2: { open: hm(9), close: hm(16) },
     3: { open: hm(9), close: hm(16) },
-    4: { open: hm(9), close: hm(16) },
-    5: { open: hm(9), close: hm(14) },   // Friday — early close before Shabbat
+    4: { open: hm(9), close: hm(16) },   // Thursday — the last trading day
+    5: { open: null, close: null },      // Friday — closed
     6: { open: null, close: null },      // Saturday — closed
 };
 
@@ -139,6 +143,18 @@ export function withinHours(day: number, mins: Minutes): boolean {
  * but the hours come from WEEK instead of from four hard-coded comparisons, and
  * the last slot is bounded by CLOSING rather than by a separate 21:00 constant
  * that no longer had anything to do with the shop's actual hours.
+ *
+ * NO PRE-ORDERING — owner's decision, 2026-08-11. Orders are taken during
+ * trading hours only: POST /api/orders gates on shopStatus, and the summary
+ * screen replaces the slot grid with the closed message.
+ *
+ * Which makes the `Math.max(open, …)` clamp below unreachable in practice — it
+ * binds only when now + lead is still before opening, i.e. before 08:45, by
+ * which time nothing may be ordered anyway. It stays because this is a pure
+ * function that should be correct on its own terms: it must never name a
+ * pickup time before the shop opens, whoever calls it. Said plainly here
+ * because the clamp otherwise reads as evidence that pre-ordering is supported,
+ * and section 9 of the harness holds the rule against exactly that reading.
  */
 export function pickupSlots(now: Date): { id: string; label: string; isPeak: boolean }[] {
     const { day, mins: nowMins } = shopParts(now);

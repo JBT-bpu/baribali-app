@@ -49,9 +49,12 @@ for (const d of [0, 1, 2, 3, 4]) {
     const { open, close } = hoursFor(d);
     ok(open === hm(9) && close === hm(16), `${DAY_NAME[d]}: 09:00–16:00`);
 }
-ok(hoursFor(5).open === hm(9) && hoursFor(5).close === hm(14), 'Fri: 09:00–14:00 (early close)');
+// Five trading days — owner's decision 2026-08-11. Friday used to trade until
+// 14:00; it is now shut with Saturday.
+ok(hoursFor(5).open === null, 'Fri: closed');
 ok(hoursFor(6).open === null, 'Sat: closed');
-ok(at(0, 12).getDay() === 0 && at(6, 12).getDay() === 6, 'the fixture dates land on the weekdays they claim');
+ok([0, 1, 2, 3, 4, 5, 6].filter(d => hoursFor(d).open !== null).length === 5, 'exactly five trading days');
+ok(shopParts(at(0, 12)).day === 0 && shopParts(at(6, 12)).day === 6, 'the fixture dates land on the weekdays they claim');
 
 // ── 2. parse/format round-trip ──────────────────────────────────────────────
 head('2. Time parsing');
@@ -94,10 +97,11 @@ head('4. Pickup slots');
 }
 ok(pickupSlots(at(6, 12)).length === 0, 'Saturday offers nothing');
 ok(pickupSlots(at(1, 15, 55)).length === 0, 'too late for the 15min lead before a 16:00 close -> nothing');
-ok(pickupSlots(at(5, 13, 50)).length === 0, 'Friday 13:50 is past the last workable slot');
+ok(pickupSlots(at(5, 12)).length === 0, 'Friday offers nothing');
 {
+    // The clamp is a boundary guard, not a pre-order route — see section 9.
     const early = pickupSlots(at(1, 7));
-    ok(early.length > 0 && early[0].id === '09:00', 'ordering before opening offers slots from 09:00, not 07:15');
+    ok(early.length > 0 && early[0].id === '09:00', 'the 09:00 slot is never skipped by the lead time');
 }
 
 // ── 5. What the SERVER will accept ──────────────────────────────────────────
@@ -110,7 +114,7 @@ ok(checkPickup('04:00', at(1, 3)) === 'closed_day' || checkPickup('04:00', at(1,
 ok(checkPickup('08:30', at(1, 8)) === 'outside_hours', 'before opening: rejected');
 ok(checkPickup('16:30', at(1, 12)) === 'outside_hours', 'after closing: rejected');
 ok(checkPickup('12:00', at(6, 11)) === 'closed_day', 'Saturday: rejected as a closed day');
-ok(checkPickup('15:00', at(5, 12)) === 'outside_hours', 'Friday 15:00 is past the early close: rejected');
+ok(checkPickup('12:00', at(5, 11)) === 'closed_day', 'Friday: rejected as a closed day');
 ok(checkPickup('nonsense', at(1, 12)) === 'malformed', 'malformed pickup time: rejected');
 ok(checkPickup('11:00', at(1, 14)) === 'in_the_past', 'three hours in the past: rejected');
 
@@ -129,8 +133,11 @@ head('5b. nextOpen');
     ok(monMorning?.inDays === 0 && monMorning.at === hm(9), 'Monday 08:00 -> opens today at 09:00 (not "Sunday")');
     const monEvening = nextOpen(at(1, 18));
     ok(monEvening?.inDays === 1 && monEvening.day === 2, 'Monday 18:00 -> opens tomorrow (Tuesday)');
-    const friEvening = nextOpen(at(5, 18));
-    ok(friEvening?.inDays === 2 && friEvening.day === 0, 'Friday evening -> skips Saturday, opens Sunday');
+    // The weekend is now two days, so Thursday evening has to count over both.
+    const thuEvening = nextOpen(at(4, 18));
+    ok(thuEvening?.inDays === 3 && thuEvening.day === 0, 'Thursday evening -> skips Fri AND Sat, opens Sunday');
+    const friNoon = nextOpen(at(5, 12));
+    ok(friNoon?.inDays === 2 && friNoon.day === 0, 'Friday -> opens Sunday');
     const satNoon = nextOpen(at(6, 12));
     ok(satNoon?.inDays === 1 && satNoon.day === 0, 'Saturday -> opens tomorrow (Sunday)');
     ok(nextOpen(at(1, 9))?.inDays === 1, 'once open, "next" is the following day, not now');
@@ -180,9 +187,13 @@ head('7. The closed message says something true');
     const monLate = closed(at(1, 18));
     ok(monLate.includes('מחר'), `Mon 18:00 -> "tomorrow" ("${monLate}")`);
 
-    // Friday evening skips Saturday.
-    const friLate = closed(at(5, 18));
-    ok(friLate.includes('ראשון'), `Fri 18:00 -> names Sunday ("${friLate}")`);
+    // The two-day weekend: Thursday evening and all of Friday must name Sunday,
+    // never "tomorrow". Getting this wrong sends someone to a shut shop.
+    const thuLate = closed(at(4, 18));
+    ok(thuLate.includes('ראשון'), `Thu 18:00 -> names Sunday ("${thuLate}")`);
+    const friNoonMsg = closed(at(5, 12));
+    ok(friNoonMsg.includes('ראשון'), `Fri 12:00 -> names Sunday ("${friNoonMsg}")`);
+    ok(!friNoonMsg.includes('מחר'), 'Fri 12:00 -> does not say "tomorrow" (that is Saturday)');
     ok(reopenLine(at(6, 12))?.includes('מחר') === true, 'Sat noon -> "tomorrow"');
 
     // A manual override must not invent a reopening time — nobody knows one.
@@ -246,9 +257,10 @@ head('8. Hours are Israel time wherever the code runs');
     ok(shopParts(israeliSaturday).day === 6, 'Sat 12:00 Israel reads as Saturday');
     ok(shopStatus(israeliSaturday).reason === 'closed_day', 'Israeli Saturday is the closed day');
 
-    // Friday's early close, on the shop's clock.
-    const fridayLate = new Date('2026-08-14T12:00:00Z'); // Fri 15:00 Israel, closes 14:00
-    ok(shopStatus(fridayLate).reason === 'after_close', 'Fri 15:00 Israel -> shut (closes 14:00)');
+    // The weekend is Israel's Friday and Saturday, on the shop's clock.
+    const israeliFriday = new Date('2026-08-14T09:00:00Z'); // Fri 12:00 Israel
+    ok(shopParts(israeliFriday).day === 5, 'Fri 12:00 Israel reads as Friday');
+    ok(shopStatus(israeliFriday).reason === 'closed_day', 'Israeli Friday is a closed day');
 
     // The offered slots and the server's check must still agree — now across
     // timezones rather than only within one process.
@@ -266,6 +278,55 @@ head('8. Hours are Israel time wherever the code runs');
             const p = shopParts(at(day, h, m));
             ok(p.day === day && p.mins === hm(h, m),
                 `at(${DAY_NAME[day]} ${toHHMM(hm(h, m))}) is that time in Israel (got ${DAY_NAME[p.day]} ${toHHMM(p.mins)})`);
+        }
+    }
+}
+
+// ── 9. No pre-ordering ──────────────────────────────────────────────────────
+// Owner's decision, 2026-08-11: orders are taken during trading hours only.
+//
+// Worth pinning rather than leaving implicit, because the code LOOKS like it
+// supports pre-orders — pickupSlots clamps its first slot to opening time,
+// which only does anything if someone can order before the shop opens. That
+// clamp is a boundary guard (so the 09:00 slot is not skipped by the lead time
+// at 08:59), and the rule it appears to contradict lives one file away in
+// POST /api/orders. Somebody will eventually read the clamp as permission.
+head('9. Orders are taken during trading hours only');
+{
+    // Outside hours the shop is shut, whatever the slot list would compute.
+    for (const [day, h, label] of [
+        [1, 7, 'two hours before opening'],
+        [1, 8, 'an hour before opening'],
+        [1, 17, 'an hour after closing'],
+        [1, 3, 'the middle of the night'],
+        [5, 12, 'Friday'],
+        [6, 12, 'Saturday'],
+    ] as [number, number, string][]) {
+        const now = at(day, h);
+        ok(!shopStatus(now).open, `${DAY_NAME[day]} ${toHHMM(hm(h))} (${label}) -> shop is shut, no order taken`);
+    }
+
+    // ...and open, it is genuinely open.
+    for (const h of [9, 12, 15, 16]) {
+        ok(shopStatus(at(1, h)).open, `Mon ${toHHMM(hm(h))} -> open`);
+    }
+
+    // Once trading starts it is the LEAD TIME that sets the first slot, not the
+    // clamp — the kitchen still needs its 15 minutes.
+    ok(!shopStatus(at(1, 8, 59)).open, 'Mon 08:59 -> still shut');
+    ok(pickupSlots(at(1, 9))[0]?.id === '09:15', 'Mon 09:00 -> first pickup is 09:15 (the 15min lead)');
+
+    // The clamp's real and only job, stated as the invariant it actually is:
+    // pickupSlots is a pure function and must never name a time before opening,
+    // whoever calls it and whenever. Unreachable while the no-pre-order rule
+    // holds — kept so the function stays correct on its own terms.
+    for (const day of [0, 1, 2, 3, 4]) {
+        const openMins = hoursFor(day).open!;
+        for (const hour of [0, 3, 7, 8, 9, 12, 15, 20, 23]) {
+            for (const slot of pickupSlots(at(day, hour, 30))) {
+                ok(parseHHMM(slot.id)! >= openMins,
+                    `${DAY_NAME[day]} ${toHHMM(hm(hour, 30))} -> slot ${slot.id} is not before opening`);
+            }
         }
     }
 }

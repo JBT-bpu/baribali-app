@@ -2,14 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 import { listDemoOrders } from '@/lib/demoStore';
 import { enforceRateLimit } from '@/lib/rateLimit';
+import { pickupSlots, SHOP_TZ } from '@/lib/shopHours';
 
 const SLOT_CAPACITY = 5;      // max orders per slot
-const SLOT_MINUTES = 5;       // slot size in minutes
-const LEAD_MINUTES_NORMAL = 15;
-const LEAD_MINUTES_PEAK = 25;
-const SLOTS_TO_SHOW = 12;
-const CLOSING_HOUR = 21;
-const TIMEZONE = 'Asia/Jerusalem';
+const TIMEZONE = SHOP_TZ;
 
 const WEEKDAY_INDEX: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
 
@@ -43,30 +39,20 @@ function getIsraelMidnightUTC(date: Date): Date {
     return new Date(guessUTC.getTime() - (hour * 60 + minute) * 60000);
 }
 
-function isPeakHour(h: number, m: number) {
-    return (h === 11 && m >= 45) || h === 12 || h === 13 || (h === 14 && m <= 30);
-}
-
-function generateSlotTimes(fromDate: Date): string[] {
-    const { weekday: day, hour: h, minute: m } = getIsraelDateParts(fromDate);
-
-    if (day === 6) return [];
-    if (day === 5 && h >= 16) return [];
-
-    const lead = isPeakHour(h, m) ? LEAD_MINUTES_PEAK : LEAD_MINUTES_NORMAL;
-    const firstMin = Math.ceil((h * 60 + m + lead) / SLOT_MINUTES) * SLOT_MINUTES;
-
-    const slots: string[] = [];
-    for (let i = 0; i < SLOTS_TO_SHOW; i++) {
-        const totalMins = firstMin + i * SLOT_MINUTES;
-        const sh = Math.floor(totalMins / 60);
-        const sm = totalMins % 60;
-        if (sh >= CLOSING_HOUR) break;
-        if (day === 5 && sh >= 16) break;
-        slots.push(`${String(sh).padStart(2, '0')}:${String(sm).padStart(2, '0')}`);
-    }
-    return slots;
-}
+/**
+ * This route used to carry its own opening hours — Saturday closed, Friday
+ * until 16:00, everything bounded by a CLOSING_HOUR of 21:00 — none of which
+ * matched the shop's actual schedule after it moved to five days, 9:00-16:00.
+ * It went stale silently because the customer's slot list is built from
+ * lib/shopHours and this endpoint only supplies the per-slot capacity counts,
+ * merged by id: extra slots were ignored and missing ones defaulted to
+ * available, so nothing looked wrong.
+ *
+ * That is precisely how the original mess happened — several copies of the
+ * hours in different files, drifting apart, with no single one authoritative.
+ * The times now come from pickupSlots, the same function the customer's picker
+ * and POST /api/orders both use.
+ */
 
 export async function GET(req: NextRequest) {
     // Generous — this is polled during checkout — but still bounded.
@@ -74,7 +60,8 @@ export async function GET(req: NextRequest) {
     if (limited) return limited;
 
     const now = new Date();
-    const slotTimes = generateSlotTimes(now);
+    const offered = pickupSlots(now);
+    const slotTimes = offered.map(s => s.id);
 
     if (slotTimes.length === 0) {
         return NextResponse.json({ slots: [], closed: true });
@@ -104,12 +91,8 @@ export async function GET(req: NextRequest) {
         if (o.pickup_time) counts[o.pickup_time] = (counts[o.pickup_time] || 0) + 1;
     });
 
-    const slots = slotTimes.map(time => {
+    const slots = offered.map(({ id: time, isPeak }) => {
         const booked = counts[time] || 0;
-        const isPeak = (() => {
-            const [sh, sm] = time.split(':').map(Number);
-            return isPeakHour(sh, sm);
-        })();
         return {
             time,
             booked,
