@@ -14,7 +14,7 @@
 import {
     WEEK, hm, toHHMM, parseHHMM, hoursFor, withinHours, isPeak,
     pickupSlots, checkPickup, shopStatus, nextOpen, LEAD_NORMAL, LEAD_PEAK, LATE_SUBMIT_GRACE,
-    closedMessage, reopenLine, noPickupMessage,
+    closedMessage, reopenLine, noPickupMessage, shopParts, SHOP_TZ,
 } from '../src/lib/shopHours.ts';
 
 let failed = 0;
@@ -24,9 +24,23 @@ const ok = (cond: boolean, msg: string) => {
 };
 const head = (s: string) => console.log(`\n${s}`);
 
-/** A local Date on a known weekday. 2026-08-09 is a Sunday. */
+/**
+ * An instant that reads as the given ISRAEL wall-clock time, whatever timezone
+ * this process is in. 2026-08-09 is a Sunday.
+ *
+ * It used to be `new Date(2026, 7, ...)` — the HOST's local time. That passed
+ * on the developer's Israel machine and would have passed just as happily on a
+ * UTC one while testing the wrong three hours of the day, which is exactly the
+ * bug this file exists to catch. Section 8 checks this helper itself.
+ */
 const SUNDAY = 9;
-const at = (weekday: number, h: number, m = 0) => new Date(2026, 7, SUNDAY + weekday, h, m, 0, 0);
+function at(weekday: number, h: number, m = 0): Date {
+    const guess = new Date(Date.UTC(2026, 7, SUNDAY + weekday, h, m, 0, 0));
+    let diff = shopParts(guess).mins - hm(h, m);
+    if (diff > 720) diff -= 1440;   // the guess landed on the previous day
+    if (diff < -720) diff += 1440;  // ...or the next one
+    return new Date(guess.getTime() - diff * 60000);
+}
 const DAY_NAME = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 // ── 1. The schedule the owner asked for ─────────────────────────────────────
@@ -197,6 +211,63 @@ head('7. The closed message says something true');
     const forcedMsg = noPickupMessage(forcedStatus, forced);
     ok(forcedMsg.includes('פתוח'), `forced open -> says open ("${forcedMsg}")`);
     ok(!forcedMsg.includes('נפתח מחר'), 'forced open -> does not tell them to come back tomorrow');
+}
+
+// ── 8. The shop's clock, not the server's ───────────────────────────────────
+// THE REGRESSION. shopHours read now.getDay()/getHours() — the clock of
+// whatever process it ran in — with a comment asserting that was Israel time on
+// both sides. On Vercel the server runs in UTC, three hours behind Israel in
+// summer: the shop would have refused every order from 09:00 to 12:00 Israel
+// (server still reading "before 09:00") and taken them until 19:00 (server
+// still reading "before 16:00"). Fixed instants below, so these assertions mean
+// the same thing on any machine.
+head('8. Hours are Israel time wherever the code runs');
+{
+    ok(SHOP_TZ === 'Asia/Jerusalem', `shop timezone is ${SHOP_TZ}`);
+    console.log(`  (this process is running in ${Intl.DateTimeFormat().resolvedOptions().timeZone})`);
+
+    // Summer, UTC+3.
+    const summerMorning = new Date('2026-08-11T07:00:00Z'); // Tue 10:00 Israel
+    const p1 = shopParts(summerMorning);
+    ok(p1.day === 2 && p1.mins === hm(10), `07:00Z in August -> Tue 10:00 Israel (got ${DAY_NAME[p1.day]} ${toHHMM(p1.mins)})`);
+    ok(shopStatus(summerMorning).open, '10:00 Israel on a Tuesday -> OPEN (was refused: server read 07:00)');
+
+    const summerEvening = new Date('2026-08-11T14:30:00Z'); // Tue 17:30 Israel
+    ok(shopStatus(summerEvening).reason === 'after_close', '17:30 Israel -> closed (was accepted: server read 14:30)');
+
+    // Winter, UTC+2 — the same code must not need a different constant.
+    const winterMorning = new Date('2026-01-13T07:00:00Z'); // Tue 09:00 Israel
+    const p2 = shopParts(winterMorning);
+    ok(p2.day === 2 && p2.mins === hm(9), `07:00Z in January -> Tue 09:00 Israel (got ${DAY_NAME[p2.day]} ${toHHMM(p2.mins)})`);
+    ok(shopStatus(winterMorning).open, 'DST handled: 09:00 Israel in winter is open too');
+
+    // The closed day is Israel's Saturday, not UTC's.
+    const israeliSaturday = new Date('2026-08-15T09:00:00Z'); // Sat 12:00 Israel
+    ok(shopParts(israeliSaturday).day === 6, 'Sat 12:00 Israel reads as Saturday');
+    ok(shopStatus(israeliSaturday).reason === 'closed_day', 'Israeli Saturday is the closed day');
+
+    // Friday's early close, on the shop's clock.
+    const fridayLate = new Date('2026-08-14T12:00:00Z'); // Fri 15:00 Israel, closes 14:00
+    ok(shopStatus(fridayLate).reason === 'after_close', 'Fri 15:00 Israel -> shut (closes 14:00)');
+
+    // The offered slots and the server's check must still agree — now across
+    // timezones rather than only within one process.
+    for (const iso of ['2026-08-11T06:30:00Z', '2026-08-11T09:15:00Z', '2026-01-13T08:00:00Z']) {
+        const now = new Date(iso);
+        for (const slot of pickupSlots(now)) {
+            ok(checkPickup(slot.id, now) === null, `${iso} -> offered slot ${slot.id} is acceptable`);
+        }
+    }
+
+    // The helper this whole file leans on: every constructed time really is the
+    // Israel wall clock it claims to be.
+    for (const day of [0, 1, 2, 3, 4, 5, 6]) {
+        for (const [h, m] of [[0, 0], [9, 0], [13, 45], [23, 55]] as [number, number][]) {
+            const p = shopParts(at(day, h, m));
+            ok(p.day === day && p.mins === hm(h, m),
+                `at(${DAY_NAME[day]} ${toHHMM(hm(h, m))}) is that time in Israel (got ${DAY_NAME[p.day]} ${toHHMM(p.mins)})`);
+        }
+    }
 }
 
 console.log(`\n  week: ${Object.entries(WEEK).map(([d, h]) =>

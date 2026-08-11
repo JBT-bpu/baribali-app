@@ -18,9 +18,52 @@
  * Opening hours are worth nothing if only the UI believes in them.
  *
  * Plain .ts with no imports so both sides — and the assertion harness — can use
- * it. Times are local shop time, which is the server's timezone on Vercel and
- * the browser's on the client; the app has always assumed Israel for both.
+ * it.
+ *
+ * ALL TIMES ARE ISRAEL LOCAL, DERIVED EXPLICITLY — never read off whatever
+ * clock the code happens to be running on. This file originally used
+ * `now.getDay()` / `now.getHours()`, with a comment claiming that was Israel
+ * time on both sides. It is not:
+ *
+ *   - On Vercel the server runs in UTC, three hours behind Israel in summer.
+ *     The shop would have refused every order between 09:00 and 12:00 Israel
+ *     (the server still reading "before 09:00") and accepted them until 19:00
+ *     (the server still reading "before 16:00"). src/app/api/slots/route.ts had
+ *     already hit this and converts via Intl — the warning was sitting in the
+ *     next file over.
+ *   - In the browser it is the customer's own timezone, so a phone set to
+ *     London showed Israeli opening hours on a London clock.
+ *
+ * Deriving the shop's timezone on both sides also makes them agree by
+ * construction, which is the property that matters: the slot list the customer
+ * picks from and the check the server applies can no longer drift apart.
  */
+
+export const SHOP_TZ = 'Asia/Jerusalem';
+
+const WEEKDAY_INDEX: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+
+/**
+ * The weekday and minute-of-day it is *in the shop*, whatever clock the caller
+ * is on. Intl carries the DST rules, so this stays right across the October and
+ * March switches without a table to maintain.
+ */
+export function shopParts(date: Date): { day: number; mins: Minutes } {
+    const fmt = new Intl.DateTimeFormat('en-US', {
+        timeZone: SHOP_TZ,
+        weekday: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+    });
+    const map: Record<string, string> = {};
+    for (const part of fmt.formatToParts(date)) map[part.type] = part.value;
+    return {
+        day: WEEKDAY_INDEX[map.weekday] ?? 0,
+        // Intl can report midnight as "24" rather than "00".
+        mins: hm(Number(map.hour) % 24, Number(map.minute)),
+    };
+}
 
 /** Minutes from midnight. 9:00 -> 540. */
 export type Minutes = number;
@@ -98,11 +141,10 @@ export function withinHours(day: number, mins: Minutes): boolean {
  * that no longer had anything to do with the shop's actual hours.
  */
 export function pickupSlots(now: Date): { id: string; label: string; isPeak: boolean }[] {
-    const day = now.getDay();
+    const { day, mins: nowMins } = shopParts(now);
     const { open, close } = hoursFor(day);
     if (open === null || close === null) return [];
 
-    const nowMins = hm(now.getHours(), now.getMinutes());
     const lead = isPeak(nowMins) ? LEAD_PEAK : LEAD_NORMAL;
     // Round up to the next 5-minute mark, and never earlier than opening.
     const first = Math.max(open, Math.ceil((nowMins + lead) / 5) * 5);
@@ -137,7 +179,7 @@ export interface ShopStatus {
 
 /** Schedule + override, resolved. Pure, so both sides and the harness agree. */
 export function shopStatus(now: Date, override: ShopOverride = null, note: string | null = null): ShopStatus {
-    const day = now.getDay();
+    const { day, mins: nowMins } = shopParts(now);
     const { open, close } = hoursFor(day);
     const opensAt = open === null ? null : toHHMM(open);
     const closesAt = close === null ? null : toHHMM(close);
@@ -148,7 +190,6 @@ export function shopStatus(now: Date, override: ShopOverride = null, note: strin
 
     if (open === null || close === null) return { open: false, reason: 'closed_day', note, opensAt, closesAt };
 
-    const nowMins = hm(now.getHours(), now.getMinutes());
     if (nowMins < open) return { open: false, reason: 'before_open', note, opensAt, closesAt };
     if (nowMins > close) return { open: false, reason: 'after_close', note, opensAt, closesAt };
     return { open: true, reason: 'open', note, opensAt, closesAt };
@@ -164,8 +205,7 @@ export function shopStatus(now: Date, override: ShopOverride = null, note: strin
  * Returns null only if no day of the week has hours at all.
  */
 export function nextOpen(now: Date): { inDays: number; day: number; at: Minutes } | null {
-    const today = now.getDay();
-    const nowMins = hm(now.getHours(), now.getMinutes());
+    const { day: today, mins: nowMins } = shopParts(now);
 
     for (let ahead = 0; ahead <= 7; ahead++) {
         const day = (today + ahead) % 7;
@@ -258,12 +298,11 @@ export function checkPickup(pickup: string | null | undefined, now: Date): Picku
     const mins = parseHHMM(pickup);
     if (mins === null) return 'malformed';
 
-    const day = now.getDay();
+    const { day, mins: nowMins } = shopParts(now);
     const { open, close } = hoursFor(day);
     if (open === null || close === null) return 'closed_day';
     if (mins < open || mins > close) return 'outside_hours';
 
-    const nowMins = hm(now.getHours(), now.getMinutes());
     if (mins < nowMins - LATE_SUBMIT_GRACE) return 'in_the_past';
 
     return null;
