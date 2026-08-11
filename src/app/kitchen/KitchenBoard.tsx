@@ -66,9 +66,16 @@ const CHECK_KEY = 'bb-kitchen-checks';
  *     bg    30% bright   mean 13.7   spread  9.2   default
  *     bg-b  42% bright   mean 14.8   spread 12.7   boldest
  *
- * All three sit near mean 14, so white text is comfortable on any of them —
- * what differs is how much the ground pulls at the eye, which is an attention
- * question, not a legibility one. ?bg=a / ?bg=b switch live.
+ * THOSE FIGURES WERE TAKEN AT THE OLD 0.80/0.86 SCRIM and are left as the
+ * record of that comparison — the scrim has since eased to 0.75/0.81, so the
+ * absolute numbers now read low. What they are actually used for survives the
+ * change: the ORDERING. Re-measured at the new scrim, a is still quietest and
+ * b still boldest, in both mean and variation, and all three still sit far
+ * enough below white for text to be comfortable on any of them (white against
+ * the brightest point of the default ground: 17.6:1, where AA wants 4.5).
+ *
+ * So the choice remains an attention question, not a legibility one.
+ * ?bg=a / ?bg=b switch live.
  */
 const KITCHEN_BG = '/kitchen-assets/bg.webp';
 
@@ -566,18 +573,24 @@ const K: Record<string, React.CSSProperties> = {
         // The owner's 16:9 brand plate, which happens to match the wall
         // tablet's aspect exactly. It is a photographic image with a bright
         // gold logo dead centre — i.e. directly behind the order header and the
-        // ingredient chips — so it is blurred and darkened hard before it gets
-        // anywhere near this screen. What survives is the shape of the brand,
-        // not detail that competes with text someone is reading under time
-        // pressure. The panels above it stay opaque for the same reason.
+        // ingredient chips — so it is darkened hard before it gets anywhere
+        // near this screen. (Not blurred: see the note at the top of the file.
+        // Darkening alone does the job, and the measurements are there.) What
+        // survives is the shape of the brand, not detail that competes with
+        // text someone is reading under time pressure. The panels above it stay
+        // opaque for the same reason, so this scrim only ever changes the
+        // ground — no text contrast rides on it.
         backgroundColor: '#050f06',
         // Layer order is top-first: gold pool, near-uniform scrim, then the
         // plate. The scrim is uniform on purpose — a gradient that reached full
         // opacity at the bottom made the image fade out down the screen, which
         // reads as a smudge rather than as a ground.
+        //
+        // Scrim eased by 5 points (was 0.80/0.86) at the owner's request, to
+        // let a little more of the plate through.
         backgroundImage: [
             'radial-gradient(ellipse 70% 45% at 50% 0%, rgba(200,168,78,0.08) 0%, transparent 70%)',
-            'linear-gradient(180deg, rgba(6,18,7,0.80) 0%, rgba(4,12,5,0.86) 100%)',
+            'linear-gradient(180deg, rgba(6,18,7,0.75) 0%, rgba(4,12,5,0.81) 100%)',
             `url(${KITCHEN_BG})`,
         ].join(', '),
         backgroundSize: 'cover, cover, cover',
