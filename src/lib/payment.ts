@@ -9,8 +9,14 @@
  * kitchen board, which only shows paid / pay_at_pickup / paid_unverified).
  */
 
-export function paymentProvider(): string {
-    return process.env.PAYMENT_PROVIDER ?? 'tranzila';
+export type PaymentProvider = 'hyp' | 'yaadpay' | 'tranzila';
+
+export function paymentProvider(): PaymentProvider {
+    const configured = (process.env.PAYMENT_PROVIDER ?? 'tranzila').trim().toLowerCase();
+    if (configured === 'hyp' || configured === 'yaadpay' || configured === 'tranzila') {
+        return configured;
+    }
+    throw new Error('PAYMENT_PROVIDER_INVALID');
 }
 
 /**
@@ -24,7 +30,6 @@ export function isPaymentConfigured(): boolean {
         case 'yaadpay':
             return !!(process.env.YAADPAY_MASOF && process.env.YAADPAY_PASSP);
         case 'tranzila':
-        default:
             // The .env.example ships a placeholder; treat that as unconfigured.
             return !!process.env.TRANZILA_TERMINAL && process.env.TRANZILA_TERMINAL !== 'your_terminal_name';
     }

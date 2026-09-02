@@ -22,14 +22,16 @@ Deployed on Vercel, auto-deploys from `main` (GitHub `JBT-bpu/baribali-app`, pri
 npm install
 npm run dev        # demo mode unless .env.local has real Supabase creds
 npm run build
-npx tsc --noEmit   # typecheck (no dedicated script)
+npm run typecheck
 npm run lint       # eslint .
+npm test           # focused payment foundation tests
+npm run check      # typecheck + lint + payment tests + production build
 npm run fresh      # rimraf .next && next dev — use if the dev cache corrupts
 ```
 
 - **Demo vs real mode** hinges on `isSupabaseConfigured()` in `src/lib/supabase.ts`. Without real creds the app is fully usable against an in-memory demo store (`src/lib/demoStore.ts`).
-- **Lint baseline: 0 errors / 17 warnings.** Hold that line — don't add warnings; the 17 are pre-existing (mostly `react-hooks/set-state-in-effect` and unused `no-img-element` disables).
-- **No test framework exists.** The safety net is git history + manual smoke-testing, so verify changes by actually running the affected flow.
+- **Lint baseline: 0 errors / 14 warnings.** Hold that line — don't add warnings; the 14 are pre-existing (mostly `react-hooks/set-state-in-effect` and unused `no-img-element` disables).
+- **Payment tests use Node's built-in test runner through pinned `tsx`.** Coverage is focused rather than app-wide, so manual smoke-testing remains required for affected UI flows.
 
 ## 4. Where things live
 
@@ -76,11 +78,13 @@ src/
 
 - **`TORTILLA_STEPS` is imported but never used.** `BariBaliBuilder` renders the salad step set for tortillas too, so a "tortilla" today = salad ingredients on a wrap base price (₪42). Tortilla orders are distinguished **only by base price**, not by their item ids (this is why `src/lib/reorder.ts` detects type from the base).
 - **`/kitchen` auth is live in production** — `KITCHEN_PASSWORD` is set on Vercel (verified: the deployed `/kitchen` renders the login screen and `/api/kitchen/orders` returns 401 anonymously). Unset locally = board runs open, which is the intended dev behaviour.
-- **Payment webhook has no signature verification** → confirmed payments land as `paid_unverified` (staff confirm at pickup) rather than `paid`. Blocked on a Hyp verification credential.
+- **Hyp uses its dedicated APISign VERIFY return route.** The generic Tranzila/YaadPay webhook still has no signature verification and can only produce `paid_unverified`; it explicitly refuses Hyp payloads. Do not enable Hyp server notifications until the test-terminal payload contract is obtained and implemented.
 - **`/privacy` and `/terms` are drafts** with `[bracketed]` business-detail placeholders that must be filled before launch.
 - **Rate limiting** (`src/lib/rateLimit.ts`) is in-memory/per-process — a deterrent, approximate on serverless (no shared store).
-- **No automated tests or CI** yet.
+- **No CI** yet; focused payment tests run locally with `npm test`.
 
 ## 8. Deeper reference
 
 `PROJECT_BRIEF.md` (repo root) has the full changelog, data model / `orders` schema, security posture, environment variables, and the current pending-actions list. `MENU_FLOW_BRIEF.md` maps every screen and flow in detail (untracked working doc).
+
+`PAYMENT_FOUNDATION.md` is the migration and Hyp test-terminal runbook. Read it before applying the payment migration or configuring callbacks.

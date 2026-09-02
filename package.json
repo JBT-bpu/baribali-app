@@ -7,7 +7,11 @@
         "fresh": "rimraf .next && next dev",
         "build": "next build",
         "start": "next start",
-        "lint": "eslint ."
+        "lint": "eslint .",
+        "typecheck": "tsc --noEmit",
+        "test": "npm run test:payment",
+        "test:payment": "tsx --test tests/payment/*.test.ts",
+        "check": "npm run typecheck && npm run lint && npm run test:payment && npm run build"
     },
     "dependencies": {
         "@supabase/supabase-js": "^2.99.2",
@@ -33,6 +37,7 @@
         "postcss": "^8.4.0",
         "rimraf": "^6.1.3",
         "tailwindcss": "^4.3.2",
+        "tsx": "4.23.13",
         "typescript": "^6.0.3"
     }
 }

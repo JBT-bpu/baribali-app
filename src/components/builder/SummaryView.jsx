@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useMemo, useState, useEffect } from "react";
+import { useCallback, useMemo, useState, useEffect, useRef } from "react";
 import { fireGoldConfetti } from "../../lib/confetti";
 
 function Icon({ src, size = "1.2em", style = {} }) {
@@ -141,6 +141,15 @@ import { useShopStatus } from "../../lib/useShopStatus";
 
 const DEMO_MODE = !isSupabaseConfigured();
 
+function freshPaymentKey() {
+    if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+    const bytes = globalThis.crypto.getRandomValues(new Uint8Array(16));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = [...bytes].map(value => value.toString(16).padStart(2, '0')).join('');
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 export default function SummaryView({ sels, total, all, comboBadges, notes, setNotes, onBack, onEdit, onNewOrder, base = BASE, sizeLabel = null }) {
     // Schedule + the live staff override. The server checks this again at POST
     // /api/orders and is the authority; this is so the screen stops pretending.
@@ -175,6 +184,10 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     const [submitting, setSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState("");
     const [autoDiscount, setAutoDiscount] = useState(null); // standing "tag" discount for signed-in customers
+    const [hasPendingPayment, setHasPendingPayment] = useState(false);
+    // Once the order exists, retries must reopen payment for that same order.
+    // Re-running POST /api/orders would create a second kitchen order.
+    const pendingPaymentRef = useRef(null);
 
     // Signed-in customers may have a standing discount assigned to their account
     // ("tag", e.g. an approved municipal worker's 10%). Fetch it so the shown
@@ -241,6 +254,65 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
         navigator.vibrate?.([30, 40, 30]);
     }, []);
 
+    const requestPaymentPage = async (pendingPayment) => {
+        const ctl = new AbortController();
+        const timeoutId = setTimeout(() => ctl.abort(), 20000);
+        try {
+            for (let attempt = 0; attempt < 2; attempt += 1) {
+                const response = await fetch('/api/payment/create', {
+                    method: 'POST',
+                    signal: ctl.signal,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        orderId: pendingPayment.orderId,
+                        idempotencyKey: pendingPayment.idempotencyKey,
+                    }),
+                });
+                const payload = await response.json().catch(() => null);
+                if (response.status === 202 && attempt === 0) {
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    continue;
+                }
+                return { response, payload, networkError: null };
+            }
+        } catch (error) {
+            return { response: null, payload: null, networkError: error };
+        } finally {
+            clearTimeout(timeoutId);
+        }
+        return { response: null, payload: null, networkError: null };
+    };
+
+    const launchPendingPayment = async (pendingPayment) => {
+        const { response, payload, networkError } = await requestPaymentPage(pendingPayment);
+
+        if (payload?.paymentUrl) {
+            window.location.href = payload.paymentUrl;
+            return;
+        }
+        if (payload?.code === 'PAYMENT_ALREADY_SETTLED') {
+            window.location.href = `/order/${encodeURIComponent(pendingPayment.orderId)}?payment=success`;
+            return;
+        }
+        if (payload?.code === 'PAYMENT_VERIFICATION_PENDING') {
+            window.location.href = `/order/${encodeURIComponent(pendingPayment.orderId)}?payment=verifying`;
+            return;
+        }
+        if (payload?.retryWithNewKey) {
+            // The server only permits a new key after the old initialization
+            // was closed before a checkout page could be returned.
+            pendingPayment.idempotencyKey = freshPaymentKey();
+        }
+
+        const message = networkError?.name === 'AbortError'
+            ? "ההזמנה נקלטה, אבל פתיחת התשלום נמשכה זמן רב מדי. לחצו שוב כדי לנסות את אותו תשלום."
+            : response?.status === 202
+                ? "ההזמנה נקלטה והתשלום עדיין נפתח. המתינו רגע ולחצו שוב."
+                : "ההזמנה נקלטה אך התשלום לא נפתח. לחצו שוב כדי לנסות, או פנו לקופה עם מספר ההזמנה "
+                    + (pendingPayment.orderNum ?? "");
+        failSubmit(message);
+    };
+
     const submitOrder = async (choiceOverride) => {
         if (submitting) return;        // a double-tap must not create two orders
         const choice = choiceOverride ?? paymentChoice;
@@ -250,6 +322,13 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
         setAcceptedOrder(null);
         if (navigator.vibrate) navigator.vibrate(isFailureTest ? [30, 40, 30] : [15, 40, 30]);
         if (!isFailureTest) setShowMixing(true);
+
+        // A previous click may already have created the order. In that case
+        // retry only the idempotent payment-page request for the same order.
+        if (pendingPaymentRef.current) {
+            await launchPendingPayment(pendingPaymentRef.current);
+            return;
+        }
 
         // A hung request never rejects, so without this the customer sat on the
         // mixing overlay indefinitely with no way out — a real outcome on a
@@ -320,19 +399,13 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
             // order is already pay-at-pickup (server set payAtPickup) — skip
             // the redirect and let the confirmation screen show.
             if (data.id && !data.demo && !data.payAtPickup) {
-                const payRes = await fetch('/api/payment/create', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ orderId: data.id }),
-                }).then(r => r.ok ? r.json() : null).catch(() => null);
-                if (payRes?.paymentUrl) {
-                    window.location.href = payRes.paymentUrl;
-                    return; // leaving the page — never accept the order here
-                }
-                // The order exists but we can't reach the gateway; it is on the
-                // board as pending, so send them to its status page rather than
-                // claim success here.
-                failSubmit("ההזמנה נקלטה אך התשלום לא נפתח. פנו לקופה עם מספר ההזמנה " + (data.orderNum ?? ""));
+                pendingPaymentRef.current = {
+                    orderId: data.id,
+                    orderNum: data.orderNum ?? null,
+                    idempotencyKey: freshPaymentKey(),
+                };
+                setHasPendingPayment(true);
+                await launchPendingPayment(pendingPaymentRef.current);
                 return;
             }
 
@@ -677,11 +750,11 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                     <BariButton
                         variant="primary"
                         fullWidth
-                        disabled={submitting || shopBlocked}
-                        style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif", opacity: (submitting || shopBlocked) ? 0.6 : 1 }}
+                        disabled={submitting || (shopBlocked && !hasPendingPayment)}
+                        style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif", opacity: (submitting || (shopBlocked && !hasPendingPayment)) ? 0.6 : 1 }}
                         onClick={() => submitOrder()}
                     >
-                        <span>{shopBlocked ? "סגור כרגע" : submitting ? "שולח…" : submitError ? "נסו שוב" : "שלח הזמנה"}</span>
+                        <span>{submitting ? "שולח…" : hasPendingPayment ? "פתח תשלום" : shopBlocked ? "סגור כרגע" : submitError ? "נסו שוב" : "שלח הזמנה"}</span>
                         <span style={S.orderBtnPrice}>₪{finalTotal}</span>
                     </BariButton>
                     {/* Consent disclosure — links open the legal docs before ordering */}

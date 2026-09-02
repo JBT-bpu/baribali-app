@@ -1,47 +1,52 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+
 import { verifyHypPayment } from '@/lib/hypPay';
+import { settleHypCallback } from '@/lib/hypSettlement';
+import { applyPaymentVerification, recordPaymentCallback } from '@/lib/paymentAttempts';
+import { enforceRateLimit } from '@/lib/rateLimit';
 
-/*
-  Configure this URL as the "success page" (and, per Hyp's own recommendation,
-  leave the error page on their default so codes like 700/800 for postponed/
-  two-phase transactions aren't misread as failures) in the Hyp Pay portal:
-  Settings -> "Payment Page and API" -> "Post-transaction address".
+function appOrigin(req: NextRequest): string {
+    const configured = process.env.NEXT_PUBLIC_APP_URL;
+    if (configured) {
+        try {
+            const url = new URL(configured);
+            if (url.protocol === 'https:' || url.protocol === 'http:') return url.origin;
+        } catch {
+            // Fall back to the URL Next.js constructed for this request.
+        }
+    }
+    return req.nextUrl.origin;
+}
 
-  Hyp redirects the customer's browser here with query params (Id, CCode,
-  Amount, Order, Sign, ...) after a transaction completes. Those params alone
-  aren't proof of anything — anyone could hit this URL with fabricated
-  values — so before trusting it, we call Hyp's VERIFY endpoint server-side
-  with the same params and only trust CCode=0 from *that* response.
-*/
+function redirect(req: NextRequest, orderId: string | null, payment: 'success' | 'verifying') {
+    const path = orderId ? `/order/${encodeURIComponent(orderId)}` : '/home2';
+    const target = new URL(path, appOrigin(req));
+    target.searchParams.set('payment', payment);
+    return NextResponse.redirect(target, 303);
+}
+
 export async function GET(req: NextRequest) {
-    const params = req.nextUrl.searchParams;
-    const orderNum = params.get('Order');
-    const origin = req.nextUrl.origin;
+    const limited = enforceRateLimit(req, 'hyp-browser-return', 30, 60_000);
+    if (limited) return limited;
 
-    if (!orderNum) {
-        return NextResponse.redirect(`${origin}/`);
+    try {
+        const settled = await settleHypCallback(
+            req.nextUrl.searchParams,
+            'browser_return',
+            {
+                verify: verifyHypPayment,
+                record: recordPaymentCallback,
+                apply: applyPaymentVerification,
+            },
+        );
+        return redirect(req, settled.orderId, settled.paid ? 'success' : 'verifying');
+    } catch (error) {
+        // A callback/database/VERIFY failure is ambiguous, never a decline.
+        // The durable event (when recording succeeded) remains available for
+        // reconciliation, and the order remains pending rather than failed.
+        console.error('[GET /api/payment/hyp/return] settlement deferred', {
+            name: error instanceof Error ? error.name : 'unknown',
+        });
+        return redirect(req, null, 'verifying');
     }
-
-    const { data: order } = await supabaseAdmin
-        .from('orders')
-        .select('id, payment_status')
-        .eq('order_num', orderNum)
-        .single();
-
-    if (!order) {
-        return NextResponse.redirect(`${origin}/`);
-    }
-
-    // Only transition orders still pending — don't let a repeat/replayed hit
-    // flip an order that's already been settled one way or the other.
-    if (order.payment_status === 'pending') {
-        const { verified } = await verifyHypPayment(params).catch(() => ({ verified: false, ccode: null }));
-        await supabaseAdmin
-            .from('orders')
-            .update({ payment_status: verified ? 'paid' : 'failed' })
-            .eq('id', order.id);
-    }
-
-    return NextResponse.redirect(`${origin}/order/${order.id}`);
 }

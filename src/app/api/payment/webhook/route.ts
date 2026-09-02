@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
+import { paymentProvider } from '@/lib/payment';
 
 /*
   Payment webhook — called by Tranzila/YaadPay after payment completes.
@@ -23,13 +24,21 @@ import { supabaseAdmin } from '@/lib/supabase';
 */
 
 export async function POST(req: NextRequest) {
+    const provider = paymentProvider();
+    if (provider === 'hyp') {
+        // Hyp's legacy notification payload is not documented publicly. Do not
+        // interpret it as Tranzila and settle an order on guessed fields.
+        return NextResponse.json({
+            ok: false,
+            error: 'Hyp notifications require the dedicated verified endpoint',
+        }, { status: 409 });
+    }
+
     const body = await req.text();
     const params = new URLSearchParams(body);
 
     // Tranzila sends: Response=000 (success), orderId=BB-XXXX, sum=<amount>
     // YaadPay sends:  CCode=000 (success), Order=BB-XXXX, Price=<amount in agorot>
-    const provider = process.env.PAYMENT_PROVIDER ?? 'tranzila';
-
     let orderNum: string | null = null;
     let success = false;
     let reportedAmount: number | null = null;
@@ -84,5 +93,11 @@ export async function POST(req: NextRequest) {
 
 // Some providers do a GET ping first
 export async function GET() {
+    if (paymentProvider() === 'hyp') {
+        return NextResponse.json({
+            ok: false,
+            error: 'Hyp notifications are not configured on this endpoint',
+        }, { status: 409 });
+    }
     return new NextResponse('OK', { status: 200 });
 }

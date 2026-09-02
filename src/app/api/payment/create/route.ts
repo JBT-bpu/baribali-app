@@ -1,64 +1,58 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+
 import { createHypPaymentUrl } from '@/lib/hypPay';
+import { PaymentStartError, startHypPayment } from '@/lib/hypPaymentStart';
+import {
+    claimPaymentAttempt,
+    finishPaymentInitialization,
+    PaymentPersistenceError,
+} from '@/lib/paymentAttempts';
+import { paymentProvider } from '@/lib/payment';
 import { enforceRateLimit } from '@/lib/rateLimit';
+import { supabaseAdmin } from '@/lib/supabase';
 
-/*
-──────────────────────────────────────────────────────────────
-  PAYMENT PROVIDER — set PAYMENT_PROVIDER in .env.local:
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-  PAYMENT_PROVIDER=tranzila   → Tranzila hosted page (most common in IL)
-  PAYMENT_PROVIDER=yaadpay    → YaadPay
-  PAYMENT_PROVIDER=hyp        → Hyp Pay (formerly YaadPay) — see src/lib/hypPay.ts
+function appOrigin(req: NextRequest): string {
+    const configured = process.env.NEXT_PUBLIC_APP_URL;
+    if (configured) {
+        try {
+            const url = new URL(configured);
+            if (url.protocol === 'https:' || url.protocol === 'http:') return url.origin;
+        } catch {
+            // Fall through to the request origin. Never trust the Origin header.
+        }
+    }
+    return req.nextUrl.origin;
+}
 
-  Tranzila/YaadPay redirect the customer to their hosted payment page and
-  pass success_url/fail_url per-request; after payment they redirect back to
-  /order/:id?payment=success|fail.
-
-  Hyp Pay is different: the success/error page URLs are configured ONCE in
-  the Hyp Pay portal (Settings -> "Payment Page and API" -> "Post-transaction
-  address"), not passed per-request. Point that setting at
-  /api/payment/hyp/return, which verifies the transaction server-side before
-  redirecting the customer on to /order/:id.
-──────────────────────────────────────────────────────────────
-*/
-
-const PROVIDER = process.env.PAYMENT_PROVIDER ?? 'tranzila';
-
-// ─── Tranzila ────────────────────────────────────────────────────
-// Docs: https://www.tranzila.com/developers
-// Credentials in .env.local:
-//   TRANZILA_TERMINAL=your_terminal_name
-function buildTranzilaUrl(orderId: string, orderNum: string, total: number, successUrl: string, failUrl: string) {
+function buildTranzilaUrl(orderNum: string, total: number, successUrl: string, failUrl: string) {
     const terminal = process.env.TRANZILA_TERMINAL;
-    if (!terminal) throw new Error('TRANZILA_TERMINAL not set');
+    if (!terminal) throw new Error('TRANZILA_NOT_CONFIGURED');
     const params = new URLSearchParams({
         supplier: terminal,
         sum: String(total),
-        currency: '1',              // 1 = ILS (₪)
-        tranmode: 'A',              // authorize + capture
+        currency: '1',
+        tranmode: 'A',
         orderId: orderNum,
         remarks: orderNum,
         success_url: successUrl,
         fail_url: failUrl,
-        noorder: '1',               // don't show order form
+        noorder: '1',
         lang: 'il',
     });
     return `https://secure5.tranzila.com/cgi-bin/tranzila71u.cgi?${params}`;
 }
 
-// ─── YaadPay ─────────────────────────────────────────────────────
-// Docs: https://yaadpay.docs.apiary.io/
-// Credentials: YAADPAY_MASOF, YAADPAY_PASSP
-function buildYaadPayUrl(orderId: string, orderNum: string, total: number, successUrl: string, failUrl: string) {
+function buildYaadPayUrl(orderNum: string, total: number, successUrl: string, failUrl: string) {
     const masof = process.env.YAADPAY_MASOF;
     const passp = process.env.YAADPAY_PASSP;
-    if (!masof || !passp) throw new Error('YAADPAY_MASOF / YAADPAY_PASSP not set');
+    if (!masof || !passp) throw new Error('YAADPAY_NOT_CONFIGURED');
     const params = new URLSearchParams({
         action: 'pay',
         Masof: masof,
         PassP: passp,
-        Price: String(total * 100), // agorot
+        Price: String(total * 100),
         Currency: '1',
         Order: orderNum,
         Info: `BariBali ${orderNum}`,
@@ -70,23 +64,89 @@ function buildYaadPayUrl(orderId: string, orderNum: string, total: number, succe
     return `https://icom.yaad.net/p/?${params}`;
 }
 
-// ─── Hyp Pay ─────────────────────────────────────────────────────
-// Docs: https://developers.hyp.co.il/pay/getting-started/creating-a-payment-page.md
-// Credentials: HYP_MASOF, HYP_KEY, HYP_PASSP (from the Hyp Pay portal —
-// Settings -> "Payment Page and API" -> "Verification" section)
-async function buildHypUrl(orderNum: string, total: number): Promise<string> {
-    return createHypPaymentUrl({ amount: total, orderNum, info: `BariBali ${orderNum}` });
+function startErrorResponse(error: PaymentStartError) {
+    const customerMessage = error.httpStatus === 202
+        ? 'Payment initialization is still in progress'
+        : error.code === 'PAYMENT_ALREADY_SETTLED'
+            ? 'Order already paid'
+            : error.code === 'PAYMENT_VERIFICATION_PENDING'
+                ? 'Payment verification is pending'
+                : 'Payment could not be initialized';
+    return NextResponse.json({
+        error: customerMessage,
+        code: error.code,
+        retryWithNewKey: error.retryWithNewKey,
+    }, { status: error.httpStatus });
 }
 
 export async function POST(req: NextRequest) {
     const limited = enforceRateLimit(req, 'payment-create', 12, 60_000);
     if (limited) return limited;
-    try {
-        const { orderId } = await req.json();
-        if (!orderId) return NextResponse.json({ error: 'Missing orderId' }, { status: 400 });
 
-        // Never trust a client-submitted total/orderNum — look up the server-computed
-        // values that were stored when the order was created.
+    let body: unknown;
+    try {
+        body = await req.json();
+    } catch {
+        return NextResponse.json({ error: 'Malformed request body' }, { status: 400 });
+    }
+
+    const orderId = typeof body === 'object' && body !== null && 'orderId' in body
+        ? String(body.orderId)
+        : '';
+    const idempotencyKey = typeof body === 'object' && body !== null && 'idempotencyKey' in body
+        ? String(body.idempotencyKey)
+        : '';
+
+    if (!UUID_PATTERN.test(orderId)) {
+        return NextResponse.json({ error: 'Invalid orderId' }, { status: 400 });
+    }
+
+    let provider: ReturnType<typeof paymentProvider>;
+    try {
+        provider = paymentProvider();
+    } catch {
+        return NextResponse.json({ error: 'Payment provider is not configured' }, { status: 503 });
+    }
+
+    if (provider === 'hyp') {
+        if (!UUID_PATTERN.test(idempotencyKey)) {
+            return NextResponse.json({ error: 'Invalid idempotencyKey' }, { status: 400 });
+        }
+
+        try {
+            const started = await startHypPayment({ orderId, idempotencyKey }, {
+                randomUUID: () => crypto.randomUUID(),
+                claim: claimPaymentAttempt,
+                finish: finishPaymentInitialization,
+                createUrl: createHypPaymentUrl,
+            });
+            return NextResponse.json(started);
+        } catch (error) {
+            if (error instanceof PaymentStartError) return startErrorResponse(error);
+            if (error instanceof PaymentPersistenceError) {
+                const status = error.code === 'P0002'
+                    ? 404
+                    : error.code === 'P0001' || error.code === '23505'
+                        ? 409
+                        : 503;
+                console.error('[POST /api/payment/create] payment persistence error', {
+                    operation: error.operation,
+                    code: error.code,
+                });
+                return NextResponse.json({
+                    error: status === 404 ? 'Order not found' : 'Payment could not be initialized',
+                    code: 'PAYMENT_PERSISTENCE_ERROR',
+                    retryWithNewKey: false,
+                }, { status });
+            }
+            console.error('[POST /api/payment/create] unexpected Hyp initialization error', {
+                name: error instanceof Error ? error.name : 'unknown',
+            });
+            return NextResponse.json({ error: 'Payment could not be initialized' }, { status: 503 });
+        }
+    }
+
+    try {
         const { data: order, error } = await supabaseAdmin
             .from('orders')
             .select('id, order_num, total, payment_status')
@@ -100,25 +160,23 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Order already paid' }, { status: 409 });
         }
 
-        const { order_num: orderNum, total } = order;
-
-        const origin = req.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001';
+        const origin = appOrigin(req);
         const successUrl = `${origin}/order/${orderId}?payment=success`;
-        const failUrl    = `${origin}/order/${orderId}?payment=failed`;
+        const failUrl = `${origin}/order/${orderId}?payment=failed`;
+        const paymentUrl = provider === 'yaadpay'
+            ? buildYaadPayUrl(order.order_num, order.total, successUrl, failUrl)
+            : buildTranzilaUrl(order.order_num, order.total, successUrl, failUrl);
 
-        let paymentUrl: string;
-        switch (PROVIDER) {
-            case 'yaadpay': paymentUrl = buildYaadPayUrl(orderId, orderNum, total, successUrl, failUrl); break;
-            case 'hyp':     paymentUrl = await buildHypUrl(orderNum, total); break;
-            default:        paymentUrl = buildTranzilaUrl(orderId, orderNum, total, successUrl, failUrl);
-        }
-
-        // Mark order as payment_pending
-        await supabaseAdmin.from('orders').update({ status: 'waiting', payment_status: 'pending' }).eq('id', orderId);
+        await supabaseAdmin
+            .from('orders')
+            .update({ status: 'waiting', payment_status: 'pending' })
+            .eq('id', orderId);
 
         return NextResponse.json({ paymentUrl });
-    } catch (err: any) {
-        console.error('[POST /api/payment/create]', err);
-        return NextResponse.json({ error: err.message || 'Payment init failed' }, { status: 500 });
+    } catch (error) {
+        console.error('[POST /api/payment/create] non-Hyp initialization error', {
+            name: error instanceof Error ? error.name : 'unknown',
+        });
+        return NextResponse.json({ error: 'Payment could not be initialized' }, { status: 500 });
     }
 }
