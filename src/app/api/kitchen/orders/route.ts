@@ -3,6 +3,7 @@ import { supabaseConfigurationState } from '@/lib/supabaseServerConfig';
 import { isKitchenAuthorized } from '@/lib/kitchenAuth';
 import { customerMap } from '@/lib/customerNames';
 import { listDemoOrders } from '@/lib/demoStore';
+import { shopDayBounds } from '@/lib/shopHours';
 import { loadSupabaseAdmin, supabaseConfigurationErrorResponse } from '@/lib/supabaseRoute';
 
 export async function GET(req: NextRequest) {
@@ -12,6 +13,7 @@ export async function GET(req: NextRequest) {
 
     const configuration = supabaseConfigurationState();
     if (configuration === 'misconfigured') return supabaseConfigurationErrorResponse();
+    const { startMs, endMs } = shopDayBounds();
     if (configuration === 'demo') {
         const demoStatuses = new Set([
             'paid',
@@ -20,13 +22,19 @@ export async function GET(req: NextRequest) {
             'no_payment_required',
         ]);
         const orders = listDemoOrders()
-            .filter(o => o.status !== 'collected' && demoStatuses.has(o.payment_status))
+            .filter(o => {
+                const createdAt = Date.parse(o.created_at);
+                return createdAt >= startMs
+                    && createdAt < endMs
+                    && o.status !== 'collected'
+                    && demoStatuses.has(o.payment_status);
+            })
             .sort((a, b) => (a.pickup_time ?? '').localeCompare(b.pickup_time ?? ''));
         return NextResponse.json(orders);
     }
 
-    const since = new Date();
-    since.setHours(0, 0, 0, 0); // today only
+    const since = new Date(startMs).toISOString();
+    const until = new Date(endMs).toISOString();
 
     let admin;
     try {
@@ -39,7 +47,8 @@ export async function GET(req: NextRequest) {
     const { data, error } = await admin
         .from('orders')
         .select('*')
-        .gte('created_at', since.toISOString())
+        .gte('created_at', since)
+        .lt('created_at', until)
         .neq('status', 'collected')
         .in('payment_status', [
             'paid',

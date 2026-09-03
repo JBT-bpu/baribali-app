@@ -6,7 +6,7 @@ import {
     isPaymentVerificationReturn,
     requiresHostedPayment,
 } from '../../src/lib/customerPayment';
-import { resolvePickupMoment } from '../../src/lib/shopHours';
+import { resolvePickupMoment, shopDayBounds } from '../../src/lib/shopHours';
 
 test('customer payment copy distinguishes verified, verifying, and still owed money', () => {
     assert.deepEqual(customerPaymentPresentation('paid'), {
@@ -111,4 +111,27 @@ test('pickup countdown anchors HH:MM to the Israel service date in every timezon
 
     assert.notEqual(resolvePickupMoment('12:20', '2028-02-29T07:00:00Z'), null,
         'February 29 remains valid in a leap year');
+});
+
+test('Israel service-day query bounds use real UTC offsets across seasons and DST', () => {
+    const summer = {
+        startMs: Date.parse('2026-09-02T21:00:00Z'),
+        endMs: Date.parse('2026-09-03T21:00:00Z'),
+    };
+    assert.deepEqual(shopDayBounds(new Date('2026-09-03T09:00:00Z')), summer,
+        'summer midnight is UTC+3');
+    assert.deepEqual(shopDayBounds(new Date('2026-09-02T21:30:00Z')), summer);
+    assert.deepEqual(shopDayBounds(new Date('2026-09-03T00:30:00Z')), summer,
+        'crossing UTC midnight must not change the Israel business day');
+    assert.deepEqual(shopDayBounds(new Date('2026-01-13T09:00:00Z')), {
+        startMs: Date.parse('2026-01-12T22:00:00Z'),
+        endMs: Date.parse('2026-01-13T22:00:00Z'),
+    }, 'winter midnight is UTC+2');
+
+    const spring = shopDayBounds(new Date('2026-03-27T12:00:00Z'));
+    assert.equal(spring.endMs - spring.startMs, 23 * 60 * 60 * 1000,
+        'the spring clock change produces a 23-hour Israel calendar day');
+    const autumn = shopDayBounds(new Date('2026-10-25T12:00:00Z'));
+    assert.equal(autumn.endMs - autumn.startMs, 25 * 60 * 60 * 1000,
+        'the autumn clock change produces a 25-hour Israel calendar day');
 });

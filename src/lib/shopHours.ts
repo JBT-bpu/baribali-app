@@ -337,6 +337,40 @@ function shopWallTimeToEpoch(
     return candidate;
 }
 
+export interface ShopDayBounds {
+    /** Inclusive Israel-local midnight, represented as a UTC epoch. */
+    startMs: number;
+    /** Exclusive next Israel-local midnight, represented as a UTC epoch. */
+    endMs: number;
+}
+
+/**
+ * UTC query bounds for the Israel calendar day containing `date`.
+ *
+ * A fixed +02:00/+03:00 offset is not safe across daylight-saving changes,
+ * and server-local midnight is UTC on Vercel. Resolve both wall-clock
+ * midnights through the same timezone-aware conversion used for pickups.
+ */
+export function shopDayBounds(date: Date = new Date()): ShopDayBounds {
+    const { year, month, calendarDay } = shopParts(date);
+    const nextCalendarDay = new Date(0);
+    nextCalendarDay.setUTCFullYear(year, month - 1, calendarDay + 1);
+    nextCalendarDay.setUTCHours(0, 0, 0, 0);
+
+    const startMs = shopWallTimeToEpoch(year, month, calendarDay, 0);
+    const endMs = shopWallTimeToEpoch(
+        nextCalendarDay.getUTCFullYear(),
+        nextCalendarDay.getUTCMonth() + 1,
+        nextCalendarDay.getUTCDate(),
+        0,
+    );
+
+    if (startMs === null || endMs === null || endMs <= startMs) {
+        throw new RangeError('Unable to resolve Israel service-day bounds');
+    }
+    return { startMs, endMs };
+}
+
 /**
  * Resolve a stored pickup value without consulting the phone's timezone.
  * HH:MM belongs to the Israel service date on which the order was created;

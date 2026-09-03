@@ -1,17 +1,22 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { NextRequest } from 'next/server';
 
+import { GET as getKitchenOrders } from '../../src/app/api/kitchen/orders/route';
 import { handoffActionLabel, paymentLabel } from '../../src/app/kitchen/types';
+import { createDemoOrder, resetDemoStore } from '../../src/lib/demoStore';
 import {
     checkPickup,
     mergePickupCapacity,
     PICKUP_SELECTION_INVALIDATED_MESSAGE,
     reconcilePickupChoice,
     resolvePickupSelection,
+    shopDayBounds,
     shopOverrideForTargetOpen,
     shopStatus,
 } from '../../src/lib/shopHours';
+import { isolateSupabaseTestEnvironment } from './testEnvironment';
 
 const kitchenOrdersRoute = readFileSync(new URL(
     '../../src/app/api/kitchen/orders/route.ts',
@@ -154,6 +159,41 @@ test('zero-charge orders remain visible on both kitchen data paths', () => {
         2,
         'demo and Supabase filters must both admit the truthful no-charge state',
     );
+});
+
+test('kitchen today is bounded by Israel midnights in demo and Supabase modes', () => {
+    assert.match(kitchenOrdersRoute, /const \{ startMs, endMs \} = shopDayBounds\(\)/);
+    assert.doesNotMatch(kitchenOrdersRoute, /\.setHours\(/,
+        'server-local midnight must not define the kitchen business day');
+    assert.match(kitchenOrdersRoute, /createdAt >= startMs[\s\S]*?createdAt < endMs/,
+        'demo orders must use the same Israel day as production');
+    assert.match(kitchenOrdersRoute, /\.gte\('created_at', since\)[\s\S]*?\.lt\('created_at', until\)/,
+        'the database query must use an inclusive start and exclusive next midnight');
+});
+
+test('demo kitchen includes the Israel-day start and excludes the next midnight', { concurrency: false }, async (t) => {
+    t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-09-03T09:00:00Z') });
+    const restoreEnvironment = isolateSupabaseTestEnvironment({
+        NEXT_PUBLIC_BARIBALI_DEMO_MODE: 'true',
+    });
+    try {
+        resetDemoStore();
+        const { startMs, endMs } = shopDayBounds();
+        const atStart = createDemoOrder({ items: [], total: 72, size: '1500', paymentStatus: 'pay_at_pickup' });
+        const beforeStart = createDemoOrder({ items: [], total: 72, size: '1500', paymentStatus: 'paid' });
+        const atEnd = createDemoOrder({ items: [], total: 72, size: '1500', paymentStatus: 'paid' });
+        atStart.created_at = new Date(startMs).toISOString();
+        beforeStart.created_at = new Date(startMs - 1).toISOString();
+        atEnd.created_at = new Date(endMs).toISOString();
+
+        const response = await getKitchenOrders(new NextRequest('http://localhost/api/kitchen/orders'));
+        assert.equal(response.status, 200);
+        const ids = (await response.json() as { id: string }[]).map(order => order.id);
+        assert.deepEqual(ids, [atStart.id], 'the kitchen day must be a half-open [start, end) interval');
+    } finally {
+        resetDemoStore();
+        restoreEnvironment();
+    }
 });
 
 test('the ready confirmation does not promise a notification channel that does not exist', () => {
