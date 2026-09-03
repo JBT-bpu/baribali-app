@@ -23,7 +23,8 @@ import { usePrefersReducedMotion } from '@/lib/motionHooks';
  *   /build  → <DropSettle/>  holds the veil until the page has painted, then
  *                            lifts it while the field is still slowing.
  *
- * Opacity only; disabled under reduced motion.
+ * Only the animated opacity transitions are disabled under reduced motion; the
+ * static full cover still masks an incomplete route while it loads.
  */
 
 /** The veil is opaque at this moment; the picker navigates just after. */
@@ -38,13 +39,16 @@ export const POUR_END = 520;
  */
 export const SWEEP = -1.2;
 
+/** Shared builder-side veil layer; loading status renders one layer above it. */
+export const BUILDER_VEIL_Z = 300;
+
 const VEIL = 'radial-gradient(ellipse 80% 70% at 50% 50%, #041204 0%, #020a02 100%)';
 
 /** Picker side: the veil closes as the field accelerates away. */
 export function DropPour() {
     const reducedMotion = usePrefersReducedMotion();
     return (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 200, pointerEvents: 'none' }}>
+        <div aria-hidden="true" style={{ position: 'fixed', inset: 0, zIndex: 200, pointerEvents: 'none' }}>
             <style>{KF}</style>
             <div style={{
                 position: 'absolute', inset: 0, background: VEIL,
@@ -61,7 +65,7 @@ export function DropPour() {
 /** The veil at full — used as the builder's Suspense fallback. */
 export function DropCover() {
     return (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 300, pointerEvents: 'none' }}>
+        <div aria-hidden="true" style={{ position: 'fixed', inset: 0, zIndex: BUILDER_VEIL_Z, pointerEvents: 'none' }}>
             <div style={{ position: 'absolute', inset: 0, background: VEIL }} />
         </div>
     );
@@ -76,7 +80,7 @@ export function DropSettle({ exiting = false }: { exiting?: boolean }) {
     const reducedMotion = usePrefersReducedMotion();
     if (reducedMotion) return null;
     return (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 300, pointerEvents: 'none' }}>
+        <div aria-hidden="true" style={{ position: 'fixed', inset: 0, zIndex: BUILDER_VEIL_Z, pointerEvents: 'none' }}>
             <style>{KF}</style>
             <div style={{
                 position: 'absolute', inset: 0, background: VEIL,

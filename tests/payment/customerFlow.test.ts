@@ -38,6 +38,14 @@ const builder = readFileSync(new URL(
     '../../src/components/builder/BariBaliBuilder.jsx',
     import.meta.url,
 ), 'utf8');
+const buildPage = readFileSync(new URL(
+    '../../src/app/build/page.tsx',
+    import.meta.url,
+), 'utf8');
+const bowlDrop = readFileSync(new URL(
+    '../../src/components/transition/BowlDrop.tsx',
+    import.meta.url,
+), 'utf8');
 
 test('customer order hand-off keeps its client-side source invariants', () => {
     const submitStart = summary.indexOf('const submitOrder = async');
@@ -333,4 +341,30 @@ test('chef recipes disclose their authoritative price before selection', () => {
         'assistive technology must receive the same price as sighted customers');
     assert.match(builder, /aria-controls=\{`chef-preset-\$\{p\.id\}`\}[\s\S]*?id=\{`chef-preset-\$\{ep\.id\}`\}/,
         'the expanded state must identify the recipe details it controls');
+});
+
+test('the pre-JavaScript builder fallback visibly and politely explains loading', () => {
+    assert.equal(buildPage.match(/role="status"/g)?.length, 1,
+        'the fallback must expose one loading announcement');
+    assert.match(buildPage, /role="status"[\s\S]*?aria-live="polite"[\s\S]*?aria-atomic="true"/);
+    assert.match(buildPage, /טוענים את בונה הסלט…/,
+        'a slow direct load must not look like an unexplained dark screen');
+    assert.doesNotMatch(buildPage, /role="alert"/,
+        'ordinary loading must not interrupt the customer as an alert');
+    assert.match(buildPage, /zIndex: BUILDER_VEIL_Z \+ 1/,
+        'the message must remain visible above the opaque transition veil');
+    assert.match(buildPage, /width: 'min\(240px, calc\(100vw - 32px\)\)'/,
+        'the message must fit a 320px phone and remain wrap-safe');
+    assert.match(buildPage, /padding: 'max\(16px, env\(safe-area-inset-top\)\)/,
+        'the fixed status must respect device safe areas');
+    assert.match(buildPage, /<Suspense fallback=\{<BuildLoadingFallback \/>\}>/,
+        'the explanatory state must be the actual Suspense fallback');
+
+    assert.match(bowlDrop, /export const BUILDER_VEIL_Z = 300/);
+    assert.match(bowlDrop, /export function DropCover\(\)[\s\S]*?<div aria-hidden="true" style=\{\{ position: 'fixed', inset: 0, zIndex: BUILDER_VEIL_Z, pointerEvents: 'none' \}\}/,
+        'the opaque cover must remain purely decorative and non-interactive');
+    assert.match(bowlDrop, /export function DropSettle[\s\S]*?if \(reducedMotion\) return null/,
+        'the animated settling veil must still disappear for reduced motion');
+    assert.match(bowlDrop, /animation: reducedMotion \? 'none' : `bbVeilIn/,
+        'the picker-side veil must still close instantly without animation for reduced motion');
 });

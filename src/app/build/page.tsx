@@ -4,7 +4,47 @@ import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import BariBaliBuilder from '@/components/builder/BariBaliBuilder';
 import GoldField from '@/components/ui/GoldField';
-import { DropSettle, DropCover, SWEEP } from '@/components/transition/BowlDrop';
+import { BUILDER_VEIL_Z, DropSettle, DropCover, SWEEP } from '@/components/transition/BowlDrop';
+
+function BuildLoadingFallback() {
+    return (
+        <div style={{ minHeight: '100dvh', background: '#020a02' }}>
+            <DropCover />
+            <div
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+                style={{
+                    position: 'fixed', inset: 0, zIndex: BUILDER_VEIL_Z + 1,
+                    pointerEvents: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxSizing: 'border-box', direction: 'rtl',
+                    padding: 'max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left))',
+                }}
+            >
+                <div style={{
+                    width: 'min(240px, calc(100vw - 32px))',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px',
+                    color: '#f5df88', textAlign: 'center',
+                    fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
+                }}>
+                    <div aria-hidden="true" style={{
+                        width: '44px', height: '44px', borderRadius: '50%', display: 'grid', placeItems: 'center',
+                        border: '1px solid rgba(240,208,96,0.7)',
+                        boxShadow: '0 0 24px rgba(200,168,50,0.24), inset 0 0 14px rgba(200,168,50,0.1)',
+                        fontSize: '20px', lineHeight: 1,
+                    }}>✦</div>
+                    <div aria-hidden="true" style={{
+                        width: '64px', height: '1px',
+                        background: 'linear-gradient(90deg, transparent, rgba(240,208,96,0.85), transparent)',
+                    }} />
+                    <span style={{ fontSize: '16px', lineHeight: 1.45, fontWeight: 800 }}>
+                        טוענים את בונה הסלט…
+                    </span>
+                </div>
+            </div>
+        </div>
+    );
+}
 
 function BuilderWithSize() {
     const searchParams = useSearchParams();
@@ -81,11 +121,7 @@ export default function BuildPage() {
     // Dark fallback matches the landing's portal-dive wash, so a slow load can't
     // flash a bright screen between the two pages.
     return (
-        <Suspense fallback={
-            <div style={{ minHeight: '100dvh', background: '#020a02' }}>
-                <DropCover />
-            </div>
-        }>
+        <Suspense fallback={<BuildLoadingFallback />}>
             <BuilderWithSize />
         </Suspense>
     );
