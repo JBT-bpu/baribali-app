@@ -292,3 +292,24 @@ test('builder size changes keep rendered, URL, history and reset state aligned',
         'change mode must reopen the shared picker on the current size');
     assert.match(builder, /initialSize=\{selectedSize \? SIZE_PARAM_BY_ML\[selectedSize\] : undefined\}/);
 });
+
+test('the builder step header remains usable on a narrow phone', () => {
+    const headerStart = builder.indexOf('Controls occupy their own row');
+    const headerEnd = builder.indexOf('{/* ── HERO BOWL CARD', headerStart);
+    assert.ok(headerStart >= 0 && headerEnd > headerStart);
+    const header = builder.slice(headerStart, headerEnd);
+
+    assert.match(header, /justifyContent: "space-between", minWidth: 0/,
+        'navigation controls must stay in a dedicated normal-flow row');
+    assert.match(header, /<h1[\s\S]*?flexWrap: "wrap"/,
+        'the step title must own a separate row and remain wrap-safe under text zoom');
+    assert.doesNotMatch(header, /position: "absolute"/,
+        'the title must not paint behind fixed-width controls');
+    assert.match(header, /disabled=\{all\.length === 0\}/,
+        'empty reset must be disabled for keyboard and pointer users alike');
+    assert.match(header, /<button type="button" onClick=\{back\}/);
+    assert.match(header, /<button type="button" onClick=\{next\}/);
+    assert.match(header, /role="group" aria-label=\{`שלבי ההרכבה, שלב/,
+        'interactive step buttons need a group rather than an ARIA progressbar that hides descendants');
+    assert.doesNotMatch(header, /role="progressbar"/);
+});

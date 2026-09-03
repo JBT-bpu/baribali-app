@@ -1045,19 +1045,25 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
             zIndex: 0,
             pointerEvents: "none"
           }} />
-          {/* Single compact header row: [→ ↺] · title (abs centered) · [←] */}
-          {/* No side padding — S.header already supplies the 16px gutter. This
-              row used to add another 10px on top of it, so the nav buttons sat
-              further in than the progress bar directly beneath them. */}
-          <div style={{ position: "relative", display: "flex", alignItems: "center", padding: "7px 0 4px" }}>
-            {/* Back + reset cluster — left */}
-            <div style={{ display: "flex", gap: "5px", flexShrink: 0, zIndex: 1 }}>
-              <button onClick={back} aria-label="חזור" style={S.navBtn}>→</button>
-              <button onClick={requestClearDraft} aria-label="נקה הכל" style={{ ...S.resetBtn, opacity: all.length > 0 ? 1 : 0.2, pointerEvents: all.length > 0 ? "auto" : "none" }}>↺</button>
+          {/* Controls occupy their own row. The title used to be absolutely
+              centred behind 3×44px controls, which guaranteed overlap at 320px
+              and under text zoom. */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", minWidth: 0, padding: "4px 0 2px" }}>
+            {/* Back + utility cluster — inline start */}
+            <div style={{ display: "flex", gap: "5px", flexShrink: 0 }}>
+              <button type="button" onClick={back} aria-label="חזור" style={S.navBtn}>→</button>
+              <button
+                type="button"
+                onClick={requestClearDraft}
+                aria-label="נקה הכל"
+                disabled={all.length === 0}
+                style={{ ...S.resetBtn, opacity: all.length > 0 ? 1 : 0.35, cursor: all.length > 0 ? "pointer" : "not-allowed" }}
+              >↺</button>
               {/* Sound toggle — rendered post-mount so the stored preference can't
                   cause a hydration mismatch. */}
               {mounted && (
                 <button
+                  type="button"
                   onClick={toggleSound}
                   aria-label={soundOn ? "כבה צלילים" : "הפעל צלילים"}
                   aria-pressed={soundOn}
@@ -1067,28 +1073,35 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                 </button>
               )}
             </div>
-            {/* Step title — truly centered over the full row, single line */}
-            <div style={{ position: "absolute", left: 0, right: 0, textAlign: "center", pointerEvents: "none" }}>
-              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: "5px", whiteSpace: "nowrap" }}>
-                <span style={{ fontSize: "clamp(15px, 4.5vw, 22px)" }}>{cur.emoji}</span>
-                <span style={{ fontFamily: "var(--font-display), 'Secular One', sans-serif", fontSize: "clamp(16px, 4.8vw, 23px)", color: "#ffffff", textShadow: "0 2px 6px rgba(0,0,0,0.6)" }}>{cur.title}</span>
-                {cur.subtitle && <>
-                  <span style={{ fontSize: "clamp(11px, 3vw, 14px)", color: "rgba(255,255,255,0.3)", fontWeight: 400 }}>·</span>
-                  <span style={{ fontSize: "clamp(11px, 3vw, 14px)", fontWeight: 700, color: "rgba(255,255,255,0.65)" }}>{cur.subtitle}</span>
-                </>}
-              </div>
-            </div>
-            {/* Spacer */}
-            <div style={{ flex: 1 }} />
-            {/* Next — right */}
-            <button onClick={next} aria-label="המשך" style={{ ...S.navBtnNext, flexShrink: 0, zIndex: 1 }}>←</button>
+            {/* Next — inline end */}
+            <button type="button" onClick={next} aria-label="המשך" style={{ ...S.navBtnNext, flexShrink: 0 }}>←</button>
           </div>
 
+          {/* A normal-flow heading gets the full width and can wrap at 200%
+              text zoom without painting beneath any controls. */}
+          <h1
+            aria-live="polite"
+            aria-atomic="true"
+            style={{
+              margin: 0, padding: "1px 4px 5px", minWidth: 0,
+              display: "flex", alignItems: "baseline", justifyContent: "center", flexWrap: "wrap",
+              gap: "4px 5px", textAlign: "center", lineHeight: 1.15, pointerEvents: "none",
+            }}
+          >
+            <span style={{ fontSize: "clamp(15px, 4.5vw, 22px)" }} aria-hidden="true">{cur.emoji}</span>
+            <span style={{ fontFamily: "var(--font-display), 'Secular One', sans-serif", fontSize: "clamp(16px, 4.8vw, 23px)", color: "#ffffff", textShadow: "0 2px 6px rgba(0,0,0,0.6)" }}>{cur.title}</span>
+            {cur.subtitle && <>
+              <span style={{ fontSize: "clamp(11px, 3vw, 14px)", color: "rgba(255,255,255,0.5)", fontWeight: 400 }} aria-hidden="true">·</span>
+              <span style={{ fontSize: "clamp(11px, 3vw, 14px)", fontWeight: 700, color: "rgba(255,255,255,0.72)" }}>{cur.subtitle}</span>
+            </>}
+          </h1>
+
           {/* Tappable progress segments */}
-          <div style={{ ...S.progressRow, alignItems: "center" }} role="progressbar" aria-valuemin={0} aria-valuemax={steps.length - 1} aria-valuenow={step} aria-label={`שלב ${step + 1} מתוך ${steps.length}`}>
+          <div style={{ ...S.progressRow, alignItems: "center" }} role="group" aria-label={`שלבי ההרכבה, שלב ${step + 1} מתוך ${steps.length}`}>
             {steps.map((s, i) => (
               <button
                 key={s.id}
+                type="button"
                 onClick={() => { if (i <= step + 1) goTo(i); }}
                 disabled={i > step + 1}
                 aria-label={`${s.title}${i < step ? " - הושלם" : i === step ? " - נוכחי" : i === step + 1 ? " - הבא" : " - לא זמין"}`}
