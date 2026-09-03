@@ -24,8 +24,9 @@ project.
 - A durably recorded callback whose VERIFY call fails remains
   `verification_pending`. If callback recording itself fails, no event is
   durable and the database state remains unchanged. The current fallback
-  redirects to `/home2?payment=verifying`, but `/home2` does not yet render
-  that hint. Neither case is treated as a decline.
+  redirects to `/home2?payment=verifying`, where the customer is warned not to
+  pay again and to contact the register if the order is missing. Neither case
+  is treated as a decline.
 - `needs_review` is sticky across callback replays and transient VERIFY
   failures. A later approved VERIFY may still settle it after all consistency
   checks pass.
