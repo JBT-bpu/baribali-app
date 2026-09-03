@@ -266,8 +266,12 @@ test('the home hero roster is a keyboard-complete mobile choice', () => {
     const confirmStart = heroSelector.indexOf('const confirmChoice', cardTapStart);
     assert.notEqual(cardTapStart, -1);
     assert.ok(confirmStart > cardTapStart);
-    assert.doesNotMatch(heroSelector.slice(cardTapStart, confirmStart), /confirmChoice/,
-        'tapping the active hero must not bypass the explicit CTA');
+    assert.match(heroSelector.slice(cardTapStart, confirmStart), /if \(!HEROES\[i\]\.locked\) confirmChoice\(\)/,
+        'the active orderable card must remain a direct route when the CTA is below a short viewport');
+    assert.match(heroSelector, /@media \(max-height: 640px\)[\s\S]*?\.hero-selector__stage[\s\S]*?height: 228px !important[\s\S]*?\.hero-selector__card[\s\S]*?height: 220px !important[\s\S]*?\.hero-selector__pips \{ display: none !important; \}/,
+        'the active card must clear the persistent dock on short phones');
+    assert.match(heroSelector, /@media \(max-height: 560px\)[\s\S]*?\.hero-selector__prompt-hint \{ display: none !important; \}[\s\S]*?\.hero-selector__stage \{ height: 144px !important[\s\S]*?\.hero-selector__card[\s\S]*?height: 140px !important/,
+        'extra-short phones must collapse the hero further above the dock');
 
     assert.match(heroSelector, /src=\{hero\.img\} alt="" aria-hidden/,
         'decorative card artwork must not duplicate each button name');
@@ -354,6 +358,14 @@ test('the builder step header remains usable on a narrow phone', () => {
     assert.match(header, /role="group" aria-label=\{`שלבי ההרכבה, שלב/,
         'interactive step buttons need a group rather than an ARIA progressbar that hides descendants');
     assert.doesNotMatch(header, /role="progressbar"/);
+    assert.match(header, /flex: 1, minWidth: 0, minHeight: "44px"/,
+        'all five progress controls must shrink without clipping and retain a full touch target');
+    assert.match(builder, /@media \(max-width: 349px\)[\s\S]*?\.builder-progress-label \{ display:none !important; \}/,
+        'narrow phones must be able to hide visual labels while retaining each aria-label');
+    assert.match(builder, /target\.closest\([\s\S]*?\[data-horizontal-scroll\]/,
+        'step swipes must ignore controls and horizontally scrolling regions');
+    assert.doesNotMatch(builder, /onChipTouchStart|onChipTouchEnd|longPressRef/,
+        'the visible info control must not be shadowed by a long-press that also fires selection');
 });
 
 test('chef recipes disclose their authoritative price before selection', () => {
@@ -375,6 +387,12 @@ test('chef recipes disclose their authoritative price before selection', () => {
         'assistive technology must receive the same price as sighted customers');
     assert.match(builder, /aria-controls=\{`chef-preset-\$\{p\.id\}`\}[\s\S]*?id=\{`chef-preset-\$\{ep\.id\}`\}/,
         'the expanded state must identify the recipe details it controls');
+    assert.match(builder, /expandedPresetRef\.current[\s\S]*?scrollIntoView\(\{ block: "center" \}\)[\s\S]*?panel\.focus/,
+        'recipe details below the grid must be brought into view and focused after expansion');
+    assert.match(builder, /closeExpandedPreset[\s\S]*?presetButtonRefs\.current\.get\(presetId\)\?\.focus/,
+        'closing recipe details must return focus to the disclosure button');
+    assert.match(builder, /const gesture = touchRef\.current;[\s\S]*?touchRef\.current = \{ x: 0, y: 0, t: 0, ignored: true \}/,
+        'each swipe must be consumed so controls cannot reuse stale touch coordinates');
 });
 
 test('the pre-JavaScript builder fallback visibly and politely explains loading', () => {
@@ -533,6 +551,11 @@ test('the customer dock is persistent, semantic and keyboard-complete', () => {
         'order status navigation must not regress to a pointer-only div');
     assert.match(ordersPage, /<h1[\s\S]*?ההזמנות שלי<\/h1>/);
     assert.match(profilePage, /<h1[\s\S]*?האזור שלי<\/h1>/);
+    assert.match(heroSelector, /@media \(max-height: 640px\)/,
+        'the home roster must reserve a compact short-phone mode for the fixed dock');
+    assert.match(ordersPage, /background: 'linear-gradient\(to bottom,[\s\S]*?url\(\/homepage-assets\/BG_8K\.webp\)/,
+        'guest copy needs a dark image veil rather than an opaque photo over a fallback gradient');
+    assert.match(profilePage, /background: 'linear-gradient\(to bottom,[\s\S]*?url\(\/homepage-assets\/BG_8K\.webp\)/);
 });
 
 test('checkout controls stay truthful, stateful and touchable in demo mode', () => {
@@ -554,6 +577,16 @@ test('checkout controls stay truthful, stateful and touchable in demo mode', () 
         'the local-only failure path must stay behind the production guard');
     assert.match(summary, /aria-busy=\{submitting\}/,
         'the primary order action must expose its in-flight state');
+    assert.match(summary, /<h1[\s\S]*?>ההזמנה שלכם<\/h1>/,
+        'checkout must expose its page title as a real heading');
+    assert.match(summary, /aria-controls="pickup-time-picker"[\s\S]*?pickupFooterLabel/,
+        'the persistent footer must give customers a route back to the buried pickup picker');
+    assert.match(summary, /id="pickup-time-picker" role="region" tabIndex=\{-1\} aria-labelledby="pickup-time-picker-title"/,
+        'the labelled pickup region must accept programmatic focus after the footer shortcut');
+    assert.match(summary, /padding: "12px 16px max\(18px, env\(safe-area-inset-bottom\)\)"/,
+        'checkout actions and legal copy must clear the iPhone home indicator');
+    assert.equal(summary.match(/target="_blank" rel="noopener noreferrer" aria-label="[^"]+\(נפתח(?:ת)? בלשונית חדשה\)"/g)?.length, 3,
+        'legal documents must open without destroying the in-progress checkout state');
 
     assert.doesNotMatch(summary, /\* \{ -webkit-tap-highlight-color:transparent; box-sizing:border-box; margin:0; padding:0; \}/,
         'the summary must not override Tailwind button padding with an unlayered reset');

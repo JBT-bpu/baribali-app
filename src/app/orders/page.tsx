@@ -27,7 +27,7 @@ const STATUS_HE: Record<string, string> = {
 
 const bg: React.CSSProperties = {
     minHeight: '100dvh',
-    background: 'url(/homepage-assets/BG_8K.webp) center top / cover no-repeat, linear-gradient(155deg, #030a03 0%, #071a07 30%, #0a200a 60%, #071a07 100%)',
+    background: 'linear-gradient(to bottom, rgba(0,0,0,0.42) 0%, rgba(1,8,1,0.68) 55%, rgba(2,10,2,0.88) 100%), url(/homepage-assets/BG_8K.webp) center top / cover no-repeat',
     fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
     direction: 'rtl', position: 'relative', overflow: 'hidden',
 };
@@ -69,7 +69,7 @@ export default function OrdersPage() {
 
     if (loading) {
         return <div style={{ ...bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '14px', fontWeight: 600 }}>טוען…</span>
+            <span style={{ color: 'rgba(255,255,255,0.62)', fontSize: '14px', fontWeight: 600 }}>טוען…</span>
             <BariBottomNav />
         </div>;
     }
@@ -82,7 +82,7 @@ export default function OrdersPage() {
                 <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', maxWidth: '320px', width: '100%' }}>
                     <div style={{ fontSize: '48px' }}>📋</div>
                     <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 900, color: '#fff' }}>ההזמנות שלי</h1>
-                    <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.55)', textAlign: 'center', lineHeight: 1.7 }}>
+                    <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.74)', textAlign: 'center', lineHeight: 1.7 }}>
                         התחברו כדי לראות את היסטוריית ההזמנות ולהזמין שוב בלחיצה.
                         <br />להזמין אפשר תמיד גם בלי חשבון.
                     </div>

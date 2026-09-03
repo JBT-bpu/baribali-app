@@ -102,7 +102,14 @@ export default function HeroSelector({ onChooseSalad, onNudge, onActiveChange }:
         // Pointer clicks follow pointerup after a swipe. Keyboard activation has
         // detail=0, so it must remain available even after a dragged gesture.
         if (moved.current && event.detail !== 0) return;
-        if (i !== activeIdx) go(i, i > activeIdx ? 1 : -1);
+        if (i !== activeIdx) {
+            go(i, i > activeIdx ? 1 : -1);
+            return;
+        }
+        // On short phones the explanatory panel sits below the first viewport.
+        // The active, visibly tappable card is therefore also a direct route to
+        // its action instead of becoming a dead tap.
+        if (!HEROES[i].locked) confirmChoice();
     };
 
     const confirmChoice = () => {
@@ -122,17 +129,18 @@ export default function HeroSelector({ onChooseSalad, onNudge, onActiveChange }:
     const active = HEROES[activeIdx];
 
     return (
-        <div style={{ ...S.wrap, animation: reducedMotion ? 'none' : S.wrap.animation }}>
+        <div className="hero-selector" style={{ ...S.wrap, animation: reducedMotion ? 'none' : S.wrap.animation }}>
             <style>{KF}</style>
 
             <h1 id="hero-selector-title" style={S.promptTitle}>בחרו את המנה שלכם</h1>
-            <p id="hero-selector-hint" style={S.promptHint}>החליקו · השתמשו בחצים · או לחצו על מנה מהצד</p>
+            <p className="hero-selector__prompt-hint" id="hero-selector-hint" style={S.promptHint}>החליקו · השתמשו בחצים · או לחצו על מנה מהצד</p>
 
             {/* Coverflow stage */}
             <div
                 role="group"
                 aria-labelledby="hero-selector-title"
                 aria-describedby="hero-selector-hint"
+                className="hero-selector__stage"
                 style={S.stage}
                 onKeyDown={handleStageKeyDown}
                 onPointerDown={onDown}
@@ -165,12 +173,13 @@ export default function HeroSelector({ onChooseSalad, onNudge, onActiveChange }:
 
                     return (
                         <button
+                            className="hero-selector__card"
                             key={hero.id}
                             ref={element => { cardRefs.current[i] = element; }}
                             type="button"
                             aria-pressed={isActive}
                             aria-hidden={hidden || undefined}
-                            aria-label={`${hero.title}, ${hero.locked ? 'בקרוב' : 'זמין עכשיו'}${isActive ? ', נבחרה' : ''}`}
+                            aria-label={`${hero.title}, ${hero.locked ? 'בקרוב' : 'זמין עכשיו'}${isActive ? hero.locked ? ', נבחרה' : ', נבחרה — לחצו לבחירת גודל' : ''}`}
                             tabIndex={isActive ? 0 : -1}
                             onClick={event => handleCardTap(i, event)}
                             style={{
@@ -244,7 +253,7 @@ export default function HeroSelector({ onChooseSalad, onNudge, onActiveChange }:
             </div>
 
             {/* Pips */}
-            <div role="group" aria-label="מעבר מהיר בין מנות" style={S.pips}>
+            <div className="hero-selector__pips" role="group" aria-label="מעבר מהיר בין מנות" style={S.pips}>
                 {/* The dot stays small, but every shortcut keeps a full 44px
                     touch target and exposes the currently previewed choice. */}
                 {HEROES.map((h, i) => (
@@ -317,4 +326,15 @@ const KF = `
 @keyframes heroIn { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:none} }
 @keyframes heroSheen { from{transform:translateX(-160%) skewX(-16deg)} to{transform:translateX(300%) skewX(-16deg)} }
 @keyframes heroRim { 0%{box-shadow:inset 0 0 0 1px rgba(240,200,50,0)} 45%{box-shadow:inset 0 0 20px 1px rgba(240,200,50,0.5)} 100%{box-shadow:inset 0 0 0 1px rgba(240,200,50,0)} }
+@media (max-height: 640px) {
+  .hero-selector__stage { height: 228px !important; margin-top: 2px !important; }
+  .hero-selector__card { width: 162px !important; height: 220px !important; margin-left: -81px !important; margin-top: -110px !important; }
+  .hero-selector__prompt-hint { margin-top: 1px !important; font-size: 11px !important; }
+  .hero-selector__pips { display: none !important; }
+}
+@media (max-height: 560px) {
+  .hero-selector__prompt-hint { display: none !important; }
+  .hero-selector__stage { height: 144px !important; margin-top: 0 !important; }
+  .hero-selector__card { width: 103px !important; height: 140px !important; margin-left: -51.5px !important; margin-top: -70px !important; }
+}
 `;

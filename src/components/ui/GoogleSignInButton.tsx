@@ -48,7 +48,7 @@ export default function GoogleSignInButton({ fullWidth = false, label = 'המש�
                 {busy ? 'רגע…' : label}
             </button>
             {!available && (
-                <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>
+                <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.62)', fontWeight: 600 }}>
                     התחברות תהיה זמינה בקרוב
                 </span>
             )}

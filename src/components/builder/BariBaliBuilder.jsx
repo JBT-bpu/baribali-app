@@ -39,7 +39,7 @@ const TORTILLA_MAX = INGREDIENT_PICK_LIMIT.tortilla;
   ALL 12 IMPROVEMENTS INTEGRATED:
   ✅ 1.  Bowl tap-to-remove (tap any bowl item to delete it)
   ✅ 2.  Step jump (tap progress dots to navigate)
-  ✅ 3.  Long-press detail + quantity toggle
+  ✅ 3.  Explicit ingredient-detail control + quantity toggle
   ✅ 4.  Swipe between steps
   ✅ 5.  Smart empty states per step
   ✅ 6.  Haptic feedback everywhere
@@ -338,12 +338,12 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
   const [detailCtx, setDetailCtx] = useState(null); // { item, stepId, maxPicks }
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [draftNotice, setDraftNotice] = useState(false);
-  // The long-press hint used to reappear on every single mount, forever —
+  // The ingredient-info hint used to reappear on every single mount, forever —
   // a returning customer on their twentieth order still lost 78px at the top of
   // the list to instructions they learned months ago. Once dismissed, it stays
   // dismissed. Lazy initialiser so the read happens once, not on every render.
-  const [showLongPressHint, setShowLongPressHint] = useState(() => !readHintSeen());
-  const dismissHint = useCallback(() => { setShowLongPressHint(false); markHintSeen(); }, []);
+  const [showInfoHint, setShowInfoHint] = useState(() => !readHintSeen());
+  const dismissHint = useCallback(() => { setShowInfoHint(false); markHintSeen(); }, []);
   const [priceFlash, setPriceFlash] = useState(null);
   const activeBase = isTortilla ? effectiveBase('tortilla') : (selectedSize ? effectiveSizePrice(selectedSize) : effectiveBase('salad'));
   const presetResolutions = useMemo(() => isTortilla
@@ -354,7 +354,30 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
   const [activeAnchor, setActiveAnchor] = useState(0);
   const [notes, setNotes] = useState("");
   const [expandedPreset, setExpandedPreset] = useState(null);
+  const expandedPresetRef = useRef(null);
+  const presetButtonRefs = useRef(new Map());
   const [bowlAnim, setBowlAnim] = useState(null);
+
+  const closeExpandedPreset = useCallback((presetId) => {
+    setExpandedPreset(null);
+    requestAnimationFrame(() => {
+      presetButtonRefs.current.get(presetId)?.focus({ preventScroll: true });
+    });
+  }, []);
+
+  // Recipe details render after the grid. On a short phone that can be well
+  // below the tapped card, so bring the revealed panel into view and move focus
+  // to the content the button announced through aria-controls.
+  useEffect(() => {
+    if (!expandedPreset) return;
+    const frame = requestAnimationFrame(() => {
+      const panel = expandedPresetRef.current;
+      if (!panel) return;
+      panel.scrollIntoView({ block: "center" });
+      panel.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [expandedPreset]);
 
   // App Router can reuse this component when browser Back/Forward changes only
   // the query string. Keep the eager local value aligned with that committed
@@ -393,8 +416,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
     fetch(file).then(r => r.json()).then(setBowlAnim).catch(() => {});
   }, [isTortilla]);
   const scrollRef = useRef(null);
-  const touchRef = useRef({ x: 0, y: 0, t: 0 });
-  const longPressRef = useRef(null);
+  const touchRef = useRef({ x: 0, y: 0, t: 0, ignored: false });
   const sgRefs = useRef([]);
 
   useEffect(() => { setTimeout(() => setAnim(null), 500); }, []);
@@ -404,7 +426,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
   // it appears until it has been seen once, and then never again.
   useEffect(() => {
     if (step !== 0 || readHintSeen()) return;
-    setShowLongPressHint(true);
+    setShowInfoHint(true);
     const t = setTimeout(dismissHint, 15000);
     return () => clearTimeout(t);
   }, [step, dismissHint]);
@@ -637,12 +659,21 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
 
   // ─── Swipe detection ───
   const onTouchStart = useCallback((e) => {
-    touchRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() };
+    const target = e.target;
+    const ignored = target instanceof Element && Boolean(target.closest(
+      'button, a, input, textarea, select, [role="checkbox"], [data-horizontal-scroll]',
+    ));
+    touchRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now(), ignored };
   }, []);
   const onTouchEnd = useCallback((e) => {
-    const dx = e.changedTouches[0].clientX - touchRef.current.x;
-    const dy = e.changedTouches[0].clientY - touchRef.current.y;
-    const dt = Date.now() - touchRef.current.t;
+    const gesture = touchRef.current;
+    // Consume every gesture once. A child control must never be able to reuse
+    // coordinates from an earlier swipe if one of its events is interrupted.
+    touchRef.current = { x: 0, y: 0, t: 0, ignored: true };
+    if (gesture.ignored || gesture.t === 0) return;
+    const dx = e.changedTouches[0].clientX - gesture.x;
+    const dy = e.changedTouches[0].clientY - gesture.y;
+    const dt = Date.now() - gesture.t;
     if (dt > 500 || Math.abs(dy) > 40) return;
     const velocity = Math.abs(dx) / dt; // px/ms
     const isFlick = velocity > 0.3 && Math.abs(dx) > 20;
@@ -652,16 +683,6 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
     if (dx > 0) next();
     else back();
   }, [next, back]);
-
-  // ─── Long-press for detail ───
-  const onChipTouchStart = (item) => {
-    // Touching an ingredient is proof enough that the hint has been read.
-    dismissHint();
-    longPressRef.current = setTimeout(() => {
-      setDetailCtx({ item, stepId: cur?.id, maxPicks: cur?.maxPicks }); haptic("tap");
-    }, 500);
-  };
-  const onChipTouchEnd = () => { clearTimeout(longPressRef.current); };
 
   // ─── Arrival stagger ───
   // When the page transition hands off, the builder's regions
@@ -783,7 +804,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                 type="button"
                 onClick={() => { setStep(0); haptic("step"); playSound("step"); }}
                 style={S.heroBtn}
-                aria-label={`לחצו להתחיל לבנות סלט ${sc.label}`}
+                aria-label={`${hasDraft ? "המשיכו לבנות" : "לחצו להתחיל לבנות"} סלט ${sc.label}`}
               >
               {/* Top row: bowl + text */}
               <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "14px", padding: "10px 14px 10px" }}>
@@ -805,8 +826,8 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
 
                 {/* Text column */}
                 <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "5px", textAlign: "right" }}>
-                  <div style={{ fontSize: "20px", fontWeight: 900, color: "#e8f5e9", textShadow: "0 2px 6px rgba(0,0,0,0.7)", letterSpacing: "0.02em", lineHeight: 1.2 }}>בנו את הסלט שלכם</div>
-                  <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.45)", fontWeight: 500 }}>5 שלבים פשוטים · בחירה חופשית</div>
+                  <div style={{ fontSize: "20px", fontWeight: 900, color: "#e8f5e9", textShadow: "0 2px 6px rgba(0,0,0,0.7)", letterSpacing: "0.02em", lineHeight: 1.2 }}>{hasDraft ? "המשיכו לבנות את הסלט" : "בנו את הסלט שלכם"}</div>
+                  <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.45)", fontWeight: 500 }}>{hasDraft ? "הבחירות שלכם נשמרו · אפשר להמשיך לערוך" : "5 שלבים פשוטים · בחירה חופשית"}</div>
                   <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "6px", padding: "5px 10px", borderRadius: "10px", background: "rgba(200,168,78,0.1)", border: "1px solid rgba(200,168,78,0.25)", width: "fit-content", alignSelf: "flex-end" }}>
                     <span style={{ fontSize: "12px", fontWeight: 800, color: "#f0d060" }}>{sc.label}</span>
                     <div style={{ width: "1px", height: "12px", background: "rgba(200,168,78,0.3)" }} />
@@ -824,7 +845,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                 display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
                 borderTop: "1px solid rgba(255,220,80,0.3)",
               }}>
-                <span style={{ fontSize: "14px", fontWeight: 900, color: "#0d2e0d", letterSpacing: "0.03em" }}>לחצו להתחיל לבנות</span>
+                <span style={{ fontSize: "14px", fontWeight: 900, color: "#0d2e0d", letterSpacing: "0.03em" }}>{hasDraft ? "המשיכו לבנות" : "לחצו להתחיל לבנות"}</span>
                 <span style={{ fontSize: "17px", fontWeight: 900, color: "#0d2e0d" }}>←</span>
               </div>
               </button>
@@ -875,8 +896,12 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                           // doesn't fight the button's own press/open transform.
                           <div key={p.id} style={{ width: "100%", animation: `cardFloat 3.6s ease-in-out ${(i % 4) * 0.25}s infinite` }}>
                             <button
+                              ref={(button) => {
+                                if (button) presetButtonRefs.current.set(p.id, button);
+                                else presetButtonRefs.current.delete(p.id);
+                              }}
                               type="button"
-                              onClick={() => setExpandedPreset(isOpen ? null : p.id)}
+                              onClick={() => isOpen ? closeExpandedPreset(p.id) : setExpandedPreset(p.id)}
                               disabled={!presetAvailable}
                               style={{
                                 ...S.presetCard,
@@ -916,7 +941,13 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
 
                     {/* Expansion Panel */}
                     {ep && epc && epQuote?.valid && (
-                      <div key={ep.id} style={{
+                      <div
+                        key={ep.id}
+                        ref={expandedPresetRef}
+                        role="region"
+                        tabIndex={-1}
+                        aria-label={`פרטי מתכון ${ep.he}`}
+                        style={{
                         // The id binds each recipe button's aria-expanded state
                         // to the details it reveals.
                         marginTop: "8px",
@@ -926,7 +957,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                         boxShadow: epc.glow,
                         overflow: "hidden",
                         animation: "expandIn 0.28s cubic-bezier(0.22,1.2,0.36,1) both",
-                      }} id={`chef-preset-${ep.id}`}>
+                        }} id={`chef-preset-${ep.id}`}>
                         {/* Header */}
                         <div style={{ padding: "10px 10px 10px 14px", display: "flex", alignItems: "center", gap: "10px", borderBottom: `1px solid ${epc.border}` }}>
                           <Icon src={ep.icon} size="28px" style={{ filter: `drop-shadow(0 2px 8px ${epc.dot})`, flexShrink: 0 }} />
@@ -938,7 +969,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                           </span>
                           <button
                             type="button"
-                            onClick={() => setExpandedPreset(null)}
+                            onClick={() => closeExpandedPreset(ep.id)}
                             style={{ width: "44px", height: "44px", display: "grid", placeItems: "center", background: "none", border: "none", color: "rgba(255,255,255,0.55)", fontSize: "14px", cursor: "pointer", padding: 0, lineHeight: 1, flexShrink: 0, borderRadius: "10px" }}
                             aria-label="סגור"
                           >✕</button>
@@ -995,7 +1026,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
           </div>
 
           {/* Clear Draft Button - inline at bottom of scroll */}
-          {hasDraft && (
+          {hasDraft && !draftNotice && (
             <div style={{ display: "flex", justifyContent: "center", paddingBottom: "8px" }}>
               <button onClick={requestClearDraft} style={S.clearDraftBtn} aria-label="מחק טיוטה">
                 🗑️ מחק טיוטה
@@ -1025,7 +1056,12 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
   const currentIntro = capApplies ? `בחרו עד ${bowlCap} מרכיבי בסיס וירקות.` : cur.intro;
 
   return (
-    <div style={S.root} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+    <div
+      style={S.root}
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
+      onTouchCancel={() => { touchRef.current.ignored = true; }}
+    >
       <div style={S.bg} />
 
       {/* Earned-badge toast. With an emblem there is no pill: the art already
@@ -1126,7 +1162,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                 disabled={i > step + 1}
                 aria-label={`${s.title}${i < step ? " - הושלם" : i === step ? " - נוכחי" : i === step + 1 ? " - הבא" : " - לא זמין"}`}
                 style={{
-                  flex: 1, border: "none", padding: "2px 1px",
+                  flex: 1, minWidth: 0, minHeight: "44px", border: "none", padding: "5px 1px",
                   cursor: i <= step + 1 ? "pointer" : "default",
                   background: "transparent", display: "flex", alignItems: "stretch",
                 }}
@@ -1151,7 +1187,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                   <span style={{ fontSize: "11px", lineHeight: 1 }}>
                     {i < step ? "✓" : s.emoji}
                   </span>
-                  <span style={{
+                  <span className="builder-progress-label" style={{
                     fontSize: "10px", fontWeight: i === step ? 800 : 700,
                     color: i === step ? "#3a2800" : i < step ? "#ffffff" : "rgba(255,255,255,0.55)",
                     letterSpacing: "0.01em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
@@ -1188,7 +1224,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
 
         {/* Anchor tabs (veggies only) */}
         {cur.id === "veggies" && (
-          <div style={S.anchorRow}>
+          <div data-horizontal-scroll style={S.anchorRow}>
             {cur.subgroups.map((sg, i) => {
               const stepColor = getStepColor("veggies");
               const isActive = activeAnchor === i;
@@ -1216,11 +1252,11 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
         {/* ── CONTENT (directional slide) ── */}
         <div style={{ ...S.content, opacity: anim === "out" ? 0 : 1, transform: anim === "out" ? `translateX(${slideX})` : "translateX(0)", filter: anim === "out" ? "blur(3px)" : "blur(0px)", transition: "opacity 0.22s ease, transform 0.28s cubic-bezier(0.25,0.46,0.45,0.94), filter 0.22s ease", ...rise(1) }} ref={scrollRef} role="main" aria-label={`${cur.title} - בחרו מרכיבים`}>
 
-          {/* Long-press discovery hint — shown until it has been read once.
+          {/* Ingredient-info discovery hint — shown until it has been read once.
               Tappable: it sits at the top of the list taking 78px, so someone
               who has already read it needs a way to clear it now rather than
               waiting out the timer. */}
-          {showLongPressHint && (
+          {showInfoHint && (
             <div
               style={S.longPressHint}
               onClick={dismissHint}
@@ -1231,8 +1267,8 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
             >
               <span style={{ fontSize: "32px", lineHeight: 1 }}>👆</span>
               <div>
-                <div style={{ fontSize: "13px", fontWeight: 900, color: "#f0d060", marginBottom: "2px" }}>למידע נוסף על הרכיב</div>
-                <div style={{ fontSize: "11px", fontWeight: 600, color: "rgba(255,255,255,0.65)" }}>לחצו על ⓘ או לחיצה ארוכה</div>
+                <div style={{ fontSize: "13px", fontWeight: 900, color: "#f0d060", marginBottom: "2px" }}>למידע נוסף על רכיב</div>
+                <div style={{ fontSize: "11px", fontWeight: 600, color: "rgba(255,255,255,0.65)" }}>לחצו על ⓘ בכרטיס שלו</div>
               </div>
             </div>
           )}
@@ -1268,8 +1304,6 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                     return (
                       <div key={item.id}
                         onClick={() => { if (!full) toggle(cur.id, item, cur.maxPicks); }}
-                        onTouchStart={() => onChipTouchStart(item)} onTouchEnd={onChipTouchEnd}
-                        onMouseDown={() => onChipTouchStart(item)} onMouseUp={onChipTouchEnd} onMouseLeave={onChipTouchEnd}
                         onKeyDown={(e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); if (!full) toggle(cur.id, item, cur.maxPicks); } }}
                         aria-label={`${item.he}${itemPrice > 0 ? `, תוספת ${itemPrice} שקלים` : ""}${on ? ", נבחר" : ""}${item.desc ? `, ${item.desc}` : ""}`}
                         aria-checked={on}
@@ -1280,14 +1314,12 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                         {on && <div style={S.check} aria-hidden="true">✓</div>}
                         {isPremiumStep && <div style={{ position: "absolute", top: "-2px", left: "-2px", fontSize: "12px", filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.6))" }} aria-hidden="true">👑</div>}
                         {item.pop && <div style={S.popTag} aria-hidden="true">פופולרי</div>}
-                        {/* Ingredient info. Was an 8px glyph at 0.18 opacity with
-                            pointerEvents:none — effectively invisible, and the only
-                            way in was a long-press nobody discovers. Now a real
-                            control (long-press still works). */}
+                        {/* Ingredient info. This explicit control replaces the old
+                            hidden long-press shortcut, which could also trigger the
+                            surrounding selection when the finger was released. */}
                         <button
                           type="button"
-                          onClick={(e) => { e.stopPropagation(); clearTimeout(longPressRef.current); setDetailCtx({ item, stepId: cur.id, maxPicks: cur.maxPicks }); haptic("tap"); }}
-                          onTouchStart={(e) => e.stopPropagation()}
+                          onClick={(e) => { e.stopPropagation(); dismissHint(); setDetailCtx({ item, stepId: cur.id, maxPicks: cur.maxPicks }); haptic("tap"); }}
                           onMouseDown={(e) => e.stopPropagation()}
                           aria-label={`מידע על ${item.he}`}
                           style={S.chipInfo}
@@ -1380,6 +1412,9 @@ const KF = `
 @media (max-width: 374px) {
   .hero-ring { width:110px; height:110px }
   .hero-bowl { width:76px;  height:76px  }
+}
+@media (max-width: 349px) {
+  .builder-progress-label { display:none !important; }
 }
 @keyframes logoFloat {
   0%, 100% { transform: translateY(0) scale(1); }

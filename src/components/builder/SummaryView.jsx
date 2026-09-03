@@ -178,6 +178,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     const [highlightedStep, setHighlightedStep] = useState(null);
     const [pickupTime, setPickupTime] = useState(null);
     const [pickupSelectionNotice, setPickupSelectionNotice] = useState("");
+    const pickupSectionRef = useRef(null);
     const effectivePickupTime = resolvePickupSelection(pickupTime, pickupAvailability.slots, shop.open);
     const [paymentChoice, setPaymentChoice] = useState("pickup"); // 'now' | 'pickup' — demo mode only
     /**
@@ -341,6 +342,18 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
         : pickupHasAvailableSlot
             ? "בחרו שעת איסוף"
             : "אין שעה פנויה";
+    const pickupFooterLabel = effectivePickupTime
+        ?? (shopBlocked
+            ? "סגור כרגע"
+            : shop.reason === 'override_open'
+                ? "בתיאום בדלפק"
+                : pickupBlockLabel);
+    const focusPickupPicker = () => {
+        const picker = pickupSectionRef.current;
+        if (!picker) return;
+        picker.scrollIntoView({ block: 'center' });
+        window.requestAnimationFrame(() => picker.focus({ preventScroll: true }));
+    };
     const applyPromo = () => {
         const d = findDiscount(promoInput);
         setAppliedDiscount(d);
@@ -645,10 +658,10 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                             disabled={checkoutLocked}
                             style={{ ...S.backBtn, ...(checkoutLocked ? { cursor: 'not-allowed', opacity: 0.45 } : {}) }}
                             onClick={onBack}
-                        >←</button>
+                        >→</button>
                         <div style={{ flex: 1, display: "flex", alignItems: "center", gap: "5px" }}>
                             <span style={{ fontSize: "17px" }}>📋</span>
-                            <span style={{ fontFamily: "var(--font-display), 'Secular One', sans-serif", fontSize: "17px", color: "#e8f5e9" }}>ההזמנה שלכם</span>
+                            <h1 style={{ margin: 0, fontFamily: "var(--font-display), 'Secular One', sans-serif", fontSize: "17px", color: "#e8f5e9" }}>ההזמנה שלכם</h1>
                         </div>
                         <div style={S.pricePill}>
                             <span style={S.priceS}>₪</span>
@@ -847,6 +860,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                         capacityStatus={pickupAvailability.status}
                         selectionNotice={pickupSelectionNotice}
                         checkingMoreSlots={pickupCheckingMoreSlots}
+                        sectionRef={pickupSectionRef}
                     />
 
                     {/* Price breakdown */}
@@ -952,12 +966,18 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                             <span style={S.metaPillIcon}>🥗</span>
                             <span style={S.metaPillText}>{all.length} בחירות</span>
                         </div>
-                        <div style={{ ...S.metaPill, ...S.metaPillGold }}>
+                        <button
+                            type="button"
+                            onClick={focusPickupPicker}
+                            aria-controls="pickup-time-picker"
+                            aria-label={`זמן איסוף: ${pickupFooterLabel}. מעבר לבחירת זמן`}
+                            style={{ ...S.metaPill, ...S.metaPillGold, cursor: "pointer", fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }}
+                        >
                             <span style={S.metaPillIcon}>⏰</span>
                             <span style={{ ...S.metaPillText, color: "#f0d060", fontWeight: 800 }}>
-                                {effectivePickupTime ?? 'בחר זמן'}
+                                {pickupFooterLabel}
                             </span>
-                        </div>
+                        </button>
                     </div>
                     {/* Submission failure — shown instead of a false confirmation */}
                     {submitError && (
@@ -992,9 +1012,9 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                     {/* Consent disclosure — links open the legal docs before ordering */}
                     <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.45)", textAlign: "center", lineHeight: 1.6, marginTop: "8px", fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }}>
                         בלחיצה על ״שלח הזמנה״ אני מאשר/ת את{" "}
-                        <a href="/terms" style={{ color: "rgba(240,208,96,0.8)" }}>תנאי השימוש</a>,{" "}
-                        <a href="/privacy" style={{ color: "rgba(240,208,96,0.8)" }}>מדיניות הפרטיות</a>{" "}
-                        ו<a href="/cancellations" style={{ color: "rgba(240,208,96,0.8)" }}>מדיניות הביטולים</a>.
+                        <a href="/terms" target="_blank" rel="noopener noreferrer" aria-label="תנאי השימוש (נפתח בלשונית חדשה)" style={{ color: "rgba(240,208,96,0.8)" }}>תנאי השימוש</a>,{" "}
+                        <a href="/privacy" target="_blank" rel="noopener noreferrer" aria-label="מדיניות הפרטיות (נפתחת בלשונית חדשה)" style={{ color: "rgba(240,208,96,0.8)" }}>מדיניות הפרטיות</a>{" "}
+                        ו<a href="/cancellations" target="_blank" rel="noopener noreferrer" aria-label="מדיניות הביטולים (נפתחת בלשונית חדשה)" style={{ color: "rgba(240,208,96,0.8)" }}>מדיניות הביטולים</a>.
                     </div>
                 </div>
             </div>
@@ -1166,7 +1186,7 @@ const S = {
     sumTotal: { display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: "36px", fontWeight: 900, color: "#f0d060", textShadow: "0 0 24px rgba(200,168,78,0.55), 0 2px 8px rgba(200,168,78,0.3)", padding: "12px 0 2px", marginTop: "10px", borderTop: "1px solid rgba(200,168,78,0.2)" },
     bar: {
         display: "flex", flexDirection: "column", gap: "10px",
-        padding: "12px 16px 18px",
+        padding: "12px 16px max(18px, env(safe-area-inset-bottom))",
         background: `linear-gradient(rgba(0,0,0,0.72), rgba(0,0,0,0.68)), url(/builder-assets/footer-brand.png) center top / cover no-repeat`,
         borderTop: "2px solid rgba(200,168,78,0.4)",
         boxShadow: "0 -6px 28px rgba(0,0,0,0.55)",
@@ -1179,7 +1199,7 @@ const S = {
         padding: "8px 16px", borderRadius: "12px",
         background: "rgba(255,255,255,0.07)",
         border: "1px solid rgba(255,255,255,0.1)",
-        flex: 1, justifyContent: "center",
+        flex: 1, justifyContent: "center", minHeight: "44px",
     },
     metaPillGold: {
         background: "rgba(200,168,78,0.12)",
@@ -1260,7 +1280,7 @@ function usePickupAvailability(shop) {
     return { localSlots, slots, status: capacity.status };
 }
 
-function PickupTimePicker({ value, onChange, disabled = false, shop, localSlots, slots, capacityStatus, selectionNotice, checkingMoreSlots }) {
+function PickupTimePicker({ value, onChange, disabled = false, shop, localSlots, slots, capacityStatus, selectionNotice, checkingMoreSlots, sectionRef }) {
 
     // Two different ways to have nothing to offer, and only one of them is the
     // schedule. `generatePickupSlots` reads WEEK, which is in the bundle and
@@ -1269,8 +1289,8 @@ function PickupTimePicker({ value, onChange, disabled = false, shop, localSlots,
     // offers times for a shop with its shutters down.
     if (localSlots === null || !shop.open) {
         return (
-            <div style={PT.box}>
-                <div style={PT.title}>⏰ זמן איסוף</div>
+            <div ref={sectionRef} id="pickup-time-picker" role="region" tabIndex={-1} aria-labelledby="pickup-time-picker-title" style={PT.box}>
+                <div id="pickup-time-picker-title" style={PT.title}>⏰ זמן איסוף</div>
                 <div style={PT.closedMsg}>{noPickupMessage(shop, new Date())}</div>
             </div>
         );
@@ -1278,8 +1298,8 @@ function PickupTimePicker({ value, onChange, disabled = false, shop, localSlots,
 
     if (slots === null) {
         return (
-            <div style={PT.box} aria-live="polite">
-                <div style={PT.title}>⏰ זמן איסוף</div>
+            <div ref={sectionRef} id="pickup-time-picker" role="region" tabIndex={-1} aria-labelledby="pickup-time-picker-title" style={PT.box} aria-live="polite">
+                <div id="pickup-time-picker-title" style={PT.title}>⏰ זמן איסוף</div>
                 <div style={PT.closedMsg}>
                     {capacityStatus === 'error'
                         ? 'לא הצלחנו לעדכן זמני איסוף · ננסה שוב אוטומטית'
@@ -1297,9 +1317,9 @@ function PickupTimePicker({ value, onChange, disabled = false, shop, localSlots,
         : selectionNotice || null;
 
     return (
-        <div style={PT.box}>
+        <div ref={sectionRef} id="pickup-time-picker" role="region" tabIndex={-1} aria-labelledby="pickup-time-picker-title" style={PT.box}>
             <div style={PT.header}>
-                <span style={PT.title}>⏰ זמן איסוף</span>
+                <span id="pickup-time-picker-title" style={PT.title}>⏰ זמן איסוף</span>
                 <span style={value ? PT.selectedLabel : PT.chooseLabel}>{value || 'בחרו שעה'}</span>
             </div>
             {statusMessage && (
