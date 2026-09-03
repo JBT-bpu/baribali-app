@@ -19,7 +19,7 @@ BariBali is a mobile-first, Hebrew (RTL) salad and tortilla builder for a real r
 ```
 
 1. **`/`** — guest-or-Google front door; signed-in members continue automatically to `/home2`.
-2. **`/home2`** — product selector and latest-order shortcut for members. A fixed three-item customer dock stays available here and on `/orders` and `/profile`. When Google Places is configured, one attributed Google Maps review is shown; otherwise the same space contains a brand-owned product-info card. Salad is the currently orderable card and opens an in-page S/M/L picker; tortilla is visibly locked as coming soon, although its deep-link builder path still exists in code.
+2. **`/home2`** — product selector and latest-order shortcut for members. A fixed three-item customer dock stays available here and on `/orders` and `/profile`. When Google Places is configured, one attributed Google Maps review is shown; otherwise the same space contains a brand-owned product-info card. Salad is the currently orderable card and opens an in-page S/M/L picker; tortilla is visibly locked as coming soon, and direct tortilla build/order requests are rejected by the shared availability rule.
 3. **`/build?size=<S|M|L>&type=salad|tortilla`** — renders `BariBaliBuilder`, a step-by-step ingredient picker (veggies → protein → sauces → finish → premium upgrades), with combo badges, presets, and a live-updating price. Tortilla currently reuses that salad step set with `finish` removed; the separate `TORTILLA_STEPS` catalog is not active.
 4. The builder's summary screen (`SummaryView`) shows the assembled bowl, lets the customer pick a pickup time slot, add notes, and submit.
 5. `POST /api/orders` records the server-validated order. Online orders then call `/api/payment/create`; pay-at-pickup/demo orders continue directly to confirmation.
@@ -86,6 +86,18 @@ Access at: http://localhost:3000
 npm run build
 npm start
 ```
+
+## Verification and CI
+
+```bash
+npm run check
+```
+
+The same locked install, typecheck, lint, focused regression suite and production
+build run in GitHub Actions for pull requests and pushes to `main`, on Node 22
+and without application secrets. The build step temporarily retries because
+`next/font/google` fetches font files during compilation; checking those font
+files into the repository will make the build fully network-independent.
 
 ## Known Gaps (as of this writing)
 

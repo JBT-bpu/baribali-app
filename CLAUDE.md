@@ -84,7 +84,7 @@ src/
 - **The durable order-creation, payment and pickup-allocation ledgers are not live yet.** They exist on `codex/payment-foundation`; none of the four forward migrations has been applied and the branch is not deployed. The connected Supabase project is pre-launch/test-only and currently holds 77 test orders. Apply/verify the full chain with filename-preserving Supabase CLI (not MCP `apply_migration`) before enabling real Supabase order creation, because the routes deliberately fail closed when their database contracts are missing.
 - **`/privacy` and `/terms` are drafts** with `[bracketed]` business-detail placeholders that must be filled before launch.
 - **Rate limiting** (`src/lib/rateLimit.ts`) is in-memory/per-process — a deterrent, approximate on serverless (no shared store).
-- **No CI** yet; focused payment tests run locally with `npm test`.
+- **CI is defined in `.github/workflows/ci.yml`.** Pull requests and pushes to `main` run locked install, typecheck, lint, the focused suite and a production build on Node 22 with read-only repository permissions and no application secrets. The build alone retries up to three times while `next/font/google` remains a network dependency.
 
 ## 8. Deeper reference
 

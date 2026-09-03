@@ -22,7 +22,7 @@ BariBali is a mobile-first, Hebrew (RTL) salad and tortilla builder for a **real
 - **PWA**: manifest (`src/app/manifest.ts`) implemented — installable/"Add to Home Screen"
 - **Lint**: ESLint 9 flat config (`eslint.config.mjs`), script is `eslint .`
 
-There are 157 focused Node/`tsx` regression tests covering Hyp, settlement and migration invariants, pricing/order authority and idempotency, product availability/reorder safety, atomic pickup capacity, Israel-day kitchen filtering, environment/configuration guardrails, hard-reload checkout recovery, generic-webhook rejection, kitchen controls/simulation and critical customer-flow/source-trust invariants. There is still no CI pipeline.
+There are 157 focused Node/`tsx` regression tests covering Hyp, settlement and migration invariants, pricing/order authority and idempotency, product availability/reorder safety, atomic pickup capacity, Israel-day kitchen filtering, environment/configuration guardrails, hard-reload checkout recovery, generic-webhook rejection, kitchen controls/simulation and critical customer-flow/source-trust invariants. GitHub Actions runs locked install, typecheck, lint, the focused suite and a production build for pull requests and `main` pushes.
 
 ## 3. Directory structure (current)
 
@@ -240,7 +240,7 @@ Git history is authoritative for exact detail — commit messages are descriptiv
 
 - **Never mix a dependency/framework upgrade with a visual redesign in the same pass.**
 - **No new dependency without a specific, named purpose.**
-- **One commit per logical phase**, descriptive messages, for bisectability. The focused regression suite, build/typecheck/lint, manual browser smoke tests and git history are the current safety net; CI is still absent.
+- **One commit per logical phase**, descriptive messages, for bisectability. GitHub Actions now enforces locked install, build/typecheck/lint and the focused regression suite on pull requests and `main`; manual browser smoke tests and git history remain part of the safety net.
 - **Dedicated feature branches off `main`**, verify build/typecheck/lint before every commit, **never merge to `main` or push without explicit go-ahead**.
 - **Guest-first is non-negotiable**: an account must never be required to order; where offered, it's an equally-weighted option, never a gate or a smaller/secondary link.
 - **A gamified trading-card/gacha loyalty feature is real future work** (GoldWallet currency, pack-opening reveals, card rarities) but is **explicitly deferred** — nothing built anticipating it until it gets its own planning session.
@@ -267,7 +267,7 @@ Supabase and undeployed. Git history is authoritative for the exact commit list.
 
 ## 10. Improvement backlog (not started, no priority commitment)
 
-- **Testing/CI**: 157 focused regression tests, no CI. The largest gaps are component/browser automation, end-to-end provider flows and a true multi-connection database concurrency test. A real 77-row Supabase transaction rehearsal already proved migration compatibility, five-slot allocation, replay, sixth-order rejection and complete rollback.
+- **Testing/CI**: 157 focused regression tests plus GitHub Actions on pull requests and `main` pushes. The largest gaps are component/browser automation, end-to-end provider flows and a true multi-connection database concurrency test. A real 77-row Supabase transaction rehearsal already proved migration compatibility, five-slot allocation, replay, sixth-order rejection and complete rollback.
 - **Observability**: no error tracking, no structured logging on payment/webhook routes.
 - **Ops**: a local password-gated admin exists for prices/discounts/customers, but there is no production reporting dashboard. Schema/policy SQL and migrations are tracked; execution, advisor runs and backup/PITR verification remain manual.
 - **Code quality**: `zustand` installed but unused — a `BariBaliBuilder.jsx` state-lifting refactor is on the table whenever there's appetite.

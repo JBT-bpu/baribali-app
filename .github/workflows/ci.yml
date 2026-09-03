@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Run focused regression suite
+        run: npm test
+
+      # next/font/google downloads font files while compiling. Retry only this
+      # network-sensitive step; deterministic code failures still fail all
+      # three attempts. Replace this loop once the fonts are checked in.
+      - name: Build production application
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            if npm run build; then
+              exit 0
+            fi
+            if (( attempt < 3 )); then
+              echo "Build attempt ${attempt} failed; retrying after 10 seconds."
+              sleep 10
+            fi
+          done
+          exit 1
