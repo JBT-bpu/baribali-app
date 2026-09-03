@@ -147,6 +147,7 @@ import {
 import { useShopStatus } from "../../lib/useShopStatus";
 
 const DEMO_MODE = !isSupabaseConfigured();
+const SHOW_FAILURE_TEST = DEMO_MODE && process.env.NODE_ENV !== "production";
 
 function freshPaymentKey() {
     if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
@@ -545,7 +546,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                 <div style={S.header}>
                     <img src={headerImage} alt="" aria-hidden="true" style={{ width: "100%", display: "block", height: "72px", objectFit: "cover", objectPosition: "center top", flexShrink: 0 }} />
                     <div style={S.headerTop}>
-                        <button style={S.backBtn} onClick={onBack}>←</button>
+                        <button type="button" aria-label="חזרה לעריכת ההזמנה" style={S.backBtn} onClick={onBack}>←</button>
                         <div style={{ flex: 1, display: "flex", alignItems: "center", gap: "5px" }}>
                             <span style={{ fontSize: "17px" }}>📋</span>
                             <span style={{ fontFamily: "var(--font-display), 'Secular One', sans-serif", fontSize: "17px", color: "#e8f5e9" }}>ההזמנה שלכם</span>
@@ -678,7 +679,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                                         </div>
                                     ); })}
                                     {onEdit && (
-                                        <button onClick={() => onEdit(STEPS.findIndex(st => st.id === s.id))}
+                                        <button type="button" aria-label={`עריכת ${s.title}`} onClick={() => onEdit(STEPS.findIndex(st => st.id === s.id))}
                                             style={{
                                                 width: "64px", height: "72px",
                                                 background: "rgba(255,255,255,0.02)",
@@ -698,7 +699,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                     </div>
 
                     {/* Notes — opens in a sheet instead of an inline collapse */}
-                    <button style={S.notesToggle} onClick={() => setNotesOpen(true)} aria-haspopup="dialog">
+                    <button type="button" style={S.notesToggle} onClick={() => setNotesOpen(true)} aria-haspopup="dialog">
                         <span>📝 הערה לבשלן</span>
                         {notes.length > 0 && (
                             <BariBadge className="mr-auto">✓ נוספה</BariBadge>
@@ -729,7 +730,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                                 }}
                                 autoFocus
                             />
-                            {notesError && <div style={{ fontSize: "10px", color: "#ef5350", marginTop: "4px" }}>⚠️ {notesError}</div>}
+                            {notesError && <div role="alert" style={{ fontSize: "10px", color: "#ef5350", marginTop: "4px" }}>⚠️ {notesError}</div>}
                             <BariButton variant="primary" fullWidth style={{ marginTop: "14px" }} onClick={() => setNotesOpen(false)}>סיימתי</BariButton>
                         </div>
                     </BariModal>
@@ -766,13 +767,13 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                                 onChange={e => { setPromoInput(e.target.value); setPromoError(""); }}
                                 placeholder="קוד הנחה"
                                 aria-label="קוד הנחה"
-                                style={{ flex: 1, padding: "8px 10px", borderRadius: "8px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.15)", color: "#fff", fontSize: "13px", fontWeight: 600, fontFamily: "var(--font-heebo), 'Heebo', sans-serif", outline: "none" }}
+                                style={{ flex: 1, minHeight: "44px", padding: "8px 10px", borderRadius: "8px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.15)", color: "#fff", fontSize: "13px", fontWeight: 600, fontFamily: "var(--font-heebo), 'Heebo', sans-serif", outline: "none" }}
                             />
-                            <button type="button" onClick={applyPromo} style={{ padding: "8px 14px", borderRadius: "8px", background: "rgba(200,168,78,0.2)", border: "1px solid rgba(200,168,78,0.4)", color: "#f0d060", fontSize: "13px", fontWeight: 800, cursor: "pointer", fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }}>החל</button>
+                            <button type="button" onClick={applyPromo} style={{ minHeight: "44px", padding: "8px 14px", borderRadius: "8px", background: "rgba(200,168,78,0.2)", border: "1px solid rgba(200,168,78,0.4)", color: "#f0d060", fontSize: "13px", fontWeight: 800, cursor: "pointer", fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }}>החל</button>
                         </div>
-                        {promoError && <div style={{ fontSize: "11px", color: "#ff7575", fontWeight: 600, marginTop: "4px" }}>{promoError}</div>}
+                        {promoError && <div role="alert" style={{ fontSize: "11px", color: "#ff7575", fontWeight: 600, marginTop: "4px" }}>{promoError}</div>}
                         {effectiveDiscount && discAmount > 0 && (
-                            <div style={{ ...S.sumPriceLine, marginTop: "6px" }}>
+                            <div role="status" aria-live="polite" style={{ ...S.sumPriceLine, marginTop: "6px" }}>
                                 <span style={{ fontSize: "12px", color: "#7dd37d", fontWeight: 700 }}>
                                     הנחה · {effectiveDiscount.note || effectiveDiscount.code}
                                     {effectiveDiscount === autoDiscount && <span style={{ fontSize: "10px", color: "rgba(125,211,125,0.7)", fontWeight: 600 }}> · אוטומטי</span>}
@@ -790,25 +791,47 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                     {/* Payment choice — demo mode only (no real gateway configured yet) */}
                     {DEMO_MODE && (
                         <div style={PAY.box}>
-                            <div style={PAY.title}>
-                                💳 איך תרצו לשלם?
+                            <div id="demo-payment-title" style={PAY.title}>
+                                💳 בדיקת מסלול תשלום
                                 <BariBadge className="mr-2">מצב הדגמה</BariBadge>
                             </div>
-                            <div style={PAY.row}>
-                                <button onClick={() => setPaymentChoice("now")} style={{ ...PAY.opt, ...(paymentChoice === "now" ? PAY.optActive : {}) }}>
-                                    <span style={{ fontSize: "20px" }}>💳</span>
-                                    <span>שלם עכשיו</span>
+                            <p id="demo-payment-note" style={PAY.demoNote}>לא מתבצע חיוב אמיתי. בחרו איזה מסלול לבדוק.</p>
+                            <div role="group" aria-labelledby="demo-payment-title" aria-describedby="demo-payment-note" style={PAY.row}>
+                                <button
+                                    type="button"
+                                    aria-pressed={paymentChoice === "now"}
+                                    disabled={submitting}
+                                    onClick={() => setPaymentChoice("now")}
+                                    style={{ ...PAY.opt, ...(paymentChoice === "now" ? PAY.optActive : {}), ...(submitting ? PAY.optDisabled : {}) }}
+                                >
+                                    {paymentChoice === "now" && <span style={PAY.selectedCheck} aria-hidden="true">✓</span>}
+                                    <span style={{ fontSize: "20px" }} aria-hidden="true">💳</span>
+                                    <span>תשלום עכשיו</span>
                                 </button>
-                                <button onClick={() => setPaymentChoice("pickup")} style={{ ...PAY.opt, ...(paymentChoice === "pickup" ? PAY.optActive : {}) }}>
-                                    <span style={{ fontSize: "20px" }}>🏪</span>
-                                    <span>שלם באיסוף</span>
+                                <button
+                                    type="button"
+                                    aria-pressed={paymentChoice === "pickup"}
+                                    disabled={submitting}
+                                    onClick={() => setPaymentChoice("pickup")}
+                                    style={{ ...PAY.opt, ...(paymentChoice === "pickup" ? PAY.optActive : {}), ...(submitting ? PAY.optDisabled : {}) }}
+                                >
+                                    {paymentChoice === "pickup" && <span style={PAY.selectedCheck} aria-hidden="true">✓</span>}
+                                    <span style={{ fontSize: "20px" }} aria-hidden="true">🏪</span>
+                                    <span>תשלום באיסוף</span>
                                 </button>
                             </div>
                             {/* Testing-only affordance, not a real customer choice — simulates
                                 a declined card so the failure path can actually be exercised. */}
-                            <button onClick={() => submitOrder("fail")} style={PAY.failTest}>
-                                🧪 דמה כשל תשלום (לבדיקה)
-                            </button>
+                            {SHOW_FAILURE_TEST && (
+                                <button
+                                    type="button"
+                                    disabled={submitting || shopBlocked || pickupBlocked}
+                                    onClick={() => submitOrder("fail")}
+                                    style={{ ...PAY.failTest, ...((submitting || shopBlocked || pickupBlocked) ? PAY.optDisabled : {}) }}
+                                >
+                                    🧪 דמה כשל תשלום (לבדיקה)
+                                </button>
+                            )}
                         </div>
                     )}
 
@@ -852,8 +875,10 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                         away from an open shop, and the server refuses for real
                         anyway — now with a message they can read. */}
                     <BariButton
+                        type="button"
                         variant="primary"
                         fullWidth
+                        aria-busy={submitting}
                         disabled={submitting || (!hasPendingPayment && (shopBlocked || pickupBlocked))}
                         style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif", opacity: (submitting || (!hasPendingPayment && (shopBlocked || pickupBlocked))) ? 0.6 : 1 }}
                         onClick={() => submitOrder()}
@@ -1031,7 +1056,7 @@ const S = {
     // the way a collection is. The title still reaches screen readers via alt.
     comboBannerRow: { display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: "6px", justifyItems: "center" },
     comboEmblem: { width: "100%", height: "auto", display: "block" },
-    notesToggle: { width: "100%", margin: "12px 0", padding: "10px 12px", borderRadius: "12px", display: "flex", alignItems: "center", gap: "8px", background: "rgba(15,45,15,0.6)", backdropFilter: "blur(8px)", border: "1px solid rgba(200,168,78,0.15)", cursor: "pointer", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.45)", direction: "rtl", textAlign: "right" },
+    notesToggle: { width: "100%", minHeight: "44px", margin: "12px 0", padding: "10px 12px", borderRadius: "12px", display: "flex", alignItems: "center", gap: "8px", background: "rgba(15,45,15,0.6)", backdropFilter: "blur(8px)", border: "1px solid rgba(200,168,78,0.15)", cursor: "pointer", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.55)", direction: "rtl", textAlign: "right" },
     notesInput: { width: "100%", padding: "8px 10px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.04)", color: "#e8f5e9", fontSize: "12px", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", outline: "none", direction: "rtl", resize: "vertical", minHeight: "60px" },
     sumPriceCard: { marginTop: "14px", padding: "14px 16px", borderRadius: "14px", background: "linear-gradient(145deg, rgba(15,45,15,0.9), rgba(20,55,20,0.85))", border: "1px solid rgba(200,168,78,0.25)", boxShadow: "0 4px 16px rgba(0,0,0,0.3)" },
     sumPriceLine: { display: "flex", justifyContent: "space-between", fontSize: "13px", color: "rgba(255,255,255,0.5)", padding: "3px 0" },
@@ -1215,11 +1240,14 @@ function PickupTimePicker({ value, onChange, shop, localSlots, slots, capacitySt
 
 const PAY = {
     box: { margin: "12px 0", padding: "12px 14px", borderRadius: "12px", background: "rgba(15,45,15,0.6)", backdropFilter: "blur(8px)", border: "1px solid rgba(200,168,78,0.15)" },
-    title: { display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.45)", marginBottom: "10px" },
+    title: { display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", fontWeight: 800, color: "rgba(255,255,255,0.72)", marginBottom: "4px" },
+    demoNote: { margin: "0 0 10px", fontSize: "11px", lineHeight: 1.45, fontWeight: 600, color: "rgba(255,255,255,0.5)" },
     row: { display: "flex", gap: "8px" },
-    opt: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", padding: "10px 8px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.12)", background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.6)", fontSize: "12px", fontWeight: 700, fontFamily: "var(--font-heebo), 'Heebo', sans-serif", cursor: "pointer", transition: "all 0.15s" },
+    opt: { position: "relative", flex: 1, minHeight: "64px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "4px", padding: "10px 8px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.12)", background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.65)", fontSize: "12px", fontWeight: 700, fontFamily: "var(--font-heebo), 'Heebo', sans-serif", cursor: "pointer", transition: "all 0.15s" },
     optActive: { background: "linear-gradient(135deg, rgba(200,168,78,0.28), rgba(200,168,78,0.12))", border: "1px solid var(--color-gold-deep)", color: "var(--color-gold-light)", boxShadow: "var(--shadow-gold-glow)" },
-    failTest: { width: "100%", marginTop: "8px", padding: "6px", background: "none", border: "none", borderTop: "1px dashed rgba(255,255,255,0.1)", color: "rgba(239,83,80,0.6)", fontSize: "10px", fontWeight: 600, fontFamily: "var(--font-heebo), 'Heebo', sans-serif", cursor: "pointer" },
+    optDisabled: { cursor: "not-allowed", opacity: 0.55 },
+    selectedCheck: { position: "absolute", insetInlineEnd: "8px", top: "7px", color: "#f0d060", fontSize: "13px", fontWeight: 900, lineHeight: 1 },
+    failTest: { width: "100%", minHeight: "44px", marginTop: "8px", padding: "8px", background: "none", border: "none", borderTop: "1px dashed rgba(255,255,255,0.1)", color: "rgba(255,154,151,0.78)", fontSize: "10px", fontWeight: 600, fontFamily: "var(--font-heebo), 'Heebo', sans-serif", cursor: "pointer" },
 };
 
 const PT = {
@@ -1248,6 +1276,5 @@ const PT = {
 const KF = `
 @keyframes popBounce { 0%{transform:scale(0.3);opacity:0} 60%{transform:scale(1.15)} 100%{transform:scale(1);opacity:1} }
 @keyframes pFadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
-* { -webkit-tap-highlight-color:transparent; box-sizing:border-box; margin:0; padding:0; }
 ::-webkit-scrollbar{display:none}
 `;

@@ -502,3 +502,39 @@ test('home reviews never impersonate customers and retain Google provenance', ()
     assert.match(reviewsStrip, /מוצגת לפי רלוונטיות/,
         'the UI must explain Google\'s default review ordering');
 });
+
+test('checkout controls stay truthful, stateful and touchable in demo mode', () => {
+    assert.match(summary, /const SHOW_FAILURE_TEST = DEMO_MODE && process\.env\.NODE_ENV !== "production"/,
+        'the destructive failure simulator must never appear in a production build');
+    assert.match(summary, /לא מתבצע חיוב אמיתי\. בחרו איזה מסלול לבדוק\./,
+        'demo payment choices must explicitly say that no charge occurs');
+    assert.match(summary, /role="group" aria-labelledby="demo-payment-title" aria-describedby="demo-payment-note"/,
+        'payment choices must expose one named and described group');
+    assert.equal(summary.match(/aria-pressed=\{paymentChoice === "(?:now|pickup)"\}/g)?.length, 2,
+        'both payment choices must expose their selected state');
+    assert.equal(summary.match(/disabled=\{submitting\}/g)?.length, 2,
+        'both choices must stop changing while their order is being submitted');
+    assert.equal(summary.match(/PAY\.selectedCheck\} aria-hidden="true">✓/g)?.length, 2,
+        'both choices must have a visible selected cue beyond colour');
+    assert.match(summary, /opt: \{ position: "relative", flex: 1, minHeight: "64px"/,
+        'payment choices must remain large mobile touch targets');
+    assert.match(summary, /\{SHOW_FAILURE_TEST && \([\s\S]*?דמה כשל תשלום/,
+        'the local-only failure path must stay behind the production guard');
+    assert.match(summary, /aria-busy=\{submitting\}/,
+        'the primary order action must expose its in-flight state');
+
+    assert.doesNotMatch(summary, /\* \{ -webkit-tap-highlight-color:transparent; box-sizing:border-box; margin:0; padding:0; \}/,
+        'the summary must not override Tailwind button padding with an unlayered reset');
+    assert.doesNotMatch(builder, /\* \{ -webkit-tap-highlight-color:transparent; box-sizing:border-box; margin:0; padding:0; \}/,
+        'the builder must rely on the safely layered global reset');
+    assert.match(summary, /notesToggle: \{ width: "100%", minHeight: "44px"/);
+    assert.match(summary, /aria-label="קוד הנחה"[\s\S]*?minHeight: "44px", padding: "8px 10px"/,
+        'the promo input must meet the mobile target floor');
+    assert.match(summary, /<button type="button" onClick=\{applyPromo\}[\s\S]*?minHeight: "44px", padding: "8px 14px"/,
+        'the promo apply button must meet the mobile target floor');
+    assert.match(summary, /promoError && <div role="alert"/);
+    assert.match(summary, /<div role="status" aria-live="polite" style=\{\{ \.\.\.S\.sumPriceLine/,
+        'an applied discount must be announced as well as shown');
+    assert.match(summary, /aria-label=\{`עריכת \$\{s\.title\}`\}/,
+        'repeated edit buttons must identify the section they open');
+});

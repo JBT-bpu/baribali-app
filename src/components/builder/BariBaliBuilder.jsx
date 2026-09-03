@@ -1394,13 +1394,6 @@ const KF = `
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-3px); }
 }
-/* Layered so Tailwind utility classes (used by BariButton etc.) can still
-   override this reset — an unlayered rule here would otherwise beat every
-   Tailwind utility regardless of source order, per the CSS cascade layers
-   spec. Same bug/fix as the one in globals.css's global reset. */
-@layer base {
-  * { -webkit-tap-highlight-color:transparent; box-sizing:border-box; margin:0; padding:0; }
-}
 ::-webkit-scrollbar{display:none}
 button:focus-visible {
   outline: 2px solid rgba(200,168,78,0.8) !important;
