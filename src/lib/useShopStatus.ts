@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { shopStatus, type ShopStatus } from './shopHours';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { shopStatus, type ShopOverride, type ShopStatus } from './shopHours';
 
 /**
  * Is the shop open — as the customer's browser understands it.
@@ -11,15 +11,15 @@ import { shopStatus, type ShopStatus } from './shopHours';
  * early because the chicken ran out. That lives in a database row and arrives
  * from GET /api/shop.
  *
- * DEGRADES TO THE SCHEDULE, exactly as the server side does (lib/shopState.ts).
- * If the fetch fails we keep the locally-computed answer rather than guessing
- * closed — a customer must never be turned away from an open shop by a dropped
- * request. The reverse risk is covered: the server checks again at POST
- * /api/orders, so the worst a stale "open" can do is produce an honest refusal
- * at checkout instead of a warning on the landing.
+ * Before the first server answer it degrades to the bundled schedule, exactly
+ * as the server side does (lib/shopState.ts). Once a staff override has been
+ * confirmed, transient refresh failures retain it; otherwise a dropped request
+ * could erase "closed now" or "open late" until connectivity returns. The
+ * server still checks again at POST /api/orders and remains authoritative.
  *
- * Refetches when the tab comes back to the foreground. A phone left open on the
- * landing page across 16:00 would otherwise still be advertising an open shop.
+ * Refetches once a minute while visible and whenever the tab returns to the
+ * foreground or is restored from bfcache. A phone left open across 16:00 would
+ * otherwise keep advertising an open shop and already-expired pickup times.
  */
 
 export interface LiveShopStatus extends ShopStatus {
@@ -27,6 +27,10 @@ export interface LiveShopStatus extends ShopStatus {
     loading: boolean;
     /** False when /api/shop could not be reached and the schedule is standing in. */
     live: boolean;
+    /** Refresh clock shared with time-sensitive customer UI such as pickup slots. */
+    refreshedAt: number;
+    /** Last server-confirmed staff override, retained across transient failures. */
+    override: ShopOverride;
 }
 
 export function useShopStatus(): LiveShopStatus {
@@ -36,37 +40,106 @@ export function useShopStatus(): LiveShopStatus {
         ...shopStatus(new Date()),
         loading: true,
         live: false,
+        refreshedAt: 0,
+        override: null,
     }));
+    const lastKnownOverrideRef = useRef<{ override: ShopOverride; note: string | null } | null>(null);
 
     const load = useCallback(() => {
+        const controller = new AbortController();
+        const requestTimeout = setTimeout(() => controller.abort(), 10_000);
         let cancelled = false;
-        fetch('/api/shop', { cache: 'no-store' })
+        const publishFallback = () => {
+            if (cancelled) return;
+            const known = lastKnownOverrideRef.current;
+            setState({
+                ...shopStatus(new Date(), known?.override ?? null, known?.note ?? null),
+                loading: false,
+                live: false,
+                refreshedAt: Date.now(),
+                override: known?.override ?? null,
+            });
+        };
+
+        fetch('/api/shop', { cache: 'no-store', signal: controller.signal })
             .then(r => (r.ok ? r.json() : null))
-            .then((data: (ShopStatus & { storeAvailable?: boolean }) | null) => {
+            .then((data: (ShopStatus & { override?: ShopOverride; storeAvailable?: boolean }) | null) => {
                 if (cancelled) return;
                 if (data && typeof data.open === 'boolean') {
-                    setState({ ...data, loading: false, live: true });
+                    const override = data.override === 'open' || data.override === 'closed'
+                        ? data.override
+                        : null;
+                    lastKnownOverrideRef.current = { override, note: data.note ?? null };
+                    setState({ ...data, override, loading: false, live: true, refreshedAt: Date.now() });
                 } else {
-                    setState(s => ({ ...s, loading: false }));
+                    publishFallback();
                 }
             })
             .catch(() => {
-                if (!cancelled) setState(s => ({ ...s, loading: false }));
-            });
-        return () => { cancelled = true; };
+                publishFallback();
+            })
+            .finally(() => clearTimeout(requestTimeout));
+
+        return () => {
+            cancelled = true;
+            clearTimeout(requestTimeout);
+            controller.abort();
+        };
     }, []);
 
     useEffect(() => {
-        let cancel = load();
-        const onVisible = () => {
-            if (document.visibilityState !== 'visible') return;
-            cancel();
-            cancel = load();
+        let cancelCurrent: () => void = () => {};
+        let intervalId: ReturnType<typeof setInterval> | null = null;
+
+        const stopInterval = () => {
+            if (intervalId === null) return;
+            clearInterval(intervalId);
+            intervalId = null;
         };
-        document.addEventListener('visibilitychange', onVisible);
+        const cancelRequest = () => {
+            cancelCurrent();
+            cancelCurrent = () => {};
+        };
+        const refresh = () => {
+            cancelRequest();
+            cancelCurrent = load();
+        };
+        const refreshForCurrentTime = () => {
+            // Move time-sensitive UI immediately on foreground/minute ticks;
+            // do not wait up to ten seconds for the network timeout first.
+            setState(current => ({ ...current, refreshedAt: Date.now() }));
+            refresh();
+        };
+        const startInterval = () => {
+            stopInterval();
+            if (document.visibilityState === 'visible') {
+                intervalId = setInterval(refreshForCurrentTime, 60_000);
+            }
+        };
+        const onVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                refreshForCurrentTime();
+                startInterval();
+            } else {
+                stopInterval();
+                cancelRequest();
+            }
+        };
+        const onPageShow = (event: PageTransitionEvent) => {
+            if (!event.persisted) return;
+            refreshForCurrentTime();
+            startInterval();
+        };
+
+        refresh();
+        startInterval();
+        document.addEventListener('visibilitychange', onVisibilityChange);
+        window.addEventListener('pageshow', onPageShow);
         return () => {
-            cancel();
-            document.removeEventListener('visibilitychange', onVisible);
+            stopInterval();
+            cancelRequest();
+            document.removeEventListener('visibilitychange', onVisibilityChange);
+            window.removeEventListener('pageshow', onPageShow);
         };
     }, [load]);
 

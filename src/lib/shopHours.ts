@@ -173,6 +173,83 @@ export function pickupSlots(now: Date): { id: string; label: string; isPeak: boo
     return slots;
 }
 
+export interface PickupSelectionSlot {
+    id: string;
+    full?: boolean;
+}
+
+/**
+ * Keep a customer's pickup choice only while it is still present and has
+ * capacity. A long-open checkout can cross a five-minute boundary, or another
+ * customer can fill the selected slot; in either case advance to the first
+ * usable choice rather than submitting the stale value hidden in the footer.
+ */
+export function resolvePickupSelection(
+    current: string | null | undefined,
+    slots: readonly PickupSelectionSlot[] | null,
+    shopOpen: boolean,
+): string | null {
+    if (!shopOpen || !slots?.length) return null;
+
+    const selected = current ? slots.find(slot => slot.id === current) : null;
+    if (selected && !selected.full) return selected.id;
+
+    return slots.find(slot => !slot.full)?.id ?? null;
+}
+
+/** Israel-local calendar key used to scope capacity snapshots to one service day. */
+export function shopDateKey(date: Date = new Date()): string {
+    const fmt = new Intl.DateTimeFormat('en-US', {
+        timeZone: SHOP_TZ,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    });
+    const map: Record<string, string> = {};
+    for (const part of fmt.formatToParts(date)) map[part.type] = part.value;
+    return `${map.year}-${map.month}-${map.day}`;
+}
+
+export interface PickupCapacitySlot {
+    time: string;
+    full: boolean;
+    available?: number;
+}
+
+export interface PickupAvailabilitySlot {
+    id: string;
+    label: string;
+    isPeak: boolean;
+    full: boolean;
+    available: number;
+    capacityPending: boolean;
+}
+
+/**
+ * Merge capacity only when it was measured for the same Israel service date.
+ * HH:MM repeats every day, so carrying yesterday's snapshot across midnight
+ * could otherwise mark a full slot today as available.
+ */
+export function mergePickupCapacity(
+    localSlots: readonly { id: string; label: string; isPeak: boolean }[] | null,
+    capacitySlots: readonly PickupCapacitySlot[] | null,
+    capacityServiceDate: string | null,
+    currentServiceDate: string,
+): PickupAvailabilitySlot[] | null {
+    if (!localSlots || capacitySlots === null || capacityServiceDate !== currentServiceDate) return null;
+
+    const liveMap = new Map(capacitySlots.map(slot => [slot.time, slot]));
+    return localSlots.map(slot => {
+        const live = liveMap.get(slot.id);
+        return {
+            ...slot,
+            full: live ? Boolean(live.full) : true,
+            available: live?.available ?? 0,
+            capacityPending: !live,
+        };
+    });
+}
+
 // ─── The live override ───────────────────────────────────────
 
 /**

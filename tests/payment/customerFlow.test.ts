@@ -14,6 +14,14 @@ const seal = readFileSync(new URL(
     '../../src/components/builder/ui/OrderSealScreen.jsx',
     import.meta.url,
 ), 'utf8');
+const shopHook = readFileSync(new URL(
+    '../../src/lib/useShopStatus.ts',
+    import.meta.url,
+), 'utf8');
+const slotsRoute = readFileSync(new URL(
+    '../../src/app/api/slots/route.ts',
+    import.meta.url,
+), 'utf8');
 
 test('customer order hand-off keeps its client-side source invariants', () => {
     const submitStart = summary.indexOf('const submitOrder = async');
@@ -56,4 +64,38 @@ test('customer order hand-off keeps its client-side source invariants', () => {
     assert.match(seal, /ההזמנה נשלחה למטבח/);
     assert.doesNotMatch(seal, />בהכנה!</,
         'the initial seal must not claim preparation has already started');
+});
+
+test('long-open customer screens refresh time-sensitive shop state safely', () => {
+    assert.match(shopHook, /setInterval\(refreshForCurrentTime, 60_000\)/,
+        'a visible tab must refresh across opening-hours boundaries');
+    assert.match(shopHook, /clearInterval\(intervalId\)/);
+    assert.match(shopHook, /addEventListener\('visibilitychange', onVisibilityChange\)/);
+    assert.match(shopHook, /removeEventListener\('visibilitychange', onVisibilityChange\)/);
+    assert.match(shopHook, /addEventListener\('pageshow', onPageShow\)/);
+    assert.match(shopHook, /removeEventListener\('pageshow', onPageShow\)/);
+    assert.match(shopHook, /signal: controller\.signal/);
+    assert.match(shopHook, /setTimeout\(\(\) => controller\.abort\(\), 10_000\)/);
+    assert.match(shopHook, /lastKnownOverrideRef\.current = \{ override, note: data\.note \?\? null \}/);
+    assert.match(shopHook, /shopStatus\(new Date\(\), known\?\.override \?\? null, known\?\.note \?\? null\)/,
+        'a failed refresh must recompute time without erasing a known staff override');
+
+    assert.match(summary, /generatePickupSlots\(shop\.refreshedAt \? new Date\(shop\.refreshedAt\) : undefined\)/);
+    assert.match(summary, /fetch\('\/api\/slots', \{ cache: 'no-store', signal: controller\.signal \}\)/);
+    assert.match(summary, /controller\.abort\(\);[\s\S]*?\}, \[shop\.loading, shop\.refreshedAt\]\)/);
+    assert.match(summary, /const effectivePickupTime = resolvePickupSelection\(pickupTime, pickupAvailability\.slots, shop\.open\)/,
+        'expired or newly-full selections must be reconciled before render and submit');
+    assert.match(summary, /status: current\.slots === null \? 'error' : 'stale'/,
+        'a failed periodic capacity refresh must retain the last successful snapshot');
+    assert.match(summary, /pickupTime: pickupForSubmit/,
+        'the submitted value must be re-resolved against current availability');
+    assert.match(summary, /setAcceptedOrder\(\{[\s\S]*?pickupTime: pickupForSubmit/,
+        'the confirmation must show the same resolved slot the server received');
+
+    assert.match(slotsRoute, /export const dynamic = 'force-dynamic'/);
+    assert.match(slotsRoute, /export const revalidate = 0/);
+    assert.match(slotsRoute, /serviceDate = shopDateKey\(now\)/,
+        'capacity responses must identify their Israel service date');
+    assert.equal(slotsRoute.match(/headers: NO_STORE_HEADERS/g)?.length, 2,
+        'both slot responses must explicitly opt out of caching');
 });

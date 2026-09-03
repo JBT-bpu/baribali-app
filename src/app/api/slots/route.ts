@@ -2,10 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 import { listDemoOrders } from '@/lib/demoStore';
 import { enforceRateLimit } from '@/lib/rateLimit';
-import { pickupSlots, SHOP_TZ } from '@/lib/shopHours';
+import { pickupSlots, shopDateKey, SHOP_TZ } from '@/lib/shopHours';
 
 const SLOT_CAPACITY = 5;      // max orders per slot
 const TIMEZONE = SHOP_TZ;
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' };
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 const WEEKDAY_INDEX: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
 
@@ -62,9 +66,10 @@ export async function GET(req: NextRequest) {
     const now = new Date();
     const offered = pickupSlots(now);
     const slotTimes = offered.map(s => s.id);
+    const serviceDate = shopDateKey(now);
 
     if (slotTimes.length === 0) {
-        return NextResponse.json({ slots: [], closed: true });
+        return NextResponse.json({ slots: [], closed: true, serviceDate }, { headers: NO_STORE_HEADERS });
     }
 
     // Count existing orders per pickup_time slot for today (Israel-local "today").
@@ -102,5 +107,5 @@ export async function GET(req: NextRequest) {
         };
     });
 
-    return NextResponse.json({ slots, closed: false });
+    return NextResponse.json({ slots, closed: false, serviceDate }, { headers: NO_STORE_HEADERS });
 }

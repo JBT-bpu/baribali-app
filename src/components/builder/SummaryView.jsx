@@ -119,8 +119,8 @@ function bowlRowLayout(row, count) {
  * Returns null rather than an empty array when there is nothing available,
  * because the callers already treat null as "closed".
  */
-function generatePickupSlots() {
-    const slots = pickupSlots(new Date());
+function generatePickupSlots(now = new Date()) {
+    const slots = pickupSlots(now);
     return slots.length ? slots : null;
 }
 import { STEPS, NUTRI, BASE } from "../../data/salad-data.js"; // NUTRI used in bowl calorie total
@@ -136,7 +136,13 @@ import BariPlaque, { BariPlaqueKeyframes } from "../ui/bari/BariPlaque";
 import { PLAQUE } from "../ui/bari/plaqueGeometry";
 import { isSupabaseConfigured } from "../../lib/supabase";
 import { getAccessToken } from "../../lib/auth";
-import { pickupSlots, noPickupMessage } from "../../lib/shopHours";
+import {
+    mergePickupCapacity,
+    noPickupMessage,
+    pickupSlots,
+    resolvePickupSelection,
+    shopDateKey,
+} from "../../lib/shopHours";
 import { useShopStatus } from "../../lib/useShopStatus";
 
 const DEMO_MODE = !isSupabaseConfigured();
@@ -154,12 +160,14 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     // Schedule + the live staff override. The server checks this again at POST
     // /api/orders and is the authority; this is so the screen stops pretending.
     const shop = useShopStatus();
+    const pickupAvailability = usePickupAvailability(shop);
     const [showMixing, setShowMixing] = useState(false);
     const [notesError, setNotesError] = useState("");
     const [notesOpen, setNotesOpen] = useState(false);
     const [notesFocused, setNotesFocused] = useState(false);
     const [highlightedStep, setHighlightedStep] = useState(null);
     const [pickupTime, setPickupTime] = useState(() => generatePickupSlots()?.[0]?.id ?? null);
+    const effectivePickupTime = resolvePickupSelection(pickupTime, pickupAvailability.slots, shop.open);
     const [paymentChoice, setPaymentChoice] = useState("pickup"); // 'now' | 'pickup' — demo mode only
     /**
      * The accepted order — null until the server says it recorded one.
@@ -243,7 +251,11 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     const discAmount = Math.max(autoAmount, typedAmount);
     const finalTotal = total - discAmount;
     // Confirmed-closed: we heard back from the server and it said no.
-    const shopBlocked = shop.live && !shop.open;
+    const shopBlocked = !shop.open && (shop.live || shop.override === 'closed');
+    // During ordinary opening hours an order needs one of the offered slots.
+    // A manual open override is the exception: staff may coordinate pickup at
+    // the register when the normal schedule has no slots at all.
+    const pickupBlocked = shop.open && shop.reason !== 'override_open' && !effectivePickupTime;
     const applyPromo = () => {
         const d = findDiscount(promoInput);
         setAppliedDiscount(d);
@@ -355,6 +367,19 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
             return;
         }
 
+        // Re-resolve at click time as well as at render time. Capacity can
+        // change between two React commits; never send a hidden expired/full
+        // value just because the reconciliation UI has not painted yet.
+        const pickupForSubmit = resolvePickupSelection(
+            pickupTime,
+            pickupAvailability.slots,
+            shop.open,
+        );
+        if (shop.open && shop.reason !== 'override_open' && !pickupForSubmit) {
+            failSubmit("זמן האיסוף השתנה. בחרו שעה פנויה ונסו שוב.");
+            return;
+        }
+
         // A hung request never rejects, so without this the customer sat on the
         // mixing overlay indefinitely with no way out — a real outcome on a
         // flaky mobile connection. 20s, then treat it as a failure they can
@@ -377,7 +402,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                 body: JSON.stringify({
                     items: all.map(i => ({ id: i.id, he: i.he, icon: i.icon, price: effectiveItemPrice(i.id, i.price || 0) })),
                     total: finalTotal,
-                    pickupTime,
+                    pickupTime: pickupForSubmit,
                     notes,
                     size: base,
                     productType,
@@ -447,7 +472,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
             setAcceptedOrder({
                 total: finalTotal,
                 items: all.length,
-                pickupTime,
+                pickupTime: pickupForSubmit,
                 orderNum: data.orderNum ?? null,
                 orderId: data.id ?? null,
                 paymentStatus: data.paymentStatus ?? null,
@@ -668,7 +693,14 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                     </BariModal>
 
                     {/* Pickup time picker */}
-                    <PickupTimePicker value={pickupTime} onChange={setPickupTime} shop={shop} />
+                    <PickupTimePicker
+                        value={effectivePickupTime}
+                        onChange={setPickupTime}
+                        shop={shop}
+                        localSlots={pickupAvailability.localSlots}
+                        slots={pickupAvailability.slots}
+                        capacityStatus={pickupAvailability.status}
+                    />
 
                     {/* Price breakdown */}
                     <BariPanel style={{ marginTop: "14px", padding: "14px 16px" }}>
@@ -753,7 +785,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                         <div style={{ ...S.metaPill, ...S.metaPillGold }}>
                             <span style={S.metaPillIcon}>⏰</span>
                             <span style={{ ...S.metaPillText, color: "#f0d060", fontWeight: 800 }}>
-                                {pickupTime ?? 'בחר זמן'}
+                                {effectivePickupTime ?? 'בחר זמן'}
                             </span>
                         </div>
                     </div>
@@ -778,11 +810,11 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                     <BariButton
                         variant="primary"
                         fullWidth
-                        disabled={submitting || (shopBlocked && !hasPendingPayment)}
-                        style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif", opacity: (submitting || (shopBlocked && !hasPendingPayment)) ? 0.6 : 1 }}
+                        disabled={submitting || (!hasPendingPayment && (shopBlocked || pickupBlocked))}
+                        style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif", opacity: (submitting || (!hasPendingPayment && (shopBlocked || pickupBlocked))) ? 0.6 : 1 }}
                         onClick={() => submitOrder()}
                     >
-                        <span>{submitting ? "שולח…" : hasPendingPayment ? "פתח תשלום" : shopBlocked ? "סגור כרגע" : submitError ? "נסו שוב" : "שלח הזמנה"}</span>
+                        <span>{submitting ? "שולח…" : hasPendingPayment ? "פתח תשלום" : shopBlocked ? "סגור כרגע" : pickupBlocked ? "אין שעה פנויה" : submitError ? "נסו שוב" : "שלח הזמנה"}</span>
                         <span style={S.orderBtnPrice}>₪{finalTotal}</span>
                     </BariButton>
                     {/* Consent disclosure — links open the legal docs before ordering */}
@@ -1040,43 +1072,95 @@ const S = {
 };
 
 // ─── Pickup time picker ────────────────────────────────────────
-function PickupTimePicker({ value, onChange, shop }) {
-    const localSlots = useMemo(() => generatePickupSlots(), []);
-    const [liveSlots, setLiveSlots] = useState(null); // null = loading
+function usePickupAvailability(shop) {
+    const localSlots = useMemo(
+        () => generatePickupSlots(shop.refreshedAt ? new Date(shop.refreshedAt) : undefined),
+        [shop.refreshedAt],
+    );
+    const serviceDate = useMemo(
+        () => shopDateKey(shop.refreshedAt ? new Date(shop.refreshedAt) : undefined),
+        [shop.refreshedAt],
+    );
+    const [capacity, setCapacity] = useState({ slots: null, serviceDate: null, status: 'loading' });
 
-    // Fetch live capacity from API
+    // Refresh capacity on the same clock as opening status. A failed periodic
+    // refresh keeps the last successful snapshot: forgetting it would turn a
+    // known-full slot back into an available one, and capacity is not yet
+    // enforced atomically by POST /api/orders.
     useEffect(() => {
-        fetch('/api/slots')
+        if (shop.loading) return;
+
+        const controller = new AbortController();
+        const requestTimeout = setTimeout(() => controller.abort(), 10_000);
+        let cancelled = false;
+
+        fetch('/api/slots', { cache: 'no-store', signal: controller.signal })
             .then(r => r.ok ? r.json() : null)
             .then(data => {
-                if (data?.slots) setLiveSlots(data.slots);
-                else setLiveSlots([]); // fallback to local if API fails
+                if (cancelled) return;
+                if (Array.isArray(data?.slots) && typeof data?.serviceDate === 'string') {
+                    setCapacity({ slots: data.slots, serviceDate: data.serviceDate, status: 'ready' });
+                } else {
+                    setCapacity(current => ({
+                        ...current,
+                        status: current.slots === null ? 'error' : 'stale',
+                    }));
+                }
             })
-            .catch(() => setLiveSlots([]));
-    }, []);
+            .catch(() => {
+                if (!cancelled) {
+                    setCapacity(current => ({
+                        ...current,
+                        status: current.slots === null ? 'error' : 'stale',
+                    }));
+                }
+            })
+            .finally(() => clearTimeout(requestTimeout));
 
-    // Merge live availability into local slots (or use local while loading)
-    const slots = useMemo(() => {
-        if (!localSlots) return null;
-        if (!liveSlots) return localSlots; // still loading — show all as available
-        const liveMap = Object.fromEntries(liveSlots.map(s => [s.time, s]));
-        return localSlots.map(s => ({
-            ...s,
-            full: liveMap[s.id]?.full ?? false,
-            available: liveMap[s.id]?.available ?? 5,
-        }));
-    }, [localSlots, liveSlots]);
+        return () => {
+            cancelled = true;
+            clearTimeout(requestTimeout);
+            controller.abort();
+        };
+    }, [shop.loading, shop.refreshedAt]);
+
+    // Never invent capacity for a slot absent from the retained server
+    // snapshot. This happens briefly when the local five-minute window moves
+    // before the next response arrives; the new slot becomes usable only once
+    // /api/slots confirms it.
+    const slots = useMemo(
+        () => mergePickupCapacity(localSlots, capacity.slots, capacity.serviceDate, serviceDate),
+        [capacity.serviceDate, capacity.slots, localSlots, serviceDate],
+    );
+
+    return { localSlots, slots, status: capacity.status };
+}
+
+function PickupTimePicker({ value, onChange, shop, localSlots, slots, capacityStatus }) {
 
     // Two different ways to have nothing to offer, and only one of them is the
     // schedule. `generatePickupSlots` reads WEEK, which is in the bundle and
     // knows nothing about staff having closed the shop twenty minutes ago — so
     // the override has to be consulted separately or the picker cheerfully
     // offers times for a shop with its shutters down.
-    if (slots === null || !shop.open) {
+    if (localSlots === null || !shop.open) {
         return (
             <div style={PT.box}>
                 <div style={PT.title}>⏰ זמן איסוף</div>
                 <div style={PT.closedMsg}>{noPickupMessage(shop, new Date())}</div>
+            </div>
+        );
+    }
+
+    if (slots === null) {
+        return (
+            <div style={PT.box} aria-live="polite">
+                <div style={PT.title}>⏰ זמן איסוף</div>
+                <div style={PT.closedMsg}>
+                    {capacityStatus === 'error'
+                        ? 'לא הצלחנו לעדכן זמני איסוף · ננסה שוב אוטומטית'
+                        : 'בודקים זמני איסוף…'}
+                </div>
             </div>
         );
     }
@@ -1101,7 +1185,11 @@ function PickupTimePicker({ value, onChange, shop }) {
                     >
                         {slot.label}
                         {slot.isPeak && !slot.full && <span style={PT.peakDot} />}
-                        {slot.full && <span style={PT.fullTag}>מלא</span>}
+                        {slot.full && (
+                            <span style={slot.capacityPending ? PT.pendingTag : PT.fullTag}>
+                                {slot.capacityPending ? 'בודקים' : 'מלא'}
+                            </span>
+                        )}
                     </button>
                 ))}
             </div>
@@ -1135,6 +1223,7 @@ const PT = {
     peakDot: { display: "inline-block", width: "5px", height: "5px", borderRadius: "50%", background: "#e57373", marginRight: "4px", verticalAlign: "middle", flexShrink: 0 },
     chipFull: { opacity: 0.3, cursor: "not-allowed", border: "1px solid rgba(255,255,255,0.06)" },
     fullTag: { fontSize: "10px", fontWeight: 800, color: "#e57373", marginRight: "4px", letterSpacing: "0.04em" },
+    pendingTag: { fontSize: "9px", fontWeight: 700, color: "rgba(255,255,255,0.5)", marginRight: "4px" },
 };
 
 const KF = `
