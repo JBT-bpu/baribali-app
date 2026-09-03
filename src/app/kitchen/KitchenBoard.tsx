@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { isSupabaseDemoMode } from '@/lib/supabase';
 import { orderSizeLabel } from '@/lib/reorder';
-import OrderTabs from './OrderTabs';
+import OrderTabs, { kitchenOrderPanelId, kitchenOrderTabId } from './OrderTabs';
 import ActiveOrder from './ActiveOrder';
 import { type Order, type OrderStatus, byPickupThenReceived } from './types';
 import { type ShopStatus } from '@/lib/shopHours';
@@ -831,15 +831,23 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
                 <>
                     <OrderTabs orders={visibleOrders} activeId={activeId} onSelect={setActiveId} newIds={newIds} />
                     {active && (
-                        <ActiveOrder
-                            key={active.id}
-                            order={active}
-                            sizeLabel={orderSizeLabel(active.size)}
-                            onStatus={s => updateStatus(active.id, s)}
-                            checked={checks[active.id] ?? []}
-                            onToggleItem={itemId => toggleItem(active.id, itemId)}
-                            statusBusy={statusBusy}
-                        />
+                        <div
+                            id={kitchenOrderPanelId(active.id)}
+                            role="tabpanel"
+                            aria-labelledby={kitchenOrderTabId(active.id)}
+                            tabIndex={0}
+                            style={K.orderPanel}
+                        >
+                            <ActiveOrder
+                                key={active.id}
+                                order={active}
+                                sizeLabel={orderSizeLabel(active.size)}
+                                onStatus={s => updateStatus(active.id, s)}
+                                checked={checks[active.id] ?? []}
+                                onToggleItem={itemId => toggleItem(active.id, itemId)}
+                                statusBusy={statusBusy}
+                            />
+                        </div>
                     )}
                 </>
             )}
@@ -927,6 +935,7 @@ const K: Record<string, React.CSSProperties> = {
     },
     loadingMsg: { padding: '60px', textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: '16px' },
     emptyMsg: { padding: '80px', textAlign: 'center', color: 'var(--color-green-accent)', fontSize: '18px', fontWeight: 700 },
+    orderPanel: { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 },
     errorBanner: {
         display: 'flex', alignItems: 'center', gap: '12px',
         margin: '10px 16px', padding: '14px 16px', borderRadius: '12px',

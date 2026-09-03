@@ -3,6 +3,27 @@
 import { useEffect, useRef } from 'react';
 import { type Order, urgencyOf, URGENCY_COLOR } from './types';
 
+export function kitchenOrderTabId(orderId: string) {
+    return `kitchen-order-tab-${orderId}`;
+}
+
+export function kitchenOrderPanelId(orderId: string) {
+    return `kitchen-order-panel-${orderId}`;
+}
+
+/**
+ * Return the next tab for a horizontal RTL strip. ArrowLeft moves to the tab
+ * drawn on the left (the next DOM item), while ArrowRight moves to the right.
+ */
+export function orderTabTargetIndex(current: number, key: string, count: number): number | null {
+    if (count <= 0 || current < 0 || current >= count) return null;
+    if (key === 'ArrowLeft') return (current + 1) % count;
+    if (key === 'ArrowRight') return (current - 1 + count) % count;
+    if (key === 'Home') return 0;
+    if (key === 'End') return count - 1;
+    return null;
+}
+
 /**
  * The queue, always visible. One tab per open order, ordered by pickup time.
  *
@@ -31,7 +52,7 @@ export default function OrderTabs({
     newIds: string[];
 }) {
     const stripRef = useRef<HTMLDivElement>(null);
-    const activeRef = useRef<HTMLButtonElement>(null);
+    const tabRefs = useRef(new Map<string, HTMLButtonElement>());
 
     /**
      * Keep the order in the worker's hands ON SCREEN.
@@ -47,7 +68,7 @@ export default function OrderTabs({
     const order = orders.map(o => o.id).join(',');
     useEffect(() => {
         const strip = stripRef.current;
-        const tab = activeRef.current;
+        const tab = activeId ? tabRefs.current.get(activeId) : null;
         if (!strip || !tab) return;
         const s = strip.getBoundingClientRect();
         const t = tab.getBoundingClientRect();
@@ -58,9 +79,19 @@ export default function OrderTabs({
         }
     }, [activeId, order]);
 
+    const selectFromKeyboard = (event: React.KeyboardEvent<HTMLButtonElement>, currentIndex: number) => {
+        const targetIndex = orderTabTargetIndex(currentIndex, event.key, orders.length);
+        if (targetIndex === null) return;
+
+        event.preventDefault();
+        const target = orders[targetIndex];
+        onSelect(target.id);
+        requestAnimationFrame(() => tabRefs.current.get(target.id)?.focus({ preventScroll: true }));
+    };
+
     return (
-        <div ref={stripRef} style={S.strip} role="tablist" aria-label="הזמנות פתוחות">
-            {orders.map(o => {
+        <div ref={stripRef} style={S.strip} role="tablist" aria-label="הזמנות פתוחות" aria-orientation="horizontal">
+            {orders.map((o, index) => {
                 const active = o.id === activeId;
                 const { level, lateBy } = urgencyOf(o.pickup_time);
                 const dot = URGENCY_COLOR[level];
@@ -71,10 +102,18 @@ export default function OrderTabs({
                 return (
                     <button
                         key={o.id}
-                        ref={active ? activeRef : undefined}
+                        ref={element => {
+                            if (element) tabRefs.current.set(o.id, element);
+                            else tabRefs.current.delete(o.id);
+                        }}
+                        id={kitchenOrderTabId(o.id)}
+                        type="button"
                         role="tab"
                         aria-selected={active}
+                        aria-controls={active ? kitchenOrderPanelId(o.id) : undefined}
+                        tabIndex={active ? 0 : -1}
                         onClick={() => onSelect(o.id)}
+                        onKeyDown={event => selectFromKeyboard(event, index)}
                         style={{
                             ...S.tab,
                             ...(active ? S.tabActive : {}),

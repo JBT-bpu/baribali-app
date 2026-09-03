@@ -4,6 +4,7 @@ import test from 'node:test';
 import { NextRequest } from 'next/server';
 
 import { GET as getKitchenOrders } from '../../src/app/api/kitchen/orders/route';
+import { orderTabTargetIndex } from '../../src/app/kitchen/OrderTabs';
 import { handoffActionLabel, paymentLabel } from '../../src/app/kitchen/types';
 import { createDemoOrder, resetDemoStore } from '../../src/lib/demoStore';
 import {
@@ -26,6 +27,40 @@ const kitchenBoard = readFileSync(new URL(
     '../../src/app/kitchen/KitchenBoard.tsx',
     import.meta.url,
 ), 'utf8');
+const kitchenLogin = readFileSync(new URL(
+    '../../src/app/kitchen/KitchenLogin.tsx',
+    import.meta.url,
+), 'utf8');
+const orderTabs = readFileSync(new URL(
+    '../../src/app/kitchen/OrderTabs.tsx',
+    import.meta.url,
+), 'utf8');
+
+test('kitchen login exposes a labelled password field and announces linked errors', () => {
+    assert.match(kitchenLogin, /<label htmlFor="kitchen-password"/);
+    assert.match(kitchenLogin, /id="kitchen-password"[\s\S]*?autoComplete="current-password"/);
+    assert.match(kitchenLogin, /aria-invalid=\{Boolean\(error\)\}/);
+    assert.match(kitchenLogin, /aria-describedby=\{error \? 'kitchen-login-error' : undefined\}/);
+    assert.match(kitchenLogin, /id="kitchen-login-error" role="alert" aria-live="assertive"/);
+});
+
+test('kitchen order tabs use an RTL roving focus model', () => {
+    assert.equal(orderTabTargetIndex(1, 'ArrowLeft', 3), 2);
+    assert.equal(orderTabTargetIndex(1, 'ArrowRight', 3), 0);
+    assert.equal(orderTabTargetIndex(2, 'ArrowLeft', 3), 0, 'left wraps to the first tab');
+    assert.equal(orderTabTargetIndex(0, 'ArrowRight', 3), 2, 'right wraps to the last tab');
+    assert.equal(orderTabTargetIndex(2, 'Home', 3), 0);
+    assert.equal(orderTabTargetIndex(0, 'End', 3), 2);
+    assert.equal(orderTabTargetIndex(1, 'Enter', 3), null);
+    assert.equal(orderTabTargetIndex(0, 'ArrowLeft', 0), null);
+
+    assert.match(orderTabs, /role="tablist"[\s\S]*?aria-orientation="horizontal"/);
+    assert.match(orderTabs, /role="tab"[\s\S]*?aria-selected=\{active\}[\s\S]*?aria-controls=\{active \? kitchenOrderPanelId\(o\.id\) : undefined\}/,
+        'only the active tab may reference the one mounted tabpanel');
+    assert.match(orderTabs, /tabIndex=\{active \? 0 : -1\}/);
+    assert.match(orderTabs, /onKeyDown=\{event => selectFromKeyboard\(event, index\)\}/);
+    assert.match(kitchenBoard, /id=\{kitchenOrderPanelId\(active\.id\)\}[\s\S]*?role="tabpanel"[\s\S]*?aria-labelledby=\{kitchenOrderTabId\(active\.id\)\}/);
+});
 
 test('shop target clears an override when the live schedule can take over', () => {
     assert.equal(shopOverrideForTargetOpen({ scheduledOpen: true }, true), null);

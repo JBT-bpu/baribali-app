@@ -10,6 +10,10 @@ const tracking = readFileSync(new URL(
     '../../src/app/order/[id]/OrderStatusView.tsx',
     import.meta.url,
 ), 'utf8');
+const trackingPage = readFileSync(new URL(
+    '../../src/app/order/[id]/page.tsx',
+    import.meta.url,
+), 'utf8');
 const seal = readFileSync(new URL(
     '../../src/components/builder/ui/OrderSealScreen.jsx',
     import.meta.url,
@@ -36,6 +40,10 @@ const heroSelector = readFileSync(new URL(
 ), 'utf8');
 const builder = readFileSync(new URL(
     '../../src/components/builder/BariBaliBuilder.jsx',
+    import.meta.url,
+), 'utf8');
+const heroBowlCard = readFileSync(new URL(
+    '../../src/components/builder/ui/HeroBowlCard.jsx',
     import.meta.url,
 ), 'utf8');
 const detailSheet = readFileSync(new URL(
@@ -148,6 +156,38 @@ test('customer order hand-off keeps its client-side source invariants', () => {
         'an ambiguous return must explicitly prevent a second payment');
     assert.match(home, /paymentVerifying && <PaymentVerifyingNotice \/>/,
         'the warning must remain visible instead of dismissing on a timer');
+});
+
+test('order tracking announces each real status transition without poll spam', () => {
+    const effectStart = tracking.indexOf('// Track real status transitions.');
+    const nextEffect = tracking.indexOf('// Flash the tab title', effectStart);
+    const statusEffect = tracking.slice(effectStart, nextEffect);
+
+    assert.ok(effectStart >= 0 && nextEffect > effectStart,
+        'the status-transition effect must remain identifiable');
+    assert.match(
+        tracking,
+        /ref=\{statusAnnouncementRef\}[\s\S]*?role="status"[\s\S]*?aria-live="polite"[\s\S]*?aria-atomic="true"[\s\S]*?style=\{P\.srOnly\}/,
+        'status changes need one persistent, visually hidden polite live region',
+    );
+    assert.match(tracking, /if \(prevStatusRef\.current === null\) prevStatusRef\.current = d\.status/,
+        'the first response must seed the baseline instead of announcing a duplicate initial state');
+    assert.match(
+        statusEffect,
+        /if \(prev !== null && prev !== orderStatus\) \{[\s\S]*?statusAnnouncementRef\.current\.textContent = statusChangeAnnouncement\(orderStatus, orderNumber\)/,
+        'the announcement must only be written inside the real-transition guard',
+    );
+    assert.equal(statusEffect.match(/\.textContent = statusChangeAnnouncement/g)?.length, 1,
+        'one transition must produce only one live-region write');
+    assert.match(statusEffect, /\}, \[orderStatus, orderNumber, triggerCelebration, triggerRingPop\]\);/,
+        'new poll objects with the same status must not rerun the announcement effect');
+    assert.match(
+        tracking,
+        /status === 'ready'[\s\S]*?הזמנה מספר \$\{orderNumber\} מוכנה\. גשו לדלפק ואמרו את מספר ההזמנה\./,
+        'the ready announcement must say whose order is ready and what to do next',
+    );
+    assert.match(trackingPage, /<OrderStatusView key=\{id\} id=\{id\}/,
+        'navigating between tracking URLs must remount and seed a fresh status baseline');
 });
 
 test('long-open customer screens refresh time-sensitive shop state safely', () => {
@@ -379,6 +419,12 @@ test('the builder step header remains usable on a narrow phone', () => {
         'step swipes must ignore controls and horizontally scrolling regions');
     assert.doesNotMatch(builder, /onChipTouchStart|onChipTouchEnd|longPressRef/,
         'the visible info control must not be shadowed by a long-press that also fires selection');
+
+    const checkbox = builder.indexOf('role="checkbox"');
+    const checkboxClose = builder.indexOf('</button>', checkbox);
+    const infoControl = builder.indexOf('aria-label={`מידע על ${item.he}`}', checkbox);
+    assert.ok(checkbox >= 0 && checkboxClose > checkbox && infoControl > checkboxClose,
+        'ingredient selection and its info disclosure must be sibling controls, not nested ARIA descendants');
 });
 
 test('chef recipes disclose their authoritative price before selection', () => {
@@ -631,8 +677,8 @@ test('checkout controls stay truthful, stateful and touchable in demo mode', () 
     assert.match(summary, /notesToggle: \{ width: "100%", minHeight: "44px"/);
     assert.match(summary, /aria-label="קוד הנחה"[\s\S]*?minHeight: "44px", padding: "8px 10px"/,
         'the promo input must meet the mobile target floor');
-    assert.match(summary, /<button type="button" disabled=\{checkoutLocked\} onClick=\{applyPromo\}[\s\S]*?minHeight: "44px", padding: "8px 14px"/,
-        'the promo apply button must meet the mobile target floor');
+    assert.match(summary, /<form[\s\S]*?onSubmit=\{event => \{ event\.preventDefault\(\); if \(!checkoutLocked\) applyPromo\(\); \}\}[\s\S]*?<button type="submit" disabled=\{checkoutLocked\}[\s\S]*?minHeight: "44px", padding: "8px 14px"/,
+        'promo entry must submit with Enter and keep a mobile-sized explicit action');
     assert.match(summary, /<PickupTimePicker[\s\S]*?disabled=\{checkoutLocked\}/,
         'an unresolved order must lock checkout-only choices until its exact request is resolved');
     assert.match(summary, /promoError && <div role="alert"/);
@@ -640,4 +686,10 @@ test('checkout controls stay truthful, stateful and touchable in demo mode', () 
         'an applied discount must be announced as well as shown');
     assert.match(summary, /aria-label=\{`עריכת \$\{s\.title\}`\}/,
         'repeated edit buttons must identify the section they open');
+    assert.match(summary, /<button[\s\S]*?aria-label=\{`הדגש את \$\{it\.he\} ברשימת הבחירות`\}[\s\S]*?<Icon src=\{it\.icon\}/,
+        'interactive bowl art must be keyboard reachable and named');
+    assert.match(summary, /key=\{t\} style=\{\{ position: "absolute", inset: 0, zIndex: t \+ 1, pointerEvents: "none" \}\}[\s\S]*?pointerEvents: "auto"/,
+        'transparent upper bowl rows must not block pointer access to ingredient buttons below');
+    assert.match(heroBowlCard, /type="button"[\s\S]*?aria-label=\{`הסר את \$\{item\.he\} מהקערה`\}[\s\S]*?onClick=\{\(\) => onRemove\(item\.id\)\}/,
+        'each compact removal control must announce the ingredient it removes');
 });

@@ -1298,35 +1298,37 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                     const full = !on && ((cur.maxPicks && cur.maxPicks > 1 && curSel.length >= cur.maxPicks) || bowlFull);
                     const isPremiumStep = cur.id === "upgrade" || cur.id === "t_upgrade";
                     const itemPrice = effectiveItemPrice(item.id, item.price);
-                    // A div rather than a <button>: it already carries
-                    // role="checkbox", and the info affordance inside is a real
-                    // button — which cannot legally nest inside a button.
+                    // Selection and information are sibling controls. ARIA
+                    // checkbox descendants are flattened to presentation, so
+                    // nesting the info button inside would hide it from AT.
                     return (
-                      <div key={item.id}
-                        onClick={() => { if (!full) toggle(cur.id, item, cur.maxPicks); }}
-                        onKeyDown={(e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); if (!full) toggle(cur.id, item, cur.maxPicks); } }}
-                        aria-label={`${item.he}${itemPrice > 0 ? `, תוספת ${itemPrice} שקלים` : ""}${on ? ", נבחר" : ""}${item.desc ? `, ${item.desc}` : ""}`}
-                        aria-checked={on}
-                        aria-disabled={full}
-                        role="checkbox"
-                        tabIndex={full ? -1 : 0}
-                        style={{ ...S.chip, ...chipVisual(cur.id, on), ...(full ? S.chipOff : {}), animationDelay: `${(si * 5 + idx) * 20}ms` }}>
-                        {on && <div style={S.check} aria-hidden="true">✓</div>}
-                        {isPremiumStep && <div style={{ position: "absolute", top: "-2px", left: "-2px", fontSize: "12px", filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.6))" }} aria-hidden="true">👑</div>}
-                        {item.pop && <div style={S.popTag} aria-hidden="true">פופולרי</div>}
+                      <div key={item.id} style={S.chipWrap}>
+                        <button
+                          type="button"
+                          onClick={() => { if (!full) toggle(cur.id, item, cur.maxPicks); }}
+                          aria-label={`${item.he}${itemPrice > 0 ? `, תוספת ${itemPrice} שקלים` : ""}${on ? ", נבחר" : ""}${item.desc ? `, ${item.desc}` : ""}`}
+                          aria-checked={on}
+                          aria-disabled={full}
+                          role="checkbox"
+                          tabIndex={full ? -1 : 0}
+                          style={{ ...S.chip, width: "100%", height: "100%", ...chipVisual(cur.id, on), ...(full ? S.chipOff : {}), animationDelay: `${(si * 5 + idx) * 20}ms` }}
+                        >
+                          {on && <div style={S.check} aria-hidden="true">✓</div>}
+                          {isPremiumStep && <div style={{ position: "absolute", top: "-2px", left: "-2px", fontSize: "12px", filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.6))" }} aria-hidden="true">👑</div>}
+                          {item.pop && <div style={S.popTag} aria-hidden="true">פופולרי</div>}
+                          <Icon src={item.icon} size="38px" style={{ ...S.chipEmoji, transform: lastAdd === item.id ? "scale(1.4) rotate(-10deg)" : "scale(1)", transition: "transform 0.25s cubic-bezier(0.34,1.56,0.64,1)" }} />
+                          <span style={S.chipName}>{item.he}</span>
+                          {itemPrice > 0 && <span style={S.chipCost}>+₪{itemPrice}</span>}
+                        </button>
                         {/* Ingredient info. This explicit control replaces the old
                             hidden long-press shortcut, which could also trigger the
                             surrounding selection when the finger was released. */}
                         <button
                           type="button"
-                          onClick={(e) => { e.stopPropagation(); dismissHint(); setDetailCtx({ item, stepId: cur.id, maxPicks: cur.maxPicks }); haptic("tap"); }}
-                          onMouseDown={(e) => e.stopPropagation()}
+                          onClick={() => { dismissHint(); setDetailCtx({ item, stepId: cur.id, maxPicks: cur.maxPicks }); haptic("tap"); }}
                           aria-label={`מידע על ${item.he}`}
                           style={S.chipInfo}
                         >ℹ</button>
-                        <Icon src={item.icon} size="38px" style={{ ...S.chipEmoji, transform: lastAdd === item.id ? "scale(1.4) rotate(-10deg)" : "scale(1)", transition: "transform 0.25s cubic-bezier(0.34,1.56,0.64,1)" }} />
-                        <span style={S.chipName}>{item.he}</span>
-                        {itemPrice > 0 && <span style={S.chipCost}>+₪{itemPrice}</span>}
                       </div>
                     );
                   })}
@@ -1515,6 +1517,7 @@ const S = {
 
   sgLabel: { fontSize: "11px", fontWeight: 800, color: "rgba(200,168,78,0.85)", padding: "10px 4px 6px", textShadow: "0 1px 3px rgba(0,0,0,0.7), 0 0 8px rgba(0,0,0,0.3)" },
   grid: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "7px" },
+  chipWrap: { position: "relative", minWidth: 0 },
 
   // animationName/Duration/TimingFunction/FillMode used instead of the
   // `animation` shorthand so it can coexist with the per-chip `animationDelay`

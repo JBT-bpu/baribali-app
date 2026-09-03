@@ -258,7 +258,12 @@ export default function HeroBowlCard({ all, ingredientCount = all.length, onRemo
                     {all.length > 0 && (
                         <div style={{ display: "flex", flexWrap: "wrap", gap: `${PANEL.chipGap}px` }}>
                             {all.map(item => (
-                                <button key={item.id} onClick={() => onRemove(item.id)} style={{
+                                <button
+                                  key={item.id}
+                                  type="button"
+                                  aria-label={`הסר את ${item.he} מהקערה`}
+                                  onClick={() => onRemove(item.id)}
+                                  style={{
                                     border: "1px solid rgba(255,255,255,0.1)",
                                     background: "rgba(255,255,255,0.05)",
                                     borderRadius: "5px",
@@ -267,7 +272,8 @@ export default function HeroBowlCard({ all, ingredientCount = all.length, onRemo
                                     cursor: "pointer",
                                     animation: lastAdd === item.id
                                         ? "itemPop 0.3s cubic-bezier(0.34,1.56,0.64,1) both" : "none",
-                                }}>
+                                  }}
+                                >
                                     {item.icon && item.icon.startsWith("/")
                                         ? <img src={item.icon} alt={item.he} style={{ width: `${PANEL.chipIcon}px`, height: `${PANEL.chipIcon}px`, objectFit: "contain" }} />
                                         : item.icon}

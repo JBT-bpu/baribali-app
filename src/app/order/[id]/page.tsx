@@ -15,5 +15,8 @@ export default async function OrderStatusPage({
     const { id } = await params;
     const payment = (await searchParams).payment;
     const paymentHint = payment === 'verifying' ? 'verifying' : null;
-    return <OrderStatusView id={id} paymentHint={paymentHint} />;
+    // A client-side hop between two tracking URLs must start a fresh polling
+    // baseline. Remounting prevents order A's status/live-region state from
+    // being mistaken for a transition on order B.
+    return <OrderStatusView key={id} id={id} paymentHint={paymentHint} />;
 }

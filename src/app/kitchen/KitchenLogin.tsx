@@ -45,17 +45,27 @@ export default function KitchenLogin() {
                 <div style={S.title}>מטבח BariBali</div>
                 <div style={S.subtitle}>הזינו את סיסמת הצוות כדי להיכנס ללוח ההזמנות</div>
 
+                <label htmlFor="kitchen-password" style={S.label}>סיסמת צוות</label>
                 <input
+                    id="kitchen-password"
                     type="password"
                     value={password}
                     onChange={e => { setPassword(e.target.value); setError(''); }}
                     placeholder="סיסמה"
                     autoFocus
                     autoComplete="current-password"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    aria-invalid={Boolean(error)}
+                    aria-describedby={error ? 'kitchen-login-error' : undefined}
                     style={{ ...S.input, ...(error ? S.inputError : {}) }}
                 />
 
-                {error && <div style={S.error}>{error}</div>}
+                {error && (
+                    <div id="kitchen-login-error" role="alert" aria-live="assertive" style={S.error}>
+                        {error}
+                    </div>
+                )}
 
                 <BariButton
                     type="submit"
@@ -89,6 +99,10 @@ const S: Record<string, React.CSSProperties> = {
     emoji: { fontSize: '44px', lineHeight: 1 },
     title: { fontSize: '22px', fontWeight: 900, color: 'var(--color-gold-light)' },
     subtitle: { fontSize: '13px', color: 'rgba(255,255,255,0.45)', textAlign: 'center', lineHeight: 1.6, marginBottom: '4px' },
+    label: {
+        width: '100%', marginBottom: '-6px',
+        fontSize: '13px', fontWeight: 800, color: 'rgba(255,255,255,0.78)', textAlign: 'right',
+    },
     input: {
         width: '100%', padding: '13px 16px', borderRadius: '12px',
         background: 'rgba(255,255,255,0.06)', border: '1.5px solid rgba(255,255,255,0.14)',

@@ -786,11 +786,13 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                                 const total = size + step * (items.length - 1);
                                 const startX = 50 - total / 2;   // centred, in % of the bowl
                                 return (
-                                    <div key={t} style={{ position: "absolute", inset: 0, zIndex: t + 1 }}>
+                                    <div key={t} style={{ position: "absolute", inset: 0, zIndex: t + 1, pointerEvents: "none" }}>
                                         {items.map((it, i) => (
-                                            <span
+                                            <button
                                                 key={it.id}
+                                                type="button"
                                                 onClick={() => highlightStep(it)}
+                                                aria-label={`הדגש את ${it.he} ברשימת הבחירות`}
                                                 style={{
                                                     position: "absolute",
                                                     // RTL: the first ingredient sits on the RIGHT and
@@ -803,12 +805,16 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                                                     transform: "translateY(-50%)",
                                                     zIndex: items.length - i,
                                                     cursor: "pointer",
+                                                    padding: 0,
+                                                    border: 0,
+                                                    background: "transparent",
+                                                    pointerEvents: "auto",
                                                     animation: `popBounce 0.3s ease ${(t * 120 + i * 35)}ms both`,
                                                     filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.55))",
                                                 }}
                                             >
                                                 <Icon src={it.icon} size="100%" style={{ display: "block" }} />
-                                            </span>
+                                            </button>
                                         ))}
                                     </div>
                                 );
@@ -977,7 +983,10 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                         ))}
 
                         {/* Promo code */}
-                        <div style={{ display: "flex", gap: "6px", alignItems: "center", marginTop: "8px" }}>
+                        <form
+                            onSubmit={event => { event.preventDefault(); if (!checkoutLocked) applyPromo(); }}
+                            style={{ display: "flex", gap: "6px", alignItems: "center", marginTop: "8px" }}
+                        >
                             <input
                                 value={promoInput}
                                 disabled={checkoutLocked}
@@ -986,8 +995,8 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                                 aria-label="קוד הנחה"
                                 style={{ flex: 1, minHeight: "44px", padding: "8px 10px", borderRadius: "8px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.15)", color: "#fff", fontSize: "13px", fontWeight: 600, fontFamily: "var(--font-heebo), 'Heebo', sans-serif", outline: "none" }}
                             />
-                            <button type="button" disabled={checkoutLocked} onClick={applyPromo} style={{ minHeight: "44px", padding: "8px 14px", borderRadius: "8px", background: "rgba(200,168,78,0.2)", border: "1px solid rgba(200,168,78,0.4)", color: "#f0d060", fontSize: "13px", fontWeight: 800, cursor: checkoutLocked ? "not-allowed" : "pointer", opacity: checkoutLocked ? 0.55 : 1, fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }}>החל</button>
-                        </div>
+                            <button type="submit" disabled={checkoutLocked} style={{ minHeight: "44px", padding: "8px 14px", borderRadius: "8px", background: "rgba(200,168,78,0.2)", border: "1px solid rgba(200,168,78,0.4)", color: "#f0d060", fontSize: "13px", fontWeight: 800, cursor: checkoutLocked ? "not-allowed" : "pointer", opacity: checkoutLocked ? 0.55 : 1, fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }}>החל</button>
+                        </form>
                         {promoError && <div role="alert" style={{ fontSize: "11px", color: "#ff7575", fontWeight: 600, marginTop: "4px" }}>{promoError}</div>}
                         {effectiveDiscount && discAmount > 0 && (
                             <div role="status" aria-live="polite" style={{ ...S.sumPriceLine, marginTop: "6px" }}>

@@ -43,6 +43,17 @@ const STATUS_STEPS: { key: OrderStatus; label: string; rail: string; medallion: 
     { key: 'collected', label: 'נאסף',   rail: 'נאסף',   medallion: '/builder-assets/track-picked.webp', railIcon: '/builder-assets/track-picked-sm.webp', sub: 'בתיאבון! נשמח לראותכם שוב' },
 ];
 
+function statusChangeAnnouncement(status: OrderStatus, orderNumber: string): string {
+    if (status === 'ready') {
+        return `הזמנה מספר ${orderNumber} מוכנה. גשו לדלפק ואמרו את מספר ההזמנה.`;
+    }
+
+    const step = STATUS_STEPS.find(candidate => candidate.key === status);
+    return step
+        ? `סטטוס הזמנה מספר ${orderNumber} עודכן: ${step.label}. ${step.sub}`
+        : `סטטוס הזמנה מספר ${orderNumber} עודכן.`;
+}
+
 /* ── Celebration Sound (Web Audio API) ── */
 function playCelebrationChime() {
     let ac: AudioContext | undefined;
@@ -139,6 +150,7 @@ export default function OrderStatusView({ id, paymentHint = null }: { id: string
     // means only that the server said 404.
     const [offline, setOffline] = useState(false);
     const prevStatusRef = useRef<OrderStatus | null>(null);
+    const statusAnnouncementRef = useRef<HTMLDivElement | null>(null);
     const [ringScale, setRingScale] = useState(false);
     const [labelSlide, setLabelSlide] = useState(false);
 
@@ -274,19 +286,26 @@ export default function OrderStatusView({ id, paymentHint = null }: { id: string
         };
     }, [id]);
 
-    // Track status changes and fire effects
+    const orderStatus = order?.status ?? null;
+    const orderNumber = order?.order_num ?? '';
+
+    // Track real status transitions. The live region is updated imperatively
+    // inside the same transition guard, so an unchanged 4-second poll cannot
+    // make a screen reader repeat the current status.
     useEffect(() => {
-        if (!order) return;
+        if (!orderStatus) return;
         const prev = prevStatusRef.current;
-        if (prev !== null && prev !== order.status) {
-            // Status changed
+        if (prev !== null && prev !== orderStatus) {
+            if (statusAnnouncementRef.current) {
+                statusAnnouncementRef.current.textContent = statusChangeAnnouncement(orderStatus, orderNumber);
+            }
             triggerRingPop();
-            if (order.status === 'ready') {
+            if (orderStatus === 'ready') {
                 triggerCelebration();
             }
         }
-        prevStatusRef.current = order.status;
-    }, [order?.status, triggerCelebration, triggerRingPop, order]);
+        prevStatusRef.current = orderStatus;
+    }, [orderStatus, orderNumber, triggerCelebration, triggerRingPop]);
 
     // Flash the tab title when the order becomes ready while this tab is
     // hidden — customers park this page in the background while waiting.
@@ -342,6 +361,13 @@ export default function OrderStatusView({ id, paymentHint = null }: { id: string
 
     return (
         <div style={P.root}>
+            <div
+                ref={statusAnnouncementRef}
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+                style={P.srOnly}
+            />
             <BariGlowBackground />
             <GoldField zIndex={0} />
 
