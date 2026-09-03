@@ -132,19 +132,23 @@ body {
     }
 }
 
-/* Prevent text selection on touch */
-* {
+/* Keep tap feedback tidy on controls without blocking customers from zooming
+   or copying useful content such as an order number or legal text. */
+button,
+[role='button'],
+[draggable='true'] {
     -webkit-tap-highlight-color: transparent;
     -webkit-touch-callout: none;
     -webkit-user-select: none;
     user-select: none;
 }
 
-/* Allow text selection for inputs */
-input,
-textarea {
-    -webkit-user-select: text;
-    user-select: text;
+/* A single keyboard-focus language across the old inline-style components and
+   the newer Tailwind components. `!important` is intentional: a few legacy
+   ingredient cards carry inline `outline: none`. */
+:where(a, button, input, textarea, select, [role='button'], [tabindex]):focus-visible {
+    outline: 3px solid var(--color-gold-bright) !important;
+    outline-offset: 3px !important;
 }
 
 /* Respect OS-level reduced-motion preference. !important is required here to

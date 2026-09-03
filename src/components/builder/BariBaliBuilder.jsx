@@ -25,7 +25,7 @@ import HeroBowlCard from "./ui/HeroBowlCard.jsx";
 import SizePicker from "../home/SizePicker";
 import BariModal from "../ui/bari/BariModal";
 import BariButton from "../ui/bari/BariButton";
-import { useAnimatedNumber } from "../../lib/motionHooks";
+import { useAnimatedNumber, usePrefersReducedMotion } from "../../lib/motionHooks";
 import { takeReorder } from "../../lib/reorder";
 import { effectiveItemPrice, effectiveBase, effectiveSizePrice } from "../../lib/menuConfig";
 import { isSoundOn, readSoundPref, setSoundPref } from "../../lib/soundPref";
@@ -299,6 +299,7 @@ function ClearConfirmModal({ open, onConfirm, onCancel }) {
 /** @param {{ sizeParam?: string | null, type?: string, entrance?: boolean, skipIntro?: boolean }} props */
 export default function BariBaliBuilder({ sizeParam = null, type = "salad", entrance = false, skipIntro = false }) {
   const isTortilla = type === "tortilla";
+  const reducedMotion = usePrefersReducedMotion();
   const steps = useMemo(() => isTortilla ? STEPS.filter(s => s.id !== "finish") : STEPS, [isTortilla]);
   const [step, setStep] = useState(isTortilla ? 0 : -1);
   const [mounted, setMounted] = useState(false);
@@ -683,7 +684,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                   </svg>
                   <div className="hero-bowl" style={{ filter: "drop-shadow(0 4px 16px rgba(200,168,78,0.25))" }}>
                     {bowlAnim
-                      ? <Lottie animationData={bowlAnim} loop autoplay style={{ width: "100%", height: "100%" }} />
+                      ? <Lottie animationData={bowlAnim} loop={!reducedMotion} autoplay={!reducedMotion} style={{ width: "100%", height: "100%" }} />
                       : <span style={{ fontSize: "52px", lineHeight: "108px", display: "block", textAlign: "center" }}>🥗</span>
                     }
                   </div>

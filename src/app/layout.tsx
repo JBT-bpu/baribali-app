@@ -33,8 +33,6 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
     width: 'device-width',
     initialScale: 1,
-    maximumScale: 1,
-    userScalable: false,
     themeColor: '#020a02',
     // Without this every `env(safe-area-inset-*)` in the app resolves to 0, so
     // the notch/home-indicator padding the components already ask for never

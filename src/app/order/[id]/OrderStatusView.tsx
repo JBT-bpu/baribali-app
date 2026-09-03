@@ -28,6 +28,7 @@ function paymentLabel(payment: string | undefined): { text: string; owed: boolea
     switch (payment) {
         case 'paid':
         case 'paid_unverified': return { text: 'שולם ✓', owed: false };
+        case 'verification_pending': return { text: 'מאמתים את התשלום — אל תשלמו שוב', owed: false };
         case 'pay_at_pickup':   return { text: 'לתשלום באיסוף', owed: true };
         case 'pending':         return { text: 'ממתין לתשלום', owed: true };
         case 'failed':          return { text: 'התשלום נכשל — שלמו באיסוף', owed: true };
@@ -159,7 +160,7 @@ function useCountdown(pickupTime: string | null, frozen: boolean) {
     return { clock, text, urgent: totalSec < 120, arrived: false };
 }
 
-export default function OrderStatusView({ id }: { id: string }) {
+export default function OrderStatusView({ id, paymentHint = null }: { id: string; paymentHint?: 'verifying' | null }) {
     const [order, setOrder] = useState<Order | null>(null);
     const [notFound, setNotFound] = useState(false);
     // Set while we can't reach the API. Distinct from `notFound`, which now
@@ -315,7 +316,13 @@ export default function OrderStatusView({ id }: { id: string }) {
         ...(labelSlide ? { animation: 'statusSlideIn 0.45s ease both' } : {}),
     };
 
-    const pay = paymentLabel(order.payment_status);
+    // The return URL is only a conservative UX hint while the durable payment
+    // attempt is being reconciled. It may suppress a second payment, but can
+    // never claim success; the order API remains authoritative for `paid`.
+    const effectivePayment = paymentHint === 'verifying' && order.payment_status === 'pending'
+        ? 'verification_pending'
+        : order.payment_status;
+    const pay = paymentLabel(effectivePayment);
 
     return (
         <div style={P.root}>
@@ -438,7 +445,7 @@ export default function OrderStatusView({ id }: { id: string }) {
                     claim matters is exactly when it stopped being true. */}
                 {/* Opened from a saved link this page had no way out of itself. */}
                 <Link
-                    href="/"
+                    href="/home2"
                     style={{ ...slot(TRACK.bottomPill.top, TRACK.bottomPill.height, TRACK.bottomPill.left, TRACK.bottomPill.right), ...P.bottomPill }}
                 >
                     ← חזרה לתפריט
@@ -517,7 +524,7 @@ function NotFound() {
             <GoldField zIndex={0} />
             <div style={{ fontSize: '48px' }}>🤔</div>
             <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '16px', fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }}>ההזמנה לא נמצאה</div>
-            <Link href="/" style={{
+            <Link href="/home2" style={{
                 marginTop: '8px', padding: '12px 32px', borderRadius: '50px', textDecoration: 'none',
                 background: 'linear-gradient(135deg,#c8a832 0%,#f0d060 45%,#ffe066 55%,#c8a832 100%)',
                 color: '#0d2e0d', fontSize: '15px', fontWeight: 900,

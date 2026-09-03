@@ -5,7 +5,15 @@ import OrderStatusView from './OrderStatusView';
 // restores itself to.
 export const metadata = { title: 'מעקב הזמנה — BariBali' };
 
-export default async function OrderStatusPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function OrderStatusPage({
+    params,
+    searchParams,
+}: {
+    params: Promise<{ id: string }>;
+    searchParams: Promise<{ payment?: string | string[] }>;
+}) {
     const { id } = await params;
-    return <OrderStatusView id={id} />;
+    const payment = (await searchParams).payment;
+    const paymentHint = payment === 'verifying' ? 'verifying' : null;
+    return <OrderStatusView id={id} paymentHint={paymentHint} />;
 }

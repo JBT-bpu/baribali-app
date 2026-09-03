@@ -79,7 +79,6 @@ export default function GoldField({ impulseRef, dropRef, entrySweep = 0, entryHo
         const ctx = c.getContext('2d')!;
         const resize = () => { c.width = c.offsetWidth; c.height = c.offsetHeight; };
         resize();
-        window.addEventListener('resize', resize);
         // Palette matches the design tokens in globals.css (gold-deep/light/
         // bright, cream) — literal hex here since canvas fillStyle can't
         // resolve CSS custom properties.
@@ -133,7 +132,9 @@ export default function GoldField({ impulseRef, dropRef, entrySweep = 0, entryHo
             } catch { /* nothing handed over — start fresh */ }
         }
 
-        let raf: number, t = 0, drop = 0, live = 0;
+        const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
+        let animate = !motionPreference.matches;
+        let raf = 0, t = 0, drop = 0, live = 0;
         const draw = () => {
             t += 0.013; ctx.clearRect(0, 0, c.width, c.height);
             // "Sweep" — during the rise the field drifts upward with the panel and
@@ -190,12 +191,27 @@ export default function GoldField({ impulseRef, dropRef, entrySweep = 0, entryHo
             }
             if (impulseRef) impulseRef.current = Math.abs(imp) < 0.04 ? 0 : imp * 0.9;
             ctx.globalAlpha = 1;
-            raf = requestAnimationFrame(draw);
+            if (animate) raf = requestAnimationFrame(draw);
         };
+        const onMotionPreferenceChange = (event: MediaQueryListEvent) => {
+            const shouldAnimate = !event.matches;
+            if (animate === shouldAnimate) return;
+            animate = shouldAnimate;
+            if (animate) raf = requestAnimationFrame(draw);
+            else cancelAnimationFrame(raf);
+        };
+        const onResize = () => {
+            resize();
+            if (!animate) draw();
+        };
+        motionPreference.addEventListener('change', onMotionPreferenceChange);
+        window.addEventListener('resize', onResize);
+        // Reduced-motion users still get the branded field, frozen on one frame.
         draw();
         return () => {
             cancelAnimationFrame(raf);
-            window.removeEventListener('resize', resize);
+            motionPreference.removeEventListener('change', onMotionPreferenceChange);
+            window.removeEventListener('resize', onResize);
             // Unmounting mid-sweep: hand this exact field to the next page.
             // (Magnitude, not sign — the sweep is negative when travelling left.)
             if (persistKey && Math.abs(live) > 0.05) {
@@ -211,5 +227,5 @@ export default function GoldField({ impulseRef, dropRef, entrySweep = 0, entryHo
         };
     }, [impulseRef, dropRef, density, persistKey, entrySweep]);
 
-    return <canvas ref={ref} style={{ position: 'fixed', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex }} />;
+    return <canvas ref={ref} aria-hidden="true" style={{ position: 'fixed', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex }} />;
 }

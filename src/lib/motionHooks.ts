@@ -1,6 +1,17 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+
+const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
+
+function subscribeToReducedMotion(onStoreChange: () => void) {
+    const media = window.matchMedia(REDUCED_MOTION_QUERY);
+    media.addEventListener('change', onStoreChange);
+    return () => media.removeEventListener('change', onStoreChange);
+}
+
+const reducedMotionSnapshot = () => window.matchMedia(REDUCED_MOTION_QUERY).matches;
+const reducedMotionServerSnapshot = () => false;
 
 /**
  * OS-level reduced-motion preference, live-updating. The CSS side is already
@@ -8,15 +19,11 @@ import { useEffect, useRef, useState } from 'react';
  * number animation) that CSS can't reach.
  */
 export function usePrefersReducedMotion(): boolean {
-    const [reduced, setReduced] = useState(false);
-    useEffect(() => {
-        const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
-        setReduced(mq.matches);
-        const onChange = (e: MediaQueryListEvent) => setReduced(e.matches);
-        mq.addEventListener('change', onChange);
-        return () => mq.removeEventListener('change', onChange);
-    }, []);
-    return reduced;
+    return useSyncExternalStore(
+        subscribeToReducedMotion,
+        reducedMotionSnapshot,
+        reducedMotionServerSnapshot,
+    );
 }
 
 /**
