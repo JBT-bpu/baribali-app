@@ -38,6 +38,7 @@ const subscribeToLocation = (onChange: () => void) => {
     window.addEventListener('popstate', onChange);
     return () => window.removeEventListener('popstate', onChange);
 };
+const SIZE_PICKER_HISTORY_STATE = 'size-picker';
 
 
 // ─── Members' one-tap reorder strip ────────────────────────────────────────────
@@ -168,6 +169,17 @@ export default function HomeV2() {
 
     useEffect(() => { setReady(true); router.prefetch('/build'); }, [router]);
 
+    // The picker is a modal state on the home page, so Android/browser Back
+    // should dismiss it before leaving the page. Keeping that state in history
+    // also means Forward reopens it. Next's own history fields are preserved.
+    useEffect(() => {
+        const syncSizePickerFromHistory = (event: PopStateEvent) => {
+            setSizePicker(event.state?.bbOverlay === SIZE_PICKER_HISTORY_STATE);
+        };
+        window.addEventListener('popstate', syncSizePickerFromHistory);
+        return () => window.removeEventListener('popstate', syncSizePickerFromHistory);
+    }, []);
+
     // Members get their last order surfaced here for a true one-tap reorder —
     // the club promise ("הזמנה חוזרת בלחיצה") delivered on the first screen.
     // Guests have no history, so nothing shows (guest-first intact).
@@ -210,12 +222,37 @@ export default function HomeV2() {
     // Fires at the dive's hand-off — the picker has already played the outbound
     // half from its own field and sealed the screen, so we navigate immediately
     // and the builder resumes the motion from exactly there.
+    const openSizePicker = useCallback(() => {
+        if (window.history.state?.bbOverlay !== SIZE_PICKER_HISTORY_STATE) {
+            const currentState = typeof window.history.state === 'object' && window.history.state !== null
+                ? window.history.state
+                : {};
+            window.history.pushState(
+                { ...currentState, bbOverlay: SIZE_PICKER_HISTORY_STATE },
+                '',
+                window.location.href,
+            );
+        }
+        setSizePicker(true);
+    }, []);
+
+    const closeSizePicker = useCallback(() => {
+        if (window.history.state?.bbOverlay === SIZE_PICKER_HISTORY_STATE) {
+            window.history.back();
+            return;
+        }
+        setSizePicker(false);
+    }, []);
+
     const handleSizeSelect = useCallback((size: string) => {
         try { sessionStorage.setItem('bb-drop', '1'); } catch { /* private mode — just skip the intro */ }
-        // Plain push, deliberately: startViewTransition cross-fades the whole
-        // document, which fought the wipe (it read as "fade to black, then the
-        // builder appears"). The wipe already covers the swap.
-        router.push(`/build?size=${size}`);
+        // Plain router navigation, deliberately: startViewTransition cross-fades
+        // the whole document, which fought the wipe (it read as "fade to black,
+        // then the builder appears"). The wipe already covers the swap. replace
+        // consumes the temporary modal entry; the fallback push preserves Home.
+        const target = `/build?size=${size}`;
+        if (window.history.state?.bbOverlay === SIZE_PICKER_HISTORY_STATE) router.replace(target);
+        else router.push(target);
     }, [router]);
 
     if (!ready) return <div style={{ minHeight: '100dvh', background: '#020a02' }} />;
@@ -302,7 +339,7 @@ export default function HomeV2() {
                 {paymentVerifying && <PaymentVerifyingNotice />}
                 {showClosed && <ClosedNotice headline="המטבח סגור כרגע" detail={closedDetail} />}
                 {user && lastOrder && <ReorderStrip order={lastOrder} onReorder={reorderLast} />}
-                <HeroSelector onChooseSalad={() => setSizePicker(true)} onNudge={(dir) => { nudgeRef.current = dir * 26; }} onActiveChange={setHeroIdx} />
+                <HeroSelector onChooseSalad={openSizePicker} onNudge={(dir) => { nudgeRef.current = dir * 26; }} onActiveChange={setHeroIdx} />
             </div>
 
             {/* Reviews strip */}
@@ -313,7 +350,7 @@ export default function HomeV2() {
 
 
             {/* Size picker overlay */}
-            {sizePicker && <SizePicker onSelect={handleSizeSelect} onBack={() => setSizePicker(false)} dive />}
+            {sizePicker && <SizePicker onSelect={handleSizeSelect} onBack={closeSizePicker} dive />}
 
             {/* Login bottom sheet — a quick, in-place offer, never a gate.
                 Reachable from the header profile chip; ordering never routes

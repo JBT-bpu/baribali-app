@@ -26,6 +26,10 @@ const home = readFileSync(new URL(
     '../../src/app/home2/page.tsx',
     import.meta.url,
 ), 'utf8');
+const sizePicker = readFileSync(new URL(
+    '../../src/components/home/SizePicker.tsx',
+    import.meta.url,
+), 'utf8');
 
 test('customer order hand-off keeps its client-side source invariants', () => {
     const submitStart = summary.indexOf('const submitOrder = async');
@@ -134,4 +138,62 @@ test('long-open customer screens refresh time-sensitive shop state safely', () =
         'capacity responses must identify their Israel service date');
     assert.equal(slotsRoute.match(/headers: NO_STORE_HEADERS/g)?.length, 2,
         'both slot responses must explicitly opt out of caching');
+});
+
+test('the shared size picker is a keyboard-complete modal', () => {
+    assert.match(sizePicker, /role="dialog"/);
+    assert.match(sizePicker, /aria-modal="true"/);
+    assert.match(sizePicker, /aria-labelledby="size-picker-title"/);
+    assert.match(sizePicker, /id="size-picker-title"/);
+    assert.match(sizePicker, /document\.body\.style\.overflow = 'hidden'/,
+        'the page behind the modal must not scroll');
+    assert.match(sizePicker, /previousFocus\.focus\(\{ preventScroll: true \}\)/,
+        'dismissal must restore the control that opened the picker');
+    assert.match(sizePicker, /event\.key === 'Escape'/);
+    assert.match(sizePicker, /event\.key === 'ArrowLeft' \|\| event\.key === 'ArrowRight'/);
+    assert.match(sizePicker, /event\.key !== 'Tab'/);
+    assert.match(sizePicker, /dialogRef\.current\?\.querySelectorAll<HTMLElement>/,
+        'Tab trapping must only inspect controls inside the dialog');
+
+    assert.match(sizePicker, /className="sizePickerCup"[\s\S]*?aria-pressed=\{isOn\}/,
+        'the quick size choices must be real stateful buttons');
+    assert.match(sizePicker, /className="sizePickerCard"[\s\S]*?aria-pressed=\{isActive\}/,
+        'the visual size cards must be keyboard-operable buttons');
+    assert.match(sizePicker, /tabIndex=\{isActive \? 0 : -1\}/,
+        'the carousel must expose one active card in the tab order');
+    assert.doesNotMatch(sizePicker, /<div key=\{c\.id\} onClick=/,
+        'size shortcuts must not regress to pointer-only divs');
+    assert.doesNotMatch(sizePicker, /handleCardTap[\s\S]*?doConfirm\(\)/,
+        'tapping an already-selected card must not bypass the explicit CTA');
+
+    assert.match(sizePicker, /price: effectiveSizePrice\(750\)/,
+        'the customer-visible size price must come from the effective admin-driven layer');
+    assert.match(sizePicker, /admin price override can never contradict[\s\S]*?height: '56%'/,
+        'an opaque live-data panel must replace the launch-era price baked into the art');
+    assert.match(sizePicker, /height: '56%'[\s\S]*?key=\{isActive \? `live-price-/,
+        'the opaque price cover must stay static while only its live DOM content animates');
+    assert.match(sizePicker, /src=\{card\.img\} alt="" aria-hidden/,
+        'the stale text inside the source art must be hidden from assistive technology');
+    assert.match(sizePicker, /overflowY: 'auto', overflowX: 'hidden'/,
+        'projected side cards must not turn a 320px modal into a horizontal scroller');
+    assert.match(sizePicker, /touchAction: 'pan-y pinch-zoom'/,
+        'the carousel must preserve vertical scrolling and pinch zoom');
+
+    assert.match(sizePicker, /if \(reducedMotion\) \{[\s\S]*?setClosing\(true\);[\s\S]*?onSelect\(selected\);[\s\S]*?return;/,
+        'reduced-motion handoff must disable the modal immediately without retaining the animation delay');
+    assert.match(sizePicker, /animation: reducedMotion \? 'none'/,
+        'the overlay entrance must respect reduced motion');
+    assert.match(sizePicker, /if \(interactionLockRef\.current \|\| diving \|\| out \|\| closing\) return;[\s\S]*?interactionLockRef\.current = true;/,
+        'confirmation and dismissal must lock synchronously before timers or history navigation');
+    assert.match(sizePicker, /setClosing\(true\);\s*onBack\(\);/,
+        'a repeated Escape or back activation must not traverse history twice');
+
+    assert.match(home, /window\.history\.pushState\([\s\S]*?bbOverlay: SIZE_PICKER_HISTORY_STATE/,
+        'the home modal must own one history entry so mobile Back dismisses it first');
+    assert.match(home, /setSizePicker\(event\.state\?\.bbOverlay === SIZE_PICKER_HISTORY_STATE\)/,
+        'Back and Forward must close and reopen the modal from history state');
+    assert.match(home, /window\.history\.back\(\)/,
+        'the visible back control must consume the modal history entry');
+    assert.match(home, /router\.replace\(target\)/,
+        'selection must replace the temporary modal entry instead of leaving a duplicate home page behind');
 });
