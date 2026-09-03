@@ -1,8 +1,8 @@
 # BariBali payment foundation
 
-This branch adds durable, idempotent Hyp payment attempts. It is intentionally
-not applied to the live Supabase project yet. Restore/activate the project and
-inspect its real `public.orders` definition before running the migration.
+This branch adds durable, idempotent Hyp payment attempts. The migration has
+not been applied to Supabase. Inspect the actual `public.orders` definition
+before applying it, first in a test/staging project.
 
 ## What changes
 
@@ -16,8 +16,17 @@ inspect its real `public.orders` definition before running the migration.
 - `apply_payment_verification` settles the attempt and order in one short
   transaction. `paid` is absorbing; amount, currency, reference, and provider
   transaction-ID conflicts go to manual review.
-- Network/VERIFY ambiguity remains `verification_pending`; it never becomes a
-  decline merely because transport or persistence failed.
+- A callback that was durably recorded but could not be verified remains
+  `verification_pending`. If callback persistence itself fails, the customer
+  is sent to the verifying state while the existing order/attempt state is
+  left unchanged. Neither case is treated as a decline.
+- `needs_review` is sticky across callback replays and transient VERIFY
+  failures. A later approved VERIFY may still settle it after all consistency
+  checks pass.
+- New Hyp callbacks cannot enter through the generic unverified webhook.
+  A legacy `paid_unverified` row has no trustworthy transaction provenance,
+  so even a valid later VERIFY leaves it for manual review rather than hiding
+  a possible second charge.
 
 The migration is
 `supabase/migrations/20260902184747_payment_foundation.sql`.
@@ -57,8 +66,16 @@ order by table_name, grantee, privilege_type;
   `https://<host>/api/payment/hyp/return`.
 - Do **not** configure Hyp notifications to `/api/payment/webhook`; that route
   rejects Hyp so an undocumented payload cannot fall through as Tranzila.
+- Any future Hyp notification handler must write through the same attempt/event
+  ledger. It must not set `paid_unverified` directly; an automatic upgrade is
+  safe only when the prior event, attempt, provider, and transaction ID all
+  match the later verified result.
 - Obtain one approved and one declined test payload plus the server-notification
   specification before implementing decline mapping or a notification route.
+- Do not map `CCode=700` (J5/two-phase authorization) to `paid`. This
+  integration currently requests a normal one-phase charge. If Hyp enables a
+  two-phase flow, add an explicit `authorized` state and mark `paid` only after
+  a separately verified capture.
 - Ask Hyp whether Bit uses the same merchant reference and transaction `Id`,
   and which identifier their refund operation requires.
 

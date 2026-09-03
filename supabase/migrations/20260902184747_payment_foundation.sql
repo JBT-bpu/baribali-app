@@ -732,7 +732,10 @@ begin
     v_duplicate := true;
   end if;
 
-  if v_attempt.status not in ('paid', 'duplicate_paid') then
+  -- Manual-review is intentionally sticky. A replay or a second callback may
+  -- still be verified below, but merely receiving it must not hide an existing
+  -- operator alert by downgrading the attempt to verification_pending.
+  if v_attempt.status not in ('paid', 'duplicate_paid', 'needs_review') then
     update public.payment_attempts
     set status = 'verification_pending',
         updated_at = now()
@@ -852,7 +855,10 @@ begin
   end if;
 
   if v_outcome = 'verification_pending' then
-    if v_attempt.status not in ('paid', 'duplicate_paid') then
+    -- A transient VERIFY result cannot clear a prior manual-review decision.
+    -- A later approved event can still settle the attempt through the branch
+    -- below after all amount/currency/transaction checks pass.
+    if v_attempt.status not in ('paid', 'duplicate_paid', 'needs_review') then
       update public.payment_attempts
       set status = 'verification_pending',
           provider_code = left(p_provider_code, 120),
@@ -884,6 +890,11 @@ begin
 
   if v_transaction_id is null then
     v_result := 'missing_transaction_id';
+  elsif v_attempt.provider_transaction_id is not null
+        and v_attempt.provider_transaction_id <> v_transaction_id then
+    -- A prior review path may already have captured a transaction identifier.
+    -- Never overwrite it with a different charge on a later callback.
+    v_result := 'transaction_id_mismatch';
   else
     select a.id into v_conflicting_attempt
     from public.payment_attempts a
@@ -900,7 +911,13 @@ begin
           or v_currency is null
           or v_currency <> v_attempt.currency_code then
       v_result := 'amount_or_currency_mismatch';
-    elsif v_order.payment_status in ('paid', 'paid_unverified') then
+    -- Legacy paid_unverified rows do not identify the transaction that set
+    -- them. Even a valid VERIFY cannot prove this is the same charge, so fail
+    -- closed for manual review instead of hiding a possible second payment.
+    -- New Hyp callbacks never enter through the generic unverified webhook.
+    elsif v_order.payment_status = 'paid_unverified' then
+      v_result := 'unverified_payment_conflict';
+    elsif v_order.payment_status = 'paid' then
       v_result := case
         when v_attempt.status = 'paid'
           and v_attempt.provider_transaction_id = v_transaction_id
@@ -963,7 +980,7 @@ begin
     update public.payment_attempts
     set status = 'needs_review',
         provider_transaction_id = case
-          when v_result = 'transaction_id_conflict'
+          when v_result in ('transaction_id_conflict', 'transaction_id_mismatch')
             then provider_transaction_id
           else coalesce(v_transaction_id, provider_transaction_id)
         end,

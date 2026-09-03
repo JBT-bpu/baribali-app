@@ -6,11 +6,11 @@ BariBali is a mobile-first, Hebrew (RTL) salad and tortilla builder for a real r
 
 ## Tech Stack
 
-- **Framework**: Next.js 14 (App Router)
+- **Framework**: Next.js 16 (App Router)
 - **Language**: TypeScript + JSX
 - **Styling**: Inline style objects (component-local `S = {...}` pattern) + CSS keyframe strings. Tailwind is configured but not yet in active use outside tooling.
 - **Backend**: Supabase (Postgres + service-role API routes)
-- **Payments**: Tranzila (default), with YaadPay/Hyp as alternate providers
+- **Payments**: Hyp Pay is the intended production provider; Tranzila and YaadPay remain legacy alternatives
 
 ## User Flow
 
@@ -54,7 +54,9 @@ src/
 
 ## Environment Variables
 
-See `.env.example` for the full list. At minimum you need a Supabase project (URL + anon key + service-role key) for anything beyond the frontend UI to work.
+See `.env.example` for the full list. Without Supabase variables the app uses
+its in-memory demo store; real persistence and authentication require the
+Supabase URL, publishable/anon key, and service-role key.
 
 ## Development
 
@@ -74,7 +76,9 @@ npm start
 
 ## Known Gaps (as of this writing)
 
-- Payment webhook has no cryptographic signature verification (no Tranzila verification credential configured yet); webhook-confirmed payments are marked `paid_unverified` and require a human check at pickup.
+- Hyp browser returns use the dedicated APISign VERIFY route and may set
+  `paid`. The generic Tranzila/YaadPay webhook remains unverified, sets
+  `paid_unverified`, and intentionally rejects Hyp payloads.
 - `/kitchen` is gated by a shared staff password (`KITCHEN_PASSWORD`, server-only) exchanged for an httpOnly session cookie. Set it in production; unset locally the board runs open. It's a single shared credential, not per-user staff accounts.
 
 ## RTL Support

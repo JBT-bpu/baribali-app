@@ -91,7 +91,10 @@ export async function settleHypCallback(
     if (!callback.attemptId || !callback.orderId) {
         return { orderId: null, result: 'unknown_reference', paid: false };
     }
-    if (callback.duplicateEvent && callback.attemptStatus === 'paid') {
+    if (
+        callback.duplicateEvent
+        && (callback.attemptStatus === 'paid' || callback.attemptStatus === 'duplicate_paid')
+    ) {
         return { orderId: callback.orderId, result: 'duplicate_success', paid: true };
     }
 
@@ -112,7 +115,9 @@ export async function settleHypCallback(
         return {
             orderId: pending.orderId ?? callback.orderId,
             result: pending.result,
-            paid: false,
+            // Another callback may have completed while this VERIFY request
+            // failed. Respect the order state returned by the atomic RPC.
+            paid: pending.orderPaymentStatus === 'paid',
         };
     }
 
@@ -134,6 +139,12 @@ export async function settleHypCallback(
     return {
         orderId: applied.orderId ?? callback.orderId,
         result: applied.result,
-        paid: applied.result === 'settled' || applied.result === 'duplicate_success',
+        // A concurrent callback can settle the order between record() and
+        // apply(), in which case the second apply reports duplicate_event.
+        // The order's authoritative payment state still means the customer
+        // should land on success instead of an indefinite "verifying" view.
+        paid: applied.orderPaymentStatus === 'paid'
+            || applied.result === 'settled'
+            || applied.result === 'duplicate_success',
     };
 }

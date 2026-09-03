@@ -62,6 +62,30 @@ test('VERIFY returns the provider transaction id, reference, amount and currency
     assert.equal(result.currencyCode, 'ILS');
 });
 
+test('legacy Hyp success is exactly CCode=0 and Amount is parsed as shekels', async () => {
+    const responses = [
+        'CCode=0&Order=BBP-attempt&Id=tx-10&Amount=10.5&Coin=1',
+        'CCode=000&Order=BBP-attempt&Id=tx-10&Amount=10.5&Coin=1',
+        'CCode=0&Order=BBP-attempt&Id=tx-10&Price=1050&Coin=1',
+    ];
+    const client = createHypClient(credentials, async () => new Response(responses.shift()));
+    const callback = new URLSearchParams({
+        Order: 'BBP-attempt',
+        Id: 'tx-10',
+        Coin: '1',
+    });
+
+    const approved = await client.verifyPayment(callback);
+    const yaadPayCode = await client.verifyPayment(callback);
+    const yaadPayAmountField = await client.verifyPayment(callback);
+
+    assert.equal(approved.verified, true);
+    assert.equal(approved.amountAgorot, 1050);
+    assert.equal(yaadPayCode.verified, false);
+    assert.equal(yaadPayAmountField.verified, true);
+    assert.equal(yaadPayAmountField.amountAgorot, null);
+});
+
 test('VERIFY rejects injected reserved fields before contacting Hyp', async () => {
     let fetched = false;
     const client = createHypClient(credentials, async () => {

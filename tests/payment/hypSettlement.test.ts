@@ -101,6 +101,23 @@ test('a VERIFY transport error stays verification_pending instead of becoming fa
     assert.equal(result.paid, false);
 });
 
+test('a VERIFY error replay still succeeds when another callback already paid the order', async () => {
+    const result = await settleHypCallback(callback, 'browser_return', dependencies({
+        verify: async () => {
+            throw new HypGatewayError('HYP_VERIFY_TRANSPORT', true);
+        },
+        apply: async () => ({
+            result: 'duplicate_event',
+            orderId: '22222222-2222-4222-8222-222222222222',
+            attemptId: '11111111-1111-4111-8111-111111111111',
+            orderPaymentStatus: 'paid',
+        }),
+    }));
+
+    assert.equal(result.result, 'duplicate_event');
+    assert.equal(result.paid, true);
+});
+
 test('a duplicate callback for an already paid attempt does not call VERIFY again', async () => {
     let verified = false;
     const result = await settleHypCallback(callback, 'browser_return', dependencies({
@@ -122,6 +139,43 @@ test('a duplicate callback for an already paid attempt does not call VERIFY agai
     assert.equal(result.result, 'duplicate_success');
     assert.equal(result.paid, true);
     assert.equal(verified, false);
+});
+
+test('a replay for a recorded duplicate charge does not call VERIFY again', async () => {
+    let verified = false;
+    const result = await settleHypCallback(callback, 'browser_return', dependencies({
+        record: async () => ({
+            eventId: 17,
+            attemptId: '11111111-1111-4111-8111-111111111111',
+            orderId: '22222222-2222-4222-8222-222222222222',
+            amountAgorot: 7200,
+            currencyCode: 'ILS',
+            attemptStatus: 'duplicate_paid',
+            duplicateEvent: true,
+        }),
+        verify: async () => {
+            verified = true;
+            throw new Error('must not run');
+        },
+    }));
+
+    assert.equal(result.result, 'duplicate_success');
+    assert.equal(result.paid, true);
+    assert.equal(verified, false);
+});
+
+test('a concurrent duplicate event redirects to success once the order is paid', async () => {
+    const result = await settleHypCallback(callback, 'browser_return', dependencies({
+        apply: async () => ({
+            result: 'duplicate_event',
+            orderId: '22222222-2222-4222-8222-222222222222',
+            attemptId: '11111111-1111-4111-8111-111111111111',
+            orderPaymentStatus: 'paid',
+        }),
+    }));
+
+    assert.equal(result.result, 'duplicate_event');
+    assert.equal(result.paid, true);
 });
 
 test('unknown merchant references are recorded but never verified', async () => {
