@@ -150,7 +150,7 @@ function freshPaymentKey() {
     return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-export default function SummaryView({ sels, total, all, comboBadges, notes, setNotes, onBack, onEdit, onNewOrder, base = BASE, sizeLabel = null }) {
+export default function SummaryView({ sels, total, all, comboBadges, notes, setNotes, onBack, onEdit, onNewOrder, base = BASE, productType = 'salad', sizeLabel = null }) {
     // Schedule + the live staff override. The server checks this again at POST
     // /api/orders and is the authority; this is so the screen stops pretending.
     const shop = useShopStatus();
@@ -355,6 +355,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                     pickupTime,
                     notes,
                     size: base,
+                    productType,
                     discountCode: effectiveDiscount?.code,
                     ...(DEMO_MODE ? { paymentChoice: choice } : {}),
                 }),

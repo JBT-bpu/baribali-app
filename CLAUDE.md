@@ -59,7 +59,7 @@ src/
 ## 5. Core flows
 
 - **Order:** `/home2` → in-page size picker → `/build?size=&type=` (`BariBaliBuilder`) → `SummaryView` → `POST /api/orders` → Hyp Pay redirect (or confetti if pay-at-pickup) → `/order/[id]`.
-  **Price is recomputed server-side from the canonical catalog (`src/lib/pricing.ts` `computeOrderTotal`) — the client-submitted total is never trusted.**
+  **Price and the persisted `{ id, he, icon, price }` item snapshots are rebuilt server-side from the canonical catalog (`src/lib/pricing.ts` `computeOrderTotal`) — client-supplied item fields are never trusted.** The same boundary enforces unique IDs and the builder's ingredient/protein/sauce/finish limits.
 - **Auth:** guest-first. Supabase Google OAuth (`src/lib/auth.ts`); `user_id` on an order is set **only** from a server-verified access token, never client-claimed. Guests order identically with `user_id = null`.
 - **Reorder:** `/profile` history cards → "order again" / "order again with changes" (`src/lib/reorder.ts`).
 - **Kitchen:** `/kitchen` gated by a **server-only** `KITCHEN_PASSWORD` exchanged for an httpOnly, HMAC-signed session cookie (`src/lib/kitchenAuth.ts`).

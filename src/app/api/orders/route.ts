@@ -36,14 +36,14 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-        const { items, total, pickupTime, notes, size, paymentChoice, discountCode } = body;
+        const { items, total, pickupTime, notes, size, productType, paymentChoice, discountCode } = body;
 
         if (!items || !Array.isArray(items) || total == null) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
 
         // Recompute the true total server-side — never trust the client-submitted value.
-        const computed = computeOrderTotal(items, size);
+        const computed = computeOrderTotal(items, size, productType);
         if (!computed.valid) {
             return NextResponse.json({ error: 'Invalid order items or size' }, { status: 400 });
         }
@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
                 paymentChoice === 'fail' ? 'failed' :
                 'pay_at_pickup';
             const order = createDemoOrder({
-                items,
+                items: computed.items,
                 total: finalTotal,
                 pickupTime,
                 notes,
@@ -140,7 +140,7 @@ export async function POST(req: NextRequest) {
             .from('orders')
             .insert({
                 order_num: orderNum,
-                items,
+                items: computed.items,
                 total: finalTotal,
                 pickup_time: pickupTime ?? null,
                 notes: notes ?? null,

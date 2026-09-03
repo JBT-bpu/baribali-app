@@ -7,9 +7,6 @@ const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
 const headerImage = "/builder-assets/header-brand.png";
 const footerImage = "/builder-assets/footer-brand.png";
 
-const BOWL_MAX     = 14; // global cap for salad
-const TORTILLA_MAX =  8; // veggie/filling cap for tortilla (premiums still exempt)
-
 // Renders either a PNG icon path or an emoji string
 function Icon({ src, size = "1.4em", style = {} }) {
   if (src && src.startsWith("/")) {
@@ -28,7 +25,11 @@ import BariButton from "../ui/bari/BariButton";
 import { useAnimatedNumber, usePrefersReducedMotion } from "../../lib/motionHooks";
 import { takeReorder } from "../../lib/reorder";
 import { effectiveItemPrice, effectiveBase, effectiveSizePrice } from "../../lib/menuConfig";
+import { countsTowardIngredientPickLimit, INGREDIENT_PICK_LIMIT } from "../../lib/orderRules";
 import { isSoundOn, readSoundPref, setSoundPref } from "../../lib/soundPref";
+
+const BOWL_MAX = INGREDIENT_PICK_LIMIT.salad;
+const TORTILLA_MAX = INGREDIENT_PICK_LIMIT.tortilla;
 
 /*
   BariBali Builder — COMPLETE v3
@@ -391,15 +392,23 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
       if (draft) {
         const parsed = JSON.parse(draft);
 
-        // Migrate old drafts without metadata
+        // Rebuild the draft from the CURRENT active catalog. Besides migrating
+        // old entries without metadata, this drops removed/tampered items and
+        // prevents a salad-only `finish` choice leaking into the tortilla flow
+        // through the shared legacy draft key.
         const migratedSels = {};
         Object.entries(parsed.sels || {}).forEach(([stepId, items]) => {
-          migratedSels[stepId] = items.map(item => {
-            if (!item._meta) {
-              return { ...item, _meta: { stepId } };
-            }
-            return item;
+          const activeStep = steps.find(candidate => candidate.id === stepId);
+          if (!activeStep || !Array.isArray(items)) return;
+          const activeItems = activeStep.subgroups.flatMap(subgroup => subgroup.items);
+          const seen = new Set();
+          const rebuilt = items.flatMap(savedItem => {
+            const current = activeItems.find(item => item.id === savedItem?.id);
+            if (!current || seen.has(current.id)) return [];
+            seen.add(current.id);
+            return [{ ...current, _meta: { stepId } }];
           });
+          if (rebuilt.length > 0) migratedSels[stepId] = rebuilt;
         });
 
         setSels(migratedSels);
@@ -428,6 +437,9 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
   const getSel = id => sels[id] || [];
   const all = useMemo(() => Object.values(sels).flat(), [sels]);
   const allTags = useMemo(() => all.flatMap(i => i.tags || []), [all]);
+  const ingredientPickCount = useMemo(() => steps
+    .filter(countsTowardIngredientPickLimit)
+    .reduce((count, ingredientStep) => count + (sels[ingredientStep.id] || []).length, 0), [sels, steps]);
 
   const extras = all.reduce((s, i) => s + effectiveItemPrice(i.id, i.price || 0), 0);
   const total = activeBase + extras;
@@ -477,14 +489,15 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
       // Add metadata to item
       const itemWithMeta = { ...item, _meta: { stepId: sid } };
 
-      // Global bowl cap — only for unlimited ingredient steps (no per-step maxPicks)
-      // Exempt: premium upgrades, finish (preferences not ingredients), steps with own maxPicks
-      const isPremium    = sid === "upgrade" || sid === "t_upgrade";
-      const isPreference = sid === "finish";
-      if (!isPremium && !isPreference && !max && !exists) {
-        const totalCount = Object.values(prev).flat().length;
+      // Product ingredient cap — only for unlimited ingredient steps. Protein,
+      // sauces, finish preferences and upgrades follow their own rules.
+      const selectedStep = steps.find(candidate => candidate.id === sid);
+      if (selectedStep && countsTowardIngredientPickLimit(selectedStep)) {
+        const ingredientCount = steps
+          .filter(countsTowardIngredientPickLimit)
+          .reduce((count, ingredientStep) => count + (prev[ingredientStep.id] || []).length, 0);
         const cap = isTortilla ? TORTILLA_MAX : BOWL_MAX;
-        if (totalCount >= cap) return prev;
+        if (ingredientCount >= cap) return prev;
       }
 
       if (sid === "finish") {
@@ -869,18 +882,18 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
     );
   }
 
-  if (summary) return <SummaryView sels={sels} total={total} all={all} comboBadges={comboBadges} notes={notes} setNotes={setNotes} onBack={back} onEdit={(stepIndex) => { setSummary(false); setStep(stepIndex); }} onNewOrder={resetAll} base={activeBase} sizeLabel={selectedSize ? SIZE_CONFIG[selectedSize].label : null} />;
+  if (summary) return <SummaryView sels={sels} total={total} all={all} comboBadges={comboBadges} notes={notes} setNotes={setNotes} onBack={back} onEdit={(stepIndex) => { setSummary(false); setStep(stepIndex); }} onNewOrder={resetAll} base={activeBase} productType={isTortilla ? 'tortilla' : 'salad'} sizeLabel={selectedSize ? SIZE_CONFIG[selectedSize].label : null} />;
 
   const slideX = anim === "out" ? (slideDir > 0 ? "-60px" : "60px") : anim === "in" ? "0" : undefined;
 
-  // Global bowl cap, surfaced. `toggle` has always enforced it by silently
+  // Product ingredient cap, surfaced. `toggle` has always enforced it by silently
   // returning the previous state, so at 14/14 an ingredient chip still looked
   // tappable and simply did nothing — which reads as the app being broken.
   // Steps with their own maxPicks, premium upgrades and the finish step are
   // exempt from the cap (see toggle), so they must not be blocked here either.
   const bowlCap = isTortilla ? TORTILLA_MAX : BOWL_MAX;
-  const capApplies = !!cur && !cur.maxPicks && cur.id !== "finish" && cur.id !== "upgrade" && cur.id !== "t_upgrade";
-  const bowlFull = capApplies && all.length >= bowlCap;
+  const capApplies = !!cur && countsTowardIngredientPickLimit(cur);
+  const bowlFull = capApplies && ingredientPickCount >= bowlCap;
 
   return (
     <div style={S.root} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
@@ -1018,6 +1031,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
         <div style={rise(2) ?? undefined}>
           <HeroBowlCard
             all={all}
+            ingredientCount={ingredientPickCount}
             onRemove={removeFromBowl}
             lastAdd={lastAdd}
             animFile={isTortilla ? "/mexican-burrito.json" : "/cat-salad-bowl.json"}

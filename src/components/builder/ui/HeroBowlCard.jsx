@@ -45,7 +45,7 @@ const KF = `
 }
 `;
 
-export default function HeroBowlCard({ all, onRemove, lastAdd, animFile = "/cat-salad-bowl.json", freePlay = false, bowlTop = "24%", max = 14 }) {
+export default function HeroBowlCard({ all, ingredientCount = all.length, onRemove, lastAdd, animFile = "/cat-salad-bowl.json", freePlay = false, bowlTop = "24%", max = 14 }) {
     const lottieRef      = useRef(null);
     const prevIdsRef     = useRef(null);   // null = not yet seeded
     const targetFrameRef = useRef(null);   // frame to stop at during playback
@@ -57,7 +57,7 @@ export default function HeroBowlCard({ all, onRemove, lastAdd, animFile = "/cat-
     useEffect(() => { setMounted(true); }, []);
     useEffect(() => { fetch(animFile).then(r => r.json()).then(setBowlAnim).catch(() => {}); }, [animFile]);
 
-    const fillPct  = Math.min(all.length / max, 1);
+    const fillPct  = Math.min(ingredientCount / max, 1);
     const offset   = CIRC * (1 - fillPct);
     const pctLabel = Math.round(fillPct * 100);
     const isEmpty  = all.length === 0;
@@ -245,7 +245,7 @@ export default function HeroBowlCard({ all, onRemove, lastAdd, animFile = "/cat-
 
                     {/* Ingredient count */}
                     <div style={{ fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.3)", letterSpacing: "0.05em" }}>
-                        {isEmpty ? "הקערה ריקה" : `${all.length} / ${max} מרכיבים`}
+                        {isEmpty ? "הקערה ריקה" : `${ingredientCount} / ${max} מרכיבי בסיס`}
                     </div>
 
                     {/* Ingredient chips — tap to remove. Not capped: a full bowl

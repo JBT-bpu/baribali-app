@@ -1,32 +1,171 @@
-import { effectiveItemPriceMap, effectiveValidBases } from '@/lib/menuConfig';
+import { STEPS } from '@/data/salad-data.js';
+import { effectiveBase, effectiveItemPrice, effectiveSizePrice } from '@/lib/menuConfig';
+import {
+    countsTowardIngredientPickLimit,
+    INGREDIENT_PICK_LIMIT,
+    type OrderProduct,
+} from '@/lib/orderRules';
 
-export interface OrderItemInput {
+interface CatalogItem {
     id: string;
+    he: string;
+    icon: string;
+    price: number;
 }
 
-export interface ComputedTotal {
-    total: number;
-    valid: boolean;
+interface CatalogSubgroup {
+    items: CatalogItem[];
+}
+
+interface CatalogStep {
+    id: string;
+    maxPicks?: number;
+    subgroups: CatalogSubgroup[];
+}
+
+interface CatalogEntry extends CatalogItem {
+    stepId: string;
+    subgroupIndex: number;
+    maxPicks?: number;
+}
+
+export interface CanonicalOrderItem {
+    id: string;
+    he: string;
+    icon: string;
+    price: number;
+}
+
+export type ComputedTotal =
+    | { total: number; valid: true; items: CanonicalOrderItem[] }
+    | { total: 0; valid: false; items: [] };
+
+function invalidResult(): ComputedTotal {
+    return { total: 0, valid: false, items: [] };
+}
+
+function productFromBase(base: number, requestedProduct: unknown): OrderProduct | null {
+    const matchingProducts = new Set<OrderProduct>();
+    const saladBases = [
+        effectiveBase('salad'),
+        effectiveSizePrice(750),
+        effectiveSizePrice(1000),
+        effectiveSizePrice(1500),
+    ];
+    if (saladBases.includes(base)) matchingProducts.add('salad');
+    if (base === effectiveBase('tortilla')) matchingProducts.add('tortilla');
+
+    // `productType` is not persisted yet, while order history/reorder still
+    // infer it from this base. Therefore even an explicit request cannot make
+    // an ambiguous base safe to store; reject it until the DB has that column.
+    if (matchingProducts.size !== 1) return null;
+    const matchedProduct = [...matchingProducts][0];
+
+    // Backward compatibility for an already-open client from before the
+    // product field existed. A current client must also agree with the base.
+    if (requestedProduct === undefined) return matchedProduct;
+    if (requestedProduct !== 'salad' && requestedProduct !== 'tortilla') return null;
+    return requestedProduct === matchedProduct ? matchedProduct : null;
+}
+
+function activeCatalog(product: OrderProduct): Map<string, CatalogEntry> | null {
+    // The current tortilla builder intentionally renders the salad steps minus
+    // `finish` (see BariBaliBuilder and reorder.ts). Keep the server aligned
+    // with the product customers can actually build today. TORTILLA_STEPS must
+    // not become orderable through a forged request before the UI adopts it.
+    const steps = (STEPS as CatalogStep[]).filter(
+        step => product === 'salad' || step.id !== 'finish',
+    );
+    const catalog = new Map<string, CatalogEntry>();
+
+    for (const step of steps) {
+        for (const [subgroupIndex, subgroup] of step.subgroups.entries()) {
+            for (const item of subgroup.items) {
+                // Duplicate ids in the source catalog would make pricing and
+                // category rules ambiguous. Fail closed rather than allowing
+                // whichever duplicate happened to be visited last.
+                if (
+                    typeof item.id !== 'string'
+                    || item.id.length === 0
+                    || typeof item.he !== 'string'
+                    || typeof item.icon !== 'string'
+                    || !Number.isFinite(item.price)
+                    || item.price < 0
+                    || catalog.has(item.id)
+                ) return null;
+                const price = effectiveItemPrice(item.id, item.price);
+                if (!Number.isFinite(price) || price < 0) return null;
+                catalog.set(item.id, {
+                    id: item.id,
+                    he: item.he,
+                    icon: item.icon,
+                    price,
+                    stepId: step.id,
+                    subgroupIndex,
+                    maxPicks: step.maxPicks,
+                });
+            }
+        }
+    }
+
+    return catalog;
 }
 
 /**
- * Recomputes an order's true total server-side from the canonical ingredient/
- * base prices — ignoring any price the client submitted. Prices come from the
- * effective-price layer (code defaults merged with the manager's overrides in
- * menu-prices.json), so this stays authoritative even after prices are edited.
+ * Validates an order against the builder's selection rules and reconstructs
+ * every saved item from the canonical catalog. Client-supplied labels, icons,
+ * prices and metadata are ignored. Prices come from the effective-price layer
+ * (code defaults merged with the manager's menu overrides).
  */
-export function computeOrderTotal(items: OrderItemInput[], base: number): ComputedTotal {
-    if (typeof base !== 'number' || !effectiveValidBases().includes(base)) {
-        return { total: 0, valid: false };
-    }
-    const priceMap = effectiveItemPriceMap();
+export function computeOrderTotal(
+    items: unknown,
+    base: unknown,
+    requestedProduct?: unknown,
+): ComputedTotal {
+    if (!Array.isArray(items) || typeof base !== 'number' || !Number.isFinite(base)) return invalidResult();
+
+    const product = productFromBase(base, requestedProduct);
+    if (!product) return invalidResult();
+    const catalog = activeCatalog(product);
+    if (!catalog || items.length > catalog.size) return invalidResult();
+
+    const seenIds = new Set<string>();
+    const stepCounts = new Map<string, number>();
+    const finishSubgroupCounts = new Map<number, number>();
+    const canonicalItems: CanonicalOrderItem[] = [];
+    let ingredientPicks = 0;
     let sum = base;
-    for (const item of items) {
-        const price = priceMap[item?.id];
-        if (price === undefined) {
-            return { total: 0, valid: false };
+
+    for (const submitted of items) {
+        if (!submitted || typeof submitted !== 'object' || Array.isArray(submitted)) return invalidResult();
+        const id = (submitted as { id?: unknown }).id;
+        if (typeof id !== 'string' || id.length === 0 || seenIds.has(id)) return invalidResult();
+
+        // Map lookup intentionally avoids prototype-chain keys such as
+        // `constructor`, `toString` and `__proto__` becoming phantom products.
+        const item = catalog.get(id);
+        if (!item) return invalidResult();
+        seenIds.add(id);
+
+        const stepCount = (stepCounts.get(item.stepId) ?? 0) + 1;
+        stepCounts.set(item.stepId, stepCount);
+        if (item.maxPicks !== undefined && stepCount > item.maxPicks) return invalidResult();
+
+        if (item.stepId === 'finish') {
+            const subgroupCount = (finishSubgroupCounts.get(item.subgroupIndex) ?? 0) + 1;
+            finishSubgroupCounts.set(item.subgroupIndex, subgroupCount);
+            if (subgroupCount > 1) return invalidResult();
         }
-        sum += price;
+
+        if (countsTowardIngredientPickLimit({ id: item.stepId, maxPicks: item.maxPicks })) {
+            ingredientPicks += 1;
+            if (ingredientPicks > INGREDIENT_PICK_LIMIT[product]) return invalidResult();
+        }
+
+        canonicalItems.push({ id: item.id, he: item.he, icon: item.icon, price: item.price });
+        sum += item.price;
+        if (!Number.isFinite(sum) || sum < 0) return invalidResult();
     }
-    return { total: sum, valid: true };
+
+    return { total: sum, valid: true, items: canonicalItems };
 }
