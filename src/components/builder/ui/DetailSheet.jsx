@@ -16,7 +16,7 @@ export default function DetailSheet({ item, isAdded, onToggle, onClose }) {
     const itemPrice = effectiveItemPrice(item.id, item.price || 0);
 
     return (
-        <BariModal open onClose={onClose} variant="sheet">
+        <BariModal open onClose={onClose} variant="sheet" title={`פרטי ${item.he}`}>
             <div style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: "rtl" }}>
                 {/* ── Hero row: icon left · info right ── */}
                 <div style={S.heroRow}>

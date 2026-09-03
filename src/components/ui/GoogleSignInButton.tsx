@@ -20,6 +20,7 @@ export default function GoogleSignInButton({ fullWidth = false, label = 'המש�
             <button
                 type="button"
                 disabled={!available || busy}
+                aria-busy={busy}
                 onClick={async () => {
                     setBusy(true);
                     setError(null);
@@ -44,7 +45,7 @@ export default function GoogleSignInButton({ fullWidth = false, label = 'המש�
                     boxShadow: '0 4px 20px rgba(0,0,0,0.35)',
                 }}
             >
-                <span style={{ fontSize: '17px', fontWeight: 900, color: '#4285F4' }}>G</span>
+                <span aria-hidden="true" style={{ fontSize: '17px', fontWeight: 900, color: '#4285F4' }}>G</span>
                 {busy ? 'רגע…' : label}
             </button>
             {!available && (
@@ -53,7 +54,7 @@ export default function GoogleSignInButton({ fullWidth = false, label = 'המש�
                 </span>
             )}
             {error && (
-                <span style={{ fontSize: '11px', color: '#ff7575', fontWeight: 600 }}>{error}</span>
+                <span role="alert" style={{ fontSize: '11px', color: '#ff7575', fontWeight: 600 }}>{error}</span>
             )}
         </div>
     );

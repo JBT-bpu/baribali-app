@@ -188,6 +188,16 @@ test('order tracking announces each real status transition without poll spam', (
     );
     assert.match(trackingPage, /<OrderStatusView key=\{id\} id=\{id\}/,
         'navigating between tracking URLs must remount and seed a fresh status baseline');
+    assert.match(tracking, /<ol aria-label="שלבי ההזמנה" style=\{P\.railList\}>[\s\S]*?<li[\s\S]*?aria-current=\{active \? 'step' : undefined\}/,
+        'the visual progress rail must expose ordered steps and the current one');
+    assert.doesNotMatch(tracking, /<img[^>]*aria-current=/,
+        'current-step semantics belong to the process item, not its decorative artwork');
+    assert.match(tracking, /<div id="order-status-summary" style=\{labelStyle\}>[\s\S]*?<span style=\{P\.srOnly\}>סטטוס ההזמנה: <\/span>[\s\S]*?\{step\.label\}/,
+        'the visible status label must remain a concise, browseable non-live summary');
+    assert.equal(tracking.match(/role="status"/g)?.length, 1,
+        'tracking must keep one live status region so transitions are not announced twice');
+    assert.equal(tracking.match(/aria-live="polite"/g)?.length, 1,
+        'tracking must keep one polite announcement channel');
 });
 
 test('long-open customer screens refresh time-sensitive shop state safely', () => {

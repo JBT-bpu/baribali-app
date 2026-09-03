@@ -394,33 +394,38 @@ export default function OrderStatusView({ id, paymentHint = null }: { id: string
                     desaturated, and the current one carries the glow. This
                     artwork leaves no room for labels under them, so the card
                     names the current step instead. */}
-                {STATUS_STEPS.map((s, i) => {
-                    const reached = i <= currentStep;
-                    const active = i === currentStep;
-                    return (
-                        <div
-                            key={s.key}
-                            title={s.rail}
-                            style={{
-                                ...P.railDot,
-                                left: xPct(TRACK.rail.centres[i] - TRACK.rail.size / 2),
-                                ...(active ? P.railActive : {}),
-                            }}
-                        >
-                            <img
-                                src={s.railIcon}
-                                alt={s.rail}
-                                style={{ ...P.railImg, ...(reached ? {} : P.railImgPending) }}
-                            />
-                        </div>
-                    );
-                })}
+                <ol aria-label="שלבי ההזמנה" style={P.railList}>
+                    {STATUS_STEPS.map((s, i) => {
+                        const reached = i <= currentStep;
+                        const active = i === currentStep;
+                        return (
+                            <li
+                                key={s.key}
+                                aria-current={active ? 'step' : undefined}
+                                style={{
+                                    ...P.railDot,
+                                    left: xPct(TRACK.rail.centres[i] - TRACK.rail.size / 2),
+                                    ...(active ? P.railActive : {}),
+                                }}
+                            >
+                                <img
+                                    src={s.railIcon}
+                                    alt={s.rail}
+                                    style={{ ...P.railImg, ...(reached ? {} : P.railImgPending) }}
+                                />
+                            </li>
+                        );
+                    })}
+                </ol>
 
                 {/* ── The card: one open field carrying the whole order. Every
                        row is clamped rather than allowed to grow, because the
                        card is a fixed slot in the artwork. ── */}
                 <div style={{ ...slot(TRACK.card.top, TRACK.card.height, TRACK.card.left, TRACK.card.right), ...P.band }}>
-                    <div style={labelStyle}>{step.label}</div>
+                    <div id="order-status-summary" style={labelStyle}>
+                        <span style={P.srOnly}>סטטוס ההזמנה: </span>
+                        {step.label}
+                    </div>
 
                     {/* One line, priority-ordered, because the artwork has room
                         for exactly one and these never all matter at once:
@@ -713,6 +718,7 @@ const P: Record<string, React.CSSProperties> = {
         margin: '-1px', overflow: 'hidden', clip: 'rect(0, 0, 0, 0)',
         whiteSpace: 'nowrap', border: 0,
     },
+    railList: { position: 'absolute', inset: 0, margin: 0, padding: 0, listStyle: 'none', pointerEvents: 'none' },
 
     footer: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: 'clamp(8px, 2.7vw, 11px)', color: 'rgba(255,255,255,0.62)', fontWeight: 600, textShadow: '0 1px 6px rgba(0,0,0,0.9)' },
 

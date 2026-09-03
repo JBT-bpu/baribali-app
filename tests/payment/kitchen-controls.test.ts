@@ -60,6 +60,10 @@ test('kitchen order tabs use an RTL roving focus model', () => {
     assert.match(orderTabs, /tabIndex=\{active \? 0 : -1\}/);
     assert.match(orderTabs, /onKeyDown=\{event => selectFromKeyboard\(event, index\)\}/);
     assert.match(kitchenBoard, /id=\{kitchenOrderPanelId\(active\.id\)\}[\s\S]*?role="tabpanel"[\s\S]*?aria-labelledby=\{kitchenOrderTabId\(active\.id\)\}/);
+    assert.match(kitchenBoard, /setActiveId\(nextActiveId\);[\s\S]*?focusKitchenSelection\(nextActiveId\);/,
+        'collecting an order must move focus to the replacement tab');
+    assert.match(kitchenBoard, /id=\{EMPTY_ORDERS_FOCUS_ID\} role="status" tabIndex=\{-1\}/,
+        'collecting the final order must leave focus on a meaningful empty state');
 });
 
 test('shop target clears an override when the live schedule can take over', () => {

@@ -20,8 +20,8 @@ export default function ProfilePage() {
     const { user, loading } = useUser();
 
     if (loading) {
-        return <div style={{ ...bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ color: 'rgba(255,255,255,0.62)', fontSize: '14px', fontWeight: 600 }}>טוען…</span>
+        return <div aria-busy="true" style={{ ...bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span role="status" aria-live="polite" style={{ color: 'rgba(255,255,255,0.62)', fontSize: '14px', fontWeight: 600 }}>טוען…</span>
             <BariBottomNav />
         </div>;
     }

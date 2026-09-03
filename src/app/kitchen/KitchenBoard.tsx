@@ -49,6 +49,15 @@ function playKitchenChime(ctx: AudioContext) {
 const CHECK_KEY = 'bb-kitchen-checks';
 const MIN_ACTION_LOCK_MS = 750;
 const REQUEST_TIMEOUT_MS = 12000;
+const EMPTY_ORDERS_FOCUS_ID = 'kitchen-empty-orders';
+
+/** Keep keyboard focus somewhere meaningful when the active ticket disappears. */
+function focusKitchenSelection(orderId: string | null) {
+    const targetId = orderId ? kitchenOrderTabId(orderId) : EMPTY_ORDERS_FOCUS_ID;
+    requestAnimationFrame(() => {
+        document.getElementById(targetId)?.focus({ preventScroll: true });
+    });
+}
 
 async function fetchWithTimeout(
     input: Parameters<typeof fetch>[0],
@@ -548,7 +557,9 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
         // somewhere to land.
         if (status === 'collected') {
             const rest = ordersRef.current.filter(o => o.id !== id && o.status !== 'collected');
-            setActiveId(rest.length ? rest[0].id : null);
+            const nextActiveId = rest.length ? rest[0].id : null;
+            setActiveId(nextActiveId);
+            focusKitchenSelection(nextActiveId);
         }
 
         setOrders(prev => {
@@ -596,6 +607,7 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
             }
             if (status === 'collected') {
                 setActiveId(id);
+                focusKitchenSelection(id);
             } else if (previous === 'collected') {
                 const rest = ordersRef.current.filter(o => o.id !== id && o.status !== 'collected');
                 setActiveId(rest.length ? rest[0].id : null);
@@ -782,6 +794,7 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
                             knownIdsRef.current.add(u.id);
                             setNewIds(ids => ids.filter(id => id !== u.id));
                             setActiveId(u.id);      // put it back in the worker's hands
+                            focusKitchenSelection(u.id);
                             updateStatus(u.id, u.to, u.order, false, u.from);
                         }}>
                         ↩ בטל
@@ -824,7 +837,9 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
 
             {loading && <div style={K.loadingMsg}>טוען הזמנות...</div>}
             {!loading && !loadError && visibleOrders.length === 0 && (
-                <div style={K.emptyMsg}>אין הזמנות פעילות כרגע ✓</div>
+                <div id={EMPTY_ORDERS_FOCUS_ID} role="status" tabIndex={-1} style={K.emptyMsg}>
+                    אין הזמנות פעילות כרגע ✓
+                </div>
             )}
 
             {visibleOrders.length > 0 && (

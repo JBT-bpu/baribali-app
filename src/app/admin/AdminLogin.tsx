@@ -32,20 +32,27 @@ export default function AdminLogin() {
 
     return (
         <div style={S.root}>
-            <form onSubmit={submit} style={S.card}>
+            <form onSubmit={submit} style={S.card} aria-busy={busy}>
                 <div style={S.emoji}>🛠️</div>
                 <div style={S.title}>ניהול BariBali</div>
                 <div style={S.subtitle}>הזינו סיסמת מנהל</div>
+                <label htmlFor="admin-password" style={S.label}>סיסמת מנהל</label>
                 <input
+                    id="admin-password"
                     type="password"
                     value={password}
                     onChange={e => { setPassword(e.target.value); setError(''); }}
                     placeholder="סיסמה"
                     autoFocus
                     autoComplete="current-password"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    aria-invalid={Boolean(error)}
+                    aria-describedby={error ? 'admin-login-error' : undefined}
+                    disabled={busy}
                     style={{ ...S.input, ...(error ? S.inputError : {}) }}
                 />
-                {error && <div style={S.error}>{error}</div>}
+                {error && <div id="admin-login-error" role="alert" aria-live="assertive" style={S.error}>{error}</div>}
                 <BariButton type="submit" variant="primary" fullWidth disabled={busy || !password}
                     style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif", marginTop: '4px' }}>
                     {busy ? 'רגע…' : 'כניסה'}
@@ -71,6 +78,10 @@ const S: Record<string, React.CSSProperties> = {
     emoji: { fontSize: '40px', lineHeight: 1 },
     title: { fontSize: '22px', fontWeight: 900, color: 'var(--color-gold-light)' },
     subtitle: { fontSize: '13px', color: 'rgba(255,255,255,0.45)', marginBottom: '4px' },
+    label: {
+        width: '100%', marginBottom: '-6px',
+        fontSize: '13px', fontWeight: 800, color: 'rgba(255,255,255,0.78)', textAlign: 'right',
+    },
     input: {
         width: '100%', padding: '13px 16px', borderRadius: '12px',
         background: 'rgba(255,255,255,0.06)', border: '1.5px solid rgba(255,255,255,0.14)',

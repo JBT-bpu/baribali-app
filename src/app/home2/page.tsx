@@ -372,7 +372,7 @@ export default function HomeV2() {
             {/* Login bottom sheet — a quick, in-place offer, never a gate.
                 Reachable from the header profile chip; ordering never routes
                 through here. */}
-            <BariModal open={loginSheet} onClose={() => setLoginSheet(false)} variant="sheet">
+            <BariModal open={loginSheet} onClose={() => setLoginSheet(false)} variant="sheet" title="כניסה לחשבון">
                 <div style={{
                     position: 'relative',
                     padding: '8px 24px max(28px, env(safe-area-inset-bottom))',

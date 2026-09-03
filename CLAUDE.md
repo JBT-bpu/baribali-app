@@ -31,7 +31,7 @@ npm run fresh      # rimraf .next && next dev — use if the dev cache corrupts
 
 - **Supabase configuration has three explicit states:** configured, demo and misconfigured. Empty local/test environments use the process-global demo stores (`src/lib/demoStore.ts`, `src/lib/shopState.ts`); production fails closed unless an intentionally public demo deploy sets exactly `NEXT_PUBLIC_BARIBALI_DEMO_MODE=true`. Server routes separately require a secret/service-role key and never fall back to the browser key. This demo state is single-process development data, not durable serverless persistence.
 - **Lint baseline: 0 errors / 10 warnings.** Hold that line — don't add warnings; the 10 are pre-existing `react-hooks/set-state-in-effect` findings.
-- **Focused tests use Node's built-in test runner through pinned `tsx`.** The current 152-test suite covers payment, pricing/order validation and idempotency, product availability/reorder safety, atomic pickup capacity, Israel-day kitchen filtering, configuration guardrails, kitchen controls and critical customer-flow/source-trust invariants; it is not app-wide, so manual smoke-testing remains required for affected UI flows.
+- **Focused tests use Node's built-in test runner through pinned `tsx`.** The current 157-test suite covers payment, pricing/order validation and idempotency, product availability/reorder safety, atomic pickup capacity, Israel-day kitchen filtering, configuration guardrails, kitchen controls and critical customer-flow/source-trust invariants; it is not app-wide, so manual smoke-testing remains required for affected UI flows.
 
 ## 4. Where things live
 

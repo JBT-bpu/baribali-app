@@ -76,8 +76,8 @@ export default function OrdersPage() {
     }, [router]);
 
     if (loading) {
-        return <div style={{ ...bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ color: 'rgba(255,255,255,0.62)', fontSize: '14px', fontWeight: 600 }}>טוען…</span>
+        return <div aria-busy="true" style={{ ...bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span role="status" aria-live="polite" style={{ color: 'rgba(255,255,255,0.62)', fontSize: '14px', fontWeight: 600 }}>טוען…</span>
             <BariBottomNav />
         </div>;
     }
@@ -102,7 +102,7 @@ export default function OrdersPage() {
     }
 
     return (
-        <div style={{ ...bg, padding: '0 0 calc(106px + env(safe-area-inset-bottom))' }}>
+        <div aria-busy={orders === null} style={{ ...bg, padding: '0 0 calc(106px + env(safe-area-inset-bottom))' }}>
             <GoldField zIndex={0} />
             <div style={{ position: 'relative', zIndex: 1, maxWidth: '430px', margin: '0 auto', padding: '24px 16px', paddingTop: 'max(24px, env(safe-area-inset-top))', display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
@@ -111,7 +111,7 @@ export default function OrdersPage() {
                 </h1>
 
                 {orders === null && (
-                    <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.35)', fontWeight: 600, textAlign: 'center', padding: '24px 0' }}>טוען הזמנות…</div>
+                    <div role="status" aria-live="polite" style={{ fontSize: '13px', color: 'rgba(255,255,255,0.35)', fontWeight: 600, textAlign: 'center', padding: '24px 0' }}>טוען הזמנות…</div>
                 )}
                 {/* Couldn't load — distinct from "no orders", which would tell a
                     returning customer their history had vanished. */}
