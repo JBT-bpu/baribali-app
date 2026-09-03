@@ -8,21 +8,21 @@ BariBali is a mobile-first, Hebrew (RTL) salad and tortilla builder for a real r
 
 - **Framework**: Next.js 16 (App Router)
 - **Language**: TypeScript + JSX
-- **Styling**: Inline style objects (component-local `S = {...}` pattern) + CSS keyframe strings. Tailwind is configured but not yet in active use outside tooling.
+- **Styling**: Tailwind CSS v4 for newer components, alongside existing component-local inline styles and CSS keyframes.
 - **Backend**: Supabase (Postgres + service-role API routes)
 - **Payments**: Hyp Pay is the intended production provider; Tranzila and YaadPay remain legacy alternatives
 
 ## User Flow
 
 ```
-/  →  /home2  (redirect)
+/  →  /home2  →  /build  →  /order/[id]
 ```
 
-1. **`/home2`** — landing page: swipeable card carousel (tortilla / salad / login), background particles, Google reviews strip.
-2. Tapping **"בנה סלט"** (build salad) opens an in-page size picker (S/M/L), then navigates to:
-3. **`/build?size=<ml>&type=salad|tortilla`** — renders `BariBaliBuilder`, a step-by-step ingredient picker (veggies → protein → sauces → finish → premium upgrades), with combo badges, presets, and a live-updating price.
+1. **`/`** — guest-or-Google front door; signed-in members continue automatically to `/home2`.
+2. **`/home2`** — product selector, latest-order shortcut for members, reviews, and three-item bottom navigation. Salad is the currently orderable card and opens an in-page S/M/L picker; tortilla is visibly locked as coming soon, although its deep-link builder path still exists in code.
+3. **`/build?size=<S|M|L>&type=salad|tortilla`** — renders `BariBaliBuilder`, a step-by-step ingredient picker (veggies → protein → sauces → finish → premium upgrades), with combo badges, presets, and a live-updating price. Tortilla currently reuses that salad step set with `finish` removed; the separate `TORTILLA_STEPS` catalog is not active.
 4. The builder's summary screen (`SummaryView`) shows the assembled bowl, lets the customer pick a pickup time slot, add notes, and submit.
-5. Submitting calls `/api/orders` (creates the order, price re-verified server-side) then `/api/payment/create` (builds a hosted payment-page redirect using the server-stored total).
+5. `POST /api/orders` records the server-validated order. Online orders then call `/api/payment/create`; pay-at-pickup/demo orders continue directly to confirmation.
 6. After payment, the customer lands on **`/order/[id]`** — a live order-status page (polls the API for status updates).
 7. **`/kitchen`** — an internal board showing today's active orders, grouped by pickup urgency, with a per-ingredient checklist and status-advance buttons.
 
@@ -31,25 +31,31 @@ BariBali is a mobile-first, Hebrew (RTL) salad and tortilla builder for a real r
 ```
 src/
 ├── app/
+│   ├── page.tsx                # Guest-or-Google front door
 │   ├── home2/page.tsx          # Landing page
 │   ├── build/page.tsx          # Builder entry (wraps BariBaliBuilder)
 │   ├── order/[id]/page.tsx     # Customer order-status page
 │   ├── kitchen/page.tsx        # Kitchen board
-│   ├── login/, profile/        # Stubs — no auth system exists yet
-│   ├── fresh/, top/, recommended/, favorites/  # "Coming soon" placeholders
+│   ├── login/, profile/        # Google auth + account area
+│   ├── orders/                 # Signed-in history + reorder actions
+│   ├── admin/                  # Local manager tools; inert in production
+│   ├── privacy/, terms/, cancellations/, allergens/, accessibility/, contact/
 │   └── api/
 │       ├── orders/                    # Create order, fetch by id, update status
-│       ├── payment/create, webhook     # Payment provider integration
+│       ├── payment/create, hyp/return, webhook  # Payment provider integration
+│       ├── my/                        # Authenticated history + discount
+│       ├── shop/                      # Opening-hours override
 │       ├── slots/                      # Pickup time-slot availability (Israel-local hours)
-│       └── kitchen/orders/             # Kitchen board data feed
+│       └── kitchen/                    # Kitchen feed, login/logout, rehearsal
 ├── components/
-│   ├── builder/                # BariBaliBuilder, SummaryView, MixingAnimation, DetailSheet, HeroBowlCard
-│   └── ui/                     # ReviewsStrip, ParticleCanvas, ComingSoon, CatPopup
+│   ├── builder/                # BariBaliBuilder, SummaryView, OrderSeal, DetailSheet, HeroBowlCard
+│   └── ui/                     # ReviewsStrip, GoldField, GoogleSignInButton
 ├── data/salad-data.js          # Ingredient catalog, prices, nutrition, combo rules, presets
 └── lib/
-    ├── supabase.ts             # Anon + service-role Supabase clients, schema reference
+    ├── supabase.ts             # Anon + service-role clients and demo/config detection
     ├── pricing.ts              # Server-side canonical price computation
-    └── kitchenAuth.ts          # Lightweight shared-secret gate for kitchen endpoints
+    ├── kitchenAuth.ts          # HMAC session gate for kitchen endpoints
+    └── hypPay.ts               # Hyp APISign SIGN/VERIFY client
 ```
 
 ## Environment Variables
@@ -85,9 +91,9 @@ npm start
 
 The entire app is Hebrew-first with RTL layout throughout.
 
-## Mobile-Only Design
+## Responsive Design
 
-Optimized for mobile devices — responsive sizing, touch-friendly targets, safe-area insets for notches/home indicators.
+The customer journey is mobile-first, with responsive sizing, touch targets and safe-area handling. `/kitchen` is intentionally optimized for the shop's 1920×1200 touch display.
 
 ## License
 

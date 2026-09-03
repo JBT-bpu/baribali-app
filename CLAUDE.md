@@ -24,33 +24,34 @@ npm run dev        # demo mode unless .env.local has real Supabase creds
 npm run build
 npm run typecheck
 npm run lint       # eslint .
-npm test           # focused payment foundation tests
-npm run check      # typecheck + lint + payment tests + production build
+npm test           # focused server/payment and kitchen regression suite
+npm run check      # typecheck + lint + focused tests + production build
 npm run fresh      # rimraf .next && next dev — use if the dev cache corrupts
 ```
 
 - **Demo vs real mode** hinges on `isSupabaseConfigured()` in `src/lib/supabase.ts`. Without real creds the app is fully usable against an in-memory demo store (`src/lib/demoStore.ts`).
-- **Lint baseline: 0 errors / 13 warnings.** Hold that line — don't add warnings; the 13 are pre-existing (mostly `react-hooks/set-state-in-effect` and unused `no-img-element` disables).
-- **Payment tests use Node's built-in test runner through pinned `tsx`.** Coverage is focused rather than app-wide, so manual smoke-testing remains required for affected UI flows.
+- **Lint baseline: 0 errors / 12 warnings.** Hold that line — don't add warnings; the 12 are pre-existing (mostly `react-hooks/set-state-in-effect` and unused `no-img-element` disables).
+- **Focused tests use Node's built-in test runner through pinned `tsx`.** The current 43-test suite covers payment, pricing/order validation, and kitchen controls; it is not app-wide, so manual smoke-testing remains required for affected UI flows.
 
 ## 4. Where things live
 
 ```
 src/
 ├─ app/
-│  ├─ page.tsx              → redirects to /home2
-│  ├─ home2/                landing: welcome step, product cards, size picker, bottom nav
-│  ├─ build/                builder entry (wraps BariBaliBuilder); ?size=&type=salad|tortilla
+│  ├─ page.tsx              guest-or-Google front door
+│  ├─ home2/                landing: product cards, size picker, last-order shortcut, bottom nav
+│  ├─ build/                builder entry (wraps BariBaliBuilder); ?size=S|M|L&type=salad|tortilla
 │  ├─ order/[id]/           live order-status page
+│  ├─ orders/               signed-in order history + reorder actions
 │  ├─ kitchen/              staff board (password-gated) — page.tsx guard + KitchenBoard/KitchenLogin
-│  ├─ login/, profile/      auth + order history (with "order again")
-│  ├─ privacy/, terms/      legal pages (drafts with placeholders)
-│  ├─ favorites/, fresh/, top/, recommended/   "coming soon" stubs (fresh/top/recommended orphaned)
-│  └─ api/                  orders, my/orders, kitchen/*, payment/*, slots, reviews, demo/reset
+│  ├─ login/, profile/      auth + identity/account area
+│  ├─ privacy/, terms/, cancellations/, allergens/, accessibility/, contact/   legal/info pages
+│  ├─ admin/                local-only manager tools (password-gated; disabled on Vercel by config)
+│  └─ api/                  orders, my/*, kitchen/*, payment/*, shop, slots, reviews, admin/*
 ├─ components/
 │  ├─ builder/              BariBaliBuilder.jsx, SummaryView.jsx, ui/HeroBowlCard, ui/DetailSheet
 │  ├─ ui/bari/              design system: BariButton, BariPanel, BariModal, BariBadge, BariBottomNav
-│  └─ ui/                   ReviewsStrip, ParticleCanvas, ComingSoon, CatPopup, GoogleSignInButton
+│  └─ ui/                   ReviewsStrip, GoldField, GoogleSignInButton
 ├─ data/salad-data.js       ingredient catalog, prices, combos, presets, SIZE_CONFIG, STEPS, TORTILLA_STEPS
 └─ lib/                     supabase, auth, pricing, hypPay, kitchenAuth, rateLimit, reorder,
                             demoStore, motionHooks, confetti, utils
@@ -58,10 +59,10 @@ src/
 
 ## 5. Core flows
 
-- **Order:** `/home2` → in-page size picker → `/build?size=&type=` (`BariBaliBuilder`) → `SummaryView` → `POST /api/orders` → Hyp Pay redirect (or confetti if pay-at-pickup) → `/order/[id]`.
+- **Order:** `/` guest-or-Google door → `/home2` → in-page size picker → `/build?size=S|M|L&type=` (`BariBaliBuilder`) → `SummaryView` → `POST /api/orders` → Hyp Pay redirect (or order seal if pay-at-pickup) → `/order/[id]`.
   **Price and the persisted `{ id, he, icon, price }` item snapshots are rebuilt server-side from the canonical catalog (`src/lib/pricing.ts` `computeOrderTotal`) — client-supplied item fields are never trusted.** The same boundary enforces unique IDs and the builder's ingredient/protein/sauce/finish limits.
 - **Auth:** guest-first. Supabase Google OAuth (`src/lib/auth.ts`); `user_id` on an order is set **only** from a server-verified access token, never client-claimed. Guests order identically with `user_id = null`.
-- **Reorder:** `/profile` history cards → "order again" / "order again with changes" (`src/lib/reorder.ts`).
+- **Reorder:** `/orders` history cards or the latest-order strip on `/home2` → "order again" / "change and order" (`src/lib/reorder.ts`).
 - **Kitchen:** `/kitchen` gated by a **server-only** `KITCHEN_PASSWORD` exchanged for an httpOnly, HMAC-signed session cookie (`src/lib/kitchenAuth.ts`).
 
 ## 6. Conventions (standing working agreements)
@@ -79,12 +80,13 @@ src/
 - **`TORTILLA_STEPS` is imported but never used.** `BariBaliBuilder` renders the salad step set for tortillas too, so a "tortilla" today = salad ingredients on a wrap base price (₪42). Tortilla orders are distinguished **only by base price**, not by their item ids (this is why `src/lib/reorder.ts` detects type from the base).
 - **`/kitchen` auth is live in production** — `KITCHEN_PASSWORD` is set on Vercel (verified: the deployed `/kitchen` renders the login screen and `/api/kitchen/orders` returns 401 anonymously). Unset locally = board runs open, which is the intended dev behaviour.
 - **Hyp uses its dedicated APISign VERIFY return route.** The generic Tranzila/YaadPay webhook still has no signature verification and can only produce `paid_unverified`; it explicitly refuses Hyp payloads. Do not enable Hyp server notifications until the test-terminal payload contract is obtained and implemented.
+- **The durable payment-attempt/event ledger is not live yet.** It exists on `codex/payment-foundation`; its migration has not been applied and the branch is not deployed.
 - **`/privacy` and `/terms` are drafts** with `[bracketed]` business-detail placeholders that must be filled before launch.
 - **Rate limiting** (`src/lib/rateLimit.ts`) is in-memory/per-process — a deterrent, approximate on serverless (no shared store).
 - **No CI** yet; focused payment tests run locally with `npm test`.
 
 ## 8. Deeper reference
 
-`PROJECT_BRIEF.md` (repo root) has the full changelog, data model / `orders` schema, security posture, environment variables, and the current pending-actions list. `MENU_FLOW_BRIEF.md` maps every screen and flow in detail (untracked working doc).
+`PROJECT_BRIEF.md` (repo root) has the full changelog, data model / `orders` schema, security posture, environment variables, and the current pending-actions list. `MENU_FLOW_BRIEF.md` is the tracked current screen/flow map; `MENU_RESTRUCTURE_REPLY.md` preserves the decision record behind the navigation changes.
 
 `PAYMENT_FOUNDATION.md` is the migration and Hyp test-terminal runbook. Read it before applying the payment migration or configuring callbacks.

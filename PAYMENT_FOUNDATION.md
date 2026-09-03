@@ -14,12 +14,15 @@ before applying it, first in a test/staging project.
   creation idempotent. A persisted checkout page is reused and never expires
   automatically, because an older Hyp page may still be chargeable.
 - `apply_payment_verification` settles the attempt and order in one short
-  transaction. `paid` is absorbing; amount, currency, reference, and provider
-  transaction-ID conflicts go to manual review.
-- A callback that was durably recorded but could not be verified remains
-  `verification_pending`. If callback persistence itself fails, the customer
-  is sent to the verifying state while the existing order/attempt state is
-  left unchanged. Neither case is treated as a decline.
+  transaction. `paid` is absorbing. Missing or mismatched amount/currency,
+  conflicting transaction IDs, and legacy `paid_unverified` provenance go to
+  `needs_review`. Invalid, unknown, or VERIFY-mismatched references remain
+  unresolved and are never marked paid.
+- A durably recorded callback whose VERIFY call fails remains
+  `verification_pending`. If callback recording itself fails, no event is
+  durable and the database state remains unchanged. The current fallback
+  redirects to `/home2?payment=verifying`, but `/home2` does not yet render
+  that hint. Neither case is treated as a decline.
 - `needs_review` is sticky across callback replays and transient VERIFY
   failures. A later approved VERIFY may still settle it after all consistency
   checks pass.
@@ -72,14 +75,16 @@ order by table_name, grantee, privilege_type;
   match the later verified result.
 - Obtain one approved and one declined test payload plus the server-notification
   specification before implementing decline mapping or a notification route.
-- Do not map `CCode=700` (J5/two-phase authorization) to `paid`. This
-  integration currently requests a normal one-phase charge. If Hyp enables a
-  two-phase flow, add an explicit `authorized` state and mark `paid` only after
-  a separately verified capture.
+- Only `CCode=0` is treated as approved. `CCode=700` remains unresolved because
+  the application has no authorization/capture state. Confirm the test
+  terminal's one-phase/J5 configuration and its authorization/capture fields
+  with Hyp before changing this mapping.
 - Ask Hyp whether Bit uses the same merchant reference and transaction `Id`,
   and which identifier their refund operation requires.
 
-After an approved test, verify that the refund identifier is durable:
+After an approved test, verify that the captured Hyp transaction `Id` is
+durable. Once Hyp confirms the identifier required for refunds, verify that
+the corresponding field is stored here:
 
 ```sql
 select

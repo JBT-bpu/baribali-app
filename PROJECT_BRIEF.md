@@ -1,12 +1,12 @@
 # BariBali — Project Brief
 
-> **Purpose of this file**: a self-contained snapshot of the project for pasting into a different AI chat (or handing to a new collaborator) that has no access to the repo, git history, or prior conversations. Updated 2026-07-18 (previous version 2026-07-07 — see §6 for everything that changed since). Re-export this file whenever you want to bring outside insight back into Claude Code — just say so and it'll be regenerated from the live repo state. Two companion docs exist for a specific ongoing thread — a menu/navigation restructure discussion with an outside AI — and aren't repeated here: `MENU_FLOW_BRIEF.md` (screen/flow map) and `MENU_RESTRUCTURE_REPLY.md` (our response to that AI's proposal).
+> **Purpose of this file**: a self-contained snapshot for a collaborator with no repo or conversation history. Updated 2026-09-03. `MENU_FLOW_BRIEF.md` is the current screen/flow map; `MENU_RESTRUCTURE_REPLY.md` preserves the decision record behind the navigation work.
 
 ---
 
 ## 1. What this is
 
-BariBali is a mobile-first, Hebrew (RTL) salad and tortilla builder for a **real restaurant** (not a demo/portfolio project). Customers pick a size, build their bowl/wrap ingredient by ingredient, submit an order with a pickup time, and pay online or at pickup. A kitchen-facing board shows live orders for staff to prepare and mark ready. Pre-launch — no real customer traffic yet, deployed on Vercel, auto-deploying from `main` on GitHub (`JBT-bpu/baribali-app`). **Production is currently still running in demo mode** — real Supabase/Hyp Pay credentials exist locally but haven't been added to Vercel's env vars yet, and `main`'s latest 3 commits (Google auth + home restructure) are merged locally but **not yet pushed** — see §6/§9.
+BariBali is a mobile-first, Hebrew (RTL) salad and tortilla builder for a **real restaurant** (not a demo/portfolio project). Customers build an order, choose a pickup time, and pay online or at pickup; staff work from a separate kitchen board. The app is pre-launch and deployed from the private GitHub repo `JBT-bpu/baribali-app`. `main` is pushed and live at `d44fe06`, but production still runs in demo mode because the real Supabase/Hyp variables are not set on Vercel. The current `codex/payment-foundation` work is local/unpushed; see §9.
 
 ## 2. Tech stack (current)
 
@@ -14,64 +14,67 @@ BariBali is a mobile-first, Hebrew (RTL) salad and tortilla builder for a **real
 - **Language**: TypeScript 6 (new files) + JSX (older builder components, untyped)
 - **React**: 19
 - **Styling**: Tailwind CSS v4 (CSS-first `@theme` tokens in `globals.css`) for new/migrated components; older components still use inline `S = {...}` style objects — both patterns coexist
-- **Backend**: Supabase — **real project now connected** (Postgres + Auth). Service-role client for all API-route reads/writes; anon/publishable client used client-side only for auth session + inserts.
+- **Backend**: Supabase (Postgres + Auth). Database reads/writes go through server API routes using the service-role client. The browser anon/publishable client is used for Auth only; public database roles have no order policies.
 - **Auth**: Supabase Auth, Google OAuth provider — guest-first (see §4), no password/email signup flow
-- **Payments**: **Hyp Pay is the real, primary provider** (same account as the shop's physical card terminal) — SIGN/VERIFY flow fully implemented server-side. Tranzila/YaadPay code remains in the repo as untested alternates.
+- **Payments**: Hyp is the intended primary provider. Hosted-page SIGN and server-to-server APISign VERIFY are implemented with server-held credentials. The durable attempt/event ledger is still an unapplied, unmerged migration; a real test-terminal round trip remains required. Tranzila/YaadPay code remains as legacy alternatives.
 - **Motion/UI libs**: `motion` (route transitions), `react-parallax-tilt` (card tilt/glare), `vaul` (bottom sheets), `canvas-confetti`, `lucide-react` icons, `zustand` (installed, still unused)
 - **Fonts**: Heebo (UI) + Secular One (display/headings), self-hosted via `next/font/google`
 - **PWA**: manifest (`src/app/manifest.ts`) implemented — installable/"Add to Home Screen"
 - **Lint**: ESLint 9 flat config (`eslint.config.mjs`), script is `eslint .`
 
-No test framework, no CI pipeline (see §10).
+There are 43 focused Node/`tsx` regression tests covering Hyp, settlement and migration invariants, pricing/order authority, generic-webhook rejection, and kitchen controls/simulation. There is still no CI pipeline.
 
 ## 3. Directory structure (current)
 
 ```
 src/
 ├── app/
-│   ├── home2/page.tsx           # Home: welcome-or-guest step, salad/tortilla product pick, size picker
+│   ├── page.tsx                 # Guest-or-Google front door
+│   ├── home2/page.tsx           # Home: product pick, size picker, last-order shortcut, bottom nav
 │   ├── build/page.tsx           # Builder entry (wraps BariBaliBuilder)
 │   ├── login/page.tsx           # Real Google sign-in page (guest link always present)
-│   ├── profile/page.tsx         # Identity card + order history (signed-in), sign-in prompt (guest)
+│   ├── profile/page.tsx         # Identity/account area
+│   ├── orders/page.tsx          # Signed-in history + reorder actions
 │   ├── order/[id]/              # Customer order-status page (Server wrapper + client view)
-│   ├── kitchen/page.tsx         # Kitchen board — still NO real auth, see §7
-│   ├── fresh/, top/, recommended/, favorites/  # "Coming soon" stubs — fresh/top/recommended are
-│   │                                            # fully orphaned, zero inbound links anywhere
+│   ├── kitchen/                 # Password-gated kitchen login + board
+│   ├── admin/                   # Local manager tools; disabled in production by config
+│   ├── privacy/, terms/, cancellations/, allergens/, accessibility/, contact/
 │   └── api/
 │       ├── orders/                     # Create order (server-verified price + optional verified user_id), fetch, update status
 │       ├── my/orders/                  # Signed-in user's order history (Bearer-token verified)
 │       ├── payment/create, hyp/return, webhook   # Payment provider integration
 │       ├── slots/                      # Pickup time-slot availability (Israel-local hours)
-│       └── kitchen/orders/             # Kitchen board data feed
+│       ├── kitchen/                    # Kitchen feed, session, rehearsal
+│       └── shop/                       # Live open/closed override
 ├── components/
-│   ├── builder/                # BariBaliBuilder, SummaryView, MixingAnimation, DetailSheet, HeroBowlCard
+│   ├── builder/                # BariBaliBuilder, SummaryView, OrderSeal, DetailSheet, HeroBowlCard
 │   ├── ui/bari/                # Design-system components: BariButton, BariPanel, BariModal, BariBadge, BariGlowBackground
-│   └── ui/                     # ReviewsStrip, ParticleCanvas, ComingSoon, CatPopup, GoogleSignInButton
+│   └── ui/                     # ReviewsStrip, GoldField, GoogleSignInButton
 ├── data/salad-data.js          # Ingredient catalog, prices, nutrition, combo rules, presets, SIZE_CONFIG
 └── lib/
-    ├── supabase.ts             # Anon + service-role Supabase clients, schema reference
+    ├── supabase.ts             # Anon + service-role clients and demo/config detection
     ├── auth.ts                 # Client-side auth: signInWithGoogle, useUser, getAccessToken, displayName/avatarUrl
     ├── pricing.ts               # Server-side canonical price computation (computeOrderTotal)
     ├── hypPay.ts                # Hyp Pay SIGN/VERIFY request builders
-    ├── kitchenAuth.ts           # Shared-secret gate for kitchen endpoints — deterrent only, still not real auth
+    ├── kitchenAuth.ts           # Shared password → httpOnly HMAC session gate
     └── confetti.ts              # Shared canvas-confetti wrapper
 ```
 
 ## 4. User flow (current — see `MENU_FLOW_BRIEF.md` for full detail)
 
-```
-/  →  /home2  (redirect)
+```text
+/  →  /home2
 ```
 
 **Guest-first is a deliberate, explicit product principle**: an account is never required to order, and where offered, it's presented as an equally-weighted option, never a gate.
 
-1. **`/home2`**: signed-out visitors see a full-screen welcome step *every visit* (not just once — a deliberate choice) offering Google sign-in or "המשך כאורח" (continue as guest), equally prominent. Dismissing either way reveals: header (profile chip / logo), two big product cards (סלט salad, טורטיה tortilla), Google reviews strip, bottom nav.
-2. Salad → in-page S/M/L size-picker overlay → `/build?size=<price>`. Tortilla → straight to `/build?type=tortilla` (single fixed price, no size step).
-3. **`/build`**: `BariBaliBuilder` — step-by-step ingredient picker (differs slightly per product, see `MENU_FLOW_BRIEF.md` §5), combo badges, presets, live price, `HeroBowlCard` Lottie preview.
-4. **Summary/checkout** (`SummaryView`, same route): ingredient recap, nutrition stats, notes, pickup-time picker, pay-now-vs-pay-at-pickup choice. Submit → `POST /api/orders` (server recomputes true price; attaches `user_id` from a verified Supabase token if signed in, `null` for guests) → Hyp Pay redirect (if paying now) or straight to a confetti confirmation screen.
+1. **`/`**: signed-out visitors see the guest-or-Google front door on each external entry; signed-in members continue to `/home2`. Internal navigation targets `/home2`, so guests are not repeatedly gated mid-session.
+2. **`/home2`**: product selector, closed notice, latest-order shortcut for signed-in members, reviews and a three-item bottom nav (`/home2`, `/orders`, `/profile`). Salad is the currently orderable card and opens the S/M/L picker. Tortilla is locked as coming soon on home, although `/build?type=tortilla` remains a functional deep-link code path.
+3. **`/build`**: `BariBaliBuilder` — step-by-step ingredient picker, combo badges, presets, live price and Lottie preview. Important: tortilla currently reuses `STEPS` minus `finish`; the imported `TORTILLA_STEPS` catalog is not rendered.
+4. **Summary/checkout** (`SummaryView`, same route): ingredient recap, nutrition, notes and live pickup slots. The payment-choice control is demo-only. With real Supabase, a configured gateway proceeds online automatically; without a configured gateway the server records pay-at-pickup. `POST /api/orders` rebuilds the canonical item snapshots and price before either branch.
 5. **`/order/[id]`**: live-polling status page; document-title flash when ready while backgrounded.
-6. **`/profile`**: signed-in users see an identity card and full order history (`/api/my/orders`); signed-out users see the same sign-in offer + guest link.
-7. **`/kitchen`**: internal board, pickup-urgency columns, status-advance buttons. **Still no real login screen** — see §7.
+6. **`/orders` / `/profile`**: history and reorder live on `/orders`; identity, sign-out and legal links live on `/profile`. Both preserve a clear guest path.
+7. **`/kitchen`**: password-gated queue tabs plus one active work surface, ingredient checks, urgency/alerts, explicit payment handoff and undo. Rehearsal controls are exposed only with `?sim=1`.
 
 ## 5. Data model
 
@@ -95,7 +98,13 @@ create table orders (
 
 `user_id` is nullable and set **server-side only**, from a cryptographically verified Bearer access token — never client-claimed. This is the concrete mechanism behind "guest-first": ordering never requires the column to be populated.
 
-`paid_unverified`: the payment webhook has no cryptographic signature verification configured yet, so webhook-confirmed payments land here instead of `paid`; the kitchen board treats it the same as `pay_at_pickup` (human confirms at pickup).
+`paid_unverified` is a legacy Tranzila/YaadPay generic-webhook state. Hyp browser returns use APISign VERIFY and approved results become `paid`. The kitchen renders `paid_unverified` in amber and requires an explicit register confirmation before handoff.
+
+`supabase/migrations/20260902184747_payment_foundation.sql` adds
+`orders.current_payment_attempt_id`, `orders.payment_status_updated_at`,
+`payment_attempts`, `payment_events`, and the payment RPCs. This is the target
+schema on `codex/payment-foundation`; it has **not** been applied to the live
+Supabase project yet.
 
 `shop_state` table (added 2026-08-08) — the live open/closed override:
 
@@ -129,9 +138,11 @@ in summer — so `now.getHours()` had the shop refusing every order from 09:00 t
 customer's own timezone. Fixed 2026-08-11; the harness now builds its fixtures
 as real Israel instants so it can catch a recurrence on any machine.
 
-**RLS (corrected 2026-08-08).** All three public tables now have RLS enabled and
-**no policies**, so anon and authenticated get nothing from any of them; every
-read and write goes through API routes using the service-role client.
+**RLS (corrected 2026-08-08).** The order data path has no public policies:
+`anon` and `authenticated` cannot read or write orders directly, and all
+database work goes through server API routes. Re-run the database/security
+advisors after applying any new migration; do not infer the live schema from a
+local SQL file.
 
 This section previously claimed *"anon can insert but not read orders (confirmed
 via live testing)"* and described that as correct. It was not. `orders` carried
@@ -148,8 +159,8 @@ brief's reassurance is what stopped anyone looking again.**
 **2026-07-04 to 07-07** (in the previous brief, condensed): security/correctness fixes (server-side price recomputation closing a payment-tampering hole, `paid_unverified` status, RLS lockdown, timezone fix on pickup slots), UX bug fixes, dead-code/repo-hygiene cleanup, a full dependency upgrade (TS 5→6, ESLint 8→9, React 18→19, Next.js 14→16, Tailwind 3→4 — done as its own verified-pixel-identical pass, never mixed with visual work), a new visual design system (tokens, self-hosted Hebrew type, `Bari*` component library), a motion/celebration pass, and PWA manifest/installability.
 
 **2026-07-07 to 07-13** (real backend + payments):
-- **Real Hyp Pay integration**: server-side SIGN (create payment) + VERIFY (confirm redirect callback) flow, replacing the placeholder. Hyp Pay confirmed as the actual processor (same account as the shop's physical terminal, identified from on-site hardware).
-- **Real Supabase project connected**: live URL/keys wired in; order creation, retrieval, and RLS enforcement all verified working end-to-end via live testing.
+- **Hyp integration baseline**: server-side SIGN (create payment) + APISign VERIFY (confirm browser return) flow, replacing the placeholder. Hyp is tied to the shop's physical-terminal account.
+- **Real Supabase project connected in the development environment**: order creation, retrieval, and RLS enforcement were verified end-to-end. The current Vercel deployment does not have those real variables and therefore still uses the demo store.
 - **Design/polish review round 2**: fixed a real UX inconsistency (single-tap salad card, matching tortilla), a typography pass (raised customer-facing text off 6–8px down to a 10px floor, boxes grown to fit rather than text shrunk to fit), a performance pass (compositor-friendly glow effects, sprite-based particle rendering instead of per-frame `shadowBlur`), and a juice/accessibility pass (staggered celebration timing, price count-up animation, order-ready tab-title flash, JS-driven `prefers-reduced-motion` handling to close a gap CSS animations already had covered).
 - All of the above consolidated into one `main` history and **pushed to GitHub/Vercel** — this also surfaced that production had been 18 commits stale (never auto-deployed) and fixed the gap.
 
@@ -164,6 +175,11 @@ brief's reassurance is what stopped anyone looking again.**
 - **"Order again"**: reorder / reorder-with-changes from `/profile` history (`src/lib/reorder.ts` + builder reconstruction). Detects product by base price, not item ids — see the TORTILLA_STEPS note below.
 - **Security hardening**: in-memory rate limiter (`src/lib/rateLimit.ts`) on orders/payment-create/slots/kitchen-login; Hebrew `/privacy` + `/terms` pages (with business-detail placeholders still to fill).
 
+**2026-08-08 to 09-03**:
+- RLS lockdown, server-enforced opening hours, Israel-time fixes, live shop override, customer closed-state and the five-day Sunday–Thursday week shipped to `main`.
+- The kitchen board became a queue-tab/active-ticket work surface with real login, audio readiness, rehearsal mode, explicit payment handoff, undo and network/race hardening.
+- `codex/payment-foundation` adds durable Hyp attempts/events, idempotent checkout-page creation, immediate transaction-`Id` capture, strict settlement/replay checks and focused tests. It remains unpushed and its migration is unapplied.
+
 **Non-obvious code fact (worth knowing before menu-restructure work):** `TORTILLA_STEPS` in `salad-data.js` is imported but **never used** — `BariBaliBuilder` renders the salad step set (`STEPS` minus "finish") for tortillas too. So a "tortilla" order today is salad ingredients on a tortilla base price (42); the only thing distinguishing it from a salad is that base price.
 
 Git history is authoritative for exact detail — commit messages are descriptive.
@@ -173,10 +189,10 @@ Git history is authoritative for exact detail — commit messages are descriptiv
 **Fixed:**
 - Server-side price recomputation (can't tamper with order total)
 - Payment webhook can't blindly mark orders `paid` (`paid_unverified` + amount/state checks)
-- Real Hyp Pay SIGN/VERIFY (server-side, cryptographically checked) replacing the earlier placeholder
+- Hyp hosted-page SIGN plus server-to-server APISign VERIFY using server-held credentials, replacing the earlier placeholder
 - **Supabase RLS actually locked down (2026-08-08)** — all three public tables have RLS enabled with **no policies**; anon and authenticated get nothing. This replaces an earlier entry that called the configuration correct: `orders` had a permissive `INSERT TO public` policy, and since the anon key ships in the browser bundle, anyone could create orders directly against PostgREST with any total and `payment_status: 'paid'`, bypassing every control in `POST /api/orders`. Verified before and after with the anon key (22P02 → 42501).
 - **Opening hours are enforced server-side (2026-08-08)** — `pickup_time` previously went from the request body into the database unread, so an order could be placed at 3am for 4am and would be on the kitchen board when staff arrived. `POST /api/orders` now rejects orders placed while closed or for a time outside hours (409). 571 assertions in `scripts/verify-hours.ts`, most of them checking that every slot the picker offers is one the server accepts.
-- **`paid_unverified` is now visually distinct on the kitchen board** — it used to render identically to a verified `paid` (same text, same green tick), so the "staff confirm at pickup" compensating control had no surface anywhere. It is now an amber "שולם — לאמת בקופה". This matters more once payment is digital-only, when every order on the board is unverified.
+- **`paid_unverified` is visually distinct on the kitchen board** — it is amber and the handoff action explicitly requires checking the register. Approved Hyp VERIFY returns use `paid`; `paid_unverified` remains a legacy generic-webhook state.
 - `user_id` on orders is server-verified from a Bearer token, never client-claimed
 - **`/kitchen` has real access control**: a server-only shared staff password (`KITCHEN_PASSWORD`) exchanged for an httpOnly, HMAC-signed session cookie. The server component gates the page before any board markup ships; the order API routes verify the same cookie. Replaces the old `NEXT_PUBLIC_` header "secret" that shipped in the browser bundle. Unset = board runs open (local/demo); **set on Vercel in production** — verified live: `/kitchen` serves the login screen and `/api/kitchen/orders` returns 401 to anonymous requests.
 - **Rate limiting** (`src/lib/rateLimit.ts`) on orders (12/min), payment-create (12/min), slots (40/min), kitchen-login (8/min) — 429 + Retry-After. In-memory/per-process (approximate on serverless); webhook intentionally unthrottled so gateway callbacks aren't dropped.
@@ -186,59 +202,44 @@ Git history is authoritative for exact detail — commit messages are descriptiv
 - Legal pages have unfilled placeholders (business/legal name, ח.פ., address, contact, VAT-inclusive?, cancellation/refund policy, allergen statement, jurisdiction, effective date, retention, min age).
 - Rate limiting is per-process, not distributed — a determined attacker across instances/cold-starts isn't hard-capped. Fine as a deterrent for one small shop; a hard limit needs a shared store (Vercel KV / Upstash).
 - Kitchen auth is a single shared password, not per-user staff accounts (adequate for one small shop).
-- Payment webhook still has no cryptographic signature verification (`paid_unverified` stopgap) — blocked on a gateway verification credential.
-- A live Google OAuth client-secret JSON file was briefly sitting unignored in the repo working directory — now gitignored (`/google/`), but worth deleting locally since Supabase already has the credentials saved.
+- The generic Tranzila/YaadPay webhook remains unverified. Hyp payloads are rejected there; Hyp server notifications remain disabled pending the test-terminal payload contract and a dedicated ledger-backed handler.
 
 ## 8. Working agreements (how this project is collaborated on)
 
 - **Never mix a dependency/framework upgrade with a visual redesign in the same pass.**
 - **No new dependency without a specific, named purpose.**
-- **One commit per logical phase**, descriptive messages, for bisectability — no test suite exists, so git history + manual smoke-testing is the safety net.
+- **One commit per logical phase**, descriptive messages, for bisectability. The focused regression suite, build/typecheck/lint, manual browser smoke tests and git history are the current safety net; CI is still absent.
 - **Dedicated feature branches off `main`**, verify build/typecheck/lint before every commit, **never merge to `main` or push without explicit go-ahead**.
 - **Guest-first is non-negotiable**: an account must never be required to order; where offered, it's an equally-weighted option, never a gate or a smaller/secondary link.
 - **A gamified trading-card/gacha loyalty feature is real future work** (GoldWallet currency, pack-opening reveals, card rarities) but is **explicitly deferred** — nothing built anticipating it until it gets its own planning session.
 
 ## 9. Pending manual actions / open decisions
 
-`main` is pushed and in sync with `origin` as of the 2026-07-22 checkpoint; production auto-deploys from it but is **still in demo mode** (Vercel env vars not set). Remaining:
+`main` is pushed, in sync and live at `d44fe06` as of 2026-09-03. The current `codex/payment-foundation` branch is local and unpushed. Production auto-deploys from `main` but is **still in demo mode** because the real Supabase/Hyp variables are not set on Vercel. Remaining:
 
-1. **Fill the `[bracketed]` placeholders in `/privacy` and `/terms`** before launch (business/legal name, ח.פ., address, contact email/phone, VAT-inclusive?, payment provider name, cancellation/refund policy, allergen statement, jurisdiction city, effective date, min age, retention period).
-2. ~~Set a real `KITCHEN_PASSWORD` on Vercel~~ — **done**; verified live (login screen served, `/api/kitchen/orders` 401 anonymously).
-3. Add real Supabase/Hyp Pay env vars to **Vercel** to take production out of demo mode.
-4. Production domain — not yet decided.
-5. Hyp Pay **production** credentials (`HYP_MASOF`/`HYP_KEY`/`HYP_PASSP`) — integration built + tested against error paths; live credentials not yet arrived.
-6. Delete the local `google/client_secret_*.json` file (gitignored, no longer needed — Supabase has the values).
-7. Menu/navigation restructure (with an outside AI) — see `MENU_FLOW_BRIEF.md` / `MENU_RESTRUCTURE_REPLY.md`. Phase-1 "order again" is now **done**; remaining phase-1 (welcome-screen softening, nav dedup, dead-route cleanup) and the separately-planned builder-UI unification are not yet built.
-8. **Enable leaked-password protection** in Supabase Auth (checks against HaveIBeenPwned). Flagged by the security advisor; one toggle in the dashboard. Low urgency while sign-in is Google-first.
-9. **Payment goes digital-only** once Hyp is live (owner: expected 2026-08-09). Pay-at-pickup stays working until that is confirmed — the switch should be one flag, not a rewrite. When it lands, `paid_unverified` becomes the state of *every* order, so the kitchen's "לאמת בקופה" pill and the webhook-verification gap both get more serious.
-10. **Consider a database-level guard on `payment_status`** after Hyp lands, so it cannot reach `paid` except through a verified path. The RLS fix closes the door from outside; this would mean a bug in one server route can't hand out free food either.
-11. ~~`/home2` has no closed banner~~ — **done** (`feat/kitchen-board`). The landing carries a notice, the summary honours the live override rather than only the bundled schedule, the order button is disabled with a reason on a confirmed-closed answer, and a 409's written Hebrew reason now reaches the customer instead of being replaced with "try again".
+1. **Fill the `[bracketed]` placeholders in the legal pages** before launch (business/legal name, ח.פ., address, contact email/phone, VAT-inclusive?, payment provider name, cancellation/refund policy, allergen statement, jurisdiction city, effective date, min age and retention period).
+2. Add real Supabase/Hyp Pay env vars to **Vercel** to take production out of demo mode.
+3. Production domain — not yet decided.
+4. Verify whether the emailed Hyp terminal credentials are test or production and map their exact fields before updating credential status.
+5. Menu/navigation follow-up — see `MENU_FLOW_BRIEF.md` / `MENU_RESTRUCTURE_REPLY.md`. The three-item nav, `/orders` split, reorder and dead-route cleanup are done; softening the repeated external-entry gate and unifying the builder remain open product decisions.
+6. **Enable leaked-password protection** in Supabase Auth (checks against HaveIBeenPwned). Flagged by the security advisor; one toggle in the dashboard. Low urgency while sign-in is Google-first.
+7. **Do not switch to digital-only** until the payment migration is applied and approved, declined, abandoned and replayed test-terminal flows pass. Approved Hyp VERIFY returns become `paid`; `paid_unverified` remains legacy-only. Pay-at-pickup stays working until that checkpoint is explicitly approved.
+8. **Consider a database-level guard on `payment_status`** after Hyp lands, so it cannot reach `paid` except through a verified path. The RLS fix closes the door from outside; this would mean a bug in one server route can't hand out free food either.
 
-**Two unmerged branches as of 2026-08-08** (both verified, neither pushed):
-`feat/mixing-animation` (6 commits) replaces the post-order mixing animation with
-a struck-medallion seal that becomes the confirmation in place; `feat/kitchen-board`
-(7 commits) covers the kitchen fixes, opening hours, the customer-facing closed
-state and the RLS fix. **The RLS and `shop_state` changes are already live in the
-production database** — only the code is unmerged.
-
-**They merge cleanly** — checked, not assumed. Both rewrite parts of
-`SummaryView.jsx` (the seal branch folded `OrderedScreen` into `OrderSealScreen`
-and replaced the `settle()`/`mixDoneRef` machinery with a single `acceptedOrder`
-state; the kitchen branch changed the pickup picker, the submit error handling
-and the CTA), but they touch different regions. Verified on a throwaway local
-branch on 2026-08-08: no conflicts, and on the merged tree `npx tsc --noEmit`
-clean, lint 0 errors / 14 warnings, `npm run build` compiled, and both assertion
-harnesses passing. Either order works.
+**Current unmerged work:** `codex/payment-foundation` contains the durable
+payment foundation plus the order-validation, settlement and kitchen hardening
+passes. It is unpushed, unapplied to Supabase and undeployed. Git history is
+authoritative for the exact commit list.
 
 ## 10. Improvement backlog (not started, no priority commitment)
 
-- **Testing/CI**: zero automated tests, no CI. At minimum, tests around `computeOrderTotal` and webhook status transitions would catch payment-logic regressions.
+- **Testing/CI**: 43 focused regression tests, no CI. The largest gaps are component/browser automation, end-to-end provider flows and database-backed concurrency tests.
 - **Observability**: no error tracking, no structured logging on payment/webhook routes.
-- **Ops**: no admin/reporting view (sales, popular combos); schema/policy changes are ad hoc dashboard SQL rather than tracked migrations; unconfirmed whether Supabase backups/PITR are enabled.
+- **Ops**: a local password-gated admin exists for prices/discounts/customers, but there is no production reporting dashboard. Schema/policy SQL and migrations are tracked; execution, advisor runs and backup/PITR verification remain manual.
 - **Code quality**: `zustand` installed but unused — a `BariBaliBuilder.jsx` state-lifting refactor is on the table whenever there's appetite.
 - **SEO**: no `robots.ts`/`sitemap.ts`, no Open Graph metadata.
-- Kitchen board still has no reorder/search/other convenience features beyond the basics.
+- **Kitchen hardware judgement**: test the board on the physical Lenovo for glare, sound level, touch targets, wake-lock behaviour and recovery after a long idle period.
 
 ## 11. Environment variables
 
-Canonical list in `.env.example` at repo root. Categories: Supabase (URL/publishable/secret keys), kitchen board secret, payment provider selection + per-provider credentials (Tranzila/YaadPay/Hyp), WhatsApp contact number, Google Places API (reviews strip), app base URL (payment redirects).
+Canonical list in `.env.example` at repo root. Categories: Supabase (URL/publishable/service-role keys), kitchen-board and local-admin passwords, payment-provider selection plus Tranzila/YaadPay/Hyp credentials, Google Places API (reviews strip), and app base URL (payment redirects).
