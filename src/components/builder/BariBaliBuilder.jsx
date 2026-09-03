@@ -26,6 +26,7 @@ import BariButton from "../ui/bari/BariButton";
 import { useAnimatedNumber, usePrefersReducedMotion } from "../../lib/motionHooks";
 import { takeReorder } from "../../lib/reorder";
 import { effectiveItemPrice, effectiveBase, effectiveSizePrice } from "../../lib/menuConfig";
+import { resolveChefPreset } from "../../lib/chefPresets";
 import { countsTowardIngredientPickLimit, INGREDIENT_PICK_LIMIT } from "../../lib/orderRules";
 import { isSoundOn, readSoundPref, setSoundPref } from "../../lib/soundPref";
 
@@ -345,6 +346,10 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
   const dismissHint = useCallback(() => { setShowLongPressHint(false); markHintSeen(); }, []);
   const [priceFlash, setPriceFlash] = useState(null);
   const activeBase = isTortilla ? effectiveBase('tortilla') : (selectedSize ? effectiveSizePrice(selectedSize) : effectiveBase('salad'));
+  const presetResolutions = useMemo(() => isTortilla
+    ? new Map()
+    : new Map(PRESETS.map(preset => [preset.id, resolveChefPreset(preset, steps, activeBase)])),
+  [activeBase, isTortilla, steps]);
   const [prevPrice, setPrevPrice] = useState(activeBase);
   const [activeAnchor, setActiveAnchor] = useState(0);
   const [notes, setNotes] = useState("");
@@ -572,26 +577,17 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
 
   // ─── Presets ───
   const loadPreset = useCallback((preset) => {
-    const allItems = steps.flatMap(s => s.subgroups.flatMap(sg => sg.items));
-    const v = [], p = [], sc = [];
-    preset.items.forEach(id => {
-      const item = allItems.find(i => i.id === id);
-      if (!item) return;
-      const inStep = steps.find(s => s.subgroups.some(sg => sg.items.some(i => i.id === id)));
-
-      // Add metadata to preset items
-      const itemWithMeta = { ...item, _meta: { stepId: inStep?.id } };
-
-      if (inStep?.id === "veggies") v.push(itemWithMeta);
-      else if (inStep?.id === "protein") p.push(itemWithMeta);
-      else if (inStep?.id === "sauces") sc.push(itemWithMeta);
-    });
-    setSels({ veggies: v, protein: p, sauces: sc });
+    // Re-resolve at activation time as a final fail-closed guard. The shared
+    // resolver guarantees the displayed quote, preview and loaded selections
+    // contain the exact same canonical item IDs.
+    const resolved = resolveChefPreset(preset, steps, activeBase);
+    if (!resolved.valid) return;
+    setSels(resolved.selections);
     haptic("step"); playSound("step");
 
 
     setStep(0);
-  }, [steps]);
+  }, [activeBase, steps]);
 
   // ─── Clear draft ───
   const requestClearDraft = useCallback(() => setShowClearConfirm(true), []);
@@ -860,22 +856,28 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                 </div>
               </div>
               {(() => {
-                const allIngredients = steps.flatMap(s => s.subgroups.flatMap(sg => sg.items));
                 const ep = expandedPreset ? PRESETS.find(x => x.id === expandedPreset) : null;
                 const epc = ep ? (PRESET_COLORS[ep.id] || PRESET_COLORS.balanced) : null;
+                const epQuote = ep ? presetResolutions.get(ep.id) : null;
+                const epExtra = epQuote?.valid ? epQuote.total - activeBase : 0;
+                const epItemPrices = new Map(epQuote?.valid ? epQuote.items.map(item => [item.id, item.price]) : []);
                 return (
                   <>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "7px" }}>
                       {PRESETS.map((p, i) => {
                         const pc = PRESET_COLORS[p.id] || PRESET_COLORS.balanced;
                         const isOpen = expandedPreset === p.id;
+                        const presetQuote = presetResolutions.get(p.id);
+                        const presetAvailable = presetQuote?.valid === true;
                         return (
                           // Outer wrapper carries the idle float (staggered per
                           // card for an organic, not-all-in-sync feel) so it
                           // doesn't fight the button's own press/open transform.
                           <div key={p.id} style={{ width: "100%", animation: `cardFloat 3.6s ease-in-out ${(i % 4) * 0.25}s infinite` }}>
                             <button
+                              type="button"
                               onClick={() => setExpandedPreset(isOpen ? null : p.id)}
+                              disabled={!presetAvailable}
                               style={{
                                 ...S.presetCard,
                                 width: "100%",
@@ -887,7 +889,10 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                                 transition: "all 0.2s cubic-bezier(0.34,1.56,0.64,1)",
                               }}
                               aria-expanded={isOpen}
-                              aria-label={`מתכון ${p.he}`}
+                              aria-controls={`chef-preset-${p.id}`}
+                              aria-label={presetAvailable
+                                ? `מתכון ${p.he}, מחיר המתכון ₪${presetQuote.total}`
+                                : `מתכון ${p.he}, אינו זמין כרגע`}
                               tabIndex={0}
                             >
                               {p.id === "signature" && (
@@ -896,7 +901,12 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                                 </div>
                               )}
                               <Icon src={p.icon} size="20px" style={{ flexShrink: 0, filter: `drop-shadow(0 1px 4px ${pc.dot})` }} />
-                              <span style={{ flex: 1, fontSize: "11.5px", fontWeight: 800, color: pc.text, textAlign: "right", lineHeight: 1.2 }}>{p.he}</span>
+                              <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px", textAlign: "right" }}>
+                                <span style={{ fontSize: "11.5px", fontWeight: 800, color: pc.text, lineHeight: 1.2 }}>{p.he}</span>
+                                <span style={{ fontSize: "10px", fontWeight: 800, color: presetAvailable ? "#f0d060" : "rgba(255,255,255,0.38)", lineHeight: 1.2 }}>
+                                  {presetAvailable ? `₪${presetQuote.total} למתכון` : "לא זמין כרגע"}
+                                </span>
+                              </span>
                               <span style={{ fontSize: "9px", fontWeight: 700, color: isOpen ? pc.text : "rgba(255,255,255,0.28)", flexShrink: 0, transition: "transform 0.2s", transform: isOpen ? "rotate(180deg)" : "none" }}>▾</span>
                             </button>
                           </div>
@@ -905,8 +915,10 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                     </div>
 
                     {/* Expansion Panel */}
-                    {ep && epc && (
+                    {ep && epc && epQuote?.valid && (
                       <div key={ep.id} style={{
+                        // The id binds each recipe button's aria-expanded state
+                        // to the details it reveals.
                         marginTop: "8px",
                         borderRadius: "14px",
                         background: epc.bg,
@@ -914,14 +926,20 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                         boxShadow: epc.glow,
                         overflow: "hidden",
                         animation: "expandIn 0.28s cubic-bezier(0.22,1.2,0.36,1) both",
-                      }}>
+                      }} id={`chef-preset-${ep.id}`}>
                         {/* Header */}
-                        <div style={{ padding: "14px 14px 10px", display: "flex", alignItems: "center", gap: "10px", borderBottom: `1px solid ${epc.border}` }}>
+                        <div style={{ padding: "10px 10px 10px 14px", display: "flex", alignItems: "center", gap: "10px", borderBottom: `1px solid ${epc.border}` }}>
                           <Icon src={ep.icon} size="28px" style={{ filter: `drop-shadow(0 2px 8px ${epc.dot})`, flexShrink: 0 }} />
-                          <span style={{ flex: 1, fontSize: "15px", fontWeight: 900, color: epc.text, textAlign: "right" }}>{ep.he}</span>
+                          <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px", textAlign: "right" }}>
+                            <span style={{ fontSize: "15px", fontWeight: 900, color: epc.text }}>{ep.he}</span>
+                            <span style={{ fontSize: "11px", fontWeight: 800, color: "#f0d060" }}>
+                              מחיר המתכון ₪{epQuote.total}{epExtra > 0 ? ` · תוספות ₪${epExtra}` : " · ללא תוספת"}
+                            </span>
+                          </span>
                           <button
+                            type="button"
                             onClick={() => setExpandedPreset(null)}
-                            style={{ background: "none", border: "none", color: "rgba(255,255,255,0.3)", fontSize: "14px", cursor: "pointer", padding: "2px 4px", lineHeight: 1, flexShrink: 0 }}
+                            style={{ width: "44px", height: "44px", display: "grid", placeItems: "center", background: "none", border: "none", color: "rgba(255,255,255,0.55)", fontSize: "14px", cursor: "pointer", padding: 0, lineHeight: 1, flexShrink: 0, borderRadius: "10px" }}
                             aria-label="סגור"
                           >✕</button>
                         </div>
@@ -933,18 +951,17 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
 
                         {/* Ingredient chips */}
                         <div style={{ padding: "10px 14px", display: "flex", flexWrap: "wrap", gap: "5px", justifyContent: "flex-end" }}>
-                          {ep.items.map(id => {
-                            const item = allIngredients.find(i => i.id === id);
-                            if (!item) return null;
+                          {epQuote.items.map(item => {
+                            const itemPrice = epItemPrices.get(item.id) || 0;
                             return (
-                              <span key={id} style={{
+                              <span key={item.id} style={{
                                 fontSize: "10px", fontWeight: 600,
                                 padding: "2px 8px", borderRadius: "8px",
                                 background: "rgba(255,255,255,0.08)",
                                 color: "rgba(255,255,255,0.6)",
                                 border: `1px solid ${epc.border}`,
                                 whiteSpace: "nowrap",
-                              }}><Icon src={item.icon} size="14px" /> {item.he}</span>
+                              }}><Icon src={item.icon} size="14px" /> {item.he}{itemPrice > 0 ? ` · +₪${itemPrice}` : ""}</span>
                             );
                           })}
                         </div>
@@ -952,6 +969,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                         {/* CTA */}
                         <div style={{ padding: "0 14px 14px" }}>
                           <button
+                            type="button"
                             onClick={() => { loadPreset(ep); setExpandedPreset(null); }}
                             style={{
                               width: "100%", padding: "11px 0", borderRadius: "10px",
@@ -964,7 +982,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                               letterSpacing: "0.02em",
                             }}
                           >
-                            <span>בנה את {ep.he}</span>
+                            <span>בנו את {ep.he} · ₪{epQuote.total}</span>
                             <ArrowLeft size={15} strokeWidth={2.8} />
                           </button>
                         </div>

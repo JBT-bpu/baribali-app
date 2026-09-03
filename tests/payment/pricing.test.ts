@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { STEPS, TORTILLA_STEPS } from '../../src/data/salad-data.js';
+import { PRESETS, STEPS, TORTILLA_STEPS } from '../../src/data/salad-data.js';
+import { resolveChefPreset } from '../../src/lib/chefPresets';
 import { effectiveBase, effectiveItemPriceMap, effectiveSizePrice } from '../../src/lib/menuConfig';
 import { computeOrderTotal, type CanonicalOrderItem, type ComputedTotal } from '../../src/lib/pricing';
 
@@ -203,4 +204,82 @@ test('empty and optional-step selections remain valid', () => {
 test('catalog ids are globally unique', () => {
     const ids = allCatalogItems.map(item => item.id);
     assert.equal(new Set(ids).size, ids.length);
+});
+
+test('every chef preset has a valid server-authoritative quote at each salad size', () => {
+    const prices = effectiveItemPriceMap();
+    const sizes = [750, 1000, 1500];
+
+    for (const preset of PRESETS as Array<{ id: string; items: string[] }>) {
+        const extra = preset.items.reduce((sum, id) => {
+            assert.ok(Object.hasOwn(prices, id), `${preset.id} references missing catalog item ${id}`);
+            return sum + prices[id];
+        }, 0);
+
+        for (const size of sizes) {
+            const base = effectiveSizePrice(size);
+            const resolved = resolveChefPreset(preset, saladSteps, base);
+            assert.ok(resolved.valid, `${preset.id} must resolve at ${size}ml`);
+            assert.deepEqual(
+                { valid: resolved.valid, total: resolved.total, items: resolved.items },
+                {
+                    valid: true,
+                    total: base + extra,
+                    items: preset.items.map(canonical),
+                },
+                `${preset.id} must remain selectable and honestly priced at ${size}ml`,
+            );
+
+            const loadedItems = Object.values(resolved.selections).flat();
+            assert.deepEqual(
+                loadedItems.map(item => item.id).sort(),
+                [...preset.items].sort(),
+                `${preset.id} must load every quoted item exactly once`,
+            );
+            for (const [stepId, items] of Object.entries(resolved.selections)) {
+                assert.ok(items.every(item => item._meta.stepId === stepId),
+                    `${preset.id} selections must retain their builder step`);
+            }
+        }
+    }
+
+    const signature = PRESETS.find(preset => preset.id === 'signature');
+    assert.ok(signature);
+    assert.ok(signature.items.reduce((sum, id) => sum + prices[id], 0) > 0,
+        'the regression fixture must include a paid preset so hidden surcharges cannot pass');
+
+    const smallSignature = resolveChefPreset(signature, saladSteps, effectiveSizePrice(750));
+    const largeSignature = resolveChefPreset(signature, saladSteps, effectiveSizePrice(1500));
+    assert.ok(smallSignature.valid && largeSignature.valid);
+    assert.equal(
+        largeSignature.total - smallSignature.total,
+        effectiveSizePrice(1500) - effectiveSizePrice(750),
+        'changing size must change a recipe quote only by the authoritative base delta',
+    );
+
+    const finish = step('finish');
+    const futureStepPreset = {
+        items: [finish.subgroups[0].items[0].id, finish.subgroups[1].items[0].id],
+    };
+    const futureResolved = resolveChefPreset(futureStepPreset, saladSteps, effectiveSizePrice(750));
+    assert.ok(futureResolved.valid);
+    assert.deepEqual(futureResolved.selections.finish.map(item => item.id), futureStepPreset.items,
+        'future valid step items must be loaded rather than silently discarded');
+
+    const invalidPresets = [
+        { items: [] },
+        { items: ['not-in-the-menu'] },
+        { items: ['lettuce', 'lettuce'] },
+        { items: stepIds('protein').slice(0, 2) },
+        { items: stepIds('sauces').slice(0, 3) },
+        { items: stepIds('veggies').slice(0, 15) },
+        { items: finish.subgroups[0].items.slice(0, 2).map(item => item.id) },
+    ];
+    for (const preset of invalidPresets) {
+        assert.deepEqual(
+            resolveChefPreset(preset, saladSteps, effectiveSizePrice(750)),
+            { valid: false, total: 0, items: [], selections: {} },
+            `invalid preset ${preset.items.join(',')} must fail closed`,
+        );
+    }
 });

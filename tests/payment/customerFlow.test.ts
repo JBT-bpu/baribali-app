@@ -313,3 +313,24 @@ test('the builder step header remains usable on a narrow phone', () => {
         'interactive step buttons need a group rather than an ARIA progressbar that hides descendants');
     assert.doesNotMatch(header, /role="progressbar"/);
 });
+
+test('chef recipes disclose their authoritative price before selection', () => {
+    assert.match(builder, /new Map\(PRESETS\.map\(preset => \[preset\.id, resolveChefPreset\(preset, steps, activeBase\)\]\)\)/,
+        'all displayed recipes must be recalculated from the currently selected size');
+    assert.match(builder, /const resolved = resolveChefPreset\(preset, steps, activeBase\);[\s\S]*?if \(!resolved\.valid\) return;[\s\S]*?setSels\(resolved\.selections\)/,
+        'selection must fail closed and load the exact same resolution that powers its quote');
+    assert.doesNotMatch(builder, /if \(inStep\?\.id === "veggies"\)/,
+        'preset loading must not silently discard items from future builder steps');
+    assert.match(builder, /מחיר המתכון ₪\{epQuote\.total\}/,
+        'the expanded recipe must reveal its current all-in price');
+    assert.match(builder, /epQuote\.total - activeBase/,
+        'the paid ingredient delta must be explained separately from the size price');
+    assert.match(builder, /itemPrice > 0 \? ` · \+₪\$\{itemPrice\}`/,
+        'each paid ingredient must explain which item creates the surcharge');
+    assert.match(builder, /disabled=\{!presetAvailable\}/,
+        'a future invalid preset must fail closed instead of creating a rejected order');
+    assert.match(builder, /aria-label=\{presetAvailable[\s\S]*?מחיר המתכון ₪\$\{presetQuote\.total\}/,
+        'assistive technology must receive the same price as sighted customers');
+    assert.match(builder, /aria-controls=\{`chef-preset-\$\{p\.id\}`\}[\s\S]*?id=\{`chef-preset-\$\{ep\.id\}`\}/,
+        'the expanded state must identify the recipe details it controls');
+});
