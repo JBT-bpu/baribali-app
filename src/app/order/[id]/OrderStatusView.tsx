@@ -200,6 +200,8 @@ export default function OrderStatusView({ id, paymentHint = null }: { id: string
         let stopped = false;   // terminal: the order is collected, or gone
         let inFlight = false;
         let timer: ReturnType<typeof setTimeout> | undefined;
+        let activeController: AbortController | null = null;
+        let reloadAfterAbort = false;
 
         // Visible: 4s, so a kitchen "ready" lands almost at once for someone
         // watching. Hidden: 20s — the tab-title flash below still needs polling
@@ -209,14 +211,25 @@ export default function OrderStatusView({ id, paymentHint = null }: { id: string
 
         const schedule = () => {
             if (stopped || cancelled) return;
-            timer = setTimeout(load, nextDelay());
+            timer = setTimeout(() => {
+                timer = undefined;
+                void load();
+            }, nextDelay());
         };
 
         const load = async () => {
             if (inFlight || stopped || cancelled) return;
             inFlight = true;
+            const controller = new AbortController();
+            activeController = controller;
+            // A mobile radio can leave fetch pending indefinitely. Abort one
+            // attempt after 10s so the normal polling loop can recover.
+            const requestTimeout = setTimeout(() => controller.abort(), 10_000);
             try {
-                const res = await fetch(`/api/orders/${id}`);
+                const res = await fetch(`/api/orders/${id}`, {
+                    signal: controller.signal,
+                    cache: 'no-store',
+                });
                 if (cancelled) return;
                 // Only a 404 means the order genuinely isn't there. Every other
                 // failure — a 500, a rate limit, a dropped mobile connection on
@@ -234,10 +247,20 @@ export default function OrderStatusView({ id, paymentHint = null }: { id: string
                 // says so via the step's own line, so no extra state is needed.
                 if (d.status === 'collected') stopped = true;
             } catch {
-                if (!cancelled) setOffline(true);
+                // A foreground event deliberately aborts a stale hidden-tab
+                // request and immediately replaces it; avoid flashing offline
+                // for that controlled hand-off.
+                if (!cancelled && !reloadAfterAbort) setOffline(true);
             } finally {
+                clearTimeout(requestTimeout);
+                if (activeController === controller) activeController = null;
                 inFlight = false;
-                schedule();
+                if (reloadAfterAbort && !stopped && !cancelled) {
+                    reloadAfterAbort = false;
+                    void load();
+                } else {
+                    schedule();
+                }
             }
         };
 
@@ -245,15 +268,24 @@ export default function OrderStatusView({ id, paymentHint = null }: { id: string
         // rather than sitting on stale data for the rest of a hidden interval.
         const onVisibility = () => {
             if (document.hidden || stopped || cancelled) return;
-            if (timer) clearTimeout(timer);
-            load();
+            if (timer) {
+                clearTimeout(timer);
+                timer = undefined;
+            }
+            if (inFlight) {
+                reloadAfterAbort = true;
+                activeController?.abort();
+                return;
+            }
+            void load();
         };
         document.addEventListener('visibilitychange', onVisibility);
 
-        load();
+        void load();
         return () => {
             cancelled = true;
             if (timer) clearTimeout(timer);
+            activeController?.abort();
             document.removeEventListener('visibilitychange', onVisibility);
         };
     }, [id]);

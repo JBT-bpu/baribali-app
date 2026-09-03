@@ -153,8 +153,8 @@ export default function OrderSealScreen({ order, onNewOrder }) {
                 }}
                 title={order && revealed ? (
                     <>
-                        <div style={{ ...S.title, animation: `${RISE} 0.05s both` }}>בהכנה!</div>
-                        <div style={{ ...S.subtitle, animation: `${RISE} 0.13s both` }}>מכינים את הסלט שלכם עכשיו 🐱</div>
+                        <div style={{ ...S.title, animation: `${RISE} 0.05s both` }}>ההזמנה התקבלה!</div>
+                        <div style={{ ...S.subtitle, animation: `${RISE} 0.13s both` }}>ההזמנה נשלחה למטבח 🐱</div>
                         {order.orderNum && (
                             <div style={{ marginTop: "8px", animation: `${RISE} 0.23s both` }}>
                                 <BariBadge>הזמנה {order.orderNum}</BariBadge>

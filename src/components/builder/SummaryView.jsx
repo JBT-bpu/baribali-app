@@ -188,6 +188,29 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     // Once the order exists, retries must reopen payment for that same order.
     // Re-running POST /api/orders would create a second kitchen order.
     const pendingPaymentRef = useRef(null);
+    // React state is not a synchronous mutex: two taps in one event-loop turn
+    // can both observe `submitting === false`. This ref closes before any state
+    // update or await, so only one request can enter the order-creation path.
+    const submitLockRef = useRef(false);
+
+    // A hosted payment page may be left with the browser Back button. When the
+    // build page is restored from bfcache, React state otherwise preserves the
+    // full-screen "sending" seal forever. The order already exists at this
+    // point, so recover the existing payment retry — never POST /api/orders
+    // again. A hard reload is deliberately not restored from global storage:
+    // doing that safely needs an order-scoped URL marker and expiry policy.
+    useEffect(() => {
+        const recoverFromPaymentPage = (event) => {
+            if (!event.persisted || !pendingPaymentRef.current) return;
+            submitLockRef.current = false;
+            setSubmitting(false);
+            setShowMixing(false);
+            setHasPendingPayment(true);
+            setSubmitError("חזרתם מעמוד התשלום. ההזמנה כבר נקלטה — לחצו כדי לפתוח שוב את עמוד התשלום.");
+        };
+        window.addEventListener('pageshow', recoverFromPaymentPage);
+        return () => window.removeEventListener('pageshow', recoverFromPaymentPage);
+    }, []);
 
     // Signed-in customers may have a standing discount assigned to their account
     // ("tag", e.g. an approved municipal worker's 10%). Fetch it so the shown
@@ -248,6 +271,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
 
 
     const failSubmit = useCallback((message) => {
+        submitLockRef.current = false;
         setShowMixing(false);          // stop the sequence rather than let it "complete"
         setSubmitting(false);
         setSubmitError(message);
@@ -314,7 +338,8 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     };
 
     const submitOrder = async (choiceOverride) => {
-        if (submitting) return;        // a double-tap must not create two orders
+        if (submitLockRef.current) return;
+        submitLockRef.current = true;  // close synchronously before state/await
         const choice = choiceOverride ?? paymentChoice;
         const isFailureTest = choice === "fail";
         setSubmitting(true);
@@ -340,7 +365,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
 
         try {
             // Signed-in customers get the order linked to their account (order
-            // history on /profile); guests order exactly the same without it.
+            // history on /orders); guests order exactly the same without it.
             const token = await getAccessToken().catch(() => null);
             const res = await fetch('/api/orders', {
                 method: 'POST',
@@ -383,6 +408,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                 return;
             }
             if (data?.paymentFailed) {
+                submitLockRef.current = false;
                 setShowMixing(false);
                 setSubmitting(false);
                 setFailedOrderNum(data.orderNum ?? null);
@@ -416,6 +442,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
             // number. Only the server's values go in — `total` is `finalTotal`
             // because that is what was submitted and re-derived server-side, and
             // the rest is read straight off the response.
+            submitLockRef.current = false;
             setSubmitting(false);
             setAcceptedOrder({
                 total: finalTotal,
