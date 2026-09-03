@@ -80,6 +80,33 @@ test('reuses a previously persisted checkout URL without asking Hyp again', asyn
     assert.equal(created, false);
 });
 
+test('a zero-value attempt can never launch a hosted Hyp checkout', async () => {
+    let createCalls = 0;
+    const finishInputs: Parameters<HypPaymentStartDependencies['finish']>[0][] = [];
+    await assert.rejects(
+        startHypPayment({
+            orderId: baseAttempt.orderId,
+            idempotencyKey: '44444444-4444-4444-8444-444444444444',
+        }, dependencies({
+            claim: async () => ({ ...baseAttempt, amountAgorot: 0 }),
+            createUrl: async () => {
+                createCalls += 1;
+                return 'https://pay.example/should-not-open';
+            },
+            finish: async input => {
+                finishInputs.push(input);
+                return { status: 'init_failed', checkoutUrl: null };
+            },
+        })),
+        (error: unknown) => error instanceof PaymentStartError
+            && error.code === 'PAYMENT_NOT_REQUIRED'
+            && error.httpStatus === 409,
+    );
+    assert.equal(createCalls, 0);
+    assert.equal(finishInputs[0]?.checkoutUrl, null);
+    assert.equal(finishInputs[0]?.errorCode, 'PAYMENT_NOT_REQUIRED');
+});
+
 test('a concurrent initializer returns 202 instead of creating a second page', async () => {
     await assert.rejects(
         startHypPayment({

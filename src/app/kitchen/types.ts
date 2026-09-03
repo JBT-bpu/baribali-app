@@ -87,6 +87,7 @@ export type PayTone = 'settled' | 'verify' | 'owed';
 export function paymentLabel(payment: string | undefined): { text: string; tone: PayTone; owed: boolean } | null {
     switch (payment) {
         case 'paid': return { text: 'שולם באפליקציה', tone: 'settled', owed: false };
+        case 'no_payment_required': return { text: 'ללא חיוב', tone: 'settled', owed: false };
         case 'paid_unverified': return { text: 'שולם — לאמת בקופה', tone: 'verify', owed: false };
         case 'pay_at_pickup': return { text: 'תשלום באיסוף', tone: 'owed', owed: true };
         case 'pending': return { text: 'ממתין לתשלום', tone: 'owed', owed: true };

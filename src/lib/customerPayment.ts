@@ -16,6 +16,11 @@ export function isPaymentVerificationReturn(search: string): boolean {
     return values.length === 1 && values[0] === 'verifying';
 }
 
+/** Only an explicitly pending order may open a hosted checkout page. */
+export function requiresHostedPayment(status: string | null | undefined): boolean {
+    return status === 'pending';
+}
+
 /**
  * Customer-facing payment truth shared by the immediate confirmation and the
  * tracking page. `paid_unverified` means the money must not be requested again,
@@ -27,6 +32,8 @@ export function customerPaymentPresentation(
     switch (status) {
         case 'paid':
             return { text: 'שולם', owed: false, tone: 'done', icon: '✓' };
+        case 'no_payment_required':
+            return { text: 'אין צורך בתשלום', owed: false, tone: 'done', icon: '✓' };
         case 'paid_unverified':
             return { text: 'בבדיקה — אל תשלמו שוב', owed: false, tone: 'verify', icon: '⏳' };
         case 'verification_pending':

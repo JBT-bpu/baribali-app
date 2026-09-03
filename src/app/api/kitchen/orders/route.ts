@@ -10,7 +10,12 @@ export async function GET(req: NextRequest) {
     }
 
     if (!isSupabaseConfigured()) {
-        const demoStatuses = new Set(['paid', 'pay_at_pickup', 'paid_unverified']);
+        const demoStatuses = new Set([
+            'paid',
+            'pay_at_pickup',
+            'paid_unverified',
+            'no_payment_required',
+        ]);
         const orders = listDemoOrders()
             .filter(o => o.status !== 'collected' && demoStatuses.has(o.payment_status))
             .sort((a, b) => (a.pickup_time ?? '').localeCompare(b.pickup_time ?? ''));
@@ -25,7 +30,12 @@ export async function GET(req: NextRequest) {
         .select('*')
         .gte('created_at', since.toISOString())
         .neq('status', 'collected')
-        .in('payment_status', ['paid', 'pay_at_pickup', 'paid_unverified'])
+        .in('payment_status', [
+            'paid',
+            'pay_at_pickup',
+            'paid_unverified',
+            'no_payment_required',
+        ])
         .order('pickup_time', { ascending: true });
 
     if (error) {

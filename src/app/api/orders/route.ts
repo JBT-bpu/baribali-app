@@ -17,6 +17,7 @@ import {
 import { shopStatus, checkPickup } from '@/lib/shopHours';
 import { readShopState } from '@/lib/shopState';
 import {
+    initialOrderPaymentStatus,
     isValidSubmissionKey,
     orderSubmissionFingerprint,
     parseOrderSubmissionIntent,
@@ -275,10 +276,12 @@ export async function POST(req: NextRequest) {
         }
 
         if (demoMode) {
-            const paymentStatus =
-                intent.paymentChoice === 'now' ? 'paid' :
-                intent.paymentChoice === 'fail' ? 'failed' :
-                'pay_at_pickup';
+            const paymentStatus = initialOrderPaymentStatus({
+                total: finalTotal,
+                demoMode: true,
+                paymentChoice: intent.paymentChoice,
+                paymentConfigured: false,
+            });
             const result = createDemoOrderOnce({
                 submissionKey,
                 submissionFingerprint,
@@ -297,9 +300,16 @@ export async function POST(req: NextRequest) {
             });
         }
 
-        // Without a gateway the order is immediately pay-at-pickup. With Hyp it
-        // remains pending until the separately idempotent payment flow settles.
-        const payAtPickup = !isPaymentConfigured();
+        // A fully-discounted order has no payment operation at all. Otherwise,
+        // no usable gateway means pay-at-pickup; a configured gateway remains
+        // pending until the separately idempotent payment flow settles.
+        const paymentStatus = initialOrderPaymentStatus({
+            total: finalTotal,
+            demoMode: false,
+            paymentChoice: null,
+            // Do not even inspect gateway configuration when there is no charge.
+            paymentConfigured: finalTotal > 0 && isPaymentConfigured(),
+        });
         const orderNum = `BB-${((Date.now() % 9000) + 1000)}`;
         const { data, error } = await admin!.rpc('create_order_idempotent', {
             p_idempotency_key: submissionKey,
@@ -311,7 +321,7 @@ export async function POST(req: NextRequest) {
             p_pickup_time: intent.pickupTime,
             p_notes: intent.notes,
             p_size: String(intent.size),
-            p_payment_status: payAtPickup ? 'pay_at_pickup' : 'pending',
+            p_payment_status: paymentStatus,
             p_user_id: userId,
             // These are made durable by this migration; there was no tracked
             // schema for the fields even though the former direct insert wrote

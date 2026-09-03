@@ -9,7 +9,7 @@ import {
 } from '@/lib/paymentAttempts';
 import { paymentProvider } from '@/lib/payment';
 import { enforceRateLimit } from '@/lib/rateLimit';
-import { supabaseAdmin } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/serverSupabase';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -69,6 +69,8 @@ function startErrorResponse(error: PaymentStartError) {
         ? 'Payment initialization is still in progress'
         : error.code === 'PAYMENT_ALREADY_SETTLED'
             ? 'Order already paid'
+            : error.code === 'PAYMENT_NOT_REQUIRED'
+                ? 'No payment is required for this order'
             : error.code === 'PAYMENT_VERIFICATION_PENDING'
                 ? 'Payment verification is pending'
                 : 'Payment could not be initialized';
@@ -99,6 +101,50 @@ export async function POST(req: NextRequest) {
 
     if (!UUID_PATTERN.test(orderId)) {
         return NextResponse.json({ error: 'Invalid orderId' }, { status: 400 });
+    }
+
+    // Resolve the order before choosing a provider. Besides keeping every
+    // provider on the same eligibility rules, this gives a stale recovery
+    // request a truthful terminal answer for an order that needs no charge.
+    let admin: ReturnType<typeof getSupabaseAdmin>;
+    let order: {
+        id: string;
+        order_num: string;
+        total: number;
+        payment_status: string;
+    };
+    try {
+        admin = getSupabaseAdmin();
+        const { data, error } = await admin
+            .from('orders')
+            .select('id, order_num, total, payment_status')
+            .eq('id', orderId)
+            .single();
+
+        if (error || !data) {
+            return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+        }
+        order = data;
+    } catch (error) {
+        console.error('[POST /api/payment/create] order lookup unavailable', {
+            name: error instanceof Error ? error.name : 'unknown',
+        });
+        return NextResponse.json({ error: 'Payment could not be initialized' }, { status: 503 });
+    }
+
+    if (order.total <= 0 || order.payment_status === 'no_payment_required') {
+        return NextResponse.json({
+            error: 'No payment is required for this order',
+            code: 'PAYMENT_NOT_REQUIRED',
+            retryWithNewKey: false,
+        }, { status: 409 });
+    }
+    if (order.payment_status === 'paid' || order.payment_status === 'paid_unverified') {
+        return NextResponse.json({
+            error: 'Order already paid',
+            code: 'PAYMENT_ALREADY_SETTLED',
+            retryWithNewKey: false,
+        }, { status: 409 });
     }
 
     let provider: ReturnType<typeof paymentProvider>;
@@ -147,19 +193,6 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-        const { data: order, error } = await supabaseAdmin
-            .from('orders')
-            .select('id, order_num, total, payment_status')
-            .eq('id', orderId)
-            .single();
-
-        if (error || !order) {
-            return NextResponse.json({ error: 'Order not found' }, { status: 404 });
-        }
-        if (order.payment_status === 'paid' || order.payment_status === 'paid_unverified') {
-            return NextResponse.json({ error: 'Order already paid' }, { status: 409 });
-        }
-
         const origin = appOrigin(req);
         const successUrl = `${origin}/order/${orderId}?payment=success`;
         const failUrl = `${origin}/order/${orderId}?payment=failed`;
@@ -167,7 +200,7 @@ export async function POST(req: NextRequest) {
             ? buildYaadPayUrl(order.order_num, order.total, successUrl, failUrl)
             : buildTranzilaUrl(order.order_num, order.total, successUrl, failUrl);
 
-        await supabaseAdmin
+        await admin
             .from('orders')
             .update({ status: 'waiting', payment_status: 'pending' })
             .eq('id', orderId);

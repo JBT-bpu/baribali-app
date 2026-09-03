@@ -371,6 +371,10 @@ test('checkout persists ambiguity and payment identity until tracking takes over
     const launchPending = summarySource.indexOf('await launchPendingPayment(pendingPayment)', markPending);
     assert.ok(markPending > request && launchPending > markPending,
         'payment identity must be durable before asking the provider for a page');
+    assert.match(summarySource, /requiresHostedPayment\(data\.paymentStatus\)/,
+        'only an explicitly pending order may launch hosted payment');
+    assert.doesNotMatch(summarySource, /data\.id && !data\.demo && !data\.payAtPickup/,
+        'a non-pickup status is not by itself evidence that money is owed');
     assert.match(summarySource, /restoreOrderSubmission\(recoveryCartIntent\)/);
     assert.match(trackingSource, /clearOrderSubmissionForOrder\(id\)/);
 

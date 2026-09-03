@@ -65,6 +65,27 @@ export async function startHypPayment(
         leaseToken,
     });
 
+    // The database refuses to create a zero-value attempt. Keep the same
+    // invariant at the final application boundary so a malformed/stale RPC
+    // response can never be turned into a hosted Hyp checkout URL.
+    if (!Number.isSafeInteger(attempt.amountAgorot) || attempt.amountAgorot <= 0) {
+        const errorCode = attempt.amountAgorot === 0
+            ? 'PAYMENT_NOT_REQUIRED'
+            : 'PAYMENT_ATTEMPT_AMOUNT_INVALID';
+        if (attempt.leaseOwned) {
+            await dependencies.finish({
+                attemptId: attempt.id,
+                leaseToken,
+                checkoutUrl: null,
+                errorCode,
+            });
+        }
+        throw new PaymentStartError(
+            errorCode,
+            attempt.amountAgorot === 0 ? 409 : 503,
+        );
+    }
+
     if (!attempt.leaseOwned) return existingAttemptResult(attempt);
 
     let paymentUrl: string;

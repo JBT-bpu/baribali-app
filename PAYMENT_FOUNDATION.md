@@ -1,8 +1,10 @@
 # BariBali payment foundation
 
 This branch adds durable, idempotent order creation and Hyp payment attempts.
-Neither migration has been applied to Supabase. Inspect the actual
-`public.orders` definition before applying them, first in a test/staging
+The payment, order-idempotency and final privilege-hardening migrations have
+not been applied to Supabase. The linked project already records the two
+2026-08-08 historical migrations; its older application tables previously had
+no replayable baseline in Git. Apply the forward chain first in a test/staging
 project.
 
 ## What changes
@@ -41,11 +43,23 @@ project.
   its order ID and payment idempotency key instead. A hard reload never sends
   automatically: the customer explicitly resumes the same request/payment,
   and mutable checkout controls stay locked until it is resolved.
+- A fully-discounted order is stored as `no_payment_required`: it remains a
+  normal kitchen order, but it is neither called paid nor marked for collection
+  at pickup. It creates no payment attempt and never opens a hosted checkout.
 
 The migrations are:
 
+- `supabase/migrations/20260808100000_base_schema.sql`
+- `supabase/migrations/20260808120932_shop_state.sql`
+- `supabase/migrations/20260808121915_orders_rls_remove_public_insert.sql`
 - `supabase/migrations/20260902184747_payment_foundation.sql`
 - `supabase/migrations/20260903120000_order_submission_idempotency.sql`
+- `supabase/migrations/20260903130000_server_only_table_privileges.sql`
+
+The baseline matches the live schema inspected on 2026-09-03 and aborts on an
+incompatible existing table instead of rewriting data. The final hardening
+migration explicitly removes base-table privileges from browser roles and adds
+the missing `orders.user_id` index.
 
 ## Before applying the migration
 
@@ -57,6 +71,9 @@ The migrations are:
 5. Test the `anon` and `authenticated` roles: neither may read or write the
    payment tables or order-creation ledger, nor execute their RPCs. Only
    `service_role` is granted.
+6. The baseline version predates the linked project's recorded migrations, so
+   preview the first linked push with `supabase db push --include-all --dry-run`.
+   Never run `supabase db reset --linked` against this production project.
 
 Useful post-migration checks:
 
@@ -82,6 +99,11 @@ order by table_name, grantee, privilege_type;
 
 ## Hyp test-terminal setup
 
+- The forwarded "פתיחת מסוף טסט חדש" email was located. It contains the test
+  terminal login and API credentials, but no webhook payload specification.
+  Keep those values in a password manager / environment variables only; never
+  copy them into Git. Change the initial portal password and default PassP
+  before broader testing.
 - Set `PAYMENT_PROVIDER=hyp`, `HYP_MASOF`, `HYP_KEY`, `HYP_PASSP`, the real
   server-side Supabase variables, and `NEXT_PUBLIC_APP_URL`.
 - Configure the hosted-page return URL as
@@ -129,8 +151,9 @@ npm test
 npm run build
 ```
 
-The 85-test focused suite covers SIGN/VERIFY parsing, credential-safe failures,
+The focused suite covers SIGN/VERIFY parsing, credential-safe failures,
 immediate transaction-ID capture, URL persistence, concurrent initialization,
 order/request replay across hard reloads, duplicate callbacks, unknown
 references, and verification-pending behavior.
-It does not replace a real test-terminal round trip or migration execution.
+It does not replace a real test-terminal round trip or a blank/live-shaped
+database replay with the Supabase CLI and a Docker-compatible runtime.

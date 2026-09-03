@@ -3,11 +3,26 @@
 -- Keep this migration local until the live orders schema has been inspected.
 -- It also captures the currently unversioned discount_code/discount_amount
 -- fields defensively, so the atomic RPC preserves the route's current audit
--- data. Their live types still need inspection before this file is applied.
+-- data. The compatibility guards below match the schema inspected on
+-- 2026-09-03 and abort rather than coercing an incompatible deployment.
 
 begin;
 
+do $presence$
+begin
+  if to_regclass('public.orders') is null then
+    raise exception 'order submission idempotency requires public.orders';
+  end if;
+end
+$presence$;
+
+-- Keep ordinary order traffic available while preventing a concurrent schema
+-- change from invalidating the catalog checks before the function is created.
+lock table public.orders in share update exclusive mode;
+
 do $guard$
+declare
+  v_unhandled_required_columns text;
 begin
   if to_regclass('public.orders') is null then
     raise exception 'order submission idempotency requires public.orders';
@@ -71,6 +86,97 @@ begin
     raise exception 'public.orders base columns do not match the documented schema';
   end if;
 
+  -- The RPC deliberately omits created_at and relies on the table to stamp it.
+  -- DEFAULT NULL is not sufficient: the API requires the returned timestamp.
+  if not exists (
+    select 1
+    from information_schema.columns actual
+    where actual.table_schema = 'public'
+      and actual.table_name = 'orders'
+      and actual.column_name = 'created_at'
+      and lower(actual.column_default) ~ '^(now\(\)|current_timestamp(\([0-9]+\))?)$'
+  ) then
+    raise exception 'public.orders.created_at must default to the current timestamp';
+  end if;
+
+  if exists (
+    select 1
+    from public.orders
+    where created_at is null
+  ) then
+    raise exception 'public.orders.created_at contains null values';
+  end if;
+
+  -- The explicit INSERT must remain legal if the table evolves. In particular,
+  -- pickup_time, notes and user_id may be SQL NULL, and generated/identity
+  -- columns cannot accept the values supplied by this RPC.
+  if exists (
+    select 1
+    from (
+      values
+        ('id', 'NO'),
+        ('order_num', 'NO'),
+        ('items', 'NO'),
+        ('total', 'NO'),
+        ('pickup_time', 'YES'),
+        ('notes', 'YES'),
+        ('size', 'YES'),
+        ('status', 'NO'),
+        ('payment_status', 'NO'),
+        ('user_id', 'YES')
+    ) as expected(column_name, is_nullable)
+    where not exists (
+      select 1
+      from information_schema.columns actual
+      where actual.table_schema = 'public'
+        and actual.table_name = 'orders'
+        and actual.column_name = expected.column_name
+        and actual.is_nullable = expected.is_nullable
+        and actual.is_identity = 'NO'
+        and actual.is_generated = 'NEVER'
+    )
+  ) then
+    raise exception 'public.orders insert columns have incompatible nullability or generation';
+  end if;
+
+  -- Fail before installing the RPC if the live table has gained another
+  -- required column that this explicit INSERT cannot populate. Identity and
+  -- generated columns populate themselves; a domain default also counts.
+  select string_agg(actual.column_name, ', ' order by actual.ordinal_position)
+    into v_unhandled_required_columns
+  from information_schema.columns actual
+  left join information_schema.domains domain_type
+    on domain_type.domain_catalog = actual.domain_catalog
+   and domain_type.domain_schema = actual.domain_schema
+   and domain_type.domain_name = actual.domain_name
+  where actual.table_schema = 'public'
+    and actual.table_name = 'orders'
+    and actual.column_name not in (
+      'id',
+      'order_num',
+      'items',
+      'total',
+      'pickup_time',
+      'notes',
+      'size',
+      'status',
+      'payment_status',
+      'discount_code',
+      'discount_amount',
+      'user_id'
+    )
+    and actual.is_nullable = 'NO'
+    and actual.column_default is null
+    and domain_type.domain_default is null
+    and actual.is_identity = 'NO'
+    and actual.is_generated = 'NEVER';
+
+  if v_unhandled_required_columns is not null then
+    raise exception
+      'public.orders has required columns not populated by create_order_idempotent: %',
+      v_unhandled_required_columns;
+  end if;
+
   if exists (
     select 1
     from information_schema.columns
@@ -104,6 +210,35 @@ $guard$;
 alter table public.orders
   add column if not exists discount_code text,
   add column if not exists discount_amount integer;
+
+do $discount_shape$
+begin
+  if exists (
+    select 1
+    from (
+      values ('discount_code'), ('discount_amount')
+    ) as expected(column_name)
+    where not exists (
+      select 1
+      from information_schema.columns actual
+      where actual.table_schema = 'public'
+        and actual.table_name = 'orders'
+        and actual.column_name = expected.column_name
+        and actual.is_nullable = 'YES'
+        and actual.is_identity = 'NO'
+        and actual.is_generated = 'NEVER'
+    )
+  ) then
+    raise exception 'public.orders discount columns must be nullable and writable';
+  end if;
+end
+$discount_shape$;
+
+-- Make the result contract durable. The guard above proves this cannot fail on
+-- existing rows; future inserts now always produce the timestamp the API uses.
+alter table public.orders
+  alter column created_at set default now(),
+  alter column created_at set not null;
 
 -- Keep request secrets out of orders: several existing kitchen/customer reads
 -- intentionally select the complete order row. This ledger has no client RLS
@@ -187,10 +322,12 @@ begin
      or p_size is null
      or btrim(p_size) = ''
      or char_length(p_size) > 32
-     or p_payment_status not in ('pending', 'pay_at_pickup')
+     or p_payment_status is null
+     or p_payment_status not in ('pending', 'pay_at_pickup', 'no_payment_required')
+     or (p_total = 0 and p_payment_status <> 'no_payment_required')
+     or (p_total > 0 and p_payment_status = 'no_payment_required')
      or p_discount_amount is null
      or p_discount_amount < 0
-     or p_discount_amount > p_total
      or (p_discount_code is null and p_discount_amount <> 0)
      or (
        p_discount_code is not null

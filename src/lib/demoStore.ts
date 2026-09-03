@@ -14,7 +14,13 @@
  */
 
 export type OrderStatus = 'waiting' | 'preparing' | 'ready' | 'collected';
-export type PaymentStatus = 'pending' | 'paid' | 'paid_unverified' | 'failed' | 'pay_at_pickup';
+export type PaymentStatus =
+    | 'pending'
+    | 'paid'
+    | 'paid_unverified'
+    | 'failed'
+    | 'pay_at_pickup'
+    | 'no_payment_required';
 
 export interface DemoOrderItem {
     id: string;

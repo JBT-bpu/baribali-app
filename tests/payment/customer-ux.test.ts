@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
     customerPaymentPresentation,
     isPaymentVerificationReturn,
+    requiresHostedPayment,
 } from '../../src/lib/customerPayment';
 import { resolvePickupMoment } from '../../src/lib/shopHours';
 
@@ -29,6 +30,21 @@ test('customer payment copy distinguishes verified, verifying, and still owed mo
     assert.equal(customerPaymentPresentation('pay_at_pickup')?.owed, true);
     assert.equal(customerPaymentPresentation('pending')?.tone, 'owed');
     assert.equal(customerPaymentPresentation('failed')?.tone, 'owed');
+
+    const noCharge = customerPaymentPresentation('no_payment_required');
+    assert.deepEqual(noCharge, {
+        text: 'אין צורך בתשלום',
+        owed: false,
+        tone: 'done',
+        icon: '✓',
+    });
+    assert.doesNotMatch(noCharge?.text ?? '', /שולם/,
+        'a fully-discounted order must not pretend a transaction occurred');
+
+    assert.equal(requiresHostedPayment('pending'), true);
+    for (const status of ['paid', 'paid_unverified', 'pay_at_pickup', 'failed', 'no_payment_required', null]) {
+        assert.equal(requiresHostedPayment(status), false, `${status} must not launch hosted payment`);
+    }
     assert.equal(customerPaymentPresentation('unexpected'), null);
 
     assert.equal(isPaymentVerificationReturn('?payment=verifying'), true);

@@ -6,7 +6,8 @@
  * whether the selected provider actually has usable credentials: until real
  * gateway credentials are set, orders can't be paid online, so they're treated
  * as pay-at-pickup instead of being stranded at `pending` (invisible to the
- * kitchen board, which only shows paid / pay_at_pickup / paid_unverified).
+ * kitchen board. A zero-total order uses the separate
+ * `no_payment_required` state and never enters a gateway flow.
  */
 
 export type PaymentProvider = 'hyp' | 'yaadpay' | 'tranzila';

@@ -7,6 +7,18 @@
 
 begin;
 
+do $presence$
+begin
+  if to_regclass('public.orders') is null then
+    raise exception 'payment foundation requires public.orders';
+  end if;
+end
+$presence$;
+
+-- Keep ordinary order writes available while preventing concurrent DDL from
+-- invalidating the catalog checks before the payment functions are installed.
+lock table public.orders in share update exclusive mode;
+
 do $guard$
 begin
   if to_regclass('public.orders') is null then
@@ -20,8 +32,28 @@ begin
       and table_name = 'orders'
       and column_name = 'id'
       and udt_name = 'uuid'
+      and is_nullable = 'NO'
+      and is_identity = 'NO'
+      and is_generated = 'NEVER'
   ) then
-    raise exception 'public.orders.id must be uuid';
+    raise exception 'public.orders.id must be a required writable uuid';
+  end if;
+
+  if not exists (
+    select 1
+    from pg_constraint constraint_row
+    where constraint_row.conrelid = 'public.orders'::regclass
+      and constraint_row.contype in ('p', 'u')
+      and array_length(constraint_row.conkey, 1) = 1
+      and constraint_row.conkey[1] = (
+        select attribute.attnum
+        from pg_attribute attribute
+        where attribute.attrelid = 'public.orders'::regclass
+          and attribute.attname = 'id'
+          and not attribute.attisdropped
+      )
+  ) then
+    raise exception 'public.orders.id must be a primary or unique key';
   end if;
 
   if not exists (
@@ -31,8 +63,11 @@ begin
       and table_name = 'orders'
       and column_name = 'total'
       and udt_name in ('int2', 'int4', 'int8')
+      and is_nullable = 'NO'
+      and is_identity = 'NO'
+      and is_generated = 'NEVER'
   ) then
-    raise exception 'public.orders.total must be a whole-shekel integer';
+    raise exception 'public.orders.total must be a required writable whole-shekel integer';
   end if;
 
   if not exists (
@@ -42,8 +77,15 @@ begin
       and table_name = 'orders'
       and column_name = 'payment_status'
       and udt_name in ('text', 'varchar')
+      and is_nullable = 'NO'
+      and is_identity = 'NO'
+      and is_generated = 'NEVER'
+      and (
+        character_maximum_length is null
+        or character_maximum_length >= char_length('no_payment_required')
+      )
   ) then
-    raise exception 'public.orders.payment_status must be text';
+    raise exception 'public.orders.payment_status must hold every payment state';
   end if;
 end
 $guard$;
@@ -66,6 +108,9 @@ create table public.payment_attempts (
   provider_code              text,
   verification_method        text,
   last_error_code            text,
+  review_required            boolean not null default false,
+  review_reason              text,
+  review_required_at         timestamptz,
   created_at                 timestamptz not null default now(),
   updated_at                 timestamptz not null default now(),
   settled_at                 timestamptz,
@@ -125,11 +170,54 @@ create table public.payment_attempts (
     )),
   constraint payment_attempts_paid_shape_check
     check (
-      status not in ('paid', 'duplicate_paid')
-      or (
-        provider_transaction_id is not null
+      (
+        status in ('paid', 'duplicate_paid')
+        and provider_transaction_id is not null
         and settled_at is not null
       )
+      or (
+        status not in ('paid', 'duplicate_paid')
+        and settled_at is null
+      )
+    ),
+  constraint payment_attempts_operational_shape_check
+    check (
+      (
+        status = 'initializing'
+        and checkout_url is null
+        and lease_token is not null
+        and lease_expires_at is not null
+        and lease_expires_at > created_at
+      )
+      or (
+        status = 'checkout_ready'
+        and checkout_url is not null
+        and lease_token is null
+        and lease_expires_at is null
+      )
+      or (
+        status not in ('initializing', 'checkout_ready')
+        and lease_token is null
+        and lease_expires_at is null
+      )
+    ),
+  constraint payment_attempts_review_shape_check
+    check (
+      (
+        (
+          review_required
+          and review_reason is not null
+          and btrim(review_reason) <> ''
+          and char_length(review_reason) <= 120
+          and review_required_at is not null
+        )
+        or (
+          not review_required
+          and review_reason is null
+          and review_required_at is null
+        )
+      )
+      and (status not in ('needs_review', 'duplicate_paid') or review_required)
     ),
   constraint payment_attempts_order_attempt_unique
     unique (order_id, attempt_no),
@@ -157,7 +245,8 @@ create index payment_attempts_order_created_idx
 
 create index payment_attempts_reconciliation_idx
   on public.payment_attempts (updated_at)
-  where status in ('verification_pending', 'needs_review');
+  where status in ('verification_pending', 'needs_review')
+     or review_required;
 
 create table public.payment_events (
   id                         bigint generated always as identity primary key,
@@ -236,17 +325,94 @@ create index payment_events_provider_transaction_idx
   on public.payment_events (provider, provider_transaction_id)
   where provider_transaction_id is not null;
 
+create index payment_events_unprocessed_idx
+  on public.payment_events (received_at)
+  where processed_at is null;
+
 alter table public.orders
   add column if not exists current_payment_attempt_id uuid,
   add column if not exists payment_status_updated_at timestamptz;
 
-do $constraint$
+do $current_payment_columns$
 begin
   if not exists (
     select 1
-    from pg_constraint
-    where conname = 'orders_current_payment_attempt_fkey'
-      and conrelid = 'public.orders'::regclass
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'orders'
+      and column_name = 'current_payment_attempt_id'
+      and udt_name = 'uuid'
+      and is_nullable = 'YES'
+      and is_identity = 'NO'
+      and is_generated = 'NEVER'
+      and column_default is null
+  ) then
+    raise exception 'public.orders.current_payment_attempt_id must be a nullable writable uuid';
+  end if;
+
+  if not exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'orders'
+      and column_name = 'payment_status_updated_at'
+      and udt_name = 'timestamptz'
+      and is_nullable = 'YES'
+      and is_identity = 'NO'
+      and is_generated = 'NEVER'
+      and column_default is null
+  ) then
+    raise exception 'public.orders.payment_status_updated_at must be a nullable writable timestamptz';
+  end if;
+end
+$current_payment_columns$;
+
+do $constraint$
+begin
+  if exists (
+    select 1
+    from pg_constraint constraint_row
+    where constraint_row.conname = 'orders_current_payment_attempt_fkey'
+      and constraint_row.conrelid = 'public.orders'::regclass
+  ) and not exists (
+    select 1
+    from pg_constraint constraint_row
+    where constraint_row.conname = 'orders_current_payment_attempt_fkey'
+      and constraint_row.conrelid = 'public.orders'::regclass
+      and constraint_row.contype = 'f'
+      and constraint_row.confrelid = 'public.payment_attempts'::regclass
+      and constraint_row.confdeltype = 'n'
+      and constraint_row.confupdtype = 'a'
+      and constraint_row.confmatchtype = 's'
+      and not constraint_row.condeferrable
+      and constraint_row.convalidated
+      and constraint_row.conkey = array[
+        (
+          select attribute.attnum
+          from pg_attribute attribute
+          where attribute.attrelid = 'public.orders'::regclass
+            and attribute.attname = 'current_payment_attempt_id'
+            and not attribute.attisdropped
+        )
+      ]::smallint[]
+      and constraint_row.confkey = array[
+        (
+          select attribute.attnum
+          from pg_attribute attribute
+          where attribute.attrelid = 'public.payment_attempts'::regclass
+            and attribute.attname = 'id'
+            and not attribute.attisdropped
+        )
+      ]::smallint[]
+  ) then
+    raise exception 'orders_current_payment_attempt_fkey has an incompatible definition';
+  end if;
+
+  if not exists (
+    select 1
+    from pg_constraint constraint_row
+    where constraint_row.conname = 'orders_current_payment_attempt_fkey'
+      and constraint_row.conrelid = 'public.orders'::regclass
   ) then
     alter table public.orders
       add constraint orders_current_payment_attempt_fkey
@@ -256,6 +422,39 @@ begin
   end if;
 end
 $constraint$;
+
+-- A zero-total order is fulfilled normally but has no payment transaction.
+-- Keep that state distinct from both "paid" and "pay at pickup", and make it
+-- impossible to attach a hosted-payment attempt to it. NOT VALID makes the
+-- addition explicit for existing deployments; validation aborts rather than
+-- silently rewriting any ambiguous legacy row.
+do $payment_shape$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'orders_payment_requirement_shape_check'
+      and conrelid = 'public.orders'::regclass
+  ) then
+    alter table public.orders
+      add constraint orders_payment_requirement_shape_check
+      check (
+        (
+          total = 0
+          and payment_status = 'no_payment_required'
+          and current_payment_attempt_id is null
+        )
+        or (
+          total > 0
+          and payment_status <> 'no_payment_required'
+        )
+      ) not valid;
+  end if;
+end
+$payment_shape$;
+
+alter table public.orders
+  validate constraint orders_payment_requirement_shape_check;
 
 create index if not exists orders_current_payment_attempt_idx
   on public.orders (current_payment_attempt_id)
@@ -277,8 +476,8 @@ grant select, insert, update
   on table public.payment_events to service_role;
 
 revoke all privileges on sequence public.payment_events_id_seq
-  from public, anon, authenticated;
-grant usage, select on sequence public.payment_events_id_seq to service_role;
+  from public, anon, authenticated, service_role;
+grant usage on sequence public.payment_events_id_seq to service_role;
 
 -- Claim exactly one active payment attempt. The order row is the concurrency
 -- lock, so the Hyp network call always happens after this short transaction.
@@ -331,10 +530,6 @@ begin
     raise exception 'PAYMENT_ORDER_NOT_FOUND' using errcode = 'P0002';
   end if;
 
-  if v_order.payment_status in ('paid', 'paid_unverified', 'pay_at_pickup') then
-    raise exception 'PAYMENT_ORDER_NOT_PAYABLE' using errcode = 'P0001';
-  end if;
-
   -- An abandoned initializer can be replaced after its short lease. A hosted
   -- checkout page is never expired automatically because Hyp may still accept
   -- it in another browser tab; replacing it could create a second live page.
@@ -360,6 +555,22 @@ begin
       raise exception 'PAYMENT_IDEMPOTENCY_CONFLICT' using errcode = '23505';
     end if;
 
+    -- An exact replay may be the browser recovering after settlement. Return
+    -- its terminal attempt so the application can report "already paid";
+    -- never return an unsettled checkout for an order made non-payable by a
+    -- different transaction or by a no-charge/pay-at-pickup decision.
+    if (
+      v_order.total <= 0
+      or v_order.payment_status in (
+        'paid',
+        'paid_unverified',
+        'pay_at_pickup',
+        'no_payment_required'
+      )
+    ) and v_attempt.status not in ('paid', 'duplicate_paid') then
+      raise exception 'PAYMENT_ORDER_NOT_PAYABLE' using errcode = 'P0001';
+    end if;
+
     return query select
       v_attempt.id,
       v_attempt.order_id,
@@ -374,6 +585,16 @@ begin
         and v_attempt.lease_token = p_lease_token
         and v_attempt.lease_expires_at > now();
     return;
+  end if;
+
+  if v_order.total <= 0
+     or v_order.payment_status in (
+       'paid',
+       'paid_unverified',
+       'pay_at_pickup',
+       'no_payment_required'
+     ) then
+    raise exception 'PAYMENT_ORDER_NOT_PAYABLE' using errcode = 'P0001';
   end if;
 
   select a.*
@@ -613,6 +834,7 @@ declare
   v_event_key text := btrim(p_event_key);
   v_transaction_id text := nullif(btrim(p_provider_transaction_id), '');
   v_order_id uuid;
+  v_other_active_attempt_id uuid;
   v_attempt public.payment_attempts%rowtype;
   v_event public.payment_events%rowtype;
   v_duplicate boolean := false;
@@ -626,6 +848,7 @@ begin
      or v_event_key is null
      or v_event_key = ''
      or char_length(v_event_key) > 128
+     or p_event_source is null
      or p_event_source not in (
        'browser_return',
        'server_notification',
@@ -732,12 +955,48 @@ begin
     v_duplicate := true;
   end if;
 
+  -- A delayed callback can belong to an older, already closed attempt while a
+  -- newer hosted page is active. Preserve the event either way, but do not
+  -- promote the old row into the active-status unique index and roll the event
+  -- back. The VERIFY phase can still settle the old charge atomically.
+  select other_attempt.id
+    into v_other_active_attempt_id
+  from public.payment_attempts other_attempt
+  where other_attempt.order_id = v_attempt.order_id
+    and other_attempt.id <> v_attempt.id
+    and other_attempt.status in (
+      'initializing',
+      'checkout_ready',
+      'verification_pending',
+      'needs_review'
+    )
+  order by other_attempt.created_at desc
+  limit 1
+  for update;
+
   -- Manual-review is intentionally sticky. A replay or a second callback may
   -- still be verified below, but merely receiving it must not hide an existing
   -- operator alert by downgrading the attempt to verification_pending.
-  if v_attempt.status not in ('paid', 'duplicate_paid', 'needs_review') then
+  if v_other_active_attempt_id is not null then
+    update public.payment_attempts
+    set review_required = true,
+        review_reason = case
+          when review_required then review_reason
+          else 'late_callback_while_newer_attempt_active'
+        end,
+        review_required_at = coalesce(review_required_at, now()),
+        last_error_code = coalesce(
+          last_error_code,
+          'late_callback_while_newer_attempt_active'
+        ),
+        updated_at = now()
+    where id = v_attempt.id
+    returning * into v_attempt;
+  elsif v_attempt.status not in ('paid', 'duplicate_paid', 'needs_review') then
     update public.payment_attempts
     set status = 'verification_pending',
+        lease_token = null,
+        lease_expires_at = null,
         updated_at = now()
     where id = v_attempt.id
     returning * into v_attempt;
@@ -789,11 +1048,18 @@ as $function$
 declare
   v_outcome text := lower(btrim(p_outcome));
   v_transaction_id text := nullif(btrim(p_provider_transaction_id), '');
-  v_currency text := upper(btrim(p_currency_code));
+  v_event_transaction_mismatch boolean := false;
+  v_currency_input text;
+  v_currency text;
+  v_reported_amount_agorot bigint;
+  v_merged_payload jsonb;
+  v_payload_merge_omitted boolean := false;
+  v_provider_values_malformed boolean := false;
   v_order_id uuid;
   v_event public.payment_events%rowtype;
   v_attempt public.payment_attempts%rowtype;
   v_order public.orders%rowtype;
+  v_other_active_attempt_id uuid;
   v_conflicting_attempt uuid;
   v_result text;
 begin
@@ -854,30 +1120,137 @@ begin
     return;
   end if;
 
+  -- The callback-captured Id is the refund-critical source of truth. VERIFY
+  -- may omit it, and a contradictory value must not overwrite the durable
+  -- callback value while the discrepancy is being reviewed.
+  v_event_transaction_mismatch :=
+    v_event.provider_transaction_id is not null
+    and v_transaction_id is not null
+    and v_event.provider_transaction_id <> v_transaction_id;
+  v_transaction_id := coalesce(
+    v_event.provider_transaction_id,
+    v_transaction_id
+  );
+
+  -- Provider responses are not allowed to violate the ledger's own shape.
+  -- Preserve malformed raw values in payload_safe, while typed columns remain
+  -- either normalized or NULL so the event can become a durable review case.
+  v_currency_input := nullif(upper(btrim(p_currency_code)), '');
+  if p_currency_code is not null then
+    if v_currency_input ~ '^[A-Z]{3}$' then
+      v_currency := v_currency_input;
+    else
+      v_provider_values_malformed := true;
+    end if;
+  end if;
+
+  if p_reported_amount_agorot is not null then
+    if p_reported_amount_agorot > 0 then
+      v_reported_amount_agorot := p_reported_amount_agorot;
+    else
+      v_provider_values_malformed := true;
+    end if;
+  end if;
+
+  v_merged_payload := v_event.payload_safe || p_payload_safe;
+  if octet_length(v_merged_payload::text) > 8192 then
+    -- The originally recorded callback contains the refund-critical redirect
+    -- Id. Retain it instead of letting a large VERIFY metadata merge roll the
+    -- transaction back and erase the review decision.
+    v_merged_payload := v_event.payload_safe;
+    v_payload_merge_omitted := true;
+  end if;
+
+  select other_attempt.id
+    into v_other_active_attempt_id
+  from public.payment_attempts other_attempt
+  where other_attempt.order_id = v_attempt.order_id
+    and other_attempt.id <> v_attempt.id
+    and other_attempt.status in (
+      'initializing',
+      'checkout_ready',
+      'verification_pending',
+      'needs_review'
+    )
+  order by other_attempt.created_at desc
+  limit 1
+  for update;
+
   if v_outcome = 'verification_pending' then
     -- A transient VERIFY result cannot clear a prior manual-review decision.
     -- A later approved event can still settle the attempt through the branch
-    -- below after all amount/currency/transaction checks pass.
-    if v_attempt.status not in ('paid', 'duplicate_paid', 'needs_review') then
-      update public.payment_attempts
-      set status = 'verification_pending',
-          provider_code = left(p_provider_code, 120),
-          verification_method = left(p_verification_method, 120),
-          last_error_code = 'verification_pending',
-          updated_at = now()
-      where id = v_attempt.id
-      returning * into v_attempt;
-    end if;
+    -- below after all amount/currency/transaction checks pass. If this is a
+    -- late old-attempt callback, leave its inactive status intact so a newer
+    -- active attempt cannot make this event transaction violate the unique
+    -- active-attempt index.
+    update public.payment_attempts
+    set status = case
+          when status in ('paid', 'duplicate_paid', 'needs_review') then status
+          when v_other_active_attempt_id is not null then status
+          when v_event_transaction_mismatch
+            or v_payload_merge_omitted
+            or v_provider_values_malformed
+            then 'needs_review'
+          else 'verification_pending'
+        end,
+        provider_code = left(p_provider_code, 120),
+        verification_method = left(p_verification_method, 120),
+        last_error_code = case
+          when review_required then last_error_code
+          when v_event_transaction_mismatch then 'transaction_id_mismatch'
+          when v_payload_merge_omitted then 'verification_payload_too_large'
+          when v_provider_values_malformed then 'verification_values_malformed'
+          when v_other_active_attempt_id is not null
+            then 'late_callback_while_newer_attempt_active'
+          when status not in ('paid', 'duplicate_paid', 'needs_review')
+            then 'verification_pending'
+          else last_error_code
+        end,
+        review_required = review_required
+          or v_event_transaction_mismatch
+          or v_payload_merge_omitted
+          or v_provider_values_malformed
+          or v_other_active_attempt_id is not null,
+        review_reason = case
+          when review_required then review_reason
+          when v_event_transaction_mismatch then 'transaction_id_mismatch'
+          when v_payload_merge_omitted then 'verification_payload_too_large'
+          when v_provider_values_malformed then 'verification_values_malformed'
+          when v_other_active_attempt_id is not null
+            then 'late_callback_while_newer_attempt_active'
+          else review_reason
+        end,
+        review_required_at = case
+          when review_required
+            or v_event_transaction_mismatch
+            or v_payload_merge_omitted
+            or v_provider_values_malformed
+            or v_other_active_attempt_id is not null
+            then coalesce(review_required_at, now())
+          else review_required_at
+        end,
+        lease_token = null,
+        lease_expires_at = null,
+        updated_at = now()
+    where id = v_attempt.id
+    returning * into v_attempt;
 
     update public.payment_events
     set provider_transaction_id = v_transaction_id,
         provider_code = left(p_provider_code, 120),
-        amount_agorot = p_reported_amount_agorot,
-        currency_code = nullif(v_currency, ''),
+        amount_agorot = v_reported_amount_agorot,
+        currency_code = v_currency,
         verified = false,
         outcome = 'verification_pending',
-        error_code = 'verification_pending',
-        payload_safe = v_event.payload_safe || p_payload_safe
+        error_code = case
+          when v_event_transaction_mismatch then 'transaction_id_mismatch'
+          when v_payload_merge_omitted then 'verification_payload_too_large'
+          when v_provider_values_malformed then 'verification_values_malformed'
+          when v_other_active_attempt_id is not null
+            then 'late_callback_while_newer_attempt_active'
+          else 'verification_pending'
+        end,
+        payload_safe = v_merged_payload
     where id = v_event.id;
 
     return query select
@@ -888,25 +1261,44 @@ begin
     return;
   end if;
 
-  if v_transaction_id is null then
-    v_result := 'missing_transaction_id';
-  elsif v_attempt.provider_transaction_id is not null
-        and v_attempt.provider_transaction_id <> v_transaction_id then
-    -- A prior review path may already have captured a transaction identifier.
-    -- Never overwrite it with a different charge on a later callback.
-    v_result := 'transaction_id_mismatch';
-  else
+  -- Order-row locks serialize callbacks for one order. This additional
+  -- transaction-scoped lock serializes the same provider transaction across
+  -- different orders before the conflict lookup and unique-index write.
+  if v_transaction_id is not null then
+    perform pg_catalog.pg_advisory_xact_lock(
+      pg_catalog.hashtextextended(
+        pg_catalog.char_length(v_attempt.provider)::text
+          || ':' || v_attempt.provider || v_transaction_id,
+        0
+      )
+    );
+
     select a.id into v_conflicting_attempt
     from public.payment_attempts a
     where a.provider = v_attempt.provider
       and a.provider_transaction_id = v_transaction_id
       and a.id <> v_attempt.id
     limit 1;
+  end if;
 
-    if found then
-      v_result := 'transaction_id_conflict';
-    elsif p_reported_amount_agorot is null
-          or p_reported_amount_agorot <> v_attempt.amount_agorot
+  if v_event_transaction_mismatch then
+    v_result := 'transaction_id_mismatch';
+  elsif v_transaction_id is null then
+    v_result := 'missing_transaction_id';
+  elsif v_attempt.provider_transaction_id is not null
+        and v_attempt.provider_transaction_id <> v_transaction_id then
+    -- A prior review path may already have captured a transaction identifier.
+    -- Never overwrite it with a different charge on a later callback.
+    v_result := 'transaction_id_mismatch';
+  elsif v_conflicting_attempt is not null then
+    v_result := 'transaction_id_conflict';
+  elsif v_payload_merge_omitted then
+    v_result := 'verification_payload_too_large';
+  elsif v_provider_values_malformed then
+    v_result := 'verification_values_malformed';
+  else
+    if v_reported_amount_agorot is null
+          or v_reported_amount_agorot <> v_attempt.amount_agorot
           or v_attempt.amount_agorot <> round(v_order.total::numeric * 100)::bigint
           or v_currency is null
           or v_currency <> v_attempt.currency_code then
@@ -919,9 +1311,11 @@ begin
       v_result := 'unverified_payment_conflict';
     elsif v_order.payment_status = 'paid' then
       v_result := case
-        when v_attempt.status = 'paid'
-          and v_attempt.provider_transaction_id = v_transaction_id
-          then 'duplicate_success'
+        when v_attempt.provider_transaction_id = v_transaction_id
+          then case
+            when v_attempt.status = 'paid' then 'duplicate_success'
+            else 'duplicate_charge'
+          end
         else 'duplicate_charge'
       end;
     else
@@ -950,6 +1344,9 @@ begin
         provider_code = left(p_provider_code, 120),
         verification_method = left(p_verification_method, 120),
         last_error_code = null,
+        review_required = false,
+        review_reason = null,
+        review_required_at = null,
         lease_token = null,
         lease_expires_at = null,
         updated_at = now(),
@@ -971,14 +1368,27 @@ begin
         provider_code = left(p_provider_code, 120),
         verification_method = left(p_verification_method, 120),
         last_error_code = 'duplicate_charge',
+        review_required = true,
+        review_reason = 'duplicate_charge',
+        review_required_at = coalesce(review_required_at, now()),
+        lease_token = null,
+        lease_expires_at = null,
         updated_at = now(),
-        settled_at = now()
+        settled_at = coalesce(settled_at, now())
     where id = v_attempt.id
     returning * into v_attempt;
 
   elsif v_result <> 'duplicate_success' then
     update public.payment_attempts
-    set status = 'needs_review',
+    set status = case
+          -- Paid is absorbing: retain the customer-facing financial state but
+          -- make every later discrepancy independently discoverable.
+          when status in ('paid', 'duplicate_paid') then status
+          -- A late callback for an old attempt must not collide with the newer
+          -- active attempt. Its review flag carries the operator alert.
+          when v_other_active_attempt_id is not null then status
+          else 'needs_review'
+        end,
         provider_transaction_id = case
           when v_result in ('transaction_id_conflict', 'transaction_id_mismatch')
             then provider_transaction_id
@@ -987,24 +1397,28 @@ begin
         provider_code = left(p_provider_code, 120),
         verification_method = left(p_verification_method, 120),
         last_error_code = v_result,
+        review_required = true,
+        review_reason = v_result,
+        review_required_at = coalesce(review_required_at, now()),
+        lease_token = null,
+        lease_expires_at = null,
         updated_at = now()
     where id = v_attempt.id
-      and status not in ('paid', 'duplicate_paid')
     returning * into v_attempt;
   end if;
 
   update public.payment_events
   set provider_transaction_id = v_transaction_id,
       provider_code = left(p_provider_code, 120),
-      amount_agorot = p_reported_amount_agorot,
-      currency_code = nullif(v_currency, ''),
+      amount_agorot = v_reported_amount_agorot,
+      currency_code = v_currency,
       verified = true,
       outcome = v_result,
       error_code = case
         when v_result in ('settled', 'duplicate_success') then null
         else v_result
       end,
-      payload_safe = v_event.payload_safe || p_payload_safe,
+      payload_safe = v_merged_payload,
       processed_at = now()
   where id = v_event.id;
 

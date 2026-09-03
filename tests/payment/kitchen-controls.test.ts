@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-import { handoffActionLabel } from '../../src/app/kitchen/types';
+import { handoffActionLabel, paymentLabel } from '../../src/app/kitchen/types';
 import {
     mergePickupCapacity,
     PICKUP_SELECTION_INVALIDATED_MESSAGE,
@@ -10,6 +11,11 @@ import {
     shopOverrideForTargetOpen,
     shopStatus,
 } from '../../src/lib/shopHours';
+
+const kitchenOrdersRoute = readFileSync(new URL(
+    '../../src/app/api/kitchen/orders/route.ts',
+    import.meta.url,
+), 'utf8');
 
 test('shop target clears an override when the live schedule can take over', () => {
     assert.equal(shopOverrideForTargetOpen({ scheduledOpen: true }, true), null);
@@ -98,7 +104,21 @@ test('an explicit pickup selection never moves when a long-open checkout becomes
 
 test('handoff action makes every unresolved payment step explicit', () => {
     assert.equal(handoffActionLabel('paid'), 'נמסר ללקוח ✓');
+    assert.deepEqual(paymentLabel('no_payment_required'), {
+        text: 'ללא חיוב',
+        tone: 'settled',
+        owed: false,
+    });
+    assert.equal(handoffActionLabel('no_payment_required'), 'נמסר ללקוח ✓');
     assert.equal(handoffActionLabel('paid_unverified'), 'וידאתי בקופה — נמסר ללקוח ✓');
     assert.equal(handoffActionLabel('pay_at_pickup'), 'התשלום נגבה — נמסר ללקוח ✓');
     assert.equal(handoffActionLabel('failed'), 'התשלום נגבה — נמסר ללקוח ✓');
+});
+
+test('zero-charge orders remain visible on both kitchen data paths', () => {
+    assert.equal(
+        kitchenOrdersRoute.match(/'no_payment_required'/g)?.length,
+        2,
+        'demo and Supabase filters must both admit the truthful no-charge state',
+    );
 });

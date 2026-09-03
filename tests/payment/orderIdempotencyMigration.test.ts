@@ -50,14 +50,60 @@ test('ledger claim and order creation are one rollback-safe transaction', () => 
     assert.match(body, /'conflict'::text/);
 });
 
-test('atomic create preserves discount provenance with guarded schema types', () => {
+test('atomic create preserves discount provenance without treating final total as subtotal', () => {
     assert.match(sql, /discount_code.*?udt_name not in \('text', 'varchar'\)/);
     assert.match(sql, /discount_amount.*?udt_name not in \('int2', 'int4', 'int8'\)/);
     assert.match(
         sql,
         /alter table public\.orders add column if not exists discount_code text, add column if not exists discount_amount integer/,
     );
-    assert.match(sql, /p_discount_amount > p_total/);
+    assert.match(sql, /p_discount_amount is null or p_discount_amount < 0/);
+    assert.match(sql, /p_discount_code is null and p_discount_amount <> 0/);
+    assert.doesNotMatch(sql, /p_discount_amount > p_total/);
+    assert.match(
+        sql,
+        /p_payment_status is null/,
+    );
+    assert.match(
+        sql,
+        /p_payment_status not in \('pending', 'pay_at_pickup', 'no_payment_required'\)/,
+    );
+    assert.match(sql, /p_total = 0 and p_payment_status <> 'no_payment_required'/);
+    assert.match(sql, /p_total > 0 and p_payment_status = 'no_payment_required'/);
+});
+
+test('orders preflight verifies omitted columns can be populated safely', () => {
+    assert.match(
+        sql,
+        /lock table public\.orders in share update exclusive mode/,
+    );
+    assert.match(
+        sql,
+        /actual\.column_name = 'created_at'.*?lower\(actual\.column_default\).*?current_timestamp/,
+    );
+    assert.match(sql, /public\.orders\.created_at must default to the current timestamp/);
+    assert.match(sql, /from public\.orders where created_at is null/);
+    assert.match(
+        sql,
+        /public\.orders insert columns have incompatible nullability or generation/,
+    );
+    assert.match(sql, /public\.orders discount columns must be nullable and writable/);
+    assert.match(
+        sql,
+        /alter table public\.orders alter column created_at set default now\(\), alter column created_at set not null/,
+    );
+
+    const requiredColumnGuard = sql.slice(
+        sql.indexOf('select string_agg(actual.column_name'),
+        sql.indexOf("raise exception 'public.orders.discount_code", sql.indexOf('select string_agg(actual.column_name')),
+    );
+    assert.match(requiredColumnGuard, /actual\.column_name not in \( 'id', 'order_num', 'items', 'total', 'pickup_time', 'notes', 'size', 'status', 'payment_status', 'discount_code', 'discount_amount', 'user_id' \)/);
+    assert.match(requiredColumnGuard, /actual\.is_nullable = 'no'/);
+    assert.match(requiredColumnGuard, /actual\.column_default is null/);
+    assert.match(requiredColumnGuard, /domain_type\.domain_default is null/);
+    assert.match(requiredColumnGuard, /actual\.is_identity = 'no'/);
+    assert.match(requiredColumnGuard, /actual\.is_generated = 'never'/);
+    assert.match(requiredColumnGuard, /public\.orders has required columns not populated by create_order_idempotent/);
 });
 
 test('route recovers before mutable checks and never falls back to direct insert', () => {

@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import type { Discount } from '../../src/lib/discounts';
-import { resolveOrderPricingDecision } from '../../src/lib/orderSubmissionServer';
+import {
+    initialOrderPaymentStatus,
+    resolveOrderPricingDecision,
+} from '../../src/lib/orderSubmissionServer';
 
 const FIVE_PERCENT: Discount = {
     code: 'FIVE',
@@ -22,6 +25,13 @@ const TWENTY_PERCENT: Discount = {
     code: 'TWENTY',
     type: 'percent',
     value: 20,
+    active: true,
+};
+
+const FULL_DISCOUNT: Discount = {
+    code: 'FULL',
+    type: 'percent',
+    value: 100,
     active: true,
 };
 
@@ -112,4 +122,53 @@ test('rejects a stale discount after the server-side entitlement disappears', ()
         accepted: false,
         acceptance: 'rejected',
     });
+});
+
+test('a legitimate full discount resolves to an accepted zero total', () => {
+    assert.deepEqual(resolveOrderPricingDecision({
+        subtotal: 100,
+        submittedTotal: 0,
+        typedDiscount: FULL_DISCOUNT,
+        assignedDiscount: null,
+    }), {
+        discount: FULL_DISCOUNT,
+        discountAmount: 100,
+        total: 0,
+        accepted: true,
+        acceptance: 'exact',
+    });
+});
+
+test('zero total always means no payment, independent of provider or demo choice', () => {
+    for (const demoMode of [false, true]) {
+        for (const paymentConfigured of [false, true]) {
+            for (const paymentChoice of [null, 'now', 'pickup', 'fail'] as const) {
+                assert.equal(initialOrderPaymentStatus({
+                    total: 0,
+                    demoMode,
+                    paymentChoice,
+                    paymentConfigured,
+                }), 'no_payment_required');
+            }
+        }
+    }
+
+    assert.equal(initialOrderPaymentStatus({
+        total: 54,
+        demoMode: false,
+        paymentChoice: null,
+        paymentConfigured: true,
+    }), 'pending');
+    assert.equal(initialOrderPaymentStatus({
+        total: 54,
+        demoMode: false,
+        paymentChoice: null,
+        paymentConfigured: false,
+    }), 'pay_at_pickup');
+    assert.equal(initialOrderPaymentStatus({
+        total: 54,
+        demoMode: true,
+        paymentChoice: 'fail',
+        paymentConfigured: false,
+    }), 'failed');
 });

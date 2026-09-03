@@ -20,6 +20,35 @@ export interface OrderSubmissionIntent {
     paymentChoice: 'now' | 'pickup' | 'fail' | null;
 }
 
+export type InitialOrderPaymentStatus =
+    | 'pending'
+    | 'paid'
+    | 'failed'
+    | 'pay_at_pickup'
+    | 'no_payment_required';
+
+/**
+ * Chooses the truthful initial money state for a newly-created order.
+ * A zero total always wins over gateway availability and demo controls: there
+ * is no charge to initialize, fail, or collect later.
+ */
+export function initialOrderPaymentStatus(input: {
+    total: number;
+    demoMode: boolean;
+    paymentChoice: OrderSubmissionIntent['paymentChoice'];
+    paymentConfigured: boolean;
+}): InitialOrderPaymentStatus {
+    if (input.total === 0) return 'no_payment_required';
+
+    if (input.demoMode) {
+        if (input.paymentChoice === 'now') return 'paid';
+        if (input.paymentChoice === 'fail') return 'failed';
+        return 'pay_at_pickup';
+    }
+
+    return input.paymentConfigured ? 'pending' : 'pay_at_pickup';
+}
+
 type ParsedIntent =
     | { valid: true; intent: OrderSubmissionIntent }
     | { valid: false };

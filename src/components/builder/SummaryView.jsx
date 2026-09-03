@@ -136,6 +136,7 @@ import BariPlaque, { BariPlaqueKeyframes } from "../ui/bari/BariPlaque";
 import { PLAQUE } from "../ui/bari/plaqueGeometry";
 import { isSupabaseConfigured } from "../../lib/supabase";
 import { getAccessToken } from "../../lib/auth";
+import { requiresHostedPayment } from "../../lib/customerPayment";
 import {
     claimOrderSubmission,
     clearOrderSubmission,
@@ -444,6 +445,10 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
             window.location.href = `/order/${encodeURIComponent(pendingPayment.orderId)}?payment=success`;
             return;
         }
+        if (payload?.code === 'PAYMENT_NOT_REQUIRED') {
+            window.location.href = `/order/${encodeURIComponent(pendingPayment.orderId)}`;
+            return;
+        }
         if (payload?.code === 'PAYMENT_VERIFICATION_PENDING') {
             window.location.href = `/order/${encodeURIComponent(pendingPayment.orderId)}?payment=verifying`;
             return;
@@ -476,7 +481,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
         const recoveredSubmission = orderSubmissionRef.current?.requestBody
             ? orderSubmissionRef.current
             : null;
-        const isFailureTest = !recoveredSubmission && choice === "fail";
+        const isFailureTest = !recoveredSubmission && checkoutTotal > 0 && choice === "fail";
         setSubmitting(true);
         setSubmitError("");
         setAcceptedOrder(null);
@@ -652,8 +657,9 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
             }
 
             // Online payment: persist both identities before the first payment
-            // request. A hard reload now resumes this order/payment directly.
-            if (data.id && !data.demo && !data.payAtPickup) {
+            // request. Only the server's explicit pending state may launch a
+            // hosted checkout; a zero-total order goes straight to confirmation.
+            if (data.id && !data.demo && requiresHostedPayment(data.paymentStatus)) {
                 const pendingPayment = {
                     orderId: data.id,
                     orderNum: data.orderNum ?? null,
@@ -972,7 +978,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                     </BariPanel>
 
                     {/* Payment choice — demo mode only (no real gateway configured yet) */}
-                    {DEMO_MODE && (
+                    {DEMO_MODE && checkoutTotal > 0 && (
                         <div style={PAY.box}>
                             <div id="demo-payment-title" style={PAY.title}>
                                 💳 בדיקת מסלול תשלום
