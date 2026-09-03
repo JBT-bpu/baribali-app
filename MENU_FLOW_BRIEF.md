@@ -26,8 +26,8 @@
 | `/home2` | Customer home | Orderable salad card, locked coming-soon cards, size picker, closed state, latest-order shortcut, one fully attributed review supplied by Google Maps when available (otherwise a product-info card), and bottom navigation. |
 | `/build?type=salad\|tortilla&size=<S\|M\|L>` | Builder and summary | Ingredient wizard and checkout live in one client component tree. |
 | `/order/[id]` | Live order tracking | Polls status, shows payment state and flashes the tab title when ready in the background. |
-| `/orders` | Order history | Signed-in history, status links, **הזמן שוב** and **שנה והזמן**. Guests receive a clear sign-in/return path. |
-| `/profile` | Account area | Identity, Google sign-in/sign-out, link to orders and legal links. |
+| `/orders` | Order history | Signed-in history, keyboard-accessible status links, **הזמן שוב** and **שנה והזמן**. Guests receive a clear sign-in path. The customer dock remains visible. |
+| `/profile` | Account area | Identity, Google sign-in/sign-out, link to orders and legal links. The customer dock remains visible. |
 | `/login` | Dedicated sign-in | Google sign-in with an explicit guest path. |
 | `/kitchen` | Staff board | Password-to-httpOnly-session gate, queue tabs, one active work surface, checks, urgency, payment handoff and undo. `?sim=1` exposes rehearsal controls. |
 | `/admin` | Local manager tools | Prices, discounts and customers. Password-gated and intentionally inert in production. |
@@ -106,7 +106,8 @@ The old `/favorites`, `/fresh`, `/top` and `/recommended` stubs are gone.
 
 ## Navigation
 
-The shared bottom navigation has three real, non-duplicated destinations:
+The fixed, safe-area-aware bottom navigation remains available across `/home2`,
+`/orders` and `/profile` and has three real, non-duplicated destinations:
 
 | Label | Route | Responsibility |
 |---|---|---|

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import GoldField from '@/components/ui/GoldField';
 import GoogleSignInButton from '@/components/ui/GoogleSignInButton';
-import { BariPanel, BariBadge, BariButton } from '@/components/ui/bari';
+import { BariPanel, BariBadge, BariBottomNav, BariButton } from '@/components/ui/bari';
 import { useUser, getAccessToken } from '@/lib/auth';
 import { buildReorderHref, stashReorder, type ReorderMode } from '@/lib/reorder';
 
@@ -70,36 +70,37 @@ export default function OrdersPage() {
     if (loading) {
         return <div style={{ ...bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '14px', fontWeight: 600 }}>טוען…</span>
+            <BariBottomNav />
         </div>;
     }
 
     // History requires an account — guests have none by definition.
     if (!user) {
         return (
-            <div style={{ ...bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '18px', padding: '20px' }}>
+            <div style={{ ...bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '18px', padding: '20px', paddingBottom: 'calc(106px + env(safe-area-inset-bottom))' }}>
                 <GoldField zIndex={0} />
                 <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', maxWidth: '320px', width: '100%' }}>
                     <div style={{ fontSize: '48px' }}>📋</div>
-                    <div style={{ fontSize: '20px', fontWeight: 900, color: '#fff' }}>ההזמנות שלי</div>
+                    <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 900, color: '#fff' }}>ההזמנות שלי</h1>
                     <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.55)', textAlign: 'center', lineHeight: 1.7 }}>
                         התחברו כדי לראות את היסטוריית ההזמנות ולהזמין שוב בלחיצה.
                         <br />להזמין אפשר תמיד גם בלי חשבון.
                     </div>
                     <GoogleSignInButton fullWidth />
-                    <Link href="/home2" style={{ fontSize: '14px', fontWeight: 700, color: 'rgba(255,255,255,0.5)', textDecoration: 'none' }}>← חזרה לדף הבית</Link>
                 </div>
+                <BariBottomNav />
             </div>
         );
     }
 
     return (
-        <div style={{ ...bg, padding: '0 0 60px' }}>
+        <div style={{ ...bg, padding: '0 0 calc(106px + env(safe-area-inset-bottom))' }}>
             <GoldField zIndex={0} />
             <div style={{ position: 'relative', zIndex: 1, maxWidth: '430px', margin: '0 auto', padding: '24px 16px', paddingTop: 'max(24px, env(safe-area-inset-top))', display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
-                <div style={{ fontSize: '22px', fontWeight: 900, color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h1 style={{ margin: 0, fontSize: '22px', fontWeight: 900, color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     📋 ההזמנות שלי
-                </div>
+                </h1>
 
                 {orders === null && (
                     <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.35)', fontWeight: 600, textAlign: 'center', padding: '24px 0' }}>טוען הזמנות…</div>
@@ -128,10 +129,12 @@ export default function OrdersPage() {
                 )}
                 {orders?.map(o => (
                     <BariPanel key={o.id} className="p-3.5" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        {/* Tap the order body to view its live status */}
-                        <div
-                            onClick={() => router.push(`/order/${o.id}`)}
-                            style={{ display: 'flex', flexDirection: 'column', gap: '8px', cursor: 'pointer' }}
+                        {/* The order body is a real link so touch, keyboard and
+                            assistive-technology users reach the same live status. */}
+                        <Link
+                            href={`/order/${encodeURIComponent(o.id)}`}
+                            aria-label={`צפייה במעקב של הזמנה ${o.order_num}`}
+                            style={{ display: 'flex', flexDirection: 'column', gap: '8px', color: 'inherit', textDecoration: 'none', cursor: 'pointer' }}
                         >
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <BariBadge>{o.order_num}</BariBadge>
@@ -144,18 +147,20 @@ export default function OrdersPage() {
                                 {o.items.slice(0, 8).map(it => (
                                     <span key={it.id} style={{ fontSize: '18px', lineHeight: 1, flexShrink: 0 }}>
                                         {it.icon && it.icon.startsWith('/')
-                                            // eslint-disable-next-line @next/next/no-img-element
                                             ? <img src={it.icon} alt={it.he} style={{ width: '20px', height: '20px', objectFit: 'contain', verticalAlign: 'middle' }} />
                                             : it.icon}
                                     </span>
                                 ))}
                                 {o.items.length > 8 && <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', fontWeight: 700 }}>+{o.items.length - 8}</span>}
                             </div>
-                            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', fontWeight: 600 }}>
-                                {new Date(o.created_at).toLocaleDateString('he-IL', { day: 'numeric', month: 'long' })}
-                                {o.pickup_time ? ` · איסוף ${o.pickup_time}` : ''}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'rgba(255,255,255,0.3)', fontWeight: 600 }}>
+                                <span>
+                                    {new Date(o.created_at).toLocaleDateString('he-IL', { day: 'numeric', month: 'long' })}
+                                    {o.pickup_time ? ` · איסוף ${o.pickup_time}` : ''}
+                                </span>
+                                <span style={{ marginRight: 'auto', color: 'rgba(240,208,96,0.78)', fontWeight: 800 }}>למעקב ←</span>
                             </div>
-                        </div>
+                        </Link>
 
                         {/* Reorder actions — the concrete payoff of having history */}
                         <div style={{ display: 'flex', gap: '8px', paddingTop: '2px' }}>
@@ -169,10 +174,8 @@ export default function OrdersPage() {
                     </BariPanel>
                 ))}
 
-                <Link href="/home2" style={{ fontSize: '14px', fontWeight: 700, color: 'rgba(255,255,255,0.5)', textDecoration: 'none', textAlign: 'center', marginTop: '8px' }}>
-                    ← חזרה לדף הבית
-                </Link>
             </div>
+            <BariBottomNav />
         </div>
     );
 }

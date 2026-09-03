@@ -62,6 +62,18 @@ const reviewsStrip = readFileSync(new URL(
     '../../src/components/ui/ReviewsStrip.tsx',
     import.meta.url,
 ), 'utf8');
+const bottomNav = readFileSync(new URL(
+    '../../src/components/ui/bari/BariBottomNav.tsx',
+    import.meta.url,
+), 'utf8');
+const ordersPage = readFileSync(new URL(
+    '../../src/app/orders/page.tsx',
+    import.meta.url,
+), 'utf8');
+const profilePage = readFileSync(new URL(
+    '../../src/app/profile/page.tsx',
+    import.meta.url,
+), 'utf8');
 
 test('customer order hand-off keeps its client-side source invariants', () => {
     const submitStart = summary.indexOf('const submitOrder = async');
@@ -501,6 +513,26 @@ test('home reviews never impersonate customers and retain Google provenance', ()
         'Google review content must keep a visible source and reporting path');
     assert.match(reviewsStrip, /מוצגת לפי רלוונטיות/,
         'the UI must explain Google\'s default review ordering');
+});
+
+test('the customer dock is persistent, semantic and keyboard-complete', () => {
+    assert.match(bottomNav, /<nav[\s\S]*?aria-label="ניווט ראשי"/,
+        'the three primary destinations must be exposed as navigation');
+    assert.match(bottomNav, /position: 'fixed'[\s\S]*?bottom: 0[\s\S]*?maxWidth: '430px'/,
+        'the mobile dock must remain reachable at the bottom of the viewport');
+    assert.match(bottomNav, /aria-current=\{active \? 'page' : undefined\}/,
+        'the active destination must be announced as the current page');
+    assert.match(bottomNav, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?animation: none !important/,
+        'the dock CSS motion must honor the same OS preference as its Motion component');
+    assert.match(home, /<BariBottomNav \/>/);
+    assert.match(ordersPage, /<BariBottomNav \/>/);
+    assert.match(profilePage, /<BariBottomNav \/>/);
+    assert.match(ordersPage, /<Link[\s\S]*?href=\{`\/order\/\$\{encodeURIComponent\(o\.id\)\}`\}[\s\S]*?aria-label=\{`צפייה במעקב של הזמנה \$\{o\.order_num\}`\}/,
+        'each order body must be a keyboard-reachable status link');
+    assert.doesNotMatch(ordersPage, /onClick=\{\(\) => router\.push\(`\/order\/\$\{o\.id\}`\)\}/,
+        'order status navigation must not regress to a pointer-only div');
+    assert.match(ordersPage, /<h1[\s\S]*?ההזמנות שלי<\/h1>/);
+    assert.match(profilePage, /<h1[\s\S]*?האזור שלי<\/h1>/);
 });
 
 test('checkout controls stay truthful, stateful and touchable in demo mode', () => {

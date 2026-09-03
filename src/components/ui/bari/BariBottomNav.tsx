@@ -25,13 +25,35 @@ export default function BariBottomNav() {
     const [ripple, setRipple] = useState<string | null>(null);
 
     return (
-        <div style={{ position: 'relative', zIndex: 2, width: '100%', padding: '10px 16px max(28px, env(safe-area-inset-bottom))', animation: 'navIn 0.6s ease 0.2s both' }}>
+        <nav
+            aria-label="ניווט ראשי"
+            style={{
+                position: 'fixed',
+                insetInline: 0,
+                bottom: 0,
+                zIndex: 40,
+                width: '100%',
+                maxWidth: '430px',
+                margin: '0 auto',
+                padding: '10px 16px max(12px, env(safe-area-inset-bottom))',
+                pointerEvents: 'none',
+            }}
+        >
             <style>{`
                 @keyframes navIn { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:none} }
                 @keyframes navRipple { 0%{transform:scale(0);opacity:0.5} 100%{transform:scale(1);opacity:0} }
                 @keyframes navIconBounce { 0%{transform:scale(1)} 45%{transform:scale(1.22)} 100%{transform:scale(1)} }
+                @media (prefers-reduced-motion: reduce) {
+                    .bari-bottom-nav__surface,
+                    .bari-bottom-nav__ripple,
+                    .bari-bottom-nav__item svg {
+                        animation: none !important;
+                        transition: none !important;
+                    }
+                }
             `}</style>
             <div
+                className="bari-bottom-nav__surface"
                 style={{
                     position: 'relative',
                     display: 'flex',
@@ -44,6 +66,8 @@ export default function BariBottomNav() {
                     WebkitBackdropFilter: 'blur(22px) saturate(1.5)',
                     border: '1px solid rgba(255,255,255,0.14)',
                     boxShadow: 'var(--shadow-card-glow), inset 0 0 0 2px rgba(240,200,50,0.12)',
+                    pointerEvents: 'auto',
+                    animation: 'navIn 0.6s ease 0.2s both',
                 }}
             >
                 {NAV_ITEMS.map(item => {
@@ -68,7 +92,7 @@ export default function BariBottomNav() {
 
                             {/* Tap ripple */}
                             {ripple === item.label && (
-                                <div style={{
+                                <div className="bari-bottom-nav__ripple" style={{
                                     position: 'absolute', top: '50%', left: '50%',
                                     width: '48px', height: '48px',
                                     marginLeft: '-24px', marginTop: '-24px',
@@ -100,7 +124,11 @@ export default function BariBottomNav() {
                     const itemStyle = {
                         position: 'relative' as const,
                         display: 'flex', flexDirection: 'column' as const, alignItems: 'center' as const, gap: '2px',
-                        padding: '5px 16px',
+                        justifyContent: 'center',
+                        flex: 1,
+                        minWidth: 0,
+                        minHeight: '52px',
+                        padding: '5px 8px',
                         borderRadius: 'var(--radius-full)',
                         textDecoration: 'none',
                         cursor: 'pointer',
@@ -112,12 +140,19 @@ export default function BariBottomNav() {
                     };
 
                     return (
-                        <Link key={item.label} href={item.href} onClick={onTap} style={itemStyle}>
+                        <Link
+                            className="bari-bottom-nav__item"
+                            key={item.label}
+                            href={item.href}
+                            aria-current={active ? 'page' : undefined}
+                            onClick={onTap}
+                            style={itemStyle}
+                        >
                             {content}
                         </Link>
                     );
                 })}
             </div>
-        </div>
+        </nav>
     );
 }

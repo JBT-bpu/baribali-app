@@ -273,6 +273,7 @@ export default function HomeV2() {
             fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: 'rtl',
             display: 'flex', flexDirection: 'column', alignItems: 'center',
             justifyContent: 'space-between', overflowX: 'hidden', overflowY: 'auto', userSelect: 'none',
+            paddingBottom: 'calc(86px + env(safe-area-inset-bottom))',
             background: '#020a02',
         }}>
             <style>{`

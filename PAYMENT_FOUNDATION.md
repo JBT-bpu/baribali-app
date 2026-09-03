@@ -129,7 +129,7 @@ npm test
 npm run build
 ```
 
-The 84-test focused suite covers SIGN/VERIFY parsing, credential-safe failures,
+The 85-test focused suite covers SIGN/VERIFY parsing, credential-safe failures,
 immediate transaction-ID capture, URL persistence, concurrent initialization,
 order/request replay across hard reloads, duplicate callbacks, unknown
 references, and verification-pending behavior.

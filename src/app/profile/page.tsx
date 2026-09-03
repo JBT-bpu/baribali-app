@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { ClipboardList, ChevronLeft } from 'lucide-react';
 import GoldField from '@/components/ui/GoldField';
 import GoogleSignInButton from '@/components/ui/GoogleSignInButton';
-import { BariPanel, BariButton } from '@/components/ui/bari';
+import { BariPanel, BariBottomNav, BariButton } from '@/components/ui/bari';
 import { useUser, signOut, displayName, avatarUrl } from '@/lib/auth';
 
 const bg: React.CSSProperties = {
@@ -22,23 +22,24 @@ export default function ProfilePage() {
     if (loading) {
         return <div style={{ ...bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '14px', fontWeight: 600 }}>טוען…</span>
+            <BariBottomNav />
         </div>;
     }
 
     if (!user) {
         return (
-            <div style={{ ...bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '18px', padding: '20px' }}>
+            <div style={{ ...bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '18px', padding: '20px', paddingBottom: 'calc(106px + env(safe-area-inset-bottom))' }}>
                 <GoldField zIndex={0} />
                 <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', maxWidth: '320px', width: '100%' }}>
                     <div style={{ fontSize: '48px' }}>👤</div>
-                    <div style={{ fontSize: '20px', fontWeight: 900, color: '#fff' }}>האזור שלי</div>
+                    <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 900, color: '#fff' }}>האזור שלי</h1>
                     <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.55)', textAlign: 'center', lineHeight: 1.7 }}>
                         התחברו כדי לשמור את היסטוריית ההזמנות ולהזמין שוב בקלות.
                         <br />להזמין אפשר תמיד גם בלי חשבון.
                     </div>
                     <GoogleSignInButton fullWidth />
-                    <Link href="/home2" style={{ fontSize: '14px', fontWeight: 700, color: 'rgba(255,255,255,0.5)', textDecoration: 'none' }}>← חזרה לדף הבית</Link>
                 </div>
+                <BariBottomNav />
             </div>
         );
     }
@@ -46,14 +47,15 @@ export default function ProfilePage() {
     const avatar = avatarUrl(user);
 
     return (
-        <div style={{ ...bg, padding: '0 0 60px' }}>
+        <div style={{ ...bg, padding: '0 0 calc(106px + env(safe-area-inset-bottom))' }}>
             <GoldField zIndex={0} />
             <div style={{ position: 'relative', zIndex: 1, maxWidth: '430px', margin: '0 auto', padding: '24px 16px', paddingTop: 'max(24px, env(safe-area-inset-top))', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+                <h1 style={{ margin: 0, fontSize: '22px', fontWeight: 900, color: '#fff' }}>האזור שלי</h1>
 
                 {/* Identity card */}
                 <BariPanel className="p-4" style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                     {avatar
-                        // eslint-disable-next-line @next/next/no-img-element
                         ? <img src={avatar} alt="" referrerPolicy="no-referrer" style={{ width: '52px', height: '52px', borderRadius: '50%', border: '2px solid rgba(200,168,78,0.5)' }} />
                         : <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: 'rgba(200,168,78,0.2)', border: '2px solid rgba(200,168,78,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px' }}>👤</div>}
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -91,10 +93,8 @@ export default function ProfilePage() {
                     ))}
                 </div>
 
-                <Link href="/home2" style={{ fontSize: '14px', fontWeight: 700, color: 'rgba(255,255,255,0.5)', textDecoration: 'none', textAlign: 'center', marginTop: '4px' }}>
-                    ← חזרה לדף הבית
-                </Link>
             </div>
+            <BariBottomNav />
         </div>
     );
 }
