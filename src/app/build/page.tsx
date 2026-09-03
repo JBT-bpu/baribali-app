@@ -1,10 +1,14 @@
 'use client';
 
 import { Suspense, useEffect, useState } from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import BariBaliBuilder from '@/components/builder/BariBaliBuilder';
 import GoldField from '@/components/ui/GoldField';
+import { BariBadge, BariPanel } from '@/components/ui/bari';
 import { BUILDER_VEIL_Z, DropSettle, DropCover, SWEEP } from '@/components/transition/BowlDrop';
+import { isOrderableProduct, type OrderProduct } from '@/lib/orderRules';
 
 function BuildLoadingFallback() {
     return (
@@ -46,10 +50,72 @@ function BuildLoadingFallback() {
     );
 }
 
-function BuilderWithSize() {
-    const searchParams = useSearchParams();
-    const size = searchParams.get('size');
-    const type = searchParams.get('type') ?? 'salad';
+function ProductUnavailable({ requestedType }: { requestedType: string }) {
+    const tortilla = requestedType === 'tortilla';
+
+    return (
+        <div style={{ position: 'relative', minHeight: '100dvh', overflowX: 'hidden', background: '#020a02' }}>
+            <GoldField zIndex={0} density={0.75} />
+            <main
+                aria-labelledby="product-unavailable-title"
+                dir="rtl"
+                style={{
+                    position: 'relative', zIndex: 1, minHeight: '100dvh',
+                    display: 'grid', placeItems: 'center', boxSizing: 'border-box',
+                    padding: 'max(24px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left))',
+                    fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
+                }}
+            >
+                <BariPanel
+                    highlighted
+                    style={{
+                        width: 'min(100%, 390px)', padding: '28px 22px', textAlign: 'center',
+                        background: 'linear-gradient(180deg, rgba(20,57,20,0.88), rgba(5,20,7,0.92))',
+                        boxShadow: '0 24px 70px rgba(0,0,0,0.5), 0 0 30px rgba(200,168,78,0.14)',
+                    }}
+                >
+                    {tortilla && (
+                        <div style={{ height: '154px', position: 'relative', margin: '-8px auto 8px' }}>
+                            <Image
+                                src="/homepage-assets/card-tortilla.png"
+                                alt=""
+                                fill
+                                sizes="(max-width: 430px) 70vw, 300px"
+                                priority
+                                style={{ objectFit: 'contain', filter: 'drop-shadow(0 14px 22px rgba(0,0,0,0.42))' }}
+                            />
+                        </div>
+                    )}
+                    <BariBadge icon={<span aria-hidden="true">✦</span>}>בקרוב</BariBadge>
+                    <h1
+                        id="product-unavailable-title"
+                        style={{ margin: '16px 0 8px', color: '#fff8dc', fontSize: 'clamp(26px, 8vw, 34px)', lineHeight: 1.15, fontWeight: 900 }}
+                    >
+                        {tortilla ? 'הטורטייה עדיין בדרך' : 'המנה הזו עדיין לא זמינה'}
+                    </h1>
+                    <p style={{ margin: '0 auto 24px', maxWidth: '31ch', color: 'rgba(255,250,220,0.78)', fontSize: '16px', lineHeight: 1.6 }}>
+                        {tortilla
+                            ? 'אנחנו מסיימים להכין אותה. בינתיים אפשר לבנות סלט בדיוק כמו שאוהבים.'
+                            : 'כרגע אפשר להזמין את הסלט שלנו מהתפריט.'}
+                    </p>
+                    <Link
+                        href="/home2"
+                        className="inline-flex min-h-12 w-full items-center justify-center rounded-full border border-gold-bright/50 px-7 py-3.5 text-base font-extrabold text-green-ink transition-transform duration-150 active:scale-[0.97]"
+                        style={{
+                            textDecoration: 'none',
+                            backgroundImage: 'linear-gradient(180deg, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0) 42%), linear-gradient(135deg, var(--color-gold-deep) 0%, var(--color-gold-light) 45%, var(--color-gold-bright) 55%, var(--color-gold-deep) 100%)',
+                            boxShadow: '0 10px 26px rgba(0,0,0,0.45), var(--shadow-gold-glow-lg), inset 0 1px 0 rgba(255,255,255,0.55), inset 0 -2px 3px rgba(120,90,10,0.3)',
+                        }}
+                    >
+                        חזרה לתפריט
+                    </Link>
+                </BariPanel>
+            </main>
+        </div>
+    );
+}
+
+function BuilderExperience({ size, type }: { size: string | null; type: OrderProduct }) {
     // Read during the FIRST render, not in an effect: the covering panel, the
     // field and full opacity all have to exist on the very first painted frame.
     // Setting them from an effect left one frame with no panel over an
@@ -111,10 +177,22 @@ function BuilderWithSize() {
                 from the dive it restores that field mote-for-mote (persistKey) and
                 carries its rush to a stop, so the motion never actually breaks. */}
             {ambient && <GoldField zIndex={1} entrySweep={arrived ? SWEEP : 0} entryHold={arrived && !revealing} persistKey="bb-field" />}
-            <BariBaliBuilder sizeParam={size ?? null} type={type} entrance={revealing} skipIntro={arrived} />
+            <BariBaliBuilder sizeParam={size} type={type} entrance={revealing} skipIntro={arrived} />
             {settling && <DropSettle exiting={revealing} />}
         </div>
     );
+}
+
+function BuilderWithSize() {
+    const searchParams = useSearchParams();
+    const size = searchParams.get('size');
+    const requestedType = searchParams.get('type') ?? 'salad';
+
+    if (!isOrderableProduct(requestedType)) {
+        return <ProductUnavailable requestedType={requestedType} />;
+    }
+
+    return <BuilderExperience size={size} type={requestedType} />;
 }
 
 export default function BuildPage() {

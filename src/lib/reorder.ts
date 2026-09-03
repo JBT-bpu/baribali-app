@@ -1,5 +1,10 @@
-import { effectiveBase, effectiveSizePrice } from '@/lib/menuConfig';
+import { effectiveSizePrice } from '@/lib/menuConfig';
 import { SIZE_CONFIG } from '@/data/salad-data.js';
+import {
+    isOrderableProduct,
+    type OrderProduct,
+} from '@/lib/orderRules';
+import { resolveOrderProduct } from '@/lib/pricing';
 
 /**
  * "Order again" plumbing. A past order is a flat list of item ids plus a base
@@ -11,20 +16,33 @@ import { SIZE_CONFIG } from '@/data/salad-data.js';
  *    time + pay; prices are recomputed server-side from current catalog).
  *  - 'edit' → rebuild and drop the customer into the builder to change things.
  *
- * Note on type detection: the builder renders the salad step set for BOTH
- * products (TORTILLA_STEPS is currently unused), so a tortilla order's items
- * are ordinary salad-catalog ids — the only thing that distinguishes it is the
- * stored base price (TORTILLA_BASE). So we key type off the base, not the ids.
+ * Note on type detection: the dormant tortilla implementation uses salad item
+ * ids (TORTILLA_STEPS is currently unused), so the only reliable distinction
+ * in historic orders is the stored base price. Reorder payloads carry that
+ * detected product so they can never leak into a different active builder.
  */
 
 export type ReorderMode = 'same' | 'edit';
-export interface ReorderPayload { itemIds: string[]; mode: ReorderMode; }
+export interface ReorderPayload {
+    itemIds: string[];
+    mode: ReorderMode;
+    product: OrderProduct;
+}
 
 const KEY = 'bb-reorder';
 
-/** Salad vs tortilla, from the stored base price (tortilla == the tortilla base). */
-export function detectOrderType(size: number | string | null | undefined): 'salad' | 'tortilla' {
-    return Number(size) === effectiveBase('tortilla') ? 'tortilla' : 'salad';
+/**
+ * Salad vs tortilla from a stored base price. Unknown, stale or ambiguous
+ * prices return null: without a persisted product column it is unsafe to turn
+ * an unrecognized historic order into today's salad by default.
+ */
+export function detectOrderType(
+    size: number | string | null | undefined,
+): OrderProduct | null {
+    if (size === null || size === undefined || size === '') return null;
+    const base = Number(size);
+    if (!Number.isFinite(base)) return null;
+    return resolveOrderProduct(base, undefined);
 }
 
 /** Maps a stored salad base price back to the ml size the /build URL expects,
@@ -43,7 +61,9 @@ export function sizeMlFromBase(base: number | string | null | undefined): number
  */
 export function orderSizeLabel(size: number | string | null | undefined): string | null {
     if (size === null || size === undefined || size === '') return null;
-    if (detectOrderType(size) === 'tortilla') return 'טורטייה';
+    const product = detectOrderType(size);
+    if (product === 'tortilla') return 'טורטייה';
+    if (product !== 'salad') return null;
     const ml = sizeMlFromBase(size);
     const cfg = ml ? (SIZE_CONFIG as Record<string, { label: string }>)[String(ml)] : null;
     return cfg?.label ?? null;
@@ -52,6 +72,7 @@ export function orderSizeLabel(size: number | string | null | undefined): string
 /** The /build destination for reordering a past order. */
 export function buildReorderHref(order: { size?: string | number | null }): string {
     const type = detectOrderType(order.size);
+    if (!type) return '/home2';
     const params = new URLSearchParams({ type });
     if (type === 'salad') {
         const ml = sizeMlFromBase(order.size);
@@ -60,22 +81,37 @@ export function buildReorderHref(order: { size?: string | number | null }): stri
     return `/build?${params.toString()}`;
 }
 
-export function stashReorder(itemIds: string[], mode: ReorderMode): void {
+export function isOrderReorderable(order: { size?: string | number | null }): boolean {
+    const product = detectOrderType(order.size);
+    return product !== null && isOrderableProduct(product);
+}
+
+export function stashReorder(itemIds: string[], mode: ReorderMode, product: OrderProduct): void {
     try {
-        sessionStorage.setItem(KEY, JSON.stringify({ itemIds, mode } satisfies ReorderPayload));
+        sessionStorage.setItem(KEY, JSON.stringify({ itemIds, mode, product } satisfies ReorderPayload));
     } catch { /* sessionStorage unavailable — reorder just falls back to a fresh build */ }
 }
 
 /** Reads and clears the stashed reorder (one-shot, so a later manual /build
- *  visit doesn't resurrect it). */
-export function takeReorder(): ReorderPayload | null {
+ *  visit doesn't resurrect it). The expected product prevents an unavailable
+ *  or stale payload from being reconstructed in a different builder. */
+export function takeReorder(expectedProduct: OrderProduct): ReorderPayload | null {
     try {
         const raw = sessionStorage.getItem(KEY);
         if (!raw) return null;
         sessionStorage.removeItem(KEY);
         const p = JSON.parse(raw);
-        if (!p || !Array.isArray(p.itemIds)) return null;
-        return { itemIds: p.itemIds.filter((x: unknown): x is string => typeof x === 'string'), mode: p.mode === 'edit' ? 'edit' : 'same' };
+        if (
+            !p
+            || !Array.isArray(p.itemIds)
+            || (p.product !== 'salad' && p.product !== 'tortilla')
+            || p.product !== expectedProduct
+        ) return null;
+        return {
+            itemIds: p.itemIds.filter((x: unknown): x is string => typeof x === 'string'),
+            mode: p.mode === 'edit' ? 'edit' : 'same',
+            product: p.product,
+        };
     } catch {
         return null;
     }

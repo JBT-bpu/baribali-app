@@ -12,10 +12,16 @@ import SizePicker from '@/components/home/SizePicker';
 import { BariButton, BariModal, BariGlowBackground, BariBottomNav } from '@/components/ui/bari';
 import { usePrefersReducedMotion } from '@/lib/motionHooks';
 import { useUser, avatarUrl, getAccessToken } from '@/lib/auth';
-import { buildReorderHref, stashReorder } from '@/lib/reorder';
+import {
+    buildReorderHref,
+    detectOrderType,
+    isOrderReorderable,
+    stashReorder,
+} from '@/lib/reorder';
 import { useShopStatus } from '@/lib/useShopStatus';
 import { reopenLine } from '@/lib/shopHours';
 import { isPaymentVerificationReturn } from '@/lib/customerPayment';
+import type { OrderProduct } from '@/lib/orderRules';
 
 // The product pick is the hero-select roster (HeroSelector); choosing the salad
 // hero opens the shared SizePicker overlay (also used by the builder).
@@ -213,9 +219,11 @@ export default function HomeV2() {
     }, [sizePicker, router]);
 
     const reorderLast = useCallback(() => {
-        if (!lastOrder) return;
+        if (!lastOrder || !isOrderReorderable(lastOrder)) return;
+        const product = detectOrderType(lastOrder.size);
+        if (!product) return;
         navigator.vibrate?.([15, 40, 30]);
-        stashReorder(lastOrder.items.map(i => i.id), 'same');
+        stashReorder(lastOrder.items.map(i => i.id), 'same', product);
         router.push(buildReorderHref(lastOrder));
     }, [lastOrder, router]);
 
@@ -243,6 +251,14 @@ export default function HomeV2() {
         }
         setSizePicker(false);
     }, []);
+
+    const chooseProduct = useCallback((product: OrderProduct) => {
+        if (product === 'salad') {
+            openSizePicker();
+            return;
+        }
+        router.push(`/build?type=${encodeURIComponent(product)}`);
+    }, [openSizePicker, router]);
 
     const handleSizeSelect = useCallback((size: string) => {
         try { sessionStorage.setItem('bb-drop', '1'); } catch { /* private mode — just skip the intro */ }
@@ -339,8 +355,8 @@ export default function HomeV2() {
             }}>
                 {paymentVerifying && <PaymentVerifyingNotice />}
                 {showClosed && <ClosedNotice headline="המטבח סגור כרגע" detail={closedDetail} />}
-                {user && lastOrder && <ReorderStrip order={lastOrder} onReorder={reorderLast} />}
-                <HeroSelector onChooseSalad={openSizePicker} onNudge={(dir) => { nudgeRef.current = dir * 26; }} onActiveChange={setHeroIdx} />
+                {user && lastOrder && isOrderReorderable(lastOrder) && <ReorderStrip order={lastOrder} onReorder={reorderLast} />}
+                <HeroSelector onChooseProduct={chooseProduct} onNudge={(dir) => { nudgeRef.current = dir * 26; }} onActiveChange={setHeroIdx} />
             </div>
 
             {/* Reviews strip */}

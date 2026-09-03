@@ -3,6 +3,8 @@ import { effectiveBase, effectiveItemPrice, effectiveSizePrice } from '@/lib/men
 import {
     countsTowardIngredientPickLimit,
     INGREDIENT_PICK_LIMIT,
+    isOrderableProduct,
+    isOrderProduct,
     type OrderProduct,
 } from '@/lib/orderRules';
 
@@ -44,7 +46,7 @@ function invalidResult(): ComputedTotal {
     return { total: 0, valid: false, items: [] };
 }
 
-function productFromBase(base: number, requestedProduct: unknown): OrderProduct | null {
+export function resolveOrderProduct(base: number, requestedProduct: unknown): OrderProduct | null {
     const matchingProducts = new Set<OrderProduct>();
     const saladBases = [
         effectiveBase('salad'),
@@ -64,15 +66,15 @@ function productFromBase(base: number, requestedProduct: unknown): OrderProduct 
     // Backward compatibility for an already-open client from before the
     // product field existed. A current client must also agree with the base.
     if (requestedProduct === undefined) return matchedProduct;
-    if (requestedProduct !== 'salad' && requestedProduct !== 'tortilla') return null;
+    if (!isOrderProduct(requestedProduct)) return null;
     return requestedProduct === matchedProduct ? matchedProduct : null;
 }
 
 function activeCatalog(product: OrderProduct): Map<string, CatalogEntry> | null {
-    // The current tortilla builder intentionally renders the salad steps minus
-    // `finish` (see BariBaliBuilder and reorder.ts). Keep the server aligned
-    // with the product customers can actually build today. TORTILLA_STEPS must
-    // not become orderable through a forged request before the UI adopts it.
+    // The dormant tortilla builder uses the salad steps minus `finish` (see
+    // BariBaliBuilder and reorder.ts). Keep that future catalog ready behind
+    // PRODUCT_AVAILABILITY; TORTILLA_STEPS must not become orderable through a
+    // forged request before the UI adopts it.
     const steps = (STEPS as CatalogStep[]).filter(
         step => product === 'salad' || step.id !== 'finish',
     );
@@ -124,8 +126,8 @@ export function computeOrderTotal(
 ): ComputedTotal {
     if (!Array.isArray(items) || typeof base !== 'number' || !Number.isFinite(base)) return invalidResult();
 
-    const product = productFromBase(base, requestedProduct);
-    if (!product) return invalidResult();
+    const product = resolveOrderProduct(base, requestedProduct);
+    if (!product || !isOrderableProduct(product)) return invalidResult();
     const catalog = activeCatalog(product);
     if (!catalog || items.length > catalog.size) return invalidResult();
 

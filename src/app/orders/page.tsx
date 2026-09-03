@@ -7,7 +7,13 @@ import GoldField from '@/components/ui/GoldField';
 import GoogleSignInButton from '@/components/ui/GoogleSignInButton';
 import { BariPanel, BariBadge, BariBottomNav, BariButton } from '@/components/ui/bari';
 import { useUser, getAccessToken } from '@/lib/auth';
-import { buildReorderHref, stashReorder, type ReorderMode } from '@/lib/reorder';
+import {
+    buildReorderHref,
+    detectOrderType,
+    isOrderReorderable,
+    stashReorder,
+    type ReorderMode,
+} from '@/lib/reorder';
 
 interface HistoryOrder {
     id: string;
@@ -63,7 +69,9 @@ export default function OrdersPage() {
     // Reorder — stash the item set and send the builder to reconstruct it.
     // 'same' jumps to the summary; 'edit' opens the builder to change things.
     const startReorder = useCallback((order: HistoryOrder, mode: ReorderMode) => {
-        stashReorder(order.items.map(i => i.id), mode);
+        const product = detectOrderType(order.size);
+        if (!product || !isOrderReorderable(order)) return;
+        stashReorder(order.items.map(i => i.id), mode, product);
         router.push(buildReorderHref(order));
     }, [router]);
 
@@ -127,8 +135,10 @@ export default function OrdersPage() {
                         </Link>
                     </BariPanel>
                 )}
-                {orders?.map(o => (
-                    <BariPanel key={o.id} className="p-3.5" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {orders?.map(o => {
+                    const reorderable = isOrderReorderable(o);
+                    return (
+                        <BariPanel key={o.id} className="p-3.5" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         {/* The order body is a real link so touch, keyboard and
                             assistive-technology users reach the same live status. */}
                         <Link
@@ -163,16 +173,23 @@ export default function OrdersPage() {
                         </Link>
 
                         {/* Reorder actions — the concrete payoff of having history */}
-                        <div style={{ display: 'flex', gap: '8px', paddingTop: '2px' }}>
-                            <BariButton variant="primary" size="sm" style={{ flex: 1 }} onClick={() => startReorder(o, 'same')}>
-                                הזמן שוב
-                            </BariButton>
-                            <BariButton variant="secondary" size="sm" style={{ flex: 1 }} onClick={() => startReorder(o, 'edit')}>
-                                שנה והזמן
-                            </BariButton>
-                        </div>
-                    </BariPanel>
-                ))}
+                        {reorderable ? (
+                            <div style={{ display: 'flex', gap: '8px', paddingTop: '2px' }}>
+                                <BariButton variant="primary" size="sm" style={{ flex: 1 }} onClick={() => startReorder(o, 'same')}>
+                                    הזמן שוב
+                                </BariButton>
+                                <BariButton variant="secondary" size="sm" style={{ flex: 1 }} onClick={() => startReorder(o, 'edit')}>
+                                    שנה והזמן
+                                </BariButton>
+                            </div>
+                        ) : (
+                            <div style={{ padding: '8px 10px', borderRadius: '10px', background: 'rgba(240,208,96,0.08)', color: 'rgba(255,248,220,0.68)', fontSize: '12px', fontWeight: 700, textAlign: 'center' }}>
+                                המנה הזו אינה זמינה כרגע להזמנה חוזרת
+                            </div>
+                        )}
+                        </BariPanel>
+                    );
+                })}
 
             </div>
             <BariBottomNav />

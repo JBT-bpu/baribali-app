@@ -436,7 +436,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
     // "Order again" takes precedence over any saved draft — reconstruct the
     // selection from the past order's item ids against the CURRENT catalog
     // (so prices are current and off-menu items simply drop out).
-    const reorder = takeReorder();
+    const reorder = takeReorder(type);
     if (reorder) {
       const catalog = steps.flatMap(s => s.subgroups.flatMap(sg => sg.items));
       const rebuilt = {};
@@ -490,7 +490,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
         }
       }
     } catch (e) { }
-  }, [steps]);
+  }, [steps, type]);
 
   // ─── Save draft to localStorage ───
   useEffect(() => {

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabaseConfigurationState } from '@/lib/supabaseServerConfig';
-import { computeOrderTotal } from '@/lib/pricing';
+import { computeOrderTotal, resolveOrderProduct } from '@/lib/pricing';
+import { isOrderableProduct, type OrderProduct } from '@/lib/orderRules';
 import {
     createDemoOrderOnce,
     getDemoOrderSubmission,
@@ -83,6 +84,16 @@ function pickupTimeRequired() {
         error: 'בחרו שעת איסוף מהרשימה.',
         code: 'PICKUP_TIME_REQUIRED',
         pickupRejected: 'required',
+    }, { status: 409 });
+}
+
+function productUnavailable(product: OrderProduct) {
+    const message = product === 'tortilla'
+        ? 'הטורטייה עדיין לא זמינה להזמנה. בחרו סלט.'
+        : 'הסלט עדיין לא זמין להזמנה. חזרו לתפריט לבחירת מנה זמינה.';
+    return NextResponse.json({
+        error: message,
+        code: 'PRODUCT_UNAVAILABLE',
     }, { status: 409 });
 }
 
@@ -214,10 +225,23 @@ export async function POST(req: NextRequest) {
             }
         }
 
+        // Resolve from the base as well as the optional product field so an
+        // old or forged client cannot bypass availability by omitting it. This
+        // deliberately stays after idempotency recovery: a committed historic
+        // order must remain recoverable after its product is taken off sale.
+        const product = resolveOrderProduct(
+            intent.size,
+            intent.productType ?? undefined,
+        );
+        if (!product) {
+            return NextResponse.json({ error: 'Invalid order items or size' }, { status: 400 });
+        }
+        if (!isOrderableProduct(product)) return productUnavailable(product);
+
         const computed = computeOrderTotal(
             input.items,
             intent.size,
-            intent.productType ?? undefined,
+            product,
         );
         if (!computed.valid) {
             return NextResponse.json({ error: 'Invalid order items or size' }, { status: 400 });

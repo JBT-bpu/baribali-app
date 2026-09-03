@@ -4,7 +4,13 @@ import test from 'node:test';
 import { PRESETS, STEPS, TORTILLA_STEPS } from '../../src/data/salad-data.js';
 import { resolveChefPreset } from '../../src/lib/chefPresets';
 import { effectiveBase, effectiveItemPriceMap, effectiveSizePrice } from '../../src/lib/menuConfig';
-import { computeOrderTotal, type CanonicalOrderItem, type ComputedTotal } from '../../src/lib/pricing';
+import { INGREDIENT_PICK_LIMIT, isOrderableProduct, PRODUCT_AVAILABILITY } from '../../src/lib/orderRules';
+import {
+    computeOrderTotal,
+    resolveOrderProduct,
+    type CanonicalOrderItem,
+    type ComputedTotal,
+} from '../../src/lib/pricing';
 
 interface TestItem { id: string; he: string; icon: string; price: number }
 interface TestSubgroup { items: TestItem[] }
@@ -104,17 +110,31 @@ test('invalid bases and non-array item payloads are rejected', () => {
     assertInvalid(computeOrderTotal({ id: 'lettuce' }, effectiveSizePrice(750)));
 });
 
-test('an explicit product must agree with its configured base', () => {
+test('product availability has one fail-closed source of truth', () => {
+    assert.deepEqual(PRODUCT_AVAILABILITY, {
+        salad: 'orderable',
+        tortilla: 'coming_soon',
+    });
+    assert.equal(isOrderableProduct('salad'), true);
+    assert.equal(isOrderableProduct('tortilla'), false);
+    assert.equal(isOrderableProduct('bowl'), false);
+});
+
+test('an explicit product must agree with its configured base and be orderable', () => {
     assert.equal(computeOrderTotal(
         [{ id: 'lettuce' }],
         effectiveSizePrice(750),
         'salad',
     ).valid, true);
-    assert.equal(computeOrderTotal(
+    assert.equal(resolveOrderProduct(
+        effectiveBase('tortilla'),
+        'tortilla',
+    ), 'tortilla', 'unavailable products must still be recognized for a specific API response');
+    assertInvalid(computeOrderTotal(
         [{ id: 'lettuce' }],
         effectiveBase('tortilla'),
         'tortilla',
-    ).valid, true);
+    ));
     assertInvalid(computeOrderTotal(
         [{ id: 'lettuce' }],
         effectiveSizePrice(750),
@@ -157,15 +177,14 @@ test('finish permits one choice per subgroup but not two from either subgroup', 
     assertInvalid(computeOrderTotal(inputs(sides.slice(0, 2)), base));
 });
 
-test('ordinary ingredient caps match the salad and current tortilla builders', () => {
+test('ordinary ingredient caps match the active salad builder', () => {
     const veggies = stepIds('veggies');
     const saladBase = effectiveSizePrice(750);
-    const tortillaBase = effectiveBase('tortilla');
 
     assert.equal(computeOrderTotal(inputs(veggies.slice(0, 14)), saladBase).valid, true);
     assertInvalid(computeOrderTotal(inputs(veggies.slice(0, 15)), saladBase));
-    assert.equal(computeOrderTotal(inputs(veggies.slice(0, 8)), tortillaBase).valid, true);
-    assertInvalid(computeOrderTotal(inputs(veggies.slice(0, 9)), tortillaBase));
+    assert.equal(INGREDIENT_PICK_LIMIT.tortilla, 8,
+        'the dormant tortilla rule remains ready behind its availability switch');
 });
 
 test('protein, sauces, finish and upgrades do not consume the ingredient allowance', () => {
@@ -188,11 +207,10 @@ test('premium proteins are upgrades, not extra included-protein picks', () => {
     ).valid, true);
 });
 
-test('current tortilla orders use salad item ids, exclude finish and reject inactive t_* ids', () => {
+test('unavailable tortilla orders fail closed with and without the product field', () => {
     const base = effectiveBase('tortilla');
-    assert.equal(computeOrderTotal(inputs(['lettuce', 'egg', 'caesar']), base).valid, true);
-    assertInvalid(computeOrderTotal(inputs(['mix_no_sauce']), base));
-    assertInvalid(computeOrderTotal(inputs(['t_lettuce']), base));
+    assertInvalid(computeOrderTotal(inputs(['lettuce', 'egg', 'caesar']), base, 'tortilla'));
+    assertInvalid(computeOrderTotal(inputs(['lettuce', 'egg', 'caesar']), base));
 });
 
 test('empty and optional-step selections remain valid', () => {

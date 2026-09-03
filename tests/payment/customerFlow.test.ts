@@ -294,6 +294,12 @@ test('the home hero roster is a keyboard-complete mobile choice', () => {
         'pagination shortcuts must expose the currently previewed hero');
     assert.match(heroSelector, /<BariButton type="button" variant="primary"/,
         'the explicit confirmation CTA must never become an accidental form submit');
+    assert.equal(heroSelector.match(/locked: !isOrderableProduct\('(?:salad|tortilla)'\)/g)?.length, 2,
+        'the product roster must use the same availability switch as the API');
+    assert.match(heroSelector, /onChooseProduct\(selected\.id\)/,
+        'turning on a future product must route that product rather than silently choosing salad');
+    assert.match(home, /const chooseProduct = useCallback\(\(product: OrderProduct\)[\s\S]*?product === 'salad'[\s\S]*?router\.push\(`\/build\?type=\$\{encodeURIComponent\(product\)\}`\)/,
+        'home must keep the active product identity through navigation');
 });
 
 test('builder size changes keep rendered, URL, history and reset state aligned', () => {
@@ -426,6 +432,29 @@ test('the pre-JavaScript builder fallback visibly and politely explains loading'
         'the animated settling veil must still disappear for reduced motion');
     assert.match(bowlDrop, /animation: reducedMotion \? 'none' : `bbVeilIn/,
         'the picker-side veil must still close instantly without animation for reduced motion');
+});
+
+test('unavailable build deep links stop before mounting the order builder', () => {
+    const availabilityCheck = buildPage.indexOf('if (!isOrderableProduct(requestedType))');
+    const unavailableReturn = buildPage.indexOf('<ProductUnavailable requestedType={requestedType} />', availabilityCheck);
+    const builderReturn = buildPage.indexOf('<BuilderExperience size={size} type={requestedType} />', unavailableReturn);
+
+    assert.ok(availabilityCheck >= 0 && unavailableReturn > availabilityCheck && builderReturn > unavailableReturn,
+        'the route boundary must reject unavailable products before mounting builder state');
+    assert.match(buildPage, /<main[\s\S]*?aria-labelledby="product-unavailable-title"/,
+        'the stable unavailable destination needs a named main landmark');
+    assert.match(buildPage, /הטורטייה עדיין בדרך/);
+    assert.match(buildPage, /<Link[\s\S]*?href="\/home2"[\s\S]*?>[\s\S]*?חזרה לתפריט/,
+        'the blocked deep link must provide a keyboard-native path back to the menu');
+});
+
+test('unavailable historical products cannot leak into an active reorder', () => {
+    assert.match(builder, /const reorder = takeReorder\(type\)/,
+        'the builder must consume only a reorder payload scoped to its own product');
+    assert.match(home, /lastOrder && isOrderReorderable\(lastOrder\) && <ReorderStrip/,
+        'home must not advertise one-tap reorder for a product that is off sale');
+    assert.match(ordersPage, /const reorderable = isOrderReorderable\(o\)[\s\S]*?המנה הזו אינה זמינה כרגע להזמנה חוזרת/,
+        'history must replace unavailable reorder actions with a truthful state');
 });
 
 test('customer-facing menu copy stays inside the facts the builder can verify', () => {

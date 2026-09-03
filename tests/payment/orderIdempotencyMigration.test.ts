@@ -108,10 +108,12 @@ test('orders preflight verifies omitted columns can be populated safely', () => 
 
 test('route recovers before mutable checks and never falls back to direct insert', () => {
     const ledgerLookup = route.indexOf(".from('order_creation_requests')");
+    const availabilityValidation = route.indexOf('if (!isOrderableProduct(product))');
     const menuValidation = route.indexOf('computeOrderTotal(');
     const hoursValidation = route.indexOf('shopStatus(');
     const rpc = route.indexOf(".rpc('create_order_idempotent'");
-    assert.ok(ledgerLookup >= 0 && ledgerLookup < menuValidation);
+    assert.ok(ledgerLookup >= 0 && ledgerLookup < availabilityValidation);
+    assert.ok(availabilityValidation < menuValidation);
     assert.ok(ledgerLookup < hoursValidation && hoursValidation < rpc);
     assert.doesNotMatch(route, /\.from\('orders'\)\s*\.insert\(/);
     assert.match(route, /ORDER_IDEMPOTENCY_NOT_READY/);

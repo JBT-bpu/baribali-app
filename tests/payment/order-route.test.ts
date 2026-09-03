@@ -4,7 +4,11 @@ import test from 'node:test';
 import { NextRequest } from 'next/server';
 
 import { STEPS } from '../../src/data/salad-data.js';
-import { effectiveItemPrice, effectiveSizePrice } from '../../src/lib/menuConfig';
+import { effectiveBase, effectiveItemPrice, effectiveSizePrice } from '../../src/lib/menuConfig';
+import {
+    orderSubmissionFingerprint,
+    parseOrderSubmissionIntent,
+} from '../../src/lib/orderSubmissionServer';
 import { pickupSlots } from '../../src/lib/shopHours';
 import { isolateSupabaseTestEnvironment } from './testEnvironment';
 
@@ -211,6 +215,78 @@ test('orders route canonicalizes and idempotently records demo orders', async t 
             const accepted = await POST(request(orderBody(key), 'order-rejected-key'));
             assert.equal(accepted.status, 200);
             assert.equal((await accepted.json()).replayed, false);
+            assert.equal(demoStore.listDemoOrders().length, 1);
+        });
+
+        await t.test('unavailable tortilla cannot be ordered or reserve a submission key', async () => {
+            demoStore.resetDemoStore();
+            const key = '67676767-6767-4767-8767-676767676767';
+            const tortillaBase = effectiveBase('tortilla');
+            const explicit = await POST(request(orderBody(key, {
+                size: tortillaBase,
+                total: tortillaBase,
+                items: [],
+                productType: 'tortilla',
+            }), 'order-tortilla-explicit'));
+
+            assert.equal(explicit.status, 409);
+            assert.deepEqual(await explicit.json(), {
+                error: 'הטורטייה עדיין לא זמינה להזמנה. בחרו סלט.',
+                code: 'PRODUCT_UNAVAILABLE',
+            });
+            assert.equal(demoStore.listDemoOrders().length, 0);
+            assert.equal(demoStore.listDemoPickupAllocations().length, 0);
+
+            const legacyBody = orderBody('68686868-6868-4868-8868-686868686868', {
+                size: tortillaBase,
+                total: tortillaBase,
+                items: [],
+            });
+            delete (legacyBody as Partial<typeof legacyBody>).productType;
+            const legacy = await POST(request(legacyBody, 'order-tortilla-legacy'));
+            assert.equal(legacy.status, 409);
+            assert.equal((await legacy.json()).code, 'PRODUCT_UNAVAILABLE');
+            assert.equal(demoStore.listDemoOrders().length, 0);
+
+            const reusedKey = await POST(request(orderBody(key), 'order-tortilla-reused-key'));
+            assert.equal(reusedKey.status, 200);
+            assert.equal((await reusedKey.json()).replayed, false);
+            assert.equal(demoStore.listDemoOrders().length, 1);
+        });
+
+        await t.test('an already-recorded tortilla submission remains replayable', async () => {
+            demoStore.resetDemoStore();
+            const key = '69696969-6969-4969-8969-696969696969';
+            const tortillaBase = effectiveBase('tortilla');
+            const historicBody = orderBody(key, {
+                size: tortillaBase,
+                total: tortillaBase,
+                items: [],
+                productType: 'tortilla',
+            });
+            const parsed = parseOrderSubmissionIntent(historicBody, true);
+            assert.equal(parsed.valid, true);
+            if (!parsed.valid) return;
+
+            const seeded = demoStore.createDemoOrderOnce({
+                submissionKey: key,
+                submissionFingerprint: orderSubmissionFingerprint(parsed.intent),
+                serviceDate: '2026-09-04',
+                items: [],
+                total: tortillaBase,
+                pickupTime: parsed.intent.pickupTime,
+                notes: parsed.intent.notes,
+                size: String(tortillaBase),
+                paymentStatus: 'pay_at_pickup',
+            });
+            assert.equal(seeded.result, 'created');
+            if (seeded.result !== 'created') return;
+
+            const replay = await POST(request(historicBody, 'order-tortilla-replay'));
+            const payload = await replay.json();
+            assert.equal(replay.status, 200);
+            assert.equal(payload.replayed, true);
+            assert.equal(payload.id, seeded.order.id);
             assert.equal(demoStore.listDemoOrders().length, 1);
         });
 

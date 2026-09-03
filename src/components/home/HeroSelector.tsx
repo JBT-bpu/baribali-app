@@ -4,12 +4,16 @@ import { useRef, useState } from 'react';
 import Image from 'next/image';
 import { BariButton } from '@/components/ui/bari';
 import { usePrefersReducedMotion } from '@/lib/motionHooks';
+import {
+    isOrderableProduct,
+    isOrderProduct,
+    type OrderProduct,
+} from '@/lib/orderRules';
 
 /**
  * Product "hero select" — a game-style character-select roster for the menu.
- * Salad is the one playable hero; tortilla and a veiled third are locked
- * "coming soon" heroes that build anticipation (and preview the future
- * card-collection idea) without pretending to be orderable.
+ * Availability comes from the same product switch enforced by the route and
+ * pricing layers. The veiled third hero remains a local coming-soon concept.
  *
  * Motion model is DISCRETE (this is what makes it feel smooth): each card sits
  * in a fixed slot — active center, or a rotated/receded side — derived purely
@@ -19,13 +23,13 @@ import { usePrefersReducedMotion } from '@/lib/motionHooks';
  * what made the earlier coverflow feel janky. Real depth comes from the stage's
  * `perspective` + each card's `translateZ` + `transform-origin: 50% 80%`.
  *
- * Parent owns what "choose salad" does (opens the existing size picker), so this
- * stays presentational via `onChooseSalad`. Reduced-motion collapses to a single
- * static active card. Built entirely in the BariBali design system — no new deps.
+ * Parent owns product navigation, so this stays presentational via
+ * `onChooseProduct`. Reduced-motion collapses to a single static active card.
+ * Built entirely in the BariBali design system — no new deps.
  */
 
 interface Hero {
-    id: string;
+    id: OrderProduct | 'mystery';
     img: string | null;
     title: string;
     copy: string;      // card subtitle
@@ -37,15 +41,23 @@ interface Hero {
 const HEROES: Hero[] = [
     {
         id: 'salad', img: '/homepage-assets/card-salad.png',
-        title: 'הסלט שלכם', copy: 'בחירת גודל · הרכבה חופשית',
-        status: 'זמין עכשיו', detail: 'בחרו גודל, ואז הרכיבו אותו בדיוק כמו שאתם אוהבים.',
-        locked: false,
+        title: 'הסלט שלכם',
+        copy: isOrderableProduct('salad') ? 'בחירת גודל · הרכבה חופשית' : 'חוזר לתפריט בקרוב',
+        status: isOrderableProduct('salad') ? 'זמין עכשיו' : 'בקרוב',
+        detail: isOrderableProduct('salad')
+            ? 'בחרו גודל, ואז הרכיבו אותו בדיוק כמו שאתם אוהבים.'
+            : 'אנחנו מסיימים להכין אותו מחדש. שווה לחכות.',
+        locked: !isOrderableProduct('salad'),
     },
     {
         id: 'tortilla', img: '/homepage-assets/card-tortilla.png',
-        title: 'טורטייה', copy: 'הגיבור הבא של התפריט',
-        status: 'בקרוב', detail: 'עוד רגע מצטרפת לתפריט. שווה לחכות.',
-        locked: true,
+        title: 'טורטייה',
+        copy: isOrderableProduct('tortilla') ? 'הרכבה חופשית' : 'הגיבור הבא של התפריט',
+        status: isOrderableProduct('tortilla') ? 'זמין עכשיו' : 'בקרוב',
+        detail: isOrderableProduct('tortilla')
+            ? 'הרכיבו אותה בדיוק כמו שאתם אוהבים.'
+            : 'עוד רגע מצטרפת לתפריט. שווה לחכות.',
+        locked: !isOrderableProduct('tortilla'),
     },
     {
         id: 'mystery', img: null,
@@ -59,7 +71,15 @@ const N = HEROES.length;
 const C_W = 210;
 const C_H = 286;
 
-export default function HeroSelector({ onChooseSalad, onNudge, onActiveChange }: { onChooseSalad: () => void; onNudge?: (dir: number) => void; onActiveChange?: (idx: number) => void }) {
+export default function HeroSelector({
+    onChooseProduct,
+    onNudge,
+    onActiveChange,
+}: {
+    onChooseProduct: (product: OrderProduct) => void;
+    onNudge?: (dir: number) => void;
+    onActiveChange?: (idx: number) => void;
+}) {
     const reducedMotion = usePrefersReducedMotion();
     const [activeIdx, setActiveIdx] = useState(0);
     const startX = useRef<number | null>(null);
@@ -113,9 +133,10 @@ export default function HeroSelector({ onChooseSalad, onNudge, onActiveChange }:
     };
 
     const confirmChoice = () => {
-        if (HEROES[activeIdx].locked) return;
+        const selected = HEROES[activeIdx];
+        if (selected.locked || !isOrderProduct(selected.id)) return;
         navigator.vibrate?.([20, 50, 40]);
-        onChooseSalad();
+        onChooseProduct(selected.id);
     };
 
     const handleStageKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
