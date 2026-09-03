@@ -148,11 +148,17 @@ test('long-open customer screens refresh time-sensitive shop state safely', () =
     assert.match(summary, /fetch\('\/api\/slots', \{ cache: 'no-store', signal: controller\.signal \}\)/);
     assert.match(summary, /controller\.abort\(\);[\s\S]*?\}, \[shop\.loading, shop\.refreshedAt\]\)/);
     assert.match(summary, /const effectivePickupTime = resolvePickupSelection\(pickupTime, pickupAvailability\.slots, shop\.open\)/,
-        'expired or newly-full selections must be reconciled before render and submit');
+        'expired or newly-full selections must be rejected before render and submit');
+    assert.match(summary, /const \[pickupTime, setPickupTime\] = useState\(null\)/,
+        'checkout must require an explicit pickup choice');
+    assert.match(summary, /const reconciled = reconcilePickupChoice\([\s\S]*?setPickupTime\(reconciled\.value\);[\s\S]*?setPickupSelectionNotice\(reconciled\.notice\)/,
+        'live capacity changes must reconcile both the stored choice and its explanation');
     assert.match(summary, /status: current\.slots === null \? 'error' : 'stale'/,
         'a failed periodic capacity refresh must retain the last successful snapshot');
     assert.match(summary, /pickupTime: pickupForSubmit/,
         'the submitted value must be re-resolved against current availability');
+    assert.match(summary, /pickupHasAvailableSlot[\s\S]*?בחרו שעת איסוף[\s\S]*?אין שעה פנויה/,
+        'a missing choice and an all-full schedule need different CTA copy');
     assert.match(summary, /setAcceptedOrder\(\{[\s\S]*?pickupTime: pickupForSubmit/,
         'the confirmation must show the same resolved slot the server received');
 
@@ -420,4 +426,32 @@ test('customer-facing menu copy stays inside the facts the builder can verify', 
     assert.doesNotMatch(sizePicker, /servings/,
         'size choices must not invent serving-count guidance');
     assert.match(sizePicker, /tag: 'קומפקטי'[\s\S]*?tag: 'הקלאסי'[\s\S]*?tag: 'הכי גדול שלנו'/);
+});
+
+test('pickup time choices expose selection and full states on a phone-sized target', () => {
+    assert.match(summary, /style=\{PT\.row\}[\s\S]*?role="group"[\s\S]*?aria-label="בחירת זמן איסוף"/,
+        'pickup slots must be one labelled choice group');
+    assert.match(summary, /<button[\s\S]*?type="button"[\s\S]*?key=\{slot\.id\}[\s\S]*?disabled=\{slot\.full\}[\s\S]*?aria-pressed=\{value === slot\.id\}/,
+        'each slot must be a native stateful button that keeps full slots disabled');
+    assert.match(summary, /value === slot\.id && <span style=\{PT\.selectedCheck\} aria-hidden="true">✓<\/span>/,
+        'the selected state must have a visible cue beyond colour');
+    assert.match(summary, /chip: \{[^}]*minHeight: "44px"/,
+        'time slots must meet the minimum mobile touch target height');
+    assert.match(summary, /row: \{[^}]*overflowX: "auto"[^}]*overscrollBehaviorX: "contain"/,
+        'all times must remain horizontally reachable on narrow screens');
+    assert.match(summary, /role="status" aria-live="polite" aria-atomic="true"/);
+    assert.match(summary, /אין שעות פנויות כרגע\./,
+        'an all-full row must explain why no keyboard-selectable choice exists');
+    assert.match(summary, /pickupCheckingMoreSlots[\s\S]*?pickupBlockLabel[\s\S]*?בודקים שעות איסוף/,
+        'pending capacity must use the same checking state in the CTA');
+    assert.match(summary, /checkingMoreSlots=\{pickupCheckingMoreSlots\}/,
+        'the picker and checkout CTA must share one pending-capacity decision');
+    assert.doesNotMatch(summary, /chipFull: \{[^}]*opacity:/,
+        'disabled status labels must not inherit low opacity from the entire button');
+    assert.match(summary, /slot\.isPeak && !slot\.full && <span style=\{PT\.peakTag\}>עמוס<\/span>/,
+        'peak demand must be conveyed in text rather than by an unexplained red dot');
+    assert.match(summary, /onClick=\{\(\) => !slot\.full && onChange\(slot\.id\)\}/,
+        'an available slot must flow into the controlled selection');
+    assert.match(summary, /pickupTime: pickupForSubmit/,
+        'the reconciled selected time must reach the order payload');
 });

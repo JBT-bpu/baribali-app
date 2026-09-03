@@ -4,6 +4,8 @@ import test from 'node:test';
 import { handoffActionLabel } from '../../src/app/kitchen/types';
 import {
     mergePickupCapacity,
+    PICKUP_SELECTION_INVALIDATED_MESSAGE,
+    reconcilePickupChoice,
     resolvePickupSelection,
     shopOverrideForTargetOpen,
     shopStatus,
@@ -28,7 +30,7 @@ test('shop status retains the underlying schedule while a manual override is act
     assert.equal(shopOverrideForTargetOpen(afterHours, true), 'open');
 });
 
-test('pickup selection advances when a long-open checkout becomes stale', () => {
+test('an explicit pickup selection never moves when a long-open checkout becomes stale', () => {
     const slots = [
         { id: '12:15', full: true },
         { id: '12:20', full: false },
@@ -36,12 +38,44 @@ test('pickup selection advances when a long-open checkout becomes stale', () => 
     ];
 
     assert.equal(resolvePickupSelection('12:20', slots, true), '12:20');
-    assert.equal(resolvePickupSelection('12:15', slots, true), '12:20');
-    assert.equal(resolvePickupSelection('12:10', slots, true), '12:20');
-    assert.equal(resolvePickupSelection(null, slots, true), '12:20');
+    assert.equal(resolvePickupSelection('12:15', slots, true), null);
+    assert.equal(resolvePickupSelection('12:10', slots, true), null);
+    assert.equal(resolvePickupSelection('12:55', slots, true), null,
+        'a later requested time must never jump to an earlier available slot');
+    assert.equal(resolvePickupSelection(null, slots, true), null,
+        'checkout must require an explicit pickup choice');
+    assert.equal(resolvePickupSelection(undefined, slots, true), null);
+    assert.equal(resolvePickupSelection('', slots, true), null);
     assert.equal(resolvePickupSelection('12:20', slots.map(slot => ({ ...slot, full: true })), true), null);
     assert.equal(resolvePickupSelection('12:20', slots, false), null);
     assert.equal(resolvePickupSelection('12:20', null, true), null);
+    assert.equal(resolvePickupSelection('12:20', [], true), null);
+
+    assert.deepEqual(
+        reconcilePickupChoice('12:15', '', slots, true),
+        { value: null, notice: PICKUP_SELECTION_INVALIDATED_MESSAGE },
+        'a full explicit choice must be cleared and explained even before alternatives appear',
+    );
+    assert.deepEqual(
+        reconcilePickupChoice(null, PICKUP_SELECTION_INVALIDATED_MESSAGE, slots, true),
+        { value: null, notice: PICKUP_SELECTION_INVALIDATED_MESSAGE },
+        'the explanation must survive a later capacity refresh until the customer chooses',
+    );
+    assert.deepEqual(
+        reconcilePickupChoice(null, PICKUP_SELECTION_INVALIDATED_MESSAGE, slots, false),
+        { value: null, notice: '' },
+        'closing the shop must clear a stale invalidation explanation',
+    );
+    assert.deepEqual(
+        reconcilePickupChoice('12:20', PICKUP_SELECTION_INVALIDATED_MESSAGE, slots, true),
+        { value: '12:20', notice: '' },
+        'a new valid choice clears the explanation',
+    );
+    assert.deepEqual(
+        reconcilePickupChoice('12:20', '', null, true),
+        { value: '12:20', notice: '' },
+        'capacity loading alone must not erase a valid stored choice',
+    );
 
     const local = [
         { id: '12:20', label: '12:20', isPeak: true },

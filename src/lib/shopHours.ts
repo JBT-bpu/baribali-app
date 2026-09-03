@@ -188,25 +188,58 @@ export function pickupSlots(now: Date): { id: string; label: string; isPeak: boo
 export interface PickupSelectionSlot {
     id: string;
     full?: boolean;
+    capacityPending?: boolean;
 }
 
+export const PICKUP_SELECTION_INVALIDATED_MESSAGE =
+    'השעה שבחרתם כבר לא פנויה. בחרו שעה חדשה.';
+
 /**
- * Keep a customer's pickup choice only while it is still present and has
+ * Keep an explicit pickup choice only while it is still present and has
  * capacity. A long-open checkout can cross a five-minute boundary, or another
- * customer can fill the selected slot; in either case advance to the first
- * usable choice rather than submitting the stale value hidden in the footer.
+ * customer can fill the selected slot. In either case clear the effective
+ * value and require a new choice: silently substituting another time can move
+ * pickup earlier than the customer requested.
  */
 export function resolvePickupSelection(
     current: string | null | undefined,
     slots: readonly PickupSelectionSlot[] | null,
     shopOpen: boolean,
 ): string | null {
-    if (!shopOpen || !slots?.length) return null;
+    if (!shopOpen || !current || !slots?.length) return null;
 
-    const selected = current ? slots.find(slot => slot.id === current) : null;
+    const selected = slots.find(slot => slot.id === current);
     if (selected && !selected.full) return selected.id;
+    return null;
+}
 
-    return slots.find(slot => !slot.full)?.id ?? null;
+export interface PickupChoiceState {
+    value: string | null;
+    notice: string;
+}
+
+/**
+ * Reconcile the stored explicit choice with live shop/capacity state.
+ *
+ * A missing capacity snapshot is not evidence that the choice disappeared, so
+ * loading preserves it. A real invalidation clears the value but deliberately
+ * retains its explanation until the customer chooses again. Closing the shop
+ * clears both so the old explanation cannot reappear when it later reopens.
+ */
+export function reconcilePickupChoice(
+    current: string | null | undefined,
+    notice: string,
+    slots: readonly PickupSelectionSlot[] | null,
+    shopOpen: boolean,
+): PickupChoiceState {
+    if (!shopOpen) return { value: null, notice: '' };
+    if (!current) return { value: null, notice };
+    if (slots === null) return { value: current, notice };
+
+    const resolved = resolvePickupSelection(current, slots, true);
+    return resolved
+        ? { value: resolved, notice: '' }
+        : { value: null, notice: PICKUP_SELECTION_INVALIDATED_MESSAGE };
 }
 
 /** Israel-local calendar key used to scope capacity snapshots to one service day. */

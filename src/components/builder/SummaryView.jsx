@@ -140,6 +140,7 @@ import {
     mergePickupCapacity,
     noPickupMessage,
     pickupSlots,
+    reconcilePickupChoice,
     resolvePickupSelection,
     shopDateKey,
 } from "../../lib/shopHours";
@@ -166,7 +167,8 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     const [notesOpen, setNotesOpen] = useState(false);
     const [notesFocused, setNotesFocused] = useState(false);
     const [highlightedStep, setHighlightedStep] = useState(null);
-    const [pickupTime, setPickupTime] = useState(() => generatePickupSlots()?.[0]?.id ?? null);
+    const [pickupTime, setPickupTime] = useState(null);
+    const [pickupSelectionNotice, setPickupSelectionNotice] = useState("");
     const effectivePickupTime = resolvePickupSelection(pickupTime, pickupAvailability.slots, shop.open);
     const [paymentChoice, setPaymentChoice] = useState("pickup"); // 'now' | 'pickup' — demo mode only
     /**
@@ -200,6 +202,29 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     // can both observe `submitting === false`. This ref closes before any state
     // update or await, so only one request can enter the order-creation path.
     const submitLockRef = useRef(false);
+
+    // Capacity and the five-minute window are external state. If they invalidate
+    // an explicit choice, clear the stored value as well as the rendered one so
+    // a later refresh cannot silently snap back to the old time. This effect is
+    // intentionally the synchronization point for that external state.
+    /* eslint-disable react-hooks/set-state-in-effect -- live slot capacity invalidates controlled checkout state */
+    useEffect(() => {
+        const reconciled = reconcilePickupChoice(
+            pickupTime,
+            pickupSelectionNotice,
+            pickupAvailability.slots,
+            shop.open,
+        );
+        if (reconciled.value === pickupTime && reconciled.notice === pickupSelectionNotice) return;
+        setPickupTime(reconciled.value);
+        setPickupSelectionNotice(reconciled.notice);
+    }, [pickupAvailability.slots, pickupSelectionNotice, pickupTime, shop.open]);
+    /* eslint-enable react-hooks/set-state-in-effect */
+
+    const selectPickupTime = (nextTime) => {
+        setPickupTime(nextTime);
+        setPickupSelectionNotice("");
+    };
 
     // A hosted payment page may be left with the browser Back button. When the
     // build page is restored from bfcache, React state otherwise preserves the
@@ -255,7 +280,16 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     // During ordinary opening hours an order needs one of the offered slots.
     // A manual open override is the exception: staff may coordinate pickup at
     // the register when the normal schedule has no slots at all.
+    const pickupHasAvailableSlot = pickupAvailability.slots?.some(slot => !slot.full) ?? false;
+    const pickupCheckingMoreSlots = pickupAvailability.slots !== null
+        && !pickupHasAvailableSlot
+        && pickupAvailability.slots.some(slot => slot.capacityPending);
     const pickupBlocked = shop.open && shop.reason !== 'override_open' && !effectivePickupTime;
+    const pickupBlockLabel = pickupAvailability.slots === null || pickupCheckingMoreSlots
+        ? "בודקים שעות איסוף"
+        : pickupHasAvailableSlot
+            ? "בחרו שעת איסוף"
+            : "אין שעה פנויה";
     const applyPromo = () => {
         const d = findDiscount(promoInput);
         setAppliedDiscount(d);
@@ -376,7 +410,15 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
             shop.open,
         );
         if (shop.open && shop.reason !== 'override_open' && !pickupForSubmit) {
-            failSubmit("זמן האיסוף השתנה. בחרו שעה פנויה ונסו שוב.");
+            failSubmit(
+                pickupTime
+                    ? "זמן האיסוף השתנה. בחרו שעה פנויה ונסו שוב."
+                    : pickupAvailability.slots === null || pickupCheckingMoreSlots
+                        ? "זמני האיסוף עדיין מתעדכנים. המתינו רגע ונסו שוב."
+                        : pickupHasAvailableSlot
+                            ? "בחרו שעת איסוף ונסו שוב."
+                            : "אין כרגע שעת איסוף פנויה.",
+            );
             return;
         }
 
@@ -695,11 +737,13 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                     {/* Pickup time picker */}
                     <PickupTimePicker
                         value={effectivePickupTime}
-                        onChange={setPickupTime}
+                        onChange={selectPickupTime}
                         shop={shop}
                         localSlots={pickupAvailability.localSlots}
                         slots={pickupAvailability.slots}
                         capacityStatus={pickupAvailability.status}
+                        selectionNotice={pickupSelectionNotice}
+                        checkingMoreSlots={pickupCheckingMoreSlots}
                     />
 
                     {/* Price breakdown */}
@@ -814,7 +858,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                         style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif", opacity: (submitting || (!hasPendingPayment && (shopBlocked || pickupBlocked))) ? 0.6 : 1 }}
                         onClick={() => submitOrder()}
                     >
-                        <span>{submitting ? "שולח…" : hasPendingPayment ? "פתח תשלום" : shopBlocked ? "סגור כרגע" : pickupBlocked ? "אין שעה פנויה" : submitError ? "נסו שוב" : "שלח הזמנה"}</span>
+                        <span>{submitting ? "שולח…" : hasPendingPayment ? "פתח תשלום" : shopBlocked ? "סגור כרגע" : pickupBlocked ? pickupBlockLabel : submitError ? "נסו שוב" : "שלח הזמנה"}</span>
                         <span style={S.orderBtnPrice}>₪{finalTotal}</span>
                     </BariButton>
                     {/* Consent disclosure — links open the legal docs before ordering */}
@@ -1088,7 +1132,7 @@ function usePickupAvailability(shop) {
     return { localSlots, slots, status: capacity.status };
 }
 
-function PickupTimePicker({ value, onChange, shop, localSlots, slots, capacityStatus }) {
+function PickupTimePicker({ value, onChange, shop, localSlots, slots, capacityStatus, selectionNotice, checkingMoreSlots }) {
 
     // Two different ways to have nothing to offer, and only one of them is the
     // schedule. `generatePickupSlots` reads WEEK, which is in the bundle and
@@ -1117,17 +1161,36 @@ function PickupTimePicker({ value, onChange, shop, localSlots, slots, capacitySt
         );
     }
 
+    const hasAvailableSlot = slots.some(slot => !slot.full);
+    const statusMessage = !hasAvailableSlot
+        ? checkingMoreSlots
+            ? 'בודקים זמינות לשעות הקרובות…'
+            : 'אין שעות פנויות כרגע.'
+        : selectionNotice || null;
+
     return (
         <div style={PT.box}>
             <div style={PT.header}>
                 <span style={PT.title}>⏰ זמן איסוף</span>
-                {value && <span style={PT.selectedLabel}>{value}</span>}
+                <span style={value ? PT.selectedLabel : PT.chooseLabel}>{value || 'בחרו שעה'}</span>
             </div>
-            <div style={PT.row}>
+            {statusMessage && (
+                <div id="pickup-time-status" role="status" aria-live="polite" aria-atomic="true" style={PT.statusMessage}>
+                    {statusMessage}
+                </div>
+            )}
+            <div
+                style={PT.row}
+                role="group"
+                aria-label="בחירת זמן איסוף"
+                aria-describedby={statusMessage ? "pickup-time-status" : undefined}
+            >
                 {slots.map(slot => (
                     <button
+                        type="button"
                         key={slot.id}
                         disabled={slot.full}
+                        aria-pressed={value === slot.id}
                         onClick={() => !slot.full && onChange(slot.id)}
                         style={{
                             ...PT.chip,
@@ -1135,8 +1198,9 @@ function PickupTimePicker({ value, onChange, shop, localSlots, slots, capacitySt
                             ...(slot.full ? PT.chipFull : {}),
                         }}
                     >
-                        {slot.label}
-                        {slot.isPeak && !slot.full && <span style={PT.peakDot} />}
+                        {value === slot.id && <span style={PT.selectedCheck} aria-hidden="true">✓</span>}
+                        <span>{slot.label}</span>
+                        {slot.isPeak && !slot.full && <span style={PT.peakTag}>עמוס</span>}
                         {slot.full && (
                             <span style={slot.capacityPending ? PT.pendingTag : PT.fullTag}>
                                 {slot.capacityPending ? 'בודקים' : 'מלא'}
@@ -1163,19 +1227,22 @@ const PT = {
     header: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" },
     title: { fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.45)" },
     selectedLabel: { fontSize: "14px", fontWeight: 900, color: "#f0d060", letterSpacing: "0.04em" },
-    row: { display: "flex", gap: "8px", overflowX: "auto", paddingBottom: "2px", scrollbarWidth: "none", WebkitOverflowScrolling: "touch" },
-    chip: { flexShrink: 0, padding: "8px 16px", borderRadius: "10px", border: "1px solid rgba(200,168,78,0.22)", background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.5)", fontSize: "13px", fontWeight: 700, fontFamily: "var(--font-heebo), 'Heebo', sans-serif", cursor: "pointer", transition: "all 0.15s" },
+    chooseLabel: { fontSize: "12px", fontWeight: 800, color: "rgba(255,255,255,0.68)" },
+    statusMessage: { marginBottom: "9px", padding: "8px 10px", borderRadius: "9px", background: "rgba(242,196,106,0.1)", border: "1px solid rgba(242,196,106,0.24)", color: "#f2c46a", fontSize: "11.5px", fontWeight: 700, lineHeight: 1.45 },
+    row: { display: "flex", gap: "8px", overflowX: "auto", overscrollBehaviorX: "contain", paddingBottom: "2px", scrollbarWidth: "none", WebkitOverflowScrolling: "touch" },
+    chip: { flexShrink: 0, minHeight: "44px", padding: "8px 16px", borderRadius: "10px", border: "1px solid rgba(200,168,78,0.22)", background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.62)", fontSize: "13px", fontWeight: 700, fontFamily: "var(--font-heebo), 'Heebo', sans-serif", cursor: "pointer", transition: "all 0.15s", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "5px" },
     chipActive: { background: "linear-gradient(135deg, rgba(200,168,78,0.28), rgba(200,168,78,0.12))", border: "1px solid var(--color-gold-deep)", color: "var(--color-gold-light)", boxShadow: "var(--shadow-gold-glow)" },
+    selectedCheck: { color: "#f0d060", fontSize: "13px", fontWeight: 900, lineHeight: 1 },
     // Was rgba(255,255,255,0.35) — a footnote weight, from when this was a
     // passing remark under a heading. It is now the reason the order button is
     // dead, so it is the one thing on the screen the customer most needs to
     // read. Amber, matching the landing page's notice, so the two closed states
     // are recognisably the same message.
     closedMsg: { fontSize: "12.5px", color: "#f2c46a", fontWeight: 700, lineHeight: 1.5 },
-    peakDot: { display: "inline-block", width: "5px", height: "5px", borderRadius: "50%", background: "#e57373", marginRight: "4px", verticalAlign: "middle", flexShrink: 0 },
-    chipFull: { opacity: 0.3, cursor: "not-allowed", border: "1px solid rgba(255,255,255,0.06)" },
-    fullTag: { fontSize: "10px", fontWeight: 800, color: "#e57373", marginRight: "4px", letterSpacing: "0.04em" },
-    pendingTag: { fontSize: "9px", fontWeight: 700, color: "rgba(255,255,255,0.5)", marginRight: "4px" },
+    peakTag: { fontSize: "9px", fontWeight: 800, color: "#f2c46a", lineHeight: 1 },
+    chipFull: { cursor: "not-allowed", border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.025)", color: "rgba(255,255,255,0.48)" },
+    fullTag: { fontSize: "10px", fontWeight: 800, color: "#ff9a97", letterSpacing: "0.04em" },
+    pendingTag: { fontSize: "9px", fontWeight: 700, color: "rgba(255,255,255,0.72)" },
 };
 
 const KF = `
