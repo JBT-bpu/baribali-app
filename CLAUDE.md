@@ -31,7 +31,7 @@ npm run fresh      # rimraf .next && next dev — use if the dev cache corrupts
 
 - **Demo vs real mode** hinges on `isSupabaseConfigured()` in `src/lib/supabase.ts`. Without real creds the app is fully usable against an in-memory demo store (`src/lib/demoStore.ts`).
 - **Lint baseline: 0 errors / 12 warnings.** Hold that line — don't add warnings; the 12 are pre-existing (mostly `react-hooks/set-state-in-effect` and unused `no-img-element` disables).
-- **Focused tests use Node's built-in test runner through pinned `tsx`.** The current 46-test suite covers payment, pricing/order validation, kitchen controls and critical customer-flow source invariants; it is not app-wide, so manual smoke-testing remains required for affected UI flows.
+- **Focused tests use Node's built-in test runner through pinned `tsx`.** The current 48-test suite covers payment, pricing/order validation, kitchen controls and critical customer-flow source invariants; it is not app-wide, so manual smoke-testing remains required for affected UI flows.
 
 ## 4. Where things live
 

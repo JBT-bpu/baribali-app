@@ -48,10 +48,19 @@ const WEEKDAY_INDEX: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, 
  * is on. Intl carries the DST rules, so this stays right across the October and
  * March switches without a table to maintain.
  */
-export function shopParts(date: Date): { day: number; mins: Minutes } {
+export function shopParts(date: Date): {
+    day: number;
+    mins: Minutes;
+    year: number;
+    month: number;
+    calendarDay: number;
+} {
     const fmt = new Intl.DateTimeFormat('en-US', {
         timeZone: SHOP_TZ,
         weekday: 'short',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
         hour: '2-digit',
         minute: '2-digit',
         hour12: false,
@@ -62,6 +71,9 @@ export function shopParts(date: Date): { day: number; mins: Minutes } {
         day: WEEKDAY_INDEX[map.weekday] ?? 0,
         // Intl can report midnight as "24" rather than "00".
         mins: hm(Number(map.hour) % 24, Number(map.minute)),
+        year: Number(map.year),
+        month: Number(map.month),
+        calendarDay: Number(map.day),
     };
 }
 
@@ -199,15 +211,127 @@ export function resolvePickupSelection(
 
 /** Israel-local calendar key used to scope capacity snapshots to one service day. */
 export function shopDateKey(date: Date = new Date()): string {
-    const fmt = new Intl.DateTimeFormat('en-US', {
-        timeZone: SHOP_TZ,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-    });
-    const map: Record<string, string> = {};
-    for (const part of fmt.formatToParts(date)) map[part.type] = part.value;
-    return `${map.year}-${map.month}-${map.day}`;
+    const { year, month, calendarDay } = shopParts(date);
+    return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(calendarDay).padStart(2, '0')}`;
+}
+
+export interface PickupMoment {
+    targetMs: number;
+    /** Israel-local clock text shown to the customer. */
+    clock: string;
+}
+
+const EXPLICIT_ISO_DATETIME = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d+))?)?(Z|([+-])(\d{2}):(\d{2}))$/i;
+
+function explicitIsoEpoch(value: string): number | null {
+    const match = EXPLICIT_ISO_DATETIME.exec(value);
+    if (!match) return null;
+
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const calendarDay = Number(match[3]);
+    const hour = Number(match[4]);
+    const minute = Number(match[5]);
+    const second = Number(match[6] ?? 0);
+    const millisecond = Number((match[7] ?? '').slice(0, 3).padEnd(3, '0'));
+
+    const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+    const monthLengths = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    if (
+        month < 1
+        || month > 12
+        || calendarDay < 1
+        || calendarDay > monthLengths[month - 1]
+        || hour > 23
+        || minute > 59
+        || second > 59
+    ) return null;
+
+    let offsetMinutes = 0;
+    if (match[8].toUpperCase() !== 'Z') {
+        const offsetHour = Number(match[10]);
+        const offsetMinute = Number(match[11]);
+        // ISO 8601 offsets range through UTC+14:00; +14:30 and larger are not
+        // real offsets even though some Date implementations normalize them.
+        if (offsetHour > 14 || offsetMinute > 59 || (offsetHour === 14 && offsetMinute !== 0)) return null;
+        const sign = match[9] === '+' ? 1 : -1;
+        offsetMinutes = sign * hm(offsetHour, offsetMinute);
+    }
+
+    // Date.UTC treats years 00–99 as 1900–1999. setUTCFullYear keeps the ISO
+    // year literal, so the parser remains strict for every four-digit year.
+    const utcWall = new Date(0);
+    utcWall.setUTCFullYear(year, month - 1, calendarDay);
+    utcWall.setUTCHours(hour, minute, second, millisecond);
+    return utcWall.getTime() - offsetMinutes * 60_000;
+}
+
+function shopWallTimeToEpoch(
+    year: number,
+    month: number,
+    calendarDay: number,
+    mins: Minutes,
+): number | null {
+    const hour = Math.floor(mins / 60);
+    const minute = mins % 60;
+    const desiredWall = Date.UTC(year, month - 1, calendarDay, hour, minute);
+    let candidate = desiredWall;
+
+    // Intl gives us wall-clock parts but not the offset. Iteratively correct a
+    // UTC guess by the difference between the desired Israel wall time and the
+    // wall time that guess actually formats to. Two passes normally suffice;
+    // three keeps the DST edge validation explicit.
+    for (let pass = 0; pass < 3; pass += 1) {
+        const seen = shopParts(new Date(candidate));
+        const seenWall = Date.UTC(
+            seen.year,
+            seen.month - 1,
+            seen.calendarDay,
+            Math.floor(seen.mins / 60),
+            seen.mins % 60,
+        );
+        const delta = desiredWall - seenWall;
+        if (delta === 0) break;
+        candidate += delta;
+    }
+
+    const check = shopParts(new Date(candidate));
+    if (
+        check.year !== year
+        || check.month !== month
+        || check.calendarDay !== calendarDay
+        || check.mins !== mins
+    ) return null;
+    return candidate;
+}
+
+/**
+ * Resolve a stored pickup value without consulting the phone's timezone.
+ * HH:MM belongs to the Israel service date on which the order was created;
+ * explicit-offset datetimes own their date and are displayed in Israel time.
+ */
+export function resolvePickupMoment(
+    pickupTime: string | null | undefined,
+    createdAt: string | null | undefined,
+): PickupMoment | null {
+    const raw = pickupTime?.trim();
+    if (!raw) return null;
+
+    const mins = parseHHMM(raw);
+    if (mins !== null) {
+        if (!createdAt) return null;
+        const createdEpoch = explicitIsoEpoch(createdAt);
+        if (createdEpoch === null) return null;
+        const created = new Date(createdEpoch);
+        const { year, month, calendarDay } = shopParts(created);
+        const targetMs = shopWallTimeToEpoch(year, month, calendarDay, mins);
+        return targetMs === null ? null : { targetMs, clock: toHHMM(mins) };
+    }
+
+    const targetEpoch = explicitIsoEpoch(raw);
+    if (targetEpoch === null) return null;
+    const target = new Date(targetEpoch);
+    return { targetMs: target.getTime(), clock: toHHMM(shopParts(target).mins) };
 }
 
 export interface PickupCapacitySlot {

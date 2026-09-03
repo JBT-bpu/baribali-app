@@ -22,6 +22,10 @@ const slotsRoute = readFileSync(new URL(
     '../../src/app/api/slots/route.ts',
     import.meta.url,
 ), 'utf8');
+const home = readFileSync(new URL(
+    '../../src/app/home2/page.tsx',
+    import.meta.url,
+), 'utf8');
 
 test('customer order hand-off keeps its client-side source invariants', () => {
     const submitStart = summary.indexOf('const submitOrder = async');
@@ -64,6 +68,38 @@ test('customer order hand-off keeps its client-side source invariants', () => {
     assert.match(seal, /ההזמנה נשלחה למטבח/);
     assert.doesNotMatch(seal, />בהכנה!</,
         'the initial seal must not claim preparation has already started');
+
+    assert.match(tracking, /customerPaymentPresentation\(effectivePayment\)/);
+    assert.match(seal, /customerPaymentPresentation\(order\.paymentStatus\)/);
+    assert.match(tracking, /pay\.tone === 'done'[\s\S]*?pay\.tone === 'verify'/,
+        'tracking styling must distinguish verified money from verification in progress');
+    assert.match(tracking, /bowl && pay\?\.tone !== 'verify'/,
+        'the bowl label must yield visual space to the anti-double-pay warning on narrow screens');
+    assert.match(tracking, /bowl && pay\?\.tone === 'verify'[\s\S]*?P\.srOnly/,
+        'the temporarily hidden bowl size must remain available to assistive technology');
+    assert.match(seal, /pay\.tone === 'done'[\s\S]*?pay\.tone === 'verify'/,
+        'the order seal must distinguish verified money from verification in progress');
+    assert.doesNotMatch(tracking, /case 'paid_unverified'/,
+        'customer payment truth must stay in the shared presentation helper');
+    assert.doesNotMatch(seal, /case 'paid_unverified'/,
+        'customer payment truth must stay in the shared presentation helper');
+
+    assert.match(tracking, /resolvePickupMoment\(pickupTime, createdAt\)/,
+        'the countdown must resolve pickup time against the Israel service date');
+    assert.doesNotMatch(tracking, /setHours\(/,
+        'the countdown must not interpret pickup HH:MM in the phone timezone');
+    assert.doesNotMatch(tracking, /\.getHours\(\)|\.getMinutes\(\)/,
+        'displayed pickup time must not come from the phone timezone');
+
+    assert.match(home, /useSyncExternalStore\(/,
+        'the payment return hint must hydrate without reading location during server render');
+    assert.match(home, /isPaymentVerificationReturn\(window\.location\.search\)/,
+        'only the conservative verifying return hint may show the warning');
+    assert.match(home, /role="alert"/);
+    assert.match(home, /אל תשלמו שוב\. אם ההזמנה לא מופיעה, פנו לקופה\./,
+        'an ambiguous return must explicitly prevent a second payment');
+    assert.match(home, /paymentVerifying && <PaymentVerifyingNotice \/>/,
+        'the warning must remain visible instead of dismissing on a timer');
 });
 
 test('long-open customer screens refresh time-sensitive shop state safely', () => {

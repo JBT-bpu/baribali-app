@@ -5,7 +5,9 @@ import Link from 'next/link';
 import GoldField from '@/components/ui/GoldField';
 import BariGlowBackground from '@/components/ui/bari/BariGlowBackground';
 import { fireGoldConfetti } from '@/lib/confetti';
+import { customerPaymentPresentation } from '@/lib/customerPayment';
 import { orderSizeLabel } from '@/lib/reorder';
+import { resolvePickupMoment } from '@/lib/shopHours';
 import { TRACK, slot, xPct, yPct } from './trackingArt';
 
 type OrderStatus = 'waiting' | 'preparing' | 'ready' | 'collected';
@@ -21,19 +23,6 @@ interface Order {
     status: OrderStatus;
     payment_status?: string;
     created_at: string;
-}
-
-/** What the customer needs to know about money, in their own terms. */
-function paymentLabel(payment: string | undefined): { text: string; owed: boolean } | null {
-    switch (payment) {
-        case 'paid':
-        case 'paid_unverified': return { text: 'שולם ✓', owed: false };
-        case 'verification_pending': return { text: 'מאמתים את התשלום — אל תשלמו שוב', owed: false };
-        case 'pay_at_pickup':   return { text: 'לתשלום באיסוף', owed: true };
-        case 'pending':         return { text: 'ממתין לתשלום', owed: true };
-        case 'failed':          return { text: 'התשלום נכשל — שלמו באיסוף', owed: true };
-        default:                return null;
-    }
 }
 
 // `sub` is the one line that says what to DO. The "ready" state in particular
@@ -101,30 +90,12 @@ function fireHaptic() {
     }
 }
 
-/**
- * Resolves a stored pickup_time to a Date. In practice it is always "HH:MM"
- * (the slot ids the picker produces, and what the schema documents), but the
- * full-datetime branch is kept — and an unparseable value now returns null
- * rather than an Invalid Date, which used to render a "NaN:NaN" countdown.
- */
-function pickupTarget(pickupTime: string | null): Date | null {
-    if (!pickupTime) return null;
-    if (/^\d{1,2}:\d{2}$/.test(pickupTime)) {
-        const [h, m] = pickupTime.split(':').map(Number);
-        if (h > 23 || m > 59) return null;
-        const t = new Date();
-        t.setHours(h, m, 0, 0);
-        return t;
-    }
-    const t = new Date(pickupTime);
-    return Number.isNaN(t.getTime()) ? null : t;
-}
-
-const hhmm = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-
 /* ── Countdown Hook ── */
-function useCountdown(pickupTime: string | null, frozen: boolean) {
-    const target = useMemo(() => pickupTarget(pickupTime), [pickupTime]);
+function useCountdown(pickupTime: string | null, createdAt: string | undefined, frozen: boolean) {
+    const moment = useMemo(
+        () => resolvePickupMoment(pickupTime, createdAt),
+        [createdAt, pickupTime],
+    );
     // Lazy initialiser: Date.now() as a bare argument re-evaluates on every
     // render (and is an impure call during render).
     const [now, setNow] = useState(() => Date.now());
@@ -133,7 +104,7 @@ function useCountdown(pickupTime: string | null, frozen: boolean) {
     // arrived the readout is a static "now", and once the order is collected
     // nothing about it can change again — either way a 1Hz re-render loop runs
     // on a phone that is by then back in someone's pocket.
-    const ticking = !!target && !frozen && target.getTime() > now;
+    const ticking = !!moment && !frozen && moment.targetMs > now;
 
     useEffect(() => {
         if (!ticking) return;
@@ -141,14 +112,14 @@ function useCountdown(pickupTime: string | null, frozen: boolean) {
         return () => clearInterval(id);
     }, [ticking]);
 
-    if (!target) return null;
+    if (!moment) return null;
 
     // The clock time is the thing the customer actually planned around, and
     // until now it appeared nowhere on this page: the only branch that rendered
     // it was unreachable, because this hook returns null solely when there is
     // no pickup time at all.
-    const clock = hhmm(target);
-    const diffMs = target.getTime() - now;
+    const clock = moment.clock;
+    const diffMs = moment.targetMs - now;
 
     if (diffMs <= 0) return { clock, text: 'עכשיו!', urgent: false, arrived: true };
 
@@ -174,7 +145,11 @@ export default function OrderStatusView({ id, paymentHint = null }: { id: string
     // set stays coherent. That also drops lottie-react and a JSON fetch from a
     // route people deliberately leave open. The ready moment is still marked —
     // confetti, chime, haptic and the ring pop all still fire.
-    const countdown = useCountdown(order?.pickup_time ?? null, order?.status === 'collected');
+    const countdown = useCountdown(
+        order?.pickup_time ?? null,
+        order?.created_at,
+        order?.status === 'collected',
+    );
 
     // Celebration trigger
     const triggerCelebration = useCallback(() => {
@@ -354,7 +329,7 @@ export default function OrderStatusView({ id, paymentHint = null }: { id: string
     const effectivePayment = paymentHint === 'verifying' && order.payment_status === 'pending'
         ? 'verification_pending'
         : order.payment_status;
-    const pay = paymentLabel(effectivePayment);
+    const pay = customerPaymentPresentation(effectivePayment);
 
     return (
         <div style={P.root}>
@@ -463,10 +438,14 @@ export default function OrderStatusView({ id, paymentHint = null }: { id: string
                         five rows, not six. */}
                     <div style={P.moneyRow}>
                         <span style={P.total}>₪{order.total}</span>
-                        {bowl && <span style={P.bowlLabel}>· {bowl}</span>}
+                        {bowl && pay?.tone !== 'verify' && <span style={P.bowlLabel}>· {bowl}</span>}
+                        {bowl && pay?.tone === 'verify' && <span style={P.srOnly}>· {bowl}</span>}
                         {pay && (
-                            <span style={{ ...P.payTag, ...(pay.owed ? P.payOwed : P.payDone) }}>
-                                {pay.owed ? '💳' : '✓'} {pay.text}
+                            <span style={{
+                                ...P.payTag,
+                                ...(pay.tone === 'done' ? P.payDone : pay.tone === 'verify' ? P.payVerify : P.payOwed),
+                            }}>
+                                <span aria-hidden>{pay.icon}</span> {pay.text}
                             </span>
                         )}
                     </div>
@@ -693,6 +672,12 @@ const P: Record<string, React.CSSProperties> = {
     payTag: { fontSize: 'clamp(8px, 2.9vw, 11px)', fontWeight: 800, whiteSpace: 'nowrap' },
     payOwed: { color: '#ffd08a' },
     payDone: { color: '#b6e6b6' },
+    payVerify: { color: '#f2c46a' },
+    srOnly: {
+        position: 'absolute', width: '1px', height: '1px', padding: 0,
+        margin: '-1px', overflow: 'hidden', clip: 'rect(0, 0, 0, 0)',
+        whiteSpace: 'nowrap', border: 0,
+    },
 
     footer: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: 'clamp(8px, 2.7vw, 11px)', color: 'rgba(255,255,255,0.62)', fontWeight: 600, textShadow: '0 1px 6px rgba(0,0,0,0.9)' },
 

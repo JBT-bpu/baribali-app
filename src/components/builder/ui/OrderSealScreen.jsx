@@ -5,6 +5,7 @@ import { usePrefersReducedMotion } from "../../../lib/motionHooks";
 // the two loudest sounds in the app and they fired even when muted.
 import { isSoundOn } from "../../../lib/soundPref";
 import { fireGoldConfetti } from "../../../lib/confetti";
+import { customerPaymentPresentation } from "../../../lib/customerPayment";
 import BariPlaque from "../../ui/bari/BariPlaque";
 import BariBadge from "../../ui/bari/BariBadge";
 import BariButton from "../../ui/bari/BariButton";
@@ -113,7 +114,7 @@ export default function OrderSealScreen({ order, onNewOrder }) {
         fontSize: `calc(min(100vw, ${PLAQUE.maxWidth}px) * ${SEAL_FOOTPRINT} / 12)`,
     }), []);
 
-    const pay = order ? confirmPayment(order.paymentStatus) : null;
+    const pay = order ? customerPaymentPresentation(order.paymentStatus) : null;
     // Only badges whose artwork exists; the rest would render a broken image.
     const earned = order ? (order.badges || []).filter(b => b?.emblem).slice(0, 6) : [];
 
@@ -178,8 +179,12 @@ export default function OrderSealScreen({ order, onNewOrder }) {
                                 screen was silent about — someone paying at
                                 pickup got no reminder to bring any. */}
                             {pay && (
-                                <div style={{ ...S.payPill, ...(pay.owed ? S.payOwed : S.payDone), animation: `${RISE} 0.47s both` }}>
-                                    <span>{pay.owed ? '💵' : '✓'}</span>
+                                <div style={{
+                                    ...S.payPill,
+                                    ...(pay.tone === 'done' ? S.payDone : pay.tone === 'verify' ? S.payVerify : S.payOwed),
+                                    animation: `${RISE} 0.47s both`,
+                                }}>
+                                    <span aria-hidden>{pay.icon}</span>
                                     <span>{pay.text}</span>
                                 </div>
                             )}
@@ -228,26 +233,6 @@ export default function OrderSealScreen({ order, onNewOrder }) {
 
 /** One entrance, one stagger unit, so the arrival reads as a single wave. */
 const RISE = "plaqueFadeUp 0.45s cubic-bezier(0.2,0.9,0.3,1)";
-
-/**
- * What the customer still owes, if anything. Mirrors the order-status page.
- *
- * Moved here verbatim with the confirmation content — the wording is what
- * customers and staff already read at the counter, and `null` for an unknown
- * status is deliberate: no pill at all beats guessing about money.
- *
- * Driven by the status the SERVER recorded, never by the choice made on the
- * previous screen.
- */
-function confirmPayment(status) {
-    switch (status) {
-        case 'paid':
-        case 'paid_unverified': return { text: 'שולם ✓', owed: false };
-        case 'pay_at_pickup':   return { text: 'לתשלום באיסוף', owed: true };
-        case 'pending':         return { text: 'ממתין לתשלום', owed: true };
-        default:                return null;
-    }
-}
 
 // ─── Sounds ──────────────────────────────────────────────────
 // Both helpers close their context when done. They used to leak one per call —
@@ -365,6 +350,7 @@ const S = {
     },
     payOwed: { background: "rgba(255,183,77,0.16)", border: "1px solid rgba(255,183,77,0.45)", color: "#ffcc80" },
     payDone: { background: "rgba(102,187,106,0.16)", border: "1px solid rgba(102,187,106,0.45)", color: "#a5d6a7" },
+    payVerify: { background: "rgba(232,170,70,0.16)", border: "1px solid rgba(232,170,70,0.45)", color: "#f2c46a" },
     badgeRow: {
         display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "6px",
         marginTop: "16px", marginBottom: "4px",

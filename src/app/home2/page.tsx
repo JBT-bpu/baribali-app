@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { User } from 'lucide-react';
@@ -15,6 +15,7 @@ import { useUser, avatarUrl, getAccessToken } from '@/lib/auth';
 import { buildReorderHref, stashReorder } from '@/lib/reorder';
 import { useShopStatus } from '@/lib/useShopStatus';
 import { reopenLine } from '@/lib/shopHours';
+import { isPaymentVerificationReturn } from '@/lib/customerPayment';
 
 // The product pick is the hero-select roster (HeroSelector); choosing the salad
 // hero opens the shared SizePicker overlay (also used by the builder).
@@ -26,6 +27,17 @@ interface HistoryOrder {
     total: number;
     size: string | null;
 }
+
+const getServerPaymentVerifying = () => false;
+const getPaymentVerifying = () => isPaymentVerificationReturn(window.location.search);
+// The visible home UI already waits for the existing `ready` hydration gate.
+// useSyncExternalStore therefore supplies the query state before the first
+// visible client render while keeping /home2 statically generated; popstate
+// also covers a provider-return entry restored from browser history.
+const subscribeToLocation = (onChange: () => void) => {
+    window.addEventListener('popstate', onChange);
+    return () => window.removeEventListener('popstate', onChange);
+};
 
 
 // ─── Members' one-tap reorder strip ────────────────────────────────────────────
@@ -104,12 +116,44 @@ function ClosedNotice({ headline, detail }: { headline: string; detail: string }
     );
 }
 
+function PaymentVerifyingNotice() {
+    return (
+        <div
+            role="alert"
+            style={{
+                width: '100%', maxWidth: '360px',
+                display: 'flex', alignItems: 'center', gap: '10px',
+                padding: '10px 13px', borderRadius: '16px',
+                background: 'linear-gradient(135deg, rgba(173,104,24,0.30), rgba(92,54,15,0.18))',
+                border: '1px solid rgba(242,196,106,0.55)',
+                backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+                boxShadow: '0 4px 18px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06)',
+                fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: 'rtl',
+                animation: 'labelIn 0.45s ease both',
+            }}
+        >
+            <span style={{ fontSize: '20px', flexShrink: 0 }} aria-hidden>⏳</span>
+            <div style={{ flex: 1, minWidth: 0, textAlign: 'right' }}>
+                <div style={{ fontSize: '13px', fontWeight: 900, color: '#f2c46a' }}>התשלום בבדיקה</div>
+                <div style={{ fontSize: '11.5px', fontWeight: 650, color: 'rgba(255,255,255,0.76)', lineHeight: 1.5 }}>
+                    אל תשלמו שוב. אם ההזמנה לא מופיעה, פנו לקופה.
+                </div>
+            </div>
+        </div>
+    );
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function HomeV2() {
     const router = useRouter();
     const { user } = useUser();
     const reducedMotion = usePrefersReducedMotion();
     const shop = useShopStatus();
+    const paymentVerifying = useSyncExternalStore(
+        subscribeToLocation,
+        getPaymentVerifying,
+        getServerPaymentVerifying,
+    );
 
     // ── Screen state ──
     const [sizePicker, setSizePicker] = useState(false);
@@ -255,6 +299,7 @@ export default function HomeV2() {
                 gap: '10px', padding: '4px 16px 0',
                 animation: 'pageIn 0.7s cubic-bezier(0.34,1.15,0.64,1) 0.08s both',
             }}>
+                {paymentVerifying && <PaymentVerifyingNotice />}
                 {showClosed && <ClosedNotice headline="המטבח סגור כרגע" detail={closedDetail} />}
                 {user && lastOrder && <ReorderStrip order={lastOrder} onReorder={reorderLast} />}
                 <HeroSelector onChooseSalad={() => setSizePicker(true)} onNudge={(dir) => { nudgeRef.current = dir * 26; }} onActiveChange={setHeroIdx} />
