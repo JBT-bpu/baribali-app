@@ -538,7 +538,7 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
                 orderNum: num,
                 to: status === 'collected' ? 'ready' : (previous ?? 'preparing'),
                 from: status,
-                label: status === 'collected' ? 'סומנה כנמסרה' : 'סומנה כמוכנה — הלקוח קיבל הודעה',
+                label: status === 'collected' ? 'סומנה כנמסרה' : 'סומנה כמוכנה — סטטוס הלקוח עודכן',
                 order: currentOrder,
             });
             undoTimer.current = setTimeout(() => setUndo(u => (u?.id === id ? null : u)), 30000);

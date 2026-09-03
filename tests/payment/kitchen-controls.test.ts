@@ -16,6 +16,10 @@ const kitchenOrdersRoute = readFileSync(new URL(
     '../../src/app/api/kitchen/orders/route.ts',
     import.meta.url,
 ), 'utf8');
+const kitchenBoard = readFileSync(new URL(
+    '../../src/app/kitchen/KitchenBoard.tsx',
+    import.meta.url,
+), 'utf8');
 
 test('shop target clears an override when the live schedule can take over', () => {
     assert.equal(shopOverrideForTargetOpen({ scheduledOpen: true }, true), null);
@@ -121,4 +125,9 @@ test('zero-charge orders remain visible on both kitchen data paths', () => {
         2,
         'demo and Supabase filters must both admit the truthful no-charge state',
     );
+});
+
+test('the ready confirmation does not promise a notification channel that does not exist', () => {
+    assert.match(kitchenBoard, /סומנה כמוכנה — סטטוס הלקוח עודכן/);
+    assert.doesNotMatch(kitchenBoard, /הלקוח קיבל הודעה/);
 });
