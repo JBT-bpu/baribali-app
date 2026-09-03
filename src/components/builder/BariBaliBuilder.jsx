@@ -1,6 +1,7 @@
 'use client';
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
 
@@ -230,11 +231,14 @@ const PRESET_COLORS = {
   eastern_night:{ bg: "linear-gradient(145deg, rgba(120,190,80,0.22), rgba(8,26,6,0.9))",     border: "rgba(120,190,80,0.4)",   glow: "0 0 16px rgba(120,190,80,0.2), 0 4px 20px rgba(0,0,0,0.35)",   text: "#8ed060", dot: "rgba(120,190,80,0.68)" },
 };
 
+const SIZE_ML_BY_PARAM = { S: 750, M: 1000, L: 1500 };
+const SIZE_PARAM_BY_ML = { 750: "S", 1000: "M", 1500: "L" };
+const BUILDER_SIZE_PICKER_HISTORY_STATE = "builder-size-picker";
+
 function parseSizeParam(raw) {
   try {
     if (!raw) return null;
-    const MAP = { S: 750, M: 1000, L: 1500 };
-    const v = MAP[raw.toUpperCase()] ?? parseInt(raw);
+    const v = SIZE_ML_BY_PARAM[raw.toUpperCase()] ?? parseInt(raw);
     return SIZE_CONFIG[v] ? v : null;
   } catch(e) { return null; }
 }
@@ -299,6 +303,7 @@ function ClearConfirmModal({ open, onConfirm, onCancel }) {
 
 /** @param {{ sizeParam?: string | null, type?: string, entrance?: boolean, skipIntro?: boolean }} props */
 export default function BariBaliBuilder({ sizeParam = null, type = "salad", entrance = false, skipIntro = false }) {
+  const router = useRouter();
   const isTortilla = type === "tortilla";
   const reducedMotion = usePrefersReducedMotion();
   const steps = useMemo(() => isTortilla ? STEPS.filter(s => s.id !== "finish") : STEPS, [isTortilla]);
@@ -315,6 +320,9 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
     haptic("tap");
   }, [soundOn]);
   const [selectedSize, setSelectedSize] = useState(() => parseSizeParam(sizeParam));
+  const [changingSize, setChangingSize] = useState(false);
+  const changeSizeButtonRef = useRef(null);
+  const startEmptyButtonRef = useRef(null);
   const [sels, setSels] = useState({});
   const [lastAdd, setLastAdd] = useState(null);
   const [summary, setSummary] = useState(false);
@@ -342,6 +350,39 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
   const [notes, setNotes] = useState("");
   const [expandedPreset, setExpandedPreset] = useState(null);
   const [bowlAnim, setBowlAnim] = useState(null);
+
+  // App Router can reuse this component when browser Back/Forward changes only
+  // the query string. Keep the eager local value aligned with that committed
+  // URL so price, label and subsequent resets can never disagree with it.
+  useEffect(() => {
+    if (isTortilla) return;
+    const nextSize = parseSizeParam(sizeParam);
+    // Prop-to-state synchronization is intentional here: the URL is the durable
+    // source and can change outside this component through browser history.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSelectedSize(current => current === nextSize ? current : nextSize);
+  }, [isTortilla, sizeParam]);
+
+  // Change Size owns one same-page history entry. Hardware/browser Back closes
+  // it, while Forward can reopen it; a committed choice replaces that entry.
+  useEffect(() => {
+    const syncSizePicker = (event) => {
+      const open = event.state?.bbOverlay === BUILDER_SIZE_PICKER_HISTORY_STATE;
+      setChangingSize(open);
+      if (changingSize && !open) {
+        requestAnimationFrame(() => changeSizeButtonRef.current?.focus({ preventScroll: true }));
+      }
+    };
+    window.addEventListener("popstate", syncSizePicker);
+    // History state survives a reload but reload itself emits no popstate.
+    // Reconcile it on the next frame so a refreshed open picker stays open.
+    const frame = requestAnimationFrame(() => syncSizePicker({ state: window.history.state }));
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("popstate", syncSizePicker);
+    };
+  }, [changingSize]);
+
   useEffect(() => {
     const file = isTortilla ? "/mexican-burrito.json" : "/cat-salad-bowl.json";
     fetch(file).then(r => r.json()).then(setBowlAnim).catch(() => {});
@@ -591,7 +632,8 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
     setComboBadges([]);
     setShownBadges(new Set());
     setSummary(false);
-    setSelectedSize(sizeParam ? parseSizeParam(sizeParam) : null);
+    // Keep the currently committed size. It already lives in the URL; resetting
+    // the bowl must not resurrect the size that happened to mount this instance.
     setStep(isTortilla ? 0 : -1);
     localStorage.removeItem("baribali-draft");
     haptic("step");
@@ -641,20 +683,78 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
     sgRefs.current[idx]?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
+  const openSizePicker = () => {
+    if (!selectedSize) return;
+    if (window.history.state?.bbOverlay === BUILDER_SIZE_PICKER_HISTORY_STATE) {
+      // Defensive recovery for a marker restored before the reconciliation
+      // frame (for example an immediate click just after reload).
+      setChangingSize(true);
+      return;
+    }
+    const currentState = typeof window.history.state === "object" && window.history.state !== null
+      ? window.history.state
+      : {};
+    window.history.pushState(
+      { ...currentState, bbOverlay: BUILDER_SIZE_PICKER_HISTORY_STATE },
+      "",
+      window.location.href,
+    );
+    setChangingSize(true);
+  };
+
+  const cancelSizeChange = () => {
+    if (window.history.state?.bbOverlay === BUILDER_SIZE_PICKER_HISTORY_STATE) {
+      window.history.back();
+      return;
+    }
+    setChangingSize(false);
+    requestAnimationFrame(() => changeSizeButtonRef.current?.focus({ preventScroll: true }));
+  };
+
+  const commitSize = (rawSize) => {
+    const nextSize = parseSizeParam(rawSize);
+    if (!nextSize) return;
+    if (changingSize && nextSize === selectedSize) {
+      cancelSizeChange();
+      return;
+    }
+
+    const url = new URL(window.location.href);
+    url.searchParams.set("size", SIZE_PARAM_BY_ML[nextSize]);
+
+    // Remove only our modal marker and preserve Next's private history fields.
+    const currentState = typeof window.history.state === "object" && window.history.state !== null
+      ? window.history.state
+      : {};
+    if (currentState.bbOverlay === BUILDER_SIZE_PICKER_HISTORY_STATE) {
+      const nextState = { ...currentState };
+      delete nextState.bbOverlay;
+      window.history.replaceState(nextState, "", window.location.href);
+    }
+
+    setSelectedSize(nextSize);
+    setChangingSize(false);
+    haptic("step");
+    router.replace(`${url.pathname}${url.search}${url.hash}`, { scroll: false });
+    requestAnimationFrame(() => startEmptyButtonRef.current?.focus({ preventScroll: true }));
+  };
+
+  // A true missing/invalid-size deep link must choose before rendering the
+  // builder. Change mode uses the same picker without destroying the committed
+  // size, so cancel is lossless.
+  if (!isTortilla && (!selectedSize || changingSize)) {
+    return (
+      <SizePicker
+        initialSize={selectedSize ? SIZE_PARAM_BY_ML[selectedSize] : undefined}
+        onSelect={commitSize}
+        onBack={changingSize ? cancelSizeChange : () => router.replace("/home2")}
+      />
+    );
+  }
+
   // ─── Preset screen ───
   if (step === -1 && !summary) {
     const hasDraft = Object.keys(sels).length > 0 || notes;
-
-    // ── No size yet (deep link / bookmark straight to /build) — show the SAME
-    //    shared picker the landing uses, so "which size?" is asked one way only.
-    if (!selectedSize) {
-      return (
-        <SizePicker
-          onSelect={(s) => { setSelectedSize(parseSizeParam(s)); haptic("step"); }}
-          onBack={() => { window.location.href = "/home2"; }}
-        />
-      );
-    }
 
     const sc = SIZE_CONFIG[selectedSize];
     return (
@@ -678,13 +778,17 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
               </div>
             )}
 
-            {/* HERO - Start Empty Button (Glassy) */}
-            <button
-              onClick={() => { setStep(0); haptic("step"); playSound("step"); }}
-              style={{ ...S.heroBtn, ...rise(1) }}
-              aria-label="התחל סלט ריק"
-              tabIndex={0}
-            >
+            {/* HERO - Start Empty Button (Glassy). Change Size is deliberately
+                a sibling control, never an interactive element nested inside
+                this button. */}
+            <div style={{ width: "100%", ...rise(1) }}>
+              <button
+                ref={startEmptyButtonRef}
+                type="button"
+                onClick={() => { setStep(0); haptic("step"); playSound("step"); }}
+                style={S.heroBtn}
+                aria-label={`לחצו להתחיל לבנות סלט ${sc.label}`}
+              >
               {/* Top row: bowl + text */}
               <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "14px", padding: "10px 14px 10px" }}>
 
@@ -712,12 +816,6 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                     <div style={{ width: "1px", height: "12px", background: "rgba(200,168,78,0.3)" }} />
                     <span style={{ fontSize: "18px", fontWeight: 900, color: "#f0d060", lineHeight: 1 }}>₪{effectiveSizePrice(sc.ml)}</span>
                   </div>
-                  <span
-                    onClick={(e) => { e.stopPropagation(); setSelectedSize(null); }}
-                    role="button" tabIndex={0}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); setSelectedSize(null); }}}
-                    style={{ cursor: "pointer", fontSize: "10px", color: "rgba(255,255,255,0.3)", fontWeight: 600, alignSelf: "flex-end" }}
-                  >שנה גודל</span>
                 </div>
               </div>
 
@@ -733,7 +831,18 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                 <span style={{ fontSize: "14px", fontWeight: 900, color: "#0d2e0d", letterSpacing: "0.03em" }}>לחצו להתחיל לבנות</span>
                 <span style={{ fontSize: "17px", fontWeight: 900, color: "#0d2e0d" }}>←</span>
               </div>
-            </button>
+              </button>
+              <button
+                ref={changeSizeButtonRef}
+                type="button"
+                onClick={openSizePicker}
+                style={S.changeSizeBtn}
+                aria-label={`שינוי גודל. הגודל הנוכחי: ${sc.label}`}
+              >
+                <span aria-hidden="true">↺</span>
+                <span>שינוי גודל · {sc.label}</span>
+              </button>
+            </div>
 
             {/* Presets - Secondary */}
             <div style={{ width: "100%", ...rise(0) }}>
@@ -1374,6 +1483,14 @@ const S = {
     // silently clipping the gold "לחצו להתחיל לבנות" strip below its own
     // fold before the column ever got a chance to just scroll instead.
     flexShrink: 0,
+  },
+  changeSizeBtn: {
+    width: "fit-content", minHeight: "44px", marginTop: "8px", marginLeft: "auto",
+    display: "flex", alignItems: "center", justifyContent: "center", gap: "7px",
+    padding: "8px 14px", borderRadius: "11px", cursor: "pointer",
+    background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.22)",
+    color: "rgba(255,255,255,0.74)", fontSize: "12px", fontWeight: 800,
+    fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
   },
   presetCard: {
     display: "flex", flexDirection: "row", alignItems: "center",

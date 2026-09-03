@@ -34,6 +34,10 @@ const heroSelector = readFileSync(new URL(
     '../../src/components/home/HeroSelector.tsx',
     import.meta.url,
 ), 'utf8');
+const builder = readFileSync(new URL(
+    '../../src/components/builder/BariBaliBuilder.jsx',
+    import.meta.url,
+), 'utf8');
 
 test('customer order hand-off keeps its client-side source invariants', () => {
     const submitStart = summary.indexOf('const submitOrder = async');
@@ -237,4 +241,54 @@ test('the home hero roster is a keyboard-complete mobile choice', () => {
         'pagination shortcuts must expose the currently previewed hero');
     assert.match(heroSelector, /<BariButton type="button" variant="primary"/,
         'the explicit confirmation CTA must never become an accidental form submit');
+});
+
+test('builder size changes keep rendered, URL, history and reset state aligned', () => {
+    assert.match(builder, /const SIZE_PARAM_BY_ML = \{ 750: "S", 1000: "M", 1500: "L" \}/,
+        'new picker choices must serialize to one canonical URL form');
+    assert.match(builder, /const nextSize = parseSizeParam\(sizeParam\);[\s\S]*?setSelectedSize\(current => current === nextSize \? current : nextSize\)/,
+        'same-route Back and Forward must mirror their committed size into the builder');
+    assert.match(builder, /const url = new URL\(window\.location\.href\);[\s\S]*?url\.searchParams\.set\("size", SIZE_PARAM_BY_ML\[nextSize\]\)/,
+        'committing a size must preserve unrelated query and hash data');
+    assert.match(builder, /delete nextState\.bbOverlay;[\s\S]*?window\.history\.replaceState\(nextState, "", window\.location\.href\)/,
+        'commit must remove only its own overlay marker while retaining Next history state');
+    assert.match(builder, /router\.replace\(`\$\{url\.pathname\}\$\{url\.search\}\$\{url\.hash\}`, \{ scroll: false \}\)/,
+        'the App Router and visible URL must receive the committed choice without scrolling');
+
+    const openStart = builder.indexOf('const openSizePicker =');
+    const cancelStart = builder.indexOf('const cancelSizeChange =', openStart);
+    const commitStart = builder.indexOf('const commitSize =', cancelStart);
+    assert.ok(openStart >= 0 && cancelStart > openStart && commitStart > cancelStart);
+    const openBody = builder.slice(openStart, cancelStart);
+    assert.match(openBody, /window\.history\.pushState\([\s\S]*?bbOverlay: BUILDER_SIZE_PICKER_HISTORY_STATE/,
+        'Change Size must own one reversible same-page history entry');
+    assert.doesNotMatch(openBody, /setSelectedSize/,
+        'opening the picker must retain the committed size for lossless cancel');
+    assert.match(builder.slice(cancelStart, commitStart), /window\.history\.back\(\)/,
+        'visible cancel must consume only the owned modal entry');
+    assert.match(builder, /window\.addEventListener\("popstate", syncSizePicker\)[\s\S]*?window\.removeEventListener\("popstate", syncSizePicker\)/,
+        'hardware Back and Forward must close and reopen change mode');
+    assert.match(builder, /requestAnimationFrame\(\(\) => syncSizePicker\(\{ state: window\.history\.state \}\)\)/,
+        'reload must reconcile a currently open picker because reload emits no popstate');
+    assert.match(openBody, /bbOverlay === BUILDER_SIZE_PICKER_HISTORY_STATE\) \{[\s\S]*?setChangingSize\(true\);[\s\S]*?return;/,
+        'an already-owned marker must reopen defensively instead of making Change Size inert');
+    assert.match(builder, /!isTortilla && \(!selectedSize \|\| changingSize\)/);
+    assert.match(builder, /onBack=\{changingSize \? cancelSizeChange : \(\) => router\.replace\("\/home2"\)\}/,
+        'only a true missing-size entry may return home');
+    assert.doesNotMatch(builder, /setSelectedSize\(null\)/,
+        'Change Size must not destroy the current selection');
+    assert.match(builder, /<button[\s\S]*?ref=\{changeSizeButtonRef\}[\s\S]*?type="button"[\s\S]*?onClick=\{openSizePicker\}/,
+        'Change Size must be a separate native control');
+    assert.doesNotMatch(builder, /role="button"[\s\S]*?>שנה גודל<\/span>/,
+        'the old nested pseudo-button must not return');
+
+    const resetStart = builder.indexOf('const resetAll =');
+    const swipeStart = builder.indexOf('// ─── Swipe detection', resetStart);
+    assert.ok(resetStart >= 0 && swipeStart > resetStart);
+    const resetBody = builder.slice(resetStart, swipeStart);
+    assert.doesNotMatch(resetBody, /setSelectedSize|sizeParam/,
+        'New Order must retain the latest committed size instead of the mount-time size');
+    assert.match(sizePicker, /initialSize = 'M'[\s\S]*?card\.id === initialSize\.toUpperCase\(\)/,
+        'change mode must reopen the shared picker on the current size');
+    assert.match(builder, /initialSize=\{selectedSize \? SIZE_PARAM_BY_ML\[selectedSize\] : undefined\}/);
 });

@@ -42,9 +42,12 @@ const S_W = 210;
 const S_H = 272;
 const NS = SIZE_CARDS.length;
 
-export default function SizePicker({ onSelect, onBack, dive = false }: { onSelect: (s: string) => void; onBack: () => void; dive?: boolean }) {
+export default function SizePicker({ onSelect, onBack, dive = false, initialSize = 'M' }: { onSelect: (s: string) => void; onBack: () => void; dive?: boolean; initialSize?: string }) {
     const reducedMotion = usePrefersReducedMotion();
-    const [activeIdx, setActiveIdx] = useState(1); // default to M
+    const [activeIdx, setActiveIdx] = useState(() => {
+        const initialIndex = SIZE_CARDS.findIndex(card => card.id === initialSize.toUpperCase());
+        return initialIndex >= 0 ? initialIndex : 1;
+    }); // default to M for an absent or invalid value
     const [out, setOut] = useState(false);
     const [diving, setDiving] = useState(false);
     const [closing, setClosing] = useState(false);
@@ -77,7 +80,7 @@ export default function SizePicker({ onSelect, onBack, dive = false }: { onSelec
                 previousFocus.focus({ preventScroll: true });
             }
         };
-        // `activeIdx` deliberately stays at its initial M value here. Later
+        // `activeIdx` deliberately stays at its initial value here. Later
         // changes move focus only when the user uses the keyboard arrows.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
