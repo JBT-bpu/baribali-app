@@ -13,6 +13,8 @@
  * is connected (every route's demo branch is a self-contained early return).
  */
 
+import { PICKUP_SLOT_CAPACITY, type PickupAllocation } from './pickupCapacity';
+
 export type OrderStatus = 'waiting' | 'preparing' | 'ready' | 'collected';
 export type PaymentStatus =
     | 'pending'
@@ -52,19 +54,33 @@ const demoGlobal = globalThis as typeof globalThis & {
         fingerprint: string;
         orderId: string;
     }>;
+    __baribaliDemoPickupAllocations?: Map<string, PickupAllocation>;
+    __baribaliDemoOrderSequence?: number;
 };
 const store = demoGlobal.__baribaliDemoOrders ??= new Map<string, DemoOrder>();
 const submissionStore = demoGlobal.__baribaliDemoOrderSubmissions ??= new Map();
+const allocationStore = demoGlobal.__baribaliDemoPickupAllocations ??= new Map();
 
 export interface DemoOrderSubmission {
     fingerprint: string;
     order: DemoOrder;
 }
 
-export type CreateDemoOrderOnceResult = DemoOrderSubmission & {
-    conflict: boolean;
-    created: boolean;
-};
+export type CreateDemoOrderOnceResult =
+    | (DemoOrderSubmission & { result: 'created' | 'replayed' })
+    | { result: 'conflict' }
+    | { result: 'slot_full' };
+
+function nextDemoOrderNumber(): string {
+    const existingMaximum = demoGlobal.__baribaliDemoOrderSequence ?? Array.from(store.values())
+        .reduce((maximum, order) => {
+            const match = /^BB-(\d+)$/.exec(order.order_num);
+            return match ? Math.max(maximum, Number(match[1])) : maximum;
+        }, 999);
+    const next = existingMaximum + 1;
+    demoGlobal.__baribaliDemoOrderSequence = next;
+    return `BB-${next}`;
+}
 
 export function createDemoOrder(input: {
     items: DemoOrderItem[];
@@ -78,7 +94,7 @@ export function createDemoOrder(input: {
     const id = crypto.randomUUID();
     const order: DemoOrder = {
         id,
-        order_num: input.orderNum ?? `BB-${((Date.now() % 9000) + 1000)}`,
+        order_num: input.orderNum ?? nextDemoOrderNumber(),
         items: input.items,
         total: input.total,
         pickup_time: input.pickupTime ?? null,
@@ -116,14 +132,22 @@ export function getDemoOrderSubmission(submissionKey: string): DemoOrderSubmissi
 export function createDemoOrderOnce(input: Parameters<typeof createDemoOrder>[0] & {
     submissionKey: string;
     submissionFingerprint: string;
+    serviceDate: string;
 }): CreateDemoOrderOnceResult {
     const existing = getDemoOrderSubmission(input.submissionKey);
     if (existing) {
-        return {
-            ...existing,
-            conflict: existing.fingerprint !== input.submissionFingerprint,
-            created: false,
-        };
+        if (existing.fingerprint !== input.submissionFingerprint) {
+            return { result: 'conflict' };
+        }
+        return { ...existing, result: 'replayed' };
+    }
+
+    if (input.pickupTime) {
+        const booked = Array.from(allocationStore.values()).filter(allocation => (
+            allocation.serviceDate === input.serviceDate
+            && allocation.pickupTime === input.pickupTime
+        )).length;
+        if (booked >= PICKUP_SLOT_CAPACITY) return { result: 'slot_full' };
     }
 
     const order = createDemoOrder(input);
@@ -131,12 +155,13 @@ export function createDemoOrderOnce(input: Parameters<typeof createDemoOrder>[0]
         fingerprint: input.submissionFingerprint,
         orderId: order.id,
     });
-    return {
-        fingerprint: input.submissionFingerprint,
-        order,
-        conflict: false,
-        created: true,
-    };
+    if (input.pickupTime) {
+        allocationStore.set(order.id, {
+            serviceDate: input.serviceDate,
+            pickupTime: input.pickupTime,
+        });
+    }
+    return { fingerprint: input.submissionFingerprint, order, result: 'created' };
 }
 
 export function getDemoOrder(id: string): DemoOrder | undefined {
@@ -145,6 +170,10 @@ export function getDemoOrder(id: string): DemoOrder | undefined {
 
 export function listDemoOrders(): DemoOrder[] {
     return Array.from(store.values()).sort((a, b) => a.created_at.localeCompare(b.created_at));
+}
+
+export function listDemoPickupAllocations(): PickupAllocation[] {
+    return Array.from(allocationStore.values());
 }
 
 export function updateDemoOrderStatus(id: string, status: OrderStatus): DemoOrder | undefined {
@@ -157,6 +186,8 @@ export function updateDemoOrderStatus(id: string, status: OrderStatus): DemoOrde
 export function resetDemoStore(): void {
     store.clear();
     submissionStore.clear();
+    allocationStore.clear();
+    demoGlobal.__baribaliDemoOrderSequence = 999;
 }
 
 /** Clears rehearsal tickets without touching real-looking demo orders. */

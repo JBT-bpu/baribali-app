@@ -108,7 +108,7 @@ ok(pickupSlots(at(5, 12)).length === 0, 'Friday offers nothing');
 // This is the half that did not exist. Every case here was previously stored.
 head('5. checkPickup — the server gate');
 ok(checkPickup('12:00', at(1, 11)) === null, 'Monday, 12:00 pickup at 11:00: accepted');
-ok(checkPickup(null, at(1, 11)) === null, 'no pickup time at all: accepted (kitchen shows "ללא שעת איסוף")');
+ok(checkPickup(null, at(1, 11)) === null, 'the validator permits no pickup; POST owns the forced-open-only exception');
 ok(checkPickup('04:00', at(1, 3)) === 'closed_day' || checkPickup('04:00', at(1, 3)) === 'outside_hours',
     '3am order for 4am: REJECTED (this used to be stored)');
 ok(checkPickup('08:30', at(1, 8)) === 'outside_hours', 'before opening: rejected');
@@ -116,6 +116,9 @@ ok(checkPickup('16:30', at(1, 12)) === 'outside_hours', 'after closing: rejected
 ok(checkPickup('12:00', at(6, 11)) === 'closed_day', 'Saturday: rejected as a closed day');
 ok(checkPickup('12:00', at(5, 11)) === 'closed_day', 'Friday: rejected as a closed day');
 ok(checkPickup('nonsense', at(1, 12)) === 'malformed', 'malformed pickup time: rejected');
+ok(checkPickup('12:31', at(1, 12)) === 'malformed', 'off-grid pickup time: rejected');
+ok(checkPickup('9:15', at(1, 9)) === 'malformed', 'non-canonical pickup time: rejected');
+ok(checkPickup('15:55', at(1, 9)) === 'unavailable', 'a time beyond the visible 12-slot horizon: rejected');
 ok(checkPickup('11:00', at(1, 14)) === 'in_the_past', 'three hours in the past: rejected');
 
 // The grace window: someone who loaded the page at 15:50 and pays at 15:56 must
@@ -151,6 +154,7 @@ head('6. Every offered slot is an acceptable slot');
 for (const day of [0, 1, 2, 3, 4, 5]) {
     for (const hour of [7, 9, 10, 11, 12, 13, 14, 15, 16, 20]) {
         const now = at(day, hour, 20);
+        if (!shopStatus(now).open) continue;
         for (const slot of pickupSlots(now)) {
             const verdict = checkPickup(slot.id, now);
             ok(verdict === null, `${DAY_NAME[day]} ${toHHMM(hm(hour, 20))} -> slot ${slot.id} accepted${verdict ? ` (got ${verdict})` : ''}`);
@@ -222,6 +226,10 @@ head('7. The closed message says something true');
     const forcedMsg = noPickupMessage(forcedStatus, forced);
     ok(forcedMsg.includes('פתוח'), `forced open -> says open ("${forcedMsg}")`);
     ok(!forcedMsg.includes('נפתח מחר'), 'forced open -> does not tell them to come back tomorrow');
+
+    const earlyForced = at(1, 8, 30);
+    ok(pickupSlots(earlyForced)[0]?.id === '09:00', 'early override shows the first scheduled slot');
+    ok(checkPickup('09:00', earlyForced, 'open') === null, 'server accepts the early-override slot the UI showed');
 }
 
 // ── 8. The shop's clock, not the server's ───────────────────────────────────
@@ -286,11 +294,10 @@ head('8. Hours are Israel time wherever the code runs');
 // Owner's decision, 2026-08-11: orders are taken during trading hours only.
 //
 // Worth pinning rather than leaving implicit, because the code LOOKS like it
-// supports pre-orders — pickupSlots clamps its first slot to opening time,
-// which only does anything if someone can order before the shop opens. That
-// clamp is a boundary guard (so the 09:00 slot is not skipped by the lead time
-// at 08:59), and the rule it appears to contradict lives one file away in
-// POST /api/orders. Somebody will eventually read the clamp as permission.
+// supports pre-orders — pickupSlots clamps its first slot to opening time. The
+// regular schedule still blocks checkout before opening; only an explicit staff
+// override can expose that list early, and POST /api/orders receives the same
+// override when validating the selected slot.
 head('9. Orders are taken during trading hours only');
 {
     // Outside hours the shop is shut, whatever the slot list would compute.
@@ -316,10 +323,9 @@ head('9. Orders are taken during trading hours only');
     ok(!shopStatus(at(1, 8, 59)).open, 'Mon 08:59 -> still shut');
     ok(pickupSlots(at(1, 9))[0]?.id === '09:15', 'Mon 09:00 -> first pickup is 09:15 (the 15min lead)');
 
-    // The clamp's real and only job, stated as the invariant it actually is:
-    // pickupSlots is a pure function and must never name a time before opening,
-    // whoever calls it and whenever. Unreachable while the no-pre-order rule
-    // holds — kept so the function stays correct on its own terms.
+    // The clamp's invariant: pickupSlots must never name a time before opening.
+    // Regular callers hide the list outside trading hours; an explicit early
+    // staff override may expose the opening-time slot, but nothing earlier.
     for (const day of [0, 1, 2, 3, 4]) {
         const openMins = hoursFor(day).open!;
         for (const hour of [0, 3, 7, 8, 9, 12, 15, 20, 23]) {

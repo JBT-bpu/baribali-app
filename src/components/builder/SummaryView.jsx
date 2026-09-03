@@ -339,7 +339,9 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     const pickupCheckingMoreSlots = pickupAvailability.slots !== null
         && !pickupHasAvailableSlot
         && pickupAvailability.slots.some(slot => slot.capacityPending);
-    const pickupBlocked = shop.open && shop.reason !== 'override_open' && !effectivePickupTime;
+    const canCoordinatePickupAtCounter =
+        shop.reason === 'override_open' && pickupAvailability.localSlots === null;
+    const pickupBlocked = shop.open && !canCoordinatePickupAtCounter && !effectivePickupTime;
     const recoveryPending = hasPendingPayment || hasPendingSubmission;
     const requestLocked = submitting || recoveryPending;
     const checkoutLocked = requestLocked || Boolean(priceReconfirmation);
@@ -351,7 +353,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     const pickupFooterLabel = effectivePickupTime
         ?? (shopBlocked
             ? "סגור כרגע"
-            : shop.reason === 'override_open'
+            : canCoordinatePickupAtCounter
                 ? "בתיאום בדלפק"
                 : pickupBlockLabel);
     const focusPickupPicker = () => {
@@ -510,7 +512,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                 pickupAvailability.slots,
                 shop.open,
             );
-            if (shop.open && shop.reason !== 'override_open' && !pickupForSubmit) {
+            if (shop.open && !canCoordinatePickupAtCounter && !pickupForSubmit) {
                 failSubmit(
                     pickupTime
                         ? "זמן האיסוף השתנה. בחרו שעה פנויה ונסו שוב."
@@ -614,6 +616,32 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                     failSubmit(typeof data.error === 'string'
                         ? data.error
                         : `המחיר עודכן ל־₪${data.expectedTotal}. עברו על הסכום ולחצו שוב לאישור.`);
+                    return;
+                }
+
+                if (res.status === 409 && data?.code === 'PICKUP_SLOT_FULL') {
+                    // The database rejected this order before creating either
+                    // the order or its idempotency claim. Drop the stale choice
+                    // and fetch the authoritative allocation ledger now rather
+                    // than waiting for the next minute-long refresh.
+                    clearOrderSubmission(submission);
+                    orderSubmissionRef.current = null;
+                    setHasPendingSubmission(false);
+                    setPriceReconfirmation(null);
+                    pickupAvailability.markFull(pickupForSubmit);
+                    setPickupTime(null);
+                    setPickupSelectionNotice(
+                        typeof data.error === 'string'
+                            ? data.error
+                            : 'שעת האיסוף התמלאה ממש עכשיו. בחרו שעה אחרת.',
+                    );
+                    pickupAvailability.refresh();
+                    failSubmit(
+                        typeof data.error === 'string'
+                            ? data.error
+                            : 'שעת האיסוף התמלאה ממש עכשיו. בחרו שעה אחרת.',
+                    );
+                    window.requestAnimationFrame(focusPickupPicker);
                     return;
                 }
 
@@ -1298,11 +1326,24 @@ function usePickupAvailability(shop) {
         [shop.refreshedAt],
     );
     const [capacity, setCapacity] = useState({ slots: null, serviceDate: null, status: 'loading' });
+    const [refreshKey, setRefreshKey] = useState(0);
+    const refresh = useCallback(() => setRefreshKey(key => key + 1), []);
+    const markFull = useCallback((pickupTime) => {
+        if (!pickupTime) return;
+        setCapacity(current => ({
+            ...current,
+            slots: current.slots?.map(slot => (
+                slot.time === pickupTime
+                    ? { ...slot, full: true, available: 0 }
+                    : slot
+            )) ?? null,
+        }));
+    }, []);
 
     // Refresh capacity on the same clock as opening status. A failed periodic
     // refresh keeps the last successful snapshot: forgetting it would turn a
-    // known-full slot back into an available one, and capacity is not yet
-    // enforced atomically by POST /api/orders.
+    // known-full slot back into an available one. POST /api/orders is the final
+    // atomic authority; this snapshot keeps the picker useful before submit.
     useEffect(() => {
         if (shop.loading) return;
 
@@ -1338,7 +1379,7 @@ function usePickupAvailability(shop) {
             clearTimeout(requestTimeout);
             controller.abort();
         };
-    }, [shop.loading, shop.refreshedAt]);
+    }, [refreshKey, shop.loading, shop.refreshedAt]);
 
     // Never invent capacity for a slot absent from the retained server
     // snapshot. This happens briefly when the local five-minute window moves
@@ -1349,7 +1390,7 @@ function usePickupAvailability(shop) {
         [capacity.serviceDate, capacity.slots, localSlots, serviceDate],
     );
 
-    return { localSlots, slots, status: capacity.status };
+    return { localSlots, slots, status: capacity.status, refresh, markFull };
 }
 
 function PickupTimePicker({ value, onChange, disabled = false, shop, localSlots, slots, capacityStatus, selectionNotice, checkingMoreSlots, sectionRef }) {

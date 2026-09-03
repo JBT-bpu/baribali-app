@@ -365,8 +365,13 @@ test('checkout persists ambiguity and payment identity until tracking takes over
     assert.match(summarySource, /total: typeof data\.total === 'number'/,
         'the confirmation must prefer the server-recorded total');
     assert.match(summarySource, /if \(data\?\.paymentFailed\)[\s\S]*?clearOrderSubmission\(submission\)/);
-    assert.equal(summarySource.match(/clearOrderSubmission\(submission\)/g)?.length, 3,
-        'only definitive rejection, payment failure, and on-page confirmation clear the key');
+    assert.match(
+        summarySource,
+        /data\?\.code === 'PICKUP_SLOT_FULL'[\s\S]*?clearOrderSubmission\(submission\)/,
+        'a conclusive capacity rejection must release its unclaimed retry key',
+    );
+    assert.equal(summarySource.match(/clearOrderSubmission\(submission\)/g)?.length, 4,
+        'only capacity/definitive rejection, payment failure, and on-page confirmation clear the key');
     const markPending = summarySource.indexOf('markOrderSubmissionPaymentPending(', request);
     const launchPending = summarySource.indexOf('await launchPendingPayment(pendingPayment)', markPending);
     assert.ok(markPending > request && launchPending > markPending,

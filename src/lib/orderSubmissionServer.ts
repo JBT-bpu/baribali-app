@@ -92,7 +92,8 @@ export function parseOrderSubmissionIntent(
     if (rawPickup !== undefined && rawPickup !== null && typeof rawPickup !== 'string') {
         return { valid: false };
     }
-    const pickupTime = typeof rawPickup === 'string' ? rawPickup.trim() : null;
+    const normalizedPickup = typeof rawPickup === 'string' ? rawPickup.trim() : '';
+    const pickupTime = normalizedPickup || null;
     if ((pickupTime?.length ?? 0) > MAX_PICKUP_LENGTH) return { valid: false };
 
     const rawNotes = input.notes;

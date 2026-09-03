@@ -31,7 +31,7 @@ npm run fresh      # rimraf .next && next dev — use if the dev cache corrupts
 
 - **Supabase configuration has three explicit states:** configured, demo and misconfigured. Empty local/test environments use the process-global demo stores (`src/lib/demoStore.ts`, `src/lib/shopState.ts`); production fails closed unless an intentionally public demo deploy sets exactly `NEXT_PUBLIC_BARIBALI_DEMO_MODE=true`. Server routes separately require a secret/service-role key and never fall back to the browser key. This demo state is single-process development data, not durable serverless persistence.
 - **Lint baseline: 0 errors / 10 warnings.** Hold that line — don't add warnings; the 10 are pre-existing `react-hooks/set-state-in-effect` findings.
-- **Focused tests use Node's built-in test runner through pinned `tsx`.** The current 130-test suite covers payment, pricing/order validation and idempotency, configuration guardrails, kitchen controls and critical customer-flow/source-trust invariants; it is not app-wide, so manual smoke-testing remains required for affected UI flows.
+- **Focused tests use Node's built-in test runner through pinned `tsx`.** The current 139-test suite covers payment, pricing/order validation and idempotency, atomic pickup capacity, configuration guardrails, kitchen controls and critical customer-flow/source-trust invariants; it is not app-wide, so manual smoke-testing remains required for affected UI flows.
 
 ## 4. Where things live
 
@@ -55,13 +55,13 @@ src/
 ├─ data/salad-data.js       ingredient catalog, prices, combos, presets, SIZE_CONFIG, STEPS, TORTILLA_STEPS
 └─ lib/                     supabase, supabaseConfig, supabaseServerConfig, serverSupabase,
                             auth, pricing, hypPay, kitchenAuth,
-                            orderSubmission*, rateLimit, reorder, demoStore, motionHooks, utils
+                            orderSubmission*, pickupCapacity, rateLimit, reorder, demoStore, motionHooks, utils
 ```
 
 ## 5. Core flows
 
 - **Order:** `/` guest-or-Google door → `/home2` → in-page size picker → `/build?size=S|M|L&type=` (`BariBaliBuilder`) → `SummaryView` → `POST /api/orders` → Hyp Pay redirect (or order seal if pay-at-pickup) → `/order/[id]`.
-  **Price and the persisted `{ id, he, icon, price }` item snapshots are rebuilt server-side from the canonical catalog (`src/lib/pricing.ts` `computeOrderTotal`) — client-supplied item fields are never trusted.** The same boundary enforces unique IDs and the builder's ingredient/protein/sauce/finish limits. A 30-minute tab-scoped record preserves the exact request and, once created, its order/payment identity; together with the server-only `order_creation_requests` ledger, response-loss and hard-reload retries resume the original order instead of creating another. Never restore a direct-insert fallback.
+  **Price and the persisted `{ id, he, icon, price }` item snapshots are rebuilt server-side from the canonical catalog (`src/lib/pricing.ts` `computeOrderTotal`) — client-supplied item fields are never trusted.** The same boundary enforces unique IDs and the builder's ingredient/protein/sauce/finish limits. A 30-minute tab-scoped record preserves the exact request and, once created, its order/payment identity; together with the server-only `order_creation_requests` ledger, response-loss and hard-reload retries resume the original order instead of creating another. Database-owned order numbers and five immutable allocation positions per Israel date/time slot make numbering and capacity atomic. Never restore a direct-insert fallback.
 - **Auth:** guest-first. Supabase Google OAuth (`src/lib/auth.ts`); `user_id` on an order is set **only** from a server-verified access token, never client-claimed. Guests order identically with `user_id = null`.
 - **Reorder:** `/orders` history cards or the latest-order strip on `/home2` → "order again" / "change and order" (`src/lib/reorder.ts`).
 - **Kitchen:** `/kitchen` gated by a **server-only** `KITCHEN_PASSWORD` exchanged for an httpOnly, HMAC-signed session cookie (`src/lib/kitchenAuth.ts`).
@@ -81,7 +81,7 @@ src/
 - **`TORTILLA_STEPS` is imported but never used.** `BariBaliBuilder` renders the salad step set for tortillas too, so a "tortilla" today = salad ingredients on a wrap base price (₪42). Tortilla orders are distinguished **only by base price**, not by their item ids (this is why `src/lib/reorder.ts` detects type from the base).
 - **`/kitchen` auth is live in production** — `KITCHEN_PASSWORD` is set on Vercel (verified: the deployed `/kitchen` renders the login screen and `/api/kitchen/orders` returns 401 anonymously). Unset locally = board runs open, which is the intended dev behaviour.
 - **Hyp uses its dedicated APISign VERIFY return route.** The generic Tranzila/YaadPay webhook still has no signature verification and can only produce `paid_unverified`; it explicitly refuses Hyp payloads. Do not enable Hyp server notifications until the test-terminal payload contract is obtained and implemented.
-- **The durable order-creation and payment ledgers are not live yet.** They exist on `codex/payment-foundation`; none of the three forward migrations has been applied and the branch is not deployed. Apply/verify order idempotency before enabling real Supabase order creation, because the route deliberately fails closed when that ledger/RPC is missing.
+- **The durable order-creation, payment and pickup-allocation ledgers are not live yet.** They exist on `codex/payment-foundation`; none of the four forward migrations has been applied and the branch is not deployed. The connected Supabase project is pre-launch/test-only and currently holds 77 test orders. Apply/verify the full chain with filename-preserving Supabase CLI (not MCP `apply_migration`) before enabling real Supabase order creation, because the routes deliberately fail closed when their database contracts are missing.
 - **`/privacy` and `/terms` are drafts** with `[bracketed]` business-detail placeholders that must be filled before launch.
 - **Rate limiting** (`src/lib/rateLimit.ts`) is in-memory/per-process — a deterrent, approximate on serverless (no shared store).
 - **No CI** yet; focused payment tests run locally with `npm test`.

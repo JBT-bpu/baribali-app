@@ -22,7 +22,7 @@ BariBali is a mobile-first, Hebrew (RTL) salad and tortilla builder for a **real
 - **PWA**: manifest (`src/app/manifest.ts`) implemented — installable/"Add to Home Screen"
 - **Lint**: ESLint 9 flat config (`eslint.config.mjs`), script is `eslint .`
 
-There are 130 focused Node/`tsx` regression tests covering Hyp, settlement and migration invariants, pricing/order authority and idempotency, environment/configuration guardrails, hard-reload checkout recovery, generic-webhook rejection, kitchen controls/simulation and critical customer-flow/source-trust invariants. There is still no CI pipeline.
+There are 139 focused Node/`tsx` regression tests covering Hyp, settlement and migration invariants, pricing/order authority and idempotency, atomic pickup capacity, environment/configuration guardrails, hard-reload checkout recovery, generic-webhook rejection, kitchen controls/simulation and critical customer-flow/source-trust invariants. There is still no CI pipeline.
 
 ## 3. Directory structure (current)
 
@@ -86,7 +86,7 @@ src/
 ```sql
 create table orders (
   id             uuid primary key default gen_random_uuid(),
-  order_num      text not null,
+  order_num      text not null unique default ('BB-' || nextval('orders_order_num_seq')),
   items          jsonb not null,
   total          integer not null,        -- server-computed, never client-trusted
   pickup_time    text,
@@ -117,6 +117,17 @@ with the durable order ID and payment idempotency key. A hard reload therefore
 offers an explicit retry of the same request or payment and locks mutable
 checkout choices until that earlier attempt is resolved.
 
+`supabase/migrations/20260903200310_order_capacity_and_numbering.sql`
+makes order numbering database-owned and adds the server-only
+`order_pickup_allocations` ledger. Each Israel service date + canonical
+five-minute pickup time has five unique positions. `create_order_idempotent`
+claims one before inserting the order, so concurrent request six rolls back and
+returns `PICKUP_SLOT_FULL` without consuming an order number or idempotency key.
+Allocations are deliberately immutable across payment/kitchen status until Hyp
+provides safe hosted-page expiry/cancellation semantics. Normal service requires
+a slot the UI could have offered; only a staff-forced opening with no schedule
+slots may coordinate pickup at the counter. `SIM-…` rehearsal orders are exempt.
+
 `paid_unverified` is a legacy Tranzila/YaadPay generic-webhook state. Hyp browser returns use APISign VERIFY and approved results become `paid`. The kitchen renders `paid_unverified` in amber and requires an explicit register confirmation before handoff.
 
 `supabase/migrations/20260902184747_payment_foundation.sql` adds
@@ -141,14 +152,15 @@ The regular week — **five trading days, Sunday to Thursday, 9:00–16:00**
 with Saturday) — is **config in code**, `src/lib/shopHours.ts`, because it
 changes rarely. This table is the other half: "we are closed right now",
 toggled from the kitchen board via `/api/shop`, taking effect immediately
-without a deploy. Every read falls back to the schedule if the table is
-unreachable, so a broken read can never close a shop that is standing open.
+without a deploy. Production order and slot routes fail closed if this row
+cannot be read; they never guess that the kitchen is open during an outage.
 
-**No pre-ordering** (same decision): orders are taken during trading hours only.
-`pickupSlots` clamps its first slot to opening time, which looks like pre-order
-support but is unreachable while the rule holds — it is kept so the pure
-function never names a time before the shop opens. Section 9 of
-`scripts/verify-hours.ts` holds the rule against that misreading.
+**No customer pre-ordering** (same decision): the schedule accepts orders only
+during trading hours. `pickupSlots` still clamps its first slot to opening time
+so the pure function never names an earlier pickup. That path becomes reachable
+only when staff explicitly force the shop open early; the customer must still
+choose one of those displayed slots. Section 9 of `scripts/verify-hours.ts`
+holds the normal-schedule rule against accidental pre-ordering.
 
 **All times are Israel time, derived via `Intl` and never read off the process
 clock** (`shopParts`). Vercel's functions run in UTC — three hours behind Israel
@@ -197,7 +209,7 @@ brief's reassurance is what stopped anyone looking again.**
 **2026-08-08 to 09-03**:
 - RLS lockdown, server-enforced opening hours, Israel-time fixes, live shop override, customer closed-state and the five-day Sunday–Thursday week shipped to `main`.
 - The kitchen board became a queue-tab/active-ticket work surface with real login, audio readiness, rehearsal mode, explicit payment handoff, undo and network/race hardening.
-- `codex/payment-foundation` adds durable order-submission and Hyp attempt/event ledgers, idempotent order and checkout-page creation, immediate transaction-`Id` capture, strict settlement/replay checks and focused tests. It remains unpushed and its three forward migrations are unapplied.
+- `codex/payment-foundation` adds durable order-submission, pickup-allocation and Hyp attempt/event ledgers, database-owned order numbers, idempotent order and checkout-page creation, immediate transaction-`Id` capture, strict settlement/replay checks and focused tests. It remains unpushed and its four forward migrations are unapplied.
 - Local demo shop overrides now use process-global state, matching the demo order store, so the customer/kitchen `/api/shop` bundle and `/api/orders` enforce the same manual open/closed decision. It remains intentionally non-durable outside a single development process.
 
 **Non-obvious code fact (worth knowing before menu-restructure work):** `TORTILLA_STEPS` in `salad-data.js` is imported but **never used** — `BariBaliBuilder` renders the salad step set (`STEPS` minus "finish") for tortillas too. So a "tortilla" order today is salad ingredients on a tortilla base price (42); the only thing distinguishing it from a salad is that base price.
@@ -211,7 +223,7 @@ Git history is authoritative for exact detail — commit messages are descriptiv
 - Payment webhook can't blindly mark orders `paid` (`paid_unverified` + amount/state checks)
 - Hyp hosted-page SIGN plus server-to-server APISign VERIFY using server-held credentials, replacing the earlier placeholder
 - **Supabase RLS actually locked down (2026-08-08)** — all three public tables have RLS enabled with **no policies**; anon and authenticated get nothing. This replaces an earlier entry that called the configuration correct: `orders` had a permissive `INSERT TO public` policy, and since the anon key ships in the browser bundle, anyone could create orders directly against PostgREST with any total and `payment_status: 'paid'`, bypassing every control in `POST /api/orders`. Verified before and after with the anon key (22P02 → 42501).
-- **Opening hours are enforced server-side (2026-08-08)** — `pickup_time` previously went from the request body into the database unread, so an order could be placed at 3am for 4am and would be on the kitchen board when staff arrived. `POST /api/orders` now rejects orders placed while closed or for a time outside hours (409). 571 assertions in `scripts/verify-hours.ts`, most of them checking that every slot the picker offers is one the server accepts.
+- **Opening hours are enforced server-side (2026-08-08)** — `pickup_time` previously went from the request body into the database unread, so an order could be placed at 3am for 4am and would be on the kitchen board when staff arrived. `POST /api/orders` now rejects orders placed while closed, missing a required slot, using an off-grid/invented time, or selecting outside hours (409). The exhaustive `scripts/verify-hours.ts` harness checks that every slot visible during real or staff-forced opening is accepted by the server.
 - **`paid_unverified` is visually distinct on the kitchen board** — it is amber and the handoff action explicitly requires checking the register. Approved Hyp VERIFY returns use `paid`; `paid_unverified` remains a legacy generic-webhook state.
 - `user_id` on orders is server-verified from a Bearer token, never client-claimed
 - **`/kitchen` has real access control**: a server-only shared staff password (`KITCHEN_PASSWORD`) exchanged for an httpOnly, HMAC-signed session cookie. The server component gates the page before any board markup ships; the order API routes verify the same cookie. Replaces the old `NEXT_PUBLIC_` header "secret" that shipped in the browser bundle. Unset = board runs open (local/demo); **set on Vercel in production** — verified live: `/kitchen` serves the login screen and `/api/kitchen/orders` returns 401 to anonymous requests.
@@ -238,22 +250,24 @@ Git history is authoritative for exact detail — commit messages are descriptiv
 `main` is pushed, in sync and live at `d44fe06` as of 2026-09-03. The current `codex/payment-foundation` branch is local and unpushed. Production auto-deploys from `main` but is **still in demo mode** because the real Supabase/Hyp variables are not set on Vercel. Remaining:
 
 1. **Fill the `[bracketed]` placeholders in the legal pages** before launch (business/legal name, ח.פ., address, contact email/phone, VAT-inclusive?, payment provider name, cancellation/refund policy, allergen statement, jurisdiction city, effective date, min age and retention period).
-2. Add real Supabase/Hyp Pay env vars to **Vercel** before deploying this branch. Current `main` falls into demo mode without them; the branch intentionally fails closed instead. A public demo deploy now requires the exact opt-in `NEXT_PUBLIC_BARIBALI_DEMO_MODE=true`, which must not coexist with credentials.
-3. Production domain — not yet decided.
-4. Verify whether the emailed Hyp terminal credentials are test or production and map their exact fields before updating credential status.
-5. Menu/navigation follow-up — see `MENU_FLOW_BRIEF.md` / `MENU_RESTRUCTURE_REPLY.md`. The three-item nav, `/orders` split, reorder and dead-route cleanup are done; softening the repeated external-entry gate and unifying the builder remain open product decisions.
-6. **Enable leaked-password protection** in Supabase Auth (checks against HaveIBeenPwned). Flagged by the security advisor; one toggle in the dashboard. Low urgency while sign-in is Google-first.
-7. **Do not switch to digital-only** until the payment migration is applied and approved, declined, abandoned and replayed test-terminal flows pass. Approved Hyp VERIFY returns become `paid`; `paid_unverified` remains legacy-only. Pay-at-pickup stays working until that checkpoint is explicitly approved.
-8. **Consider a database-level guard on `payment_status`** after Hyp lands, so it cannot reach `paid` except through a verified path. The RLS fix closes the door from outside; this would mean a bug in one server route can't hand out free food either.
+2. Apply the five locally missing migration versions to the connected pre-launch/test Supabase project with a filename-preserving CLI dry run first. The project currently contains 77 test orders and no customer tags; the full chain has passed a rollback-only rehearsal without changing them. Do not use MCP `apply_migration` for these existing timestamped files and never use `db reset --linked`.
+3. Add real Supabase/Hyp Pay env vars to **Vercel** before deploying this branch. Current `main` falls into demo mode without them; the branch intentionally fails closed instead. A public demo deploy now requires the exact opt-in `NEXT_PUBLIC_BARIBALI_DEMO_MODE=true`, which must not coexist with credentials.
+4. Production domain — not yet decided.
+5. Verify whether the emailed Hyp terminal credentials are test or production and map their exact fields before updating credential status.
+6. Menu/navigation follow-up — see `MENU_FLOW_BRIEF.md` / `MENU_RESTRUCTURE_REPLY.md`. The three-item nav, `/orders` split, reorder and dead-route cleanup are done; softening the repeated external-entry gate and unifying the builder remain open product decisions.
+7. **Enable leaked-password protection** in Supabase Auth (checks against HaveIBeenPwned). Flagged by the security advisor; one toggle in the dashboard. Low urgency while sign-in is Google-first.
+8. **Do not switch to digital-only** until the payment migration is applied and approved, declined, abandoned and replayed test-terminal flows pass. Approved Hyp VERIFY returns become `paid`; `paid_unverified` remains legacy-only. Pay-at-pickup stays working until that checkpoint is explicitly approved.
+9. **Consider a database-level guard on `payment_status`** after Hyp lands, so it cannot reach `paid` except through a verified path. The RLS fix closes the door from outside; this would mean a bug in one server route can't hand out free food either.
 
 **Current unmerged work:** `codex/payment-foundation` contains the durable
-order-submission and payment foundations plus the order-validation, settlement,
-kitchen and production-configuration hardening passes. It is unpushed, unapplied to Supabase and
-undeployed. Git history is authoritative for the exact commit list.
+order-submission, payment and pickup-capacity foundations plus database-owned
+order numbering and the order-validation, settlement, kitchen and
+production-configuration hardening passes. It is unpushed, unapplied to
+Supabase and undeployed. Git history is authoritative for the exact commit list.
 
 ## 10. Improvement backlog (not started, no priority commitment)
 
-- **Testing/CI**: 130 focused regression tests, no CI. The largest gaps are component/browser automation, end-to-end provider flows and database-backed concurrency tests.
+- **Testing/CI**: 139 focused regression tests, no CI. The largest gaps are component/browser automation, end-to-end provider flows and a true multi-connection database concurrency test. A real 77-row Supabase transaction rehearsal already proved migration compatibility, five-slot allocation, replay, sixth-order rejection and complete rollback.
 - **Observability**: no error tracking, no structured logging on payment/webhook routes.
 - **Ops**: a local password-gated admin exists for prices/discounts/customers, but there is no production reporting dashboard. Schema/policy SQL and migrations are tracked; execution, advisor runs and backup/PITR verification remain manual.
 - **Code quality**: `zustand` installed but unused — a `BariBaliBuilder.jsx` state-lifting refactor is on the table whenever there's appetite.

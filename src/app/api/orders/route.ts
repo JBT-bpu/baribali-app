@@ -18,6 +18,8 @@ import {
     SHOP_STATE_UNAVAILABLE_ERROR_CODE,
     shopStatus,
     checkPickup,
+    shopDateKey,
+    pickupSlots,
 } from '@/lib/shopHours';
 import { readShopState } from '@/lib/shopState';
 import {
@@ -66,6 +68,22 @@ function customerDiscountUnavailable() {
         error: 'לא הצלחנו לאמת כרגע את הטבת החשבון. נסו שוב בעוד רגע.',
         code: 'CUSTOMER_DISCOUNT_UNAVAILABLE',
     }, { status: 503 });
+}
+
+function pickupSlotFull() {
+    return NextResponse.json({
+        error: 'שעת האיסוף התמלאה ממש עכשיו. בחרו שעה אחרת.',
+        code: 'PICKUP_SLOT_FULL',
+        pickupRejected: 'full',
+    }, { status: 409 });
+}
+
+function pickupTimeRequired() {
+    return NextResponse.json({
+        error: 'בחרו שעת איסוף מהרשימה.',
+        code: 'PICKUP_TIME_REQUIRED',
+        pickupRejected: 'required',
+    }, { status: 409 });
 }
 
 function recordedOrderResponse(
@@ -227,11 +245,21 @@ export async function POST(req: NextRequest) {
             }, { status: 409 });
         }
 
-        const badPickup = checkPickup(intent.pickupTime, now);
+        // Only an explicit staff override can create a real order without a
+        // scheduled slot. Otherwise null would bypass the allocation ledger.
+        const canCoordinatePickupAtCounter =
+            shop.reason === 'override_open' && pickupSlots(now).length === 0;
+        if (!intent.pickupTime && !canCoordinatePickupAtCounter) {
+            return pickupTimeRequired();
+        }
+
+        const badPickup = checkPickup(intent.pickupTime, now, storedShopState.override);
         if (badPickup) {
             return NextResponse.json({
                 error: badPickup === 'in_the_past'
                     ? 'שעת האיסוף שנבחרה כבר עברה. בחרו שעה חדשה.'
+                    : badPickup === 'unavailable' || badPickup === 'malformed'
+                        ? 'שעת האיסוף אינה זמינה. בחרו שעה מהרשימה.'
                     : `שעת האיסוף אינה בשעות הפעילות (${shop.opensAt}–${shop.closesAt}).`,
                 pickupRejected: badPickup,
             }, { status: 409 });
@@ -305,11 +333,13 @@ export async function POST(req: NextRequest) {
                 notes: intent.notes,
                 size: String(intent.size),
                 paymentStatus,
+                serviceDate: shopDateKey(now),
             });
-            if (result.conflict) return submissionConflict();
+            if (result.result === 'conflict') return submissionConflict();
+            if (result.result === 'slot_full') return pickupSlotFull();
             return recordedOrderResponse(result.order, {
                 demo: true,
-                replayed: !result.created,
+                replayed: result.result === 'replayed',
                 priceAdjusted: pricing.acceptance === 'missed-stronger-standing-discount',
             });
         }
@@ -324,12 +354,10 @@ export async function POST(req: NextRequest) {
             // Do not even inspect gateway configuration when there is no charge.
             paymentConfigured: finalTotal > 0 && isPaymentConfigured(),
         });
-        const orderNum = `BB-${((Date.now() % 9000) + 1000)}`;
         const { data, error } = await admin!.rpc('create_order_idempotent', {
             p_idempotency_key: submissionKey,
             p_intent_version: ORDER_INTENT_VERSION,
             p_intent_hash: submissionFingerprint,
-            p_order_num: orderNum,
             p_items: computed.items,
             p_total: finalTotal,
             p_pickup_time: intent.pickupTime,
@@ -345,6 +373,9 @@ export async function POST(req: NextRequest) {
         });
 
         if (error) {
+            if (error.code === 'P0001' && error.message === 'PICKUP_SLOT_FULL') {
+                return pickupSlotFull();
+            }
             // A transport error may happen after commit. Never fall back to a
             // plain insert; the same key must be retried until the ledger can
             // answer conclusively.

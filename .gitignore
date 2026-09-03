@@ -30,6 +30,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# Supabase CLI local cache
+/supabase/.temp/
+
 # personal/working files not meant for version control
 /Local TECH/
 pass.txt

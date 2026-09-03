@@ -5,12 +5,13 @@ import { STEPS } from '@/data/salad-data.js';
 import { effectiveItemPrice, effectiveSizePrice } from '@/lib/menuConfig';
 import { createDemoOrder, removeDemoSimulationOrders } from '@/lib/demoStore';
 import { loadSupabaseAdmin, supabaseConfigurationErrorResponse } from '@/lib/supabaseRoute';
+import { shopParts, toHHMM } from '@/lib/shopHours';
 
 /**
  * Test orders for rehearsing the kitchen board (the chime, a tab appearing, the
  * accept screen, the focus rule) without anyone actually ordering food.
  *
- * Every simulated order is numbered `SIM-####` instead of `BB-####`, so it is
+ * Every simulated order uses a long `SIM-<hex>` number instead of `BB-####`, so it is
  * unmistakable on the board and can be removed in one sweep — a test order that
  * looks exactly like a real one is worse than no test order at all.
  *
@@ -64,12 +65,12 @@ function buildOrder() {
     const total = items.reduce((s, i) => s + i.price, base);
 
     // Pickup a few minutes out, on the 5-minute grid the app offers.
-    const at = new Date(Date.now() + (5 + Math.floor(Math.random() * 6) * 5) * 60000);
-    at.setMinutes(Math.round(at.getMinutes() / 5) * 5, 0, 0);
-    const pickup = `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`;
+    const at = new Date(Date.now() + (5 + Math.floor(Math.random() * 6) * 5) * 60_000);
+    const israelMinutes = shopParts(at).mins;
+    const pickup = toHHMM(Math.ceil(israelMinutes / 5) * 5 % (24 * 60));
 
     return {
-        order_num: `SIM-${1000 + Math.floor(Math.random() * 9000)}`,
+        order_num: `SIM-${crypto.randomUUID().replaceAll('-', '').slice(0, 12).toUpperCase()}`,
         items,
         total,
         pickup_time: pickup,

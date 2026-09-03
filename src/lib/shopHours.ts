@@ -43,6 +43,16 @@ export const SHOP_TZ = 'Asia/Jerusalem';
 export const SHOP_STATE_UNAVAILABLE_ERROR_CODE = 'SHOP_STATE_UNAVAILABLE';
 
 const WEEKDAY_INDEX: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+const SHOP_PARTS_FORMATTER = new Intl.DateTimeFormat('en-US', {
+    timeZone: SHOP_TZ,
+    weekday: 'short',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+});
 
 /**
  * The weekday and minute-of-day it is *in the shop*, whatever clock the caller
@@ -56,18 +66,8 @@ export function shopParts(date: Date): {
     month: number;
     calendarDay: number;
 } {
-    const fmt = new Intl.DateTimeFormat('en-US', {
-        timeZone: SHOP_TZ,
-        weekday: 'short',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-    });
     const map: Record<string, string> = {};
-    for (const part of fmt.formatToParts(date)) map[part.type] = part.value;
+    for (const part of SHOP_PARTS_FORMATTER.formatToParts(date)) map[part.type] = part.value;
     return {
         day: WEEKDAY_INDEX[map.weekday] ?? 0,
         // Intl can report midnight as "24" rather than "00".
@@ -161,13 +161,11 @@ export function withinHours(day: number, mins: Minutes): boolean {
  * trading hours only: POST /api/orders gates on shopStatus, and the summary
  * screen replaces the slot grid with the closed message.
  *
- * Which makes the `Math.max(open, …)` clamp below unreachable in practice — it
- * binds only when now + lead is still before opening, i.e. before 08:45, by
- * which time nothing may be ordered anyway. It stays because this is a pure
- * function that should be correct on its own terms: it must never name a
- * pickup time before the shop opens, whoever calls it. Said plainly here
- * because the clamp otherwise reads as evidence that pre-ordering is supported,
- * and section 9 of the harness holds the rule against exactly that reading.
+ * During the regular schedule, callers do not expose this list before opening.
+ * An explicit early staff override may expose it, in which case the
+ * `Math.max(open, …)` clamp deliberately offers the opening-time slot and never
+ * an earlier one. That narrow override is not general pre-ordering; section 9
+ * of the harness pins both sides of that rule.
  */
 export function pickupSlots(now: Date): { id: string; label: string; isPeak: boolean }[] {
     const { day, mins: nowMins } = shopParts(now);
@@ -534,11 +532,10 @@ export function closedMessage(status: ShopStatus, now: Date): string {
  */
 export function noPickupMessage(status: ShopStatus, now: Date): string {
     if (!status.open) return closedMessage(status, now);
-    // Staff have forced the shop open outside its scheduled hours. The slot grid
-    // is built from WEEK and so has nothing to offer, but the order still goes
-    // through with no pickup time (checkPickup allows that; the kitchen shows
-    // "ללא שעת איסוף"). Saying "we open tomorrow" over a live order button would
-    // have the screen contradicting itself.
+    // Staff have forced the shop open and the WEEK-based slot grid has nothing
+    // to offer (for example on a closed day or after the final lead-time cutoff).
+    // The order can still go through with counter coordination. Saying "we open
+    // tomorrow" over a live order button would make the screen contradict itself.
     if (status.reason === 'override_open') return 'פתוח כרגע · שעת האיסוף תתואם בקופה';
     const when = reopenLine(now);
     return when ? `אין שעות איסוף פנויות · ${when}` : 'אין שעות איסוף פנויות כרגע';
@@ -547,29 +544,52 @@ export function noPickupMessage(status: ShopStatus, now: Date): string {
 /**
  * Whether an order for `pickup` may be accepted at `now`.
  *
- * The server's check. Deliberately a little more permissive than the slot list:
- * a customer who loaded the page at 15:50 and pays at 15:56 should not have
- * their order rejected because the slot list moved on. What it will not accept
- * is a pickup outside opening hours, on a closed day, or in the past.
+ * The server's check. It accepts the slots offered now plus slots that were
+ * genuinely offered during the stale-checkout grace window. It does not accept
+ * arbitrary future clock values: capacity is keyed by the exact slot, so
+ * allowing 12:31 beside the five-minute grid would create a separate bucket.
  */
 export const LATE_SUBMIT_GRACE = 10;
 
-export type PickupRejection = 'closed_day' | 'outside_hours' | 'in_the_past' | 'malformed';
+export type PickupRejection =
+    | 'closed_day'
+    | 'outside_hours'
+    | 'in_the_past'
+    | 'malformed'
+    | 'unavailable';
 
-export function checkPickup(pickup: string | null | undefined, now: Date): PickupRejection | null {
-    // No pickup time is allowed — some flows leave it unset and the kitchen
-    // shows "ללא שעת איסוף". This function is about times that ARE given.
+export function checkPickup(
+    pickup: string | null | undefined,
+    now: Date,
+    override: ShopOverride = null,
+): PickupRejection | null {
+    // The forced-open flow may deliberately omit a time. Its caller owns that
+    // exception; during ordinary hours POST /api/orders requires a selection.
     if (pickup === null || pickup === undefined || pickup === '') return null;
 
     const mins = parseHHMM(pickup);
     if (mins === null) return 'malformed';
 
+    const canonical = toHHMM(mins);
+    if (pickup.trim() !== canonical || mins % 5 !== 0) return 'malformed';
+
     const { day, mins: nowMins } = shopParts(now);
     const { open, close } = hoursFor(day);
     if (open === null || close === null) return 'closed_day';
     if (mins < open || mins > close) return 'outside_hours';
-
     if (mins < nowMins - LATE_SUBMIT_GRACE) return 'in_the_past';
+
+    // A slot disappears from the picker roughly one kitchen lead-time before
+    // its clock time. Preserve the old ten-minute submit grace by reconstructing
+    // every list the customer could actually have seen during lead + grace.
+    const accepted = new Set<string>();
+    for (let minutesAgo = 0; minutesAgo <= LEAD_PEAK + LATE_SUBMIT_GRACE; minutesAgo += 1) {
+        const snapshot = new Date(now.getTime() - minutesAgo * 60_000);
+        if (!shopStatus(snapshot, override).open) continue;
+        for (const slot of pickupSlots(snapshot)) accepted.add(slot.id);
+    }
+
+    if (!accepted.has(canonical)) return 'unavailable';
 
     return null;
 }

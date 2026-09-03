@@ -152,4 +152,15 @@ test('server fingerprint tracks semantic intent, not forged metadata or client p
         orderSubmissionFingerprint(first.intent),
         orderSubmissionFingerprint(changedNotes),
     );
+
+    const blankPickup = parseOrderSubmissionIntent({
+        items: [{ id: 'lettuce' }],
+        total: 54,
+        pickupTime: '   ',
+        notes: null,
+        size: 54,
+        productType: 'salad',
+    }, false);
+    assert.equal(blankPickup.valid, true);
+    if (blankPickup.valid) assert.equal(blankPickup.intent.pickupTime, null);
 });

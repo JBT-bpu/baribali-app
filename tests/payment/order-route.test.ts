@@ -5,6 +5,7 @@ import { NextRequest } from 'next/server';
 
 import { STEPS } from '../../src/data/salad-data.js';
 import { effectiveItemPrice, effectiveSizePrice } from '../../src/lib/menuConfig';
+import { pickupSlots } from '../../src/lib/shopHours';
 import { isolateSupabaseTestEnvironment } from './testEnvironment';
 
 interface TestItem { id: string; he: string; icon: string; price: number }
@@ -17,6 +18,7 @@ assert.ok(lettuce);
 
 const base = effectiveSizePrice(750);
 const total = base + effectiveItemPrice(lettuce.id, lettuce.price);
+const defaultPickupTime = pickupSlots(new Date())[0]?.id ?? null;
 
 function orderBody(submissionKey: string, overrides: Record<string, unknown> = {}) {
     return {
@@ -29,7 +31,7 @@ function orderBody(submissionKey: string, overrides: Record<string, unknown> = {
             extra: 'discard me',
         }],
         total,
-        pickupTime: null,
+        pickupTime: defaultPickupTime,
         notes: null,
         size: base,
         productType: 'salad',
@@ -210,6 +212,91 @@ test('orders route canonicalizes and idempotently records demo orders', async t 
             assert.equal(accepted.status, 200);
             assert.equal((await accepted.json()).replayed, false);
             assert.equal(demoStore.listDemoOrders().length, 1);
+        });
+
+        await t.test('regular service rejects missing and invented pickup slots', async testContext => {
+            demoStore.resetDemoStore();
+            await shopState.writeShopState(null, null);
+            testContext.mock.timers.enable({
+                apis: ['Date'],
+                now: new Date('2026-09-03T09:00:00Z'), // Thursday, 12:00 Israel
+            });
+
+            const missing = await POST(request(orderBody(
+                '77777777-7777-4777-8777-777777777777',
+                { pickupTime: null },
+            ), 'order-pickup-missing'));
+            assert.equal(missing.status, 409);
+            assert.equal((await missing.json()).code, 'PICKUP_TIME_REQUIRED');
+
+            const offGrid = await POST(request(orderBody(
+                '88888888-8888-4888-8888-888888888888',
+                { pickupTime: '12:31' },
+            ), 'order-pickup-off-grid'));
+            assert.equal(offGrid.status, 409);
+            assert.equal((await offGrid.json()).pickupRejected, 'malformed');
+
+            const beyondHorizon = await POST(request(orderBody(
+                '99999999-9999-4999-8999-999999999999',
+                { pickupTime: '15:55' },
+            ), 'order-pickup-horizon'));
+            assert.equal(beyondHorizon.status, 409);
+            assert.equal((await beyondHorizon.json()).pickupRejected, 'unavailable');
+
+            const accepted = await POST(request(orderBody(
+                'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+                { pickupTime: '12:25' },
+            ), 'order-pickup-valid'));
+            assert.equal(accepted.status, 200);
+            assert.equal(demoStore.listDemoPickupAllocations().length, 1);
+
+            demoStore.resetDemoStore();
+            const capacityKey = (index: number) =>
+                `d0000000-0000-4000-8000-${String(index).padStart(12, '0')}`;
+            for (let index = 1; index <= 5; index += 1) {
+                const admitted = await POST(request(orderBody(
+                    capacityKey(index),
+                    { pickupTime: '12:25' },
+                ), 'order-capacity-route'));
+                assert.equal(admitted.status, 200);
+            }
+
+            const full = await POST(request(orderBody(
+                capacityKey(6),
+                { pickupTime: '12:25' },
+            ), 'order-capacity-route'));
+            assert.equal(full.status, 409);
+            assert.equal((await full.json()).code, 'PICKUP_SLOT_FULL');
+            assert.equal(demoStore.listDemoOrders().length, 5);
+
+            const reusedRejectedKey = await POST(request(orderBody(
+                capacityKey(6),
+                { pickupTime: '12:30' },
+            ), 'order-capacity-route'));
+            assert.equal(reusedRejectedKey.status, 200);
+            assert.equal(demoStore.listDemoOrders().length, 6);
+        });
+
+        await t.test('a forced opening with no schedule slots may coordinate pickup at the counter', async testContext => {
+            demoStore.resetDemoStore();
+            await shopState.writeShopState('open', null);
+            testContext.mock.timers.enable({
+                apis: ['Date'],
+                now: new Date('2026-09-05T09:00:00Z'), // Saturday, 12:00 Israel
+            });
+
+            const response = await POST(request(orderBody(
+                'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+                { pickupTime: null },
+            ), 'order-pickup-counter'));
+            assert.equal(response.status, 200);
+
+            const blankResponse = await POST(request(orderBody(
+                'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+                { pickupTime: '   ' },
+            ), 'order-pickup-counter-blank'));
+            assert.equal(blankResponse.status, 200);
+            assert.equal(demoStore.listDemoPickupAllocations().length, 0);
         });
     } finally {
         demoStore.resetDemoStore();

@@ -1,8 +1,9 @@
 # BariBali payment foundation
 
-This branch adds durable, idempotent order creation and Hyp payment attempts.
-The payment, order-idempotency and final privilege-hardening migrations have
-not been applied to Supabase. The linked project already records the two
+This branch adds durable, idempotent order creation, atomic pickup capacity,
+database-owned order numbers and Hyp payment attempts. The four forward
+migrations have not been applied to Supabase. The linked pre-launch test
+project already records the two
 2026-08-08 historical migrations; its older application tables previously had
 no replayable baseline in Git. Apply the forward chain first in a test/staging
 project.
@@ -39,6 +40,20 @@ project.
   response, reload or concurrent retry returns the same kitchen order. The API
   deliberately returns 503 rather than falling back to a non-idempotent insert
   when this database contract is unavailable.
+- `orders_order_num_seq` is the single durable source of human `BB-…` numbers,
+  backed by a unique constraint. Application clocks and random numbers no
+  longer decide order identity.
+- `order_pickup_allocations` owns five immutable positions per Israel service
+  date and five-minute pickup slot. The RPC wins a position before inserting an
+  order, so concurrent customer requests cannot overbook. A full sixth request
+  rolls its idempotency claim back and returns `PICKUP_SLOT_FULL`. Positions are
+  not released by payment or kitchen status yet: Hyp pages can remain
+  chargeable, failed payments can be retried, and collected tickets can be
+  undone. Releasing safely needs a confirmed Hyp expiry/cancellation contract.
+- Normal scheduled service requires a canonical slot the checkout could have
+  offered. A missing pickup time is reserved for an explicit staff-open
+  override when the schedule has no slots, where pickup is coordinated at the
+  counter. `SIM-…` kitchen rehearsal orders never consume customer capacity.
 - The browser stores the exact unresolved order request in tab-scoped
   `sessionStorage` for 30 minutes. Once the order exists, that record carries
   its order ID and payment idempotency key instead. A hard reload never sends
@@ -56,25 +71,35 @@ The migrations are:
 - `supabase/migrations/20260902184747_payment_foundation.sql`
 - `supabase/migrations/20260903120000_order_submission_idempotency.sql`
 - `supabase/migrations/20260903130000_server_only_table_privileges.sql`
+- `supabase/migrations/20260903200310_order_capacity_and_numbering.sql`
 
 The baseline matches the live schema inspected on 2026-09-03 and aborts on an
 incompatible existing table instead of rewriting data. The final hardening
 migration explicitly removes base-table privileges from browser roles and adds
-the missing `orders.user_id` index.
+the missing `orders.user_id` index. The final capacity migration backfills every
+historical timed real order, refusing to continue if any old slot is already
+overbooked or off the five-minute grid.
 
 ## Before applying the migration
 
 1. Confirm the complete `public.orders` shape, including the nullable discount
    fields. The forward migrations contain guards and abort when required types differ.
 2. Take a database backup or confirm the project's recovery option.
-3. Apply first to a restored test/staging project, not directly to production.
+3. The connected project is the pre-launch test project. It currently contains
+   77 test orders and no customer tags; do not delete or reset them implicitly.
 4. Run Supabase database and security advisors after applying.
 5. Test the `anon` and `authenticated` roles: neither may read or write the
    payment tables or order-creation ledger, nor execute their RPCs. Only
    `service_role` is granted.
-6. The baseline version predates the linked project's recorded migrations, so
-   preview the first linked push with `supabase db push --include-all --dry-run`.
-   Never run `supabase db reset --linked` against this production project.
+6. The baseline version predates the linked project's recorded migrations. Use
+   pinned Supabase CLI `2.116.0` and preview with
+   `supabase db push --linked --include-all --dry-run`. It must list exactly the
+   missing baseline plus the four `202609…` forward migrations before the real
+   push. Never run `supabase db reset --linked`.
+7. Do not apply these timestamped files with MCP `apply_migration`: that API
+   creates different server versions and would split local/remote migration
+   history. Authenticate and link the CLI interactively; never put the access
+   token or database password in a command or repository file.
 
 Useful post-migration checks:
 
@@ -84,7 +109,8 @@ from pg_class
 where oid in (
   'public.payment_attempts'::regclass,
   'public.payment_events'::regclass,
-  'public.order_creation_requests'::regclass
+  'public.order_creation_requests'::regclass,
+  'public.order_pickup_allocations'::regclass
 );
 
 select grantee, table_name, privilege_type
@@ -93,7 +119,8 @@ where table_schema = 'public'
   and table_name in (
     'payment_attempts',
     'payment_events',
-    'order_creation_requests'
+    'order_creation_requests',
+    'order_pickup_allocations'
   )
 order by table_name, grantee, privilege_type;
 ```
@@ -152,9 +179,12 @@ npm test
 npm run build
 ```
 
-The focused suite covers SIGN/VERIFY parsing, credential-safe failures,
+The 139-test focused suite covers SIGN/VERIFY parsing, credential-safe failures,
 immediate transaction-ID capture, URL persistence, concurrent initialization,
 order/request replay across hard reloads, duplicate callbacks, unknown
-references, and verification-pending behavior.
-It does not replace a real test-terminal round trip or a blank/live-shaped
-database replay with the Supabase CLI and a Docker-compatible runtime.
+references, verification-pending behavior, server pickup validation and the
+five-position capacity rule. The complete forward chain was also rehearsed on
+the connected 77-row database inside one transaction: five same-slot orders,
+replay and sixth-order rejection all passed, then `ROLLBACK` restored all 77
+rows and removed every temporary object. This does not replace a true
+multi-connection concurrency run or a real Hyp test-terminal round trip.

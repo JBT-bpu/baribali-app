@@ -4,6 +4,7 @@ import test from 'node:test';
 
 import { handoffActionLabel, paymentLabel } from '../../src/app/kitchen/types';
 import {
+    checkPickup,
     mergePickupCapacity,
     PICKUP_SELECTION_INVALIDATED_MESSAGE,
     reconcilePickupChoice,
@@ -38,6 +39,34 @@ test('shop status retains the underlying schedule while a manual override is act
     assert.equal(afterHours.open, false);
     assert.equal(afterHours.scheduledOpen, false);
     assert.equal(shopOverrideForTargetOpen(afterHours, true), 'open');
+});
+
+test('server pickup validation accepts only canonical slots the checkout could have offered', () => {
+    const opening = new Date('2026-09-03T06:00:00Z'); // 09:00 Israel, Thursday
+    assert.equal(checkPickup('09:15', opening), null);
+    assert.equal(checkPickup('09:00', opening), 'unavailable');
+    assert.equal(checkPickup('15:55', opening), 'unavailable');
+    assert.equal(checkPickup('09:16', opening), 'malformed');
+    assert.equal(checkPickup('9:15', opening), 'malformed');
+
+    const earlyOverride = new Date('2026-09-03T05:30:00Z'); // 08:30 Israel
+    assert.equal(checkPickup('09:00', earlyOverride), 'unavailable');
+    assert.equal(
+        checkPickup('09:00', earlyOverride, 'open'),
+        null,
+        'an early staff opening preserves the slot shown by the forced-open checkout',
+    );
+
+    const noon = new Date('2026-09-03T09:00:00Z');
+    assert.equal(checkPickup('11:50', noon), null, 'a slot ten minutes past keeps the submit grace');
+    assert.equal(checkPickup('11:45', noon), 'in_the_past', 'the grace never exceeds ten minutes');
+
+    const justAfterPeak = new Date('2026-09-03T11:31:00Z'); // 14:31 Israel
+    assert.equal(
+        checkPickup('15:50', justAfterPeak),
+        null,
+        'a horizon slot offered immediately before the peak lead changed remains valid',
+    );
 });
 
 test('an explicit pickup selection never moves when a long-open checkout becomes stale', () => {

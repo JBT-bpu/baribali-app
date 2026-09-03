@@ -166,7 +166,7 @@ test('long-open customer screens refresh time-sensitive shop state safely', () =
 
     assert.match(summary, /generatePickupSlots\(shop\.refreshedAt \? new Date\(shop\.refreshedAt\) : undefined\)/);
     assert.match(summary, /fetch\('\/api\/slots', \{ cache: 'no-store', signal: controller\.signal \}\)/);
-    assert.match(summary, /controller\.abort\(\);[\s\S]*?\}, \[shop\.loading, shop\.refreshedAt\]\)/);
+    assert.match(summary, /controller\.abort\(\);[\s\S]*?\}, \[refreshKey, shop\.loading, shop\.refreshedAt\]\)/);
     assert.match(summary, /const effectivePickupTime = resolvePickupSelection\(pickupTime, pickupAvailability\.slots, shop\.open\)/,
         'expired or newly-full selections must be rejected before render and submit');
     assert.match(summary, /const \[pickupTime, setPickupTime\] = useState\(null\)/,
@@ -179,6 +179,13 @@ test('long-open customer screens refresh time-sensitive shop state safely', () =
         'the submitted value must be re-resolved against current availability');
     assert.match(summary, /pickupHasAvailableSlot[\s\S]*?בחרו שעת איסוף[\s\S]*?אין שעה פנויה/,
         'a missing choice and an all-full schedule need different CTA copy');
+    assert.match(
+        summary,
+        /const canCoordinatePickupAtCounter =[\s\S]*?shop\.reason === 'override_open' && pickupAvailability\.localSlots === null/,
+        'forced-open pickup may be coordinated at the counter only when the UI has no schedule slots',
+    );
+    assert.match(summary, /shop\.open && !canCoordinatePickupAtCounter && !pickupForSubmit/,
+        'an early override with visible slots must still require an explicit selection at click time');
     assert.match(summary, /setAcceptedOrder\(\{[\s\S]*?pickupTime: pickupForSubmit/,
         'the confirmation must show the same resolved slot the server received');
 

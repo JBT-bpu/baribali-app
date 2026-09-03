@@ -1,48 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseConfigurationState } from '@/lib/supabaseServerConfig';
-import { listDemoOrders } from '@/lib/demoStore';
+import { listDemoPickupAllocations } from '@/lib/demoStore';
+import { PICKUP_SLOT_CAPACITY } from '@/lib/pickupCapacity';
 import { enforceRateLimit } from '@/lib/rateLimit';
-import { pickupSlots, shopDateKey, SHOP_TZ } from '@/lib/shopHours';
+import { pickupSlots, shopDateKey } from '@/lib/shopHours';
 import { loadSupabaseAdmin, supabaseConfigurationErrorResponse } from '@/lib/supabaseRoute';
 
-const SLOT_CAPACITY = 5;      // max orders per slot
-const TIMEZONE = SHOP_TZ;
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' };
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
-
-const WEEKDAY_INDEX: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
-
-// Server runs in UTC on Vercel, but the shop's business hours are Israel-local —
-// derive weekday/hour/minute via Intl instead of the server's own clock, so
-// this stays correct (and DST-safe) regardless of deploy region.
-function getIsraelDateParts(date: Date): { weekday: number; hour: number; minute: number; year: number; month: number; day: number } {
-    const fmt = new Intl.DateTimeFormat('en-US', {
-        timeZone: TIMEZONE,
-        weekday: 'short',
-        year: 'numeric', month: '2-digit', day: '2-digit',
-        hour: '2-digit', minute: '2-digit', hour12: false,
-    });
-    const map: Record<string, string> = {};
-    for (const part of fmt.formatToParts(date)) map[part.type] = part.value;
-    return {
-        weekday: WEEKDAY_INDEX[map.weekday] ?? 0,
-        hour: Number(map.hour) % 24, // Intl can return "24" for midnight
-        minute: Number(map.minute),
-        year: Number(map.year),
-        month: Number(map.month),
-        day: Number(map.day),
-    };
-}
-
-// The UTC instant corresponding to 00:00:00 Israel-local time on the day `date` falls on.
-function getIsraelMidnightUTC(date: Date): Date {
-    const { year, month, day } = getIsraelDateParts(date);
-    const guessUTC = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
-    const { hour, minute } = getIsraelDateParts(guessUTC); // Israel clock reading at UTC midnight (offset)
-    return new Date(guessUTC.getTime() - (hour * 60 + minute) * 60000);
-}
 
 /**
  * This route used to carry its own opening hours — Saturday closed, Friday
@@ -86,20 +53,19 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ slots: [], closed: true, serviceDate }, { headers: NO_STORE_HEADERS });
     }
 
-    // Count existing orders per pickup_time slot for today (Israel-local "today").
-    const today = getIsraelMidnightUTC(now);
-
     let existing: { pickup_time: string | null }[] = [];
     if (configuration === 'demo') {
-        existing = listDemoOrders()
-            .filter(o => o.status !== 'collected' && o.created_at >= today.toISOString() && o.pickup_time && slotTimes.includes(o.pickup_time))
-            .map(o => ({ pickup_time: o.pickup_time }));
+        existing = listDemoPickupAllocations()
+            .filter(allocation => (
+                allocation.serviceDate === serviceDate
+                && slotTimes.includes(allocation.pickupTime)
+            ))
+            .map(allocation => ({ pickup_time: allocation.pickupTime }));
     } else {
         const { data, error } = await admin!
-            .from('orders')
+            .from('order_pickup_allocations')
             .select('pickup_time')
-            .gte('created_at', today.toISOString())
-            .neq('status', 'collected')
+            .eq('service_date', serviceDate)
             .in('pickup_time', slotTimes);
         if (error) {
             console.error('[GET /api/slots] Capacity query failed:', error.message);
@@ -122,8 +88,8 @@ export async function GET(req: NextRequest) {
         return {
             time,
             booked,
-            available: SLOT_CAPACITY - booked,
-            full: booked >= SLOT_CAPACITY,
+            available: Math.max(0, PICKUP_SLOT_CAPACITY - booked),
+            full: booked >= PICKUP_SLOT_CAPACITY,
             isPeak,
         };
     });
