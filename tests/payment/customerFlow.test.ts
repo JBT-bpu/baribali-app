@@ -30,6 +30,10 @@ const sizePicker = readFileSync(new URL(
     '../../src/components/home/SizePicker.tsx',
     import.meta.url,
 ), 'utf8');
+const heroSelector = readFileSync(new URL(
+    '../../src/components/home/HeroSelector.tsx',
+    import.meta.url,
+), 'utf8');
 
 test('customer order hand-off keeps its client-side source invariants', () => {
     const submitStart = summary.indexOf('const submitOrder = async');
@@ -196,4 +200,41 @@ test('the shared size picker is a keyboard-complete modal', () => {
         'the visible back control must consume the modal history entry');
     assert.match(home, /router\.replace\(target\)/,
         'selection must replace the temporary modal entry instead of leaving a duplicate home page behind');
+});
+
+test('the home hero roster is a keyboard-complete mobile choice', () => {
+    assert.match(heroSelector, /role="group"[\s\S]*?aria-labelledby="hero-selector-title"/,
+        'the visual roster must expose one labelled choice group');
+    assert.match(heroSelector, /<button[\s\S]*?aria-pressed=\{isActive\}[\s\S]*?tabIndex=\{isActive \? 0 : -1\}/,
+        'hero cards must be stateful buttons with one roving tab stop');
+    assert.match(heroSelector, /handleStageKeyDown[\s\S]*?event\.key === 'ArrowLeft'[\s\S]*?go\([^;]*?true\)/,
+        'physical arrow keys must request focus for the active RTL card');
+    assert.match(heroSelector, /if \(focusCard\) requestAnimationFrame\(\(\) => cardRefs\.current\[next\]\?\.focus/,
+        'roving focus requests must land on the newly active card');
+    assert.match(heroSelector, /e\.currentTarget\.contains\(document\.activeElement\)[\s\S]*?go\([^;]*?moveFocus\)/,
+        'a pointer swipe from a focused card must move focus with the roving tab stop');
+    assert.doesNotMatch(heroSelector, /<div\s+key=\{hero\.id\}[\s\S]*?onClick=/,
+        'hero choices must not regress to pointer-only divs');
+
+    const cardTapStart = heroSelector.indexOf('const handleCardTap');
+    const confirmStart = heroSelector.indexOf('const confirmChoice', cardTapStart);
+    assert.notEqual(cardTapStart, -1);
+    assert.ok(confirmStart > cardTapStart);
+    assert.doesNotMatch(heroSelector.slice(cardTapStart, confirmStart), /confirmChoice/,
+        'tapping the active hero must not bypass the explicit CTA');
+
+    assert.match(heroSelector, /src=\{hero\.img\} alt="" aria-hidden/,
+        'decorative card artwork must not duplicate each button name');
+    assert.match(heroSelector, /touchAction: 'pan-y pinch-zoom'/,
+        'the large swipe stage must preserve vertical scrolling and pinch zoom');
+    assert.match(heroSelector, /animation: reducedMotion \? 'none' : S\.wrap\.animation/,
+        'the roster entrance must respect reduced motion');
+    assert.match(heroSelector, /aria-hidden=\{hidden \|\| undefined\}/,
+        'reduced-motion side cards must not remain as invisible screen-reader controls');
+    assert.match(heroSelector, /pipHit: \{ width: '44px', height: '44px'/,
+        'every pagination shortcut must keep a full mobile touch target');
+    assert.match(heroSelector, /aria-pressed=\{i === activeIdx\}/,
+        'pagination shortcuts must expose the currently previewed hero');
+    assert.match(heroSelector, /<BariButton type="button" variant="primary"/,
+        'the explicit confirmation CTA must never become an accidental form submit');
 });

@@ -67,13 +67,16 @@ export default function HeroSelector({ onChooseSalad, onNudge, onActiveChange }:
 
     // `dir` (+1 / -1) lets the parent gust the background particles the way the
     // roster moves, so a swipe feels like it stirs the whole scene.
-    const go = (idx: number, dir = 0) => {
+    const cardRefs = useRef<Array<HTMLButtonElement | null>>([]);
+
+    const go = (idx: number, dir = 0, focusCard = false) => {
         const next = ((idx % N) + N) % N; // wrap so the roster always shows both flanks
         if (next === activeIdx) return;
         navigator.vibrate?.(8);
         if (dir) onNudge?.(dir);
         onActiveChange?.(next);
         setActiveIdx(next);
+        if (focusCard) requestAnimationFrame(() => cardRefs.current[next]?.focus({ preventScroll: true }));
     };
 
     // Swipe = discrete step decided on release. A lightweight pointermove only
@@ -88,20 +91,18 @@ export default function HeroSelector({ onChooseSalad, onNudge, onActiveChange }:
         startX.current = null;
         if (Math.abs(delta) < 36) return;
         const dir = delta > 0 ? 1 : -1;   // gust follows the finger
-        go(delta > 0 ? activeIdx - 1 : activeIdx + 1, dir); // RTL: drag right → previous
+        // If a mouse/pen swipe started from the focused card, keep focus aligned
+        // with the newly active roving-tab-stop instead of stranding it on the
+        // old card. Pure touch gestures do not acquire focus unnecessarily.
+        const moveFocus = e.currentTarget.contains(document.activeElement);
+        go(delta > 0 ? activeIdx - 1 : activeIdx + 1, dir, moveFocus); // RTL: drag right → previous
     };
 
-    const handleCardTap = (i: number) => {
-        if (moved.current) return;        // it was a swipe, not a tap
-        if (i !== activeIdx) { go(i, i > activeIdx ? 1 : -1); return; }
-        if (HEROES[i].locked) { denyFeedback(); return; }
-        confirmChoice();
-    };
-
-    // Tapping a locked hero — a soft buzz so it isn't a dead tap; the lock badge
-    // and "בקרוב" panel already say why. (No shake — it read as jittery.)
-    const denyFeedback = () => {
-        navigator.vibrate?.(28);
+    const handleCardTap = (i: number, event: React.MouseEvent) => {
+        // Pointer clicks follow pointerup after a swipe. Keyboard activation has
+        // detail=0, so it must remain available even after a dragged gesture.
+        if (moved.current && event.detail !== 0) return;
+        if (i !== activeIdx) go(i, i > activeIdx ? 1 : -1);
     };
 
     const confirmChoice = () => {
@@ -110,17 +111,35 @@ export default function HeroSelector({ onChooseSalad, onNudge, onActiveChange }:
         onChooseSalad();
     };
 
+    const handleStageKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+        event.preventDefault();
+        // The higher index is visually to the left in this RTL coverflow.
+        const delta = event.key === 'ArrowLeft' ? 1 : -1;
+        go(activeIdx + delta, event.key === 'ArrowLeft' ? -1 : 1, true);
+    };
+
     const active = HEROES[activeIdx];
 
     return (
-        <div style={S.wrap}>
+        <div style={{ ...S.wrap, animation: reducedMotion ? 'none' : S.wrap.animation }}>
             <style>{KF}</style>
 
-            <div style={S.promptTitle}>בחרו את המנה שלכם</div>
-            <div style={S.promptHint}>החליקו · או לחצו על מנה מהצד</div>
+            <h1 id="hero-selector-title" style={S.promptTitle}>בחרו את המנה שלכם</h1>
+            <p id="hero-selector-hint" style={S.promptHint}>החליקו · השתמשו בחצים · או לחצו על מנה מהצד</p>
 
             {/* Coverflow stage */}
-            <div style={S.stage} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={() => { startX.current = null; }}>
+            <div
+                role="group"
+                aria-labelledby="hero-selector-title"
+                aria-describedby="hero-selector-hint"
+                style={S.stage}
+                onKeyDown={handleStageKeyDown}
+                onPointerDown={onDown}
+                onPointerMove={onMove}
+                onPointerUp={onUp}
+                onPointerCancel={() => { startX.current = null; moved.current = false; }}
+            >
                 {/* Parallax backdrop — a far gold nebula that drifts as you browse the roster, for depth */}
                 <div
                     style={{
@@ -145,13 +164,21 @@ export default function HeroSelector({ onChooseSalad, onNudge, onActiveChange }:
                     const hidden = reducedMotion && !isActive;
 
                     return (
-                        <div
+                        <button
                             key={hero.id}
-                            onClick={() => handleCardTap(i)}
+                            ref={element => { cardRefs.current[i] = element; }}
+                            type="button"
+                            aria-pressed={isActive}
+                            aria-hidden={hidden || undefined}
+                            aria-label={`${hero.title}, ${hero.locked ? 'בקרוב' : 'זמין עכשיו'}${isActive ? ', נבחרה' : ''}`}
+                            tabIndex={isActive ? 0 : -1}
+                            onClick={event => handleCardTap(i, event)}
                             style={{
                                 position: 'absolute', top: '50%', left: '50%',
                                 width: `${C_W}px`, height: `${C_H}px`,
                                 marginLeft: `${-C_W / 2}px`, marginTop: `${-C_H / 2}px`,
+                                padding: 0, border: 0, appearance: 'none', color: 'inherit',
+                                font: 'inherit', background: 'transparent',
                                 transformOrigin: '50% 80%',
                                 transform: reducedMotion ? (isActive ? 'none' : 'scale(0.9)') : transform,
                                 opacity: hidden ? 0 : (isActive ? 1 : 0.52),
@@ -178,7 +205,7 @@ export default function HeroSelector({ onChooseSalad, onNudge, onActiveChange }:
                                 {/* Art */}
                                 {hero.img ? (
                                     <Image
-                                        src={hero.img} alt={hero.title} width={C_W} height={C_H}
+                                        src={hero.img} alt="" aria-hidden width={C_W} height={C_H}
                                         style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none', display: 'block', filter: hero.locked ? 'saturate(0.45) brightness(0.66)' : 'none' }}
                                     />
                                 ) : (
@@ -211,18 +238,25 @@ export default function HeroSelector({ onChooseSalad, onNudge, onActiveChange }:
                                     </>
                                 )}
                             </div>
-                        </div>
+                        </button>
                     );
                 })}
             </div>
 
             {/* Pips */}
-            <div style={S.pips}>
-                {/* The dot stays 8px, but it sits inside a padded button so the
-                    tap target is ~22x24 rather than 8x8. */}
+            <div role="group" aria-label="מעבר מהיר בין מנות" style={S.pips}>
+                {/* The dot stays small, but every shortcut keeps a full 44px
+                    touch target and exposes the currently previewed choice. */}
                 {HEROES.map((h, i) => (
-                    <button key={h.id} onClick={() => go(i, i > activeIdx ? 1 : -1)} aria-label={h.title} style={S.pipHit}>
-                        <span style={{ ...S.pip, ...(i === activeIdx ? S.pipOn : {}) }} />
+                    <button
+                        key={h.id}
+                        type="button"
+                        onClick={() => go(i, i > activeIdx ? 1 : -1)}
+                        aria-label={`הצג ${h.title}${h.locked ? ', בקרוב' : ''}`}
+                        aria-pressed={i === activeIdx}
+                        style={S.pipHit}
+                    >
+                        <span aria-hidden style={{ ...S.pip, ...(i === activeIdx ? S.pipOn : {}) }} />
                     </button>
                 ))}
             </div>
@@ -238,7 +272,7 @@ export default function HeroSelector({ onChooseSalad, onNudge, onActiveChange }:
                 {active.locked ? (
                     <div style={S.lockedCta}>בקרוב 🔒</div>
                 ) : (
-                    <BariButton variant="primary" fullWidth onClick={confirmChoice} style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }}>
+                    <BariButton type="button" variant="primary" fullWidth onClick={confirmChoice} style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }}>
                         בחרתי — בואו נבנה ←
                     </BariButton>
                 )}
@@ -249,9 +283,9 @@ export default function HeroSelector({ onChooseSalad, onNudge, onActiveChange }:
 
 const S: Record<string, React.CSSProperties> = {
     wrap: { position: 'relative', zIndex: 2, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', animation: 'heroIn 0.6s ease both' },
-    promptTitle: { fontFamily: "var(--font-display), 'Secular One', sans-serif", fontSize: '20px', color: '#fff', textShadow: '0 2px 10px rgba(0,0,0,0.7), 0 0 20px rgba(200,168,78,0.35)' },
-    promptHint: { fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.45)', letterSpacing: '0.03em', marginTop: '3px' },
-    stage: { position: 'relative', width: '100%', height: '304px', marginTop: '8px', perspective: '950px', touchAction: 'pan-y', overflow: 'visible', cursor: 'grab' },
+    promptTitle: { margin: 0, fontFamily: "var(--font-display), 'Secular One', sans-serif", fontSize: '20px', color: '#fff', textShadow: '0 2px 10px rgba(0,0,0,0.7), 0 0 20px rgba(200,168,78,0.35)' },
+    promptHint: { fontSize: '12px', fontWeight: 600, color: 'rgba(255,255,255,0.68)', letterSpacing: '0.03em', margin: '3px 0 0' },
+    stage: { position: 'relative', width: '100%', height: '304px', marginTop: '8px', perspective: '950px', touchAction: 'pan-y pinch-zoom', overflow: 'visible', cursor: 'grab' },
     backdrop: { position: 'absolute', top: '46%', left: '50%', width: '340px', height: '260px', pointerEvents: 'none', background: 'radial-gradient(ellipse 60% 55% at 50% 45%, rgba(240,200,50,0.16), rgba(120,90,20,0.05) 45%, transparent 72%)', filter: 'blur(10px)' },
     stageGlow: { position: 'absolute', left: '50%', bottom: '24px', width: '230px', height: '66px', transform: 'translateX(-50%)', borderRadius: '50%', background: 'radial-gradient(ellipse, rgba(240,200,50,0.3), transparent 70%)', filter: 'blur(12px)', pointerEvents: 'none' },
     sheenBox: { position: 'absolute', inset: 0, zIndex: 5, overflow: 'hidden', pointerEvents: 'none' },
@@ -267,10 +301,9 @@ const S: Record<string, React.CSSProperties> = {
     cardCopy: { position: 'absolute', insetInline: 0, bottom: 0, zIndex: 4, padding: '22px 14px 13px', textAlign: 'center', background: 'linear-gradient(180deg, transparent, rgba(3,10,3,0.6) 42%, rgba(3,10,3,0.92))' },
     cardTitle: { fontFamily: "var(--font-display), 'Secular One', sans-serif", fontSize: '18px', color: '#fff', textShadow: '0 2px 8px rgba(0,0,0,0.9)' },
     cardSub: { fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.62)', marginTop: '3px' },
-    // gap/margins absorbed into pipHit's padding so the row keeps its original
-    // footprint while each dot gains a usable target.
+    // The visual dot stays compact while the button meets the mobile hit target.
     pips: { display: 'flex', gap: 0, marginTop: 0, marginBottom: 0 },
-    pipHit: { display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px 7px', border: 0, background: 'transparent', cursor: 'pointer' },
+    pipHit: { width: '44px', height: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, border: 0, background: 'transparent', cursor: 'pointer' },
     pip: { display: 'block', width: '8px', height: '8px', borderRadius: 'var(--radius-full)', background: 'rgba(255,255,255,0.22)', transition: 'width 0.28s ease, background 0.28s ease' },
     pipOn: { width: '26px', background: 'linear-gradient(90deg, #c8a832, #f0d060)' },
     selection: { textAlign: 'center', width: '100%', maxWidth: '320px', padding: '0 12px 4px' },
