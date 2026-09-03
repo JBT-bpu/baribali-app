@@ -1,8 +1,9 @@
 # BariBali payment foundation
 
-This branch adds durable, idempotent Hyp payment attempts. The migration has
-not been applied to Supabase. Inspect the actual `public.orders` definition
-before applying it, first in a test/staging project.
+This branch adds durable, idempotent order creation and Hyp payment attempts.
+Neither migration has been applied to Supabase. Inspect the actual
+`public.orders` definition before applying them, first in a test/staging
+project.
 
 ## What changes
 
@@ -30,19 +31,27 @@ before applying it, first in a test/staging project.
   A legacy `paid_unverified` row has no trustworthy transaction provenance,
   so even a valid later VERIFY leaves it for manual review rather than hiding
   a possible second charge.
+- `order_creation_requests` is a server-only key/hash ledger. Its RPC claims a
+  browser submission key and inserts the order in one transaction, so a lost
+  response, reload or concurrent retry returns the same kitchen order. The API
+  deliberately returns 503 rather than falling back to a non-idempotent insert
+  when this database contract is unavailable.
 
-The migration is
-`supabase/migrations/20260902184747_payment_foundation.sql`.
+The migrations are:
+
+- `supabase/migrations/20260902184747_payment_foundation.sql`
+- `supabase/migrations/20260903120000_order_submission_idempotency.sql`
 
 ## Before applying the migration
 
-1. Confirm `public.orders.id` is `uuid`, `total` is a whole-shekel integer, and
-   `payment_status` is text. The migration aborts if these assumptions differ.
+1. Confirm the complete `public.orders` shape, including the nullable discount
+   fields. Both migrations contain guards and abort when required types differ.
 2. Take a database backup or confirm the project's recovery option.
 3. Apply first to a restored test/staging project, not directly to production.
 4. Run Supabase database and security advisors after applying.
-5. Test the `anon` and `authenticated` roles: neither may read or write the two
-   payment tables or execute the payment RPCs. Only `service_role` is granted.
+5. Test the `anon` and `authenticated` roles: neither may read or write the
+   payment tables or order-creation ledger, nor execute their RPCs. Only
+   `service_role` is granted.
 
 Useful post-migration checks:
 
@@ -51,13 +60,18 @@ select relname, relrowsecurity
 from pg_class
 where oid in (
   'public.payment_attempts'::regclass,
-  'public.payment_events'::regclass
+  'public.payment_events'::regclass,
+  'public.order_creation_requests'::regclass
 );
 
 select grantee, table_name, privilege_type
 from information_schema.role_table_grants
 where table_schema = 'public'
-  and table_name in ('payment_attempts', 'payment_events')
+  and table_name in (
+    'payment_attempts',
+    'payment_events',
+    'order_creation_requests'
+  )
 order by table_name, grantee, privilege_type;
 ```
 

@@ -137,6 +137,11 @@ import { PLAQUE } from "../ui/bari/plaqueGeometry";
 import { isSupabaseConfigured } from "../../lib/supabase";
 import { getAccessToken } from "../../lib/auth";
 import {
+    claimOrderSubmission,
+    clearOrderSubmission,
+    orderSubmissionIntent,
+} from "../../lib/orderSubmission";
+import {
     mergePickupCapacity,
     noPickupMessage,
     pickupSlots,
@@ -199,6 +204,11 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     // Once the order exists, retries must reopen payment for that same order.
     // Re-running POST /api/orders would create a second kitchen order.
     const pendingPaymentRef = useRef(null);
+    // Before the order exists, ambiguous network failures must retry the same
+    // server submission rather than create another kitchen ticket. The matching
+    // record is also kept in sessionStorage by lib/orderSubmission so a reload
+    // within the short retry window can recover the same key.
+    const orderSubmissionRef = useRef(null);
     // React state is not a synchronous mutex: two taps in one event-loop turn
     // can both observe `submitting === false`. This ref closes before any state
     // update or await, so only one request can enter the order-creation path.
@@ -432,6 +442,30 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
         const timeoutId = setTimeout(() => ctl.abort(), 20000);
 
         try {
+            // This is the exact business payload. Its canonical intent is derived
+            // before adding the transport-only submission key, so retries of the
+            // same order reuse one key while any changed choice gets a fresh one.
+            const orderBody = {
+                items: all.map(i => ({ id: i.id, he: i.he, icon: i.icon, price: effectiveItemPrice(i.id, i.price || 0) })),
+                total: finalTotal,
+                pickupTime: pickupForSubmit,
+                notes,
+                size: base,
+                productType,
+                // Only the customer's explicitly applied code belongs to the
+                // request intent. A standing account discount is server-owned
+                // mutable state and is resolved independently on every request.
+                ...(appliedDiscount?.code ? { discountCode: appliedDiscount.code } : {}),
+                ...(DEMO_MODE ? { paymentChoice: choice } : {}),
+            };
+            const orderIntent = orderSubmissionIntent(orderBody);
+            const submission = claimOrderSubmission(
+                orderIntent,
+                orderSubmissionRef.current,
+                { randomUUID: freshPaymentKey },
+            );
+            orderSubmissionRef.current = submission;
+
             // Signed-in customers get the order linked to their account (order
             // history on /orders); guests order exactly the same without it.
             const token = await getAccessToken().catch(() => null);
@@ -442,21 +476,16 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                     'Content-Type': 'application/json',
                     ...(token ? { Authorization: `Bearer ${token}` } : {}),
                 },
-                body: JSON.stringify({
-                    items: all.map(i => ({ id: i.id, he: i.he, icon: i.icon, price: effectiveItemPrice(i.id, i.price || 0) })),
-                    total: finalTotal,
-                    pickupTime: pickupForSubmit,
-                    notes,
-                    size: base,
-                    productType,
-                    discountCode: effectiveDiscount?.code,
-                    ...(DEMO_MODE ? { paymentChoice: choice } : {}),
-                }),
+                body: JSON.stringify({ ...orderBody, submissionKey: submission.submissionKey }),
             });
             clearTimeout(timeoutId);
             const data = await res.json().catch(() => null);
 
             if (!res.ok) {
+                if (data?.code === 'SUBMISSION_KEY_CONFLICT') {
+                    clearOrderSubmission(submission);
+                    orderSubmissionRef.current = null;
+                }
                 // A 409 is a deliberate, explainable refusal — the shop is
                 // closed, or the pickup time has passed — and the server writes
                 // that reason in Hebrew for the customer. It used to be
@@ -481,6 +510,8 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                 setSubmitting(false);
                 setFailedOrderNum(data.orderNum ?? null);
                 setPaymentFailed(true);
+                clearOrderSubmission(submission);
+                orderSubmissionRef.current = null;
                 return;
             }
             // No id/order number means nothing was actually recorded — never
@@ -489,6 +520,11 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                 failSubmit("לא הצלחנו לשלוח את ההזמנה. נסו שוב.");
                 return;
             }
+
+            // The server returned a durable order identity. Any later retry is a
+            // payment retry for that order, so the pre-order submission is done.
+            clearOrderSubmission(submission);
+            orderSubmissionRef.current = null;
 
             // Online payment only when a gateway is configured. Otherwise the
             // order is already pay-at-pickup (server set payAtPickup) — skip

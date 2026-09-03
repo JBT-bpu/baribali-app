@@ -42,8 +42,23 @@ export interface DemoOrder {
 // store on the process global so every route bundle sees the same demo loop.
 const demoGlobal = globalThis as typeof globalThis & {
     __baribaliDemoOrders?: Map<string, DemoOrder>;
+    __baribaliDemoOrderSubmissions?: Map<string, {
+        fingerprint: string;
+        orderId: string;
+    }>;
 };
 const store = demoGlobal.__baribaliDemoOrders ??= new Map<string, DemoOrder>();
+const submissionStore = demoGlobal.__baribaliDemoOrderSubmissions ??= new Map();
+
+export interface DemoOrderSubmission {
+    fingerprint: string;
+    order: DemoOrder;
+}
+
+export type CreateDemoOrderOnceResult = DemoOrderSubmission & {
+    conflict: boolean;
+    created: boolean;
+};
 
 export function createDemoOrder(input: {
     items: DemoOrderItem[];
@@ -71,6 +86,53 @@ export function createDemoOrder(input: {
     return order;
 }
 
+/**
+ * Returns the order already associated with a browser submission key. The
+ * fingerprint lives in a separate map so kitchen/status API responses never
+ * disclose the key or hash as part of the order record.
+ */
+export function getDemoOrderSubmission(submissionKey: string): DemoOrderSubmission | undefined {
+    const submission = submissionStore.get(submissionKey);
+    if (!submission) return undefined;
+    const order = store.get(submission.orderId);
+    if (!order) {
+        submissionStore.delete(submissionKey);
+        return undefined;
+    }
+    return { fingerprint: submission.fingerprint, order };
+}
+
+/**
+ * Single-process equivalent of the database's unique-key insert. JavaScript
+ * runs this function without an await boundary, so two concurrent demo
+ * requests cannot both pass the lookup and create separate tickets.
+ */
+export function createDemoOrderOnce(input: Parameters<typeof createDemoOrder>[0] & {
+    submissionKey: string;
+    submissionFingerprint: string;
+}): CreateDemoOrderOnceResult {
+    const existing = getDemoOrderSubmission(input.submissionKey);
+    if (existing) {
+        return {
+            ...existing,
+            conflict: existing.fingerprint !== input.submissionFingerprint,
+            created: false,
+        };
+    }
+
+    const order = createDemoOrder(input);
+    submissionStore.set(input.submissionKey, {
+        fingerprint: input.submissionFingerprint,
+        orderId: order.id,
+    });
+    return {
+        fingerprint: input.submissionFingerprint,
+        order,
+        conflict: false,
+        created: true,
+    };
+}
+
 export function getDemoOrder(id: string): DemoOrder | undefined {
     return store.get(id);
 }
@@ -88,6 +150,7 @@ export function updateDemoOrderStatus(id: string, status: OrderStatus): DemoOrde
 
 export function resetDemoStore(): void {
     store.clear();
+    submissionStore.clear();
 }
 
 /** Clears rehearsal tickets without touching real-looking demo orders. */
@@ -96,6 +159,9 @@ export function removeDemoSimulationOrders(): number {
     for (const [id, order] of store) {
         if (!order.order_num.startsWith('SIM-')) continue;
         store.delete(id);
+        for (const [key, submission] of submissionStore) {
+            if (submission.orderId === id) submissionStore.delete(key);
+        }
         removed += 1;
     }
     return removed;

@@ -22,7 +22,7 @@ BariBali is a mobile-first, Hebrew (RTL) salad and tortilla builder for a **real
 - **PWA**: manifest (`src/app/manifest.ts`) implemented — installable/"Add to Home Screen"
 - **Lint**: ESLint 9 flat config (`eslint.config.mjs`), script is `eslint .`
 
-There are 62 focused Node/`tsx` regression tests covering Hyp, settlement and migration invariants, pricing/order authority, generic-webhook rejection, kitchen controls/simulation and critical customer-flow/source-trust invariants. There is still no CI pipeline.
+There are 81 focused Node/`tsx` regression tests covering Hyp, settlement and migration invariants, pricing/order authority and idempotency, generic-webhook rejection, kitchen controls/simulation and critical customer-flow/source-trust invariants. There is still no CI pipeline.
 
 ## 3. Directory structure (current)
 
@@ -91,12 +91,24 @@ create table orders (
   size           text,
   status         text not null default 'waiting',       -- waiting | preparing | ready | collected
   payment_status text not null default 'pending',        -- pending | paid | paid_unverified | failed | pay_at_pickup
+  discount_code  text,
+  discount_amount integer,
   user_id        uuid references auth.users(id) on delete set null,  -- null for guest orders
   created_at     timestamptz default now()
 );
 ```
 
 `user_id` is nullable and set **server-side only**, from a cryptographically verified Bearer access token — never client-claimed. This is the concrete mechanism behind "guest-first": ordering never requires the column to be populated.
+
+`supabase/migrations/20260903120000_order_submission_idempotency.sql` adds a
+server-only `order_creation_requests` ledger and `create_order_idempotent` RPC.
+The browser reuses one high-entropy key for the same semantic order intent for
+30 minutes. The RPC claims that key and creates the order in one transaction;
+equal retries return the original order and a changed intent with the same key
+returns 409. The ledger is separate from `orders` so kitchen/customer
+`select('*')` reads never expose the key or fingerprint. The route fails closed
+with 503 if the migration/RPC is unavailable; there is no unsafe direct-insert
+fallback.
 
 `paid_unverified` is a legacy Tranzila/YaadPay generic-webhook state. Hyp browser returns use APISign VERIFY and approved results become `paid`. The kitchen renders `paid_unverified` in amber and requires an explicit register confirmation before handoff.
 
@@ -178,7 +190,7 @@ brief's reassurance is what stopped anyone looking again.**
 **2026-08-08 to 09-03**:
 - RLS lockdown, server-enforced opening hours, Israel-time fixes, live shop override, customer closed-state and the five-day Sunday–Thursday week shipped to `main`.
 - The kitchen board became a queue-tab/active-ticket work surface with real login, audio readiness, rehearsal mode, explicit payment handoff, undo and network/race hardening.
-- `codex/payment-foundation` adds durable Hyp attempts/events, idempotent checkout-page creation, immediate transaction-`Id` capture, strict settlement/replay checks and focused tests. It remains unpushed and its migration is unapplied.
+- `codex/payment-foundation` adds durable order-submission and Hyp attempt/event ledgers, idempotent order and checkout-page creation, immediate transaction-`Id` capture, strict settlement/replay checks and focused tests. It remains unpushed and both migrations are unapplied.
 
 **Non-obvious code fact (worth knowing before menu-restructure work):** `TORTILLA_STEPS` in `salad-data.js` is imported but **never used** — `BariBaliBuilder` renders the salad step set (`STEPS` minus "finish") for tortillas too. So a "tortilla" order today is salad ingredients on a tortilla base price (42); the only thing distinguishing it from a salad is that base price.
 
@@ -227,13 +239,13 @@ Git history is authoritative for exact detail — commit messages are descriptiv
 8. **Consider a database-level guard on `payment_status`** after Hyp lands, so it cannot reach `paid` except through a verified path. The RLS fix closes the door from outside; this would mean a bug in one server route can't hand out free food either.
 
 **Current unmerged work:** `codex/payment-foundation` contains the durable
-payment foundation plus the order-validation, settlement and kitchen hardening
-passes. It is unpushed, unapplied to Supabase and undeployed. Git history is
-authoritative for the exact commit list.
+order-submission and payment foundations plus the order-validation, settlement
+and kitchen hardening passes. It is unpushed, unapplied to Supabase and
+undeployed. Git history is authoritative for the exact commit list.
 
 ## 10. Improvement backlog (not started, no priority commitment)
 
-- **Testing/CI**: 62 focused regression tests, no CI. The largest gaps are component/browser automation, end-to-end provider flows and database-backed concurrency tests.
+- **Testing/CI**: 81 focused regression tests, no CI. The largest gaps are component/browser automation, end-to-end provider flows and database-backed concurrency tests.
 - **Observability**: no error tracking, no structured logging on payment/webhook routes.
 - **Ops**: a local password-gated admin exists for prices/discounts/customers, but there is no production reporting dashboard. Schema/policy SQL and migrations are tracked; execution, advisor runs and backup/PITR verification remain manual.
 - **Code quality**: `zustand` installed but unused — a `BariBaliBuilder.jsx` state-lifting refactor is on the table whenever there's appetite.

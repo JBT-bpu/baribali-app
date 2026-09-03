@@ -158,7 +158,8 @@ Safe to improve without a live database change:
 
 Requires database design/migration and live-schema inspection first:
 
-- Durable order-creation idempotency across abort/retry.
+- Apply and concurrency-test the branch's completed durable order-creation
+  idempotency migration before enabling real Supabase ordering.
 - Atomic pickup-slot capacity enforcement.
 - Collision-proof, database-issued customer order numbers.
 
