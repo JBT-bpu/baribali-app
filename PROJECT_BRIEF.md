@@ -22,7 +22,7 @@ BariBali is a mobile-first, Hebrew (RTL) salad and tortilla builder for a **real
 - **PWA**: manifest (`src/app/manifest.ts`) implemented — installable/"Add to Home Screen"
 - **Lint**: ESLint 9 flat config (`eslint.config.mjs`), script is `eslint .`
 
-There are 83 focused Node/`tsx` regression tests covering Hyp, settlement and migration invariants, pricing/order authority and idempotency, hard-reload checkout recovery, generic-webhook rejection, kitchen controls/simulation and critical customer-flow/source-trust invariants. There is still no CI pipeline.
+There are 84 focused Node/`tsx` regression tests covering Hyp, settlement and migration invariants, pricing/order authority and idempotency, hard-reload checkout recovery, generic-webhook rejection, kitchen controls/simulation and critical customer-flow/source-trust invariants. There is still no CI pipeline.
 
 ## 3. Directory structure (current)
 
@@ -195,6 +195,7 @@ brief's reassurance is what stopped anyone looking again.**
 - RLS lockdown, server-enforced opening hours, Israel-time fixes, live shop override, customer closed-state and the five-day Sunday–Thursday week shipped to `main`.
 - The kitchen board became a queue-tab/active-ticket work surface with real login, audio readiness, rehearsal mode, explicit payment handoff, undo and network/race hardening.
 - `codex/payment-foundation` adds durable order-submission and Hyp attempt/event ledgers, idempotent order and checkout-page creation, immediate transaction-`Id` capture, strict settlement/replay checks and focused tests. It remains unpushed and both migrations are unapplied.
+- Local demo shop overrides now use process-global state, matching the demo order store, so the customer/kitchen `/api/shop` bundle and `/api/orders` enforce the same manual open/closed decision. It remains intentionally non-durable outside a single development process.
 
 **Non-obvious code fact (worth knowing before menu-restructure work):** `TORTILLA_STEPS` in `salad-data.js` is imported but **never used** — `BariBaliBuilder` renders the salad step set (`STEPS` minus "finish") for tortillas too. So a "tortilla" order today is salad ingredients on a tortilla base price (42); the only thing distinguishing it from a salad is that base price.
 
@@ -249,7 +250,7 @@ undeployed. Git history is authoritative for the exact commit list.
 
 ## 10. Improvement backlog (not started, no priority commitment)
 
-- **Testing/CI**: 83 focused regression tests, no CI. The largest gaps are component/browser automation, end-to-end provider flows and database-backed concurrency tests.
+- **Testing/CI**: 84 focused regression tests, no CI. The largest gaps are component/browser automation, end-to-end provider flows and database-backed concurrency tests.
 - **Observability**: no error tracking, no structured logging on payment/webhook routes.
 - **Ops**: a local password-gated admin exists for prices/discounts/customers, but there is no production reporting dashboard. Schema/policy SQL and migrations are tracked; execution, advisor runs and backup/PITR verification remain manual.
 - **Code quality**: `zustand` installed but unused — a `BariBaliBuilder.jsx` state-lifting refactor is on the table whenever there's appetite.

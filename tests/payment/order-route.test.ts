@@ -172,6 +172,26 @@ test('orders route canonicalizes and idempotently records demo orders', async t 
             await shopState.writeShopState('open', null);
         });
 
+        await t.test('demo override is shared across separately evaluated route graphs', async () => {
+            const moduleUrl = new URL('../../src/lib/shopState.ts', import.meta.url).href;
+            const writer = await import(`${moduleUrl}?graph=writer`);
+            const reader = await import(`${moduleUrl}?graph=reader`);
+
+            await writer.writeShopState('closed', 'shared graph check');
+            assert.deepEqual(await reader.readShopState(), {
+                override: 'closed',
+                note: 'shared graph check',
+                available: true,
+            });
+
+            await reader.writeShopState('open', null);
+            assert.deepEqual(await writer.readShopState(), {
+                override: 'open',
+                note: null,
+                available: true,
+            });
+        });
+
         await t.test('a rejected attempt does not reserve its key', async () => {
             demoStore.resetDemoStore();
             const key = '66666666-6666-4666-8666-666666666666';

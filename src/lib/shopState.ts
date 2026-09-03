@@ -29,8 +29,23 @@ export interface StoredShopState {
 
 const NO_OVERRIDE: StoredShopState = { override: null, note: null, available: false };
 
-/** Demo mode has no database; the override lives for the life of the process. */
-let demoState: { override: ShopOverride; note: string | null } = { override: null, note: null };
+interface DemoShopState {
+    override: ShopOverride;
+    note: string | null;
+}
+
+// Next compiles route handlers into separate module graphs. A module-local
+// object therefore lets /api/shop report a successful override while
+// /api/orders keeps reading a different copy. Store the demo value on the
+// process global and resolve it on every access so every route bundle shares
+// the same object. This remains a local/demo convenience, not persistence.
+const demoGlobal = globalThis as typeof globalThis & {
+    __baribaliDemoShopState?: DemoShopState;
+};
+
+function demoState(): DemoShopState {
+    return demoGlobal.__baribaliDemoShopState ??= { override: null, note: null };
+}
 
 // Logged once rather than on every request — the board polls, and a missing
 // table would otherwise fill the function logs with the same line forever.
@@ -42,7 +57,7 @@ function warnOnce(message: string) {
 }
 
 export async function readShopState(): Promise<StoredShopState> {
-    if (!isSupabaseConfigured()) return { ...demoState, available: true };
+    if (!isSupabaseConfigured()) return { ...demoState(), available: true };
     try {
         const { data, error } = await supabaseAdmin
             .from(TABLE)
@@ -60,7 +75,10 @@ export async function readShopState(): Promise<StoredShopState> {
 }
 
 export async function writeShopState(override: ShopOverride, note: string | null): Promise<boolean> {
-    if (!isSupabaseConfigured()) { demoState = { override, note }; return true; }
+    if (!isSupabaseConfigured()) {
+        Object.assign(demoState(), { override, note });
+        return true;
+    }
     try {
         const { error } = await supabaseAdmin
             .from(TABLE)
