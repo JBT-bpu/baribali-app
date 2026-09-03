@@ -172,7 +172,7 @@ export default function OrderSealScreen({ order, onNewOrder }) {
                         <div style={S.growerInner}>
                             <div style={{ ...S.price, animation: `${RISE} 0.31s both, plaqueGoldShimmer 3s ease 1.2s infinite` }}>₪{order.total}</div>
                             <div style={{ ...S.meta, animation: `${RISE} 0.39s both` }}>
-                                {order.items} מרכיבים{order.pickupTime ? ` · איסוף: ${order.pickupTime}` : ' · מוכן בכ-8 דקות'}
+                                {order.items} בחירות{order.pickupTime ? ` · איסוף: ${order.pickupTime}` : ' · מוכן בכ-8 דקות'}
                             </div>
 
                             {/* Whether money is still owed is the one thing this

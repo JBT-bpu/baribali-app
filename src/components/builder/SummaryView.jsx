@@ -44,9 +44,9 @@ function Icon({ src, size = "1.2em", style = {} }) {
   row's lowest pixel clears the front-rim arc across its whole width — see
   ARC_* below, measured off the artwork.
 */
-// One piece of art holds both the nutrition plaque and the bowl, so every
+// One piece of art holds both the composition plaque and the bowl, so every
 // figure below is a fraction of THAT panel, measured off it directly:
-//   nutrition plaque interior   x 8.2-91.4%,  y 16-56%
+//   composition plaque interior x 8.2-91.4%,  y 16-56%
 //   bowl interior begins        y 56.4%
 //   front rim                   ~78% at the centre, ~70% at the far edges
 const PANEL_AR = 760 / 1035;  // width / height
@@ -123,7 +123,7 @@ function generatePickupSlots(now = new Date()) {
     const slots = pickupSlots(now);
     return slots.length ? slots : null;
 }
-import { STEPS, NUTRI, BASE } from "../../data/salad-data.js"; // NUTRI used in bowl calorie total
+import { STEPS, BASE } from "../../data/salad-data.js";
 import { effectiveItemPrice } from "../../lib/menuConfig";
 import { findDiscount, discountAmount } from "../../lib/discounts";
 const headerImage = "/builder-assets/header-brand.png";
@@ -506,7 +506,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                         <button style={S.backBtn} onClick={onBack}>←</button>
                         <div style={{ flex: 1, display: "flex", alignItems: "center", gap: "5px" }}>
                             <span style={{ fontSize: "17px" }}>📋</span>
-                            <span style={{ fontFamily: "var(--font-display), 'Secular One', sans-serif", fontSize: "17px", color: "#e8f5e9" }}>הסלט שלכם</span>
+                            <span style={{ fontFamily: "var(--font-display), 'Secular One', sans-serif", fontSize: "17px", color: "#e8f5e9" }}>ההזמנה שלכם</span>
                         </div>
                         <div style={S.pricePill}>
                             <span style={S.priceS}>₪</span>
@@ -519,11 +519,11 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                     {/* Layered bowl — hero */}
                     <div style={S.sumBowlWrap}>
                         <div style={S.sumBowlGlow} />
-                        {/* One piece of art: the nutrition plaque and the bowl are a
+                        {/* One piece of art: the composition plaque and the bowl are a
                             single frame, so both live inside it as positioned slots
                             rather than as two stacked panels with their own borders. */}
                         <div style={S.panel}>
-                            <div style={S.panelNut}><NutriStats all={all} /></div>
+                            <div style={S.panelNut}><CompositionStats all={all} /></div>
                             {bowlRows.map((items, t) => {
                                 if (!items.length) return null;
                                 const row = BOWL_ROWS[t];
@@ -560,7 +560,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                             })}
                         </div>
                         <div style={S.sumBowlMeta}>
-                            <span>{all.length} מרכיבים</span>
+                            <span>{all.length} בחירות</span>
                         </div>
                     </div>
 
@@ -705,7 +705,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                     {/* Price breakdown */}
                     <BariPanel style={{ marginTop: "14px", padding: "14px 16px" }}>
                         <div style={S.sumPriceLine}>
-                            <span>סלט בסיס{sizeLabel ? <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)", fontWeight: 500 }}> · {sizeLabel}</span> : null}</span>
+                            <span>מחיר בסיס{sizeLabel ? <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)", fontWeight: 500 }}> · {sizeLabel}</span> : null}</span>
                             <span style={{ fontWeight: 700 }}>₪{base}</span>
                         </div>
                         {extras.map(it => (
@@ -770,7 +770,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
 
                     <div style={S.trustCopy}>
                         <span style={{ opacity: 0.75 }}>🌿</span>
-                        <span>אנחנו משתמשים בחומרי גלם טריים בלבד</span>
+                        <span>מרכיבים כל הזמנה לפי הבחירות שלכם</span>
                     </div>
                     <div style={{ height: "110px" }} />
                 </div>
@@ -780,7 +780,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                     <div style={S.barMeta}>
                         <div style={S.metaPill}>
                             <span style={S.metaPillIcon}>🥗</span>
-                            <span style={S.metaPillText}>{all.length} מרכיבים</span>
+                            <span style={S.metaPillText}>{all.length} בחירות</span>
                         </div>
                         <div style={{ ...S.metaPill, ...S.metaPillGold }}>
                             <span style={S.metaPillIcon}>⏰</span>
@@ -831,76 +831,28 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     );
 }
 
-// ─── Nutritional stats ─────────────────────────────────────
-function NutriStats({ all }) {
-    const totals = all.reduce((acc, item) => {
-        const n = NUTRI[item.id];
-        if (!n) return acc;
-        acc.kcal += n.kcal || 0;
-        acc.p    += n.p    || 0;
-        acc.f    += n.f    || 0;
-        acc.c    += n.c    || 0;
-        acc.fb   += n.fb   || 0;
-        return acc;
-    }, { kcal: 0, p: 0, f: 0, c: 0, fb: 0 });
-
-    if (totals.kcal < 1) return null;
-
-    const stats = [
-        { key:"p",  label:"חלבון",  val: Math.round(totals.p),  color:"#c8a832", bg:"rgba(200,168,50,0.14)",  border:"rgba(200,168,50,0.35)",  badge: totals.p  >= 20 ? "💪" : null },
-        { key:"c",  label:"פחמ׳",   val: Math.round(totals.c),  color:"#3ab8b8", bg:"rgba(58,184,184,0.12)",  border:"rgba(58,184,184,0.28)",  badge: null },
-        { key:"f",  label:"שומן",   val: Math.round(totals.f),  color:"#6abf69", bg:"rgba(106,191,105,0.12)", border:"rgba(106,191,105,0.28)", badge: null },
-        { key:"fb", label:"סיבים",  val: Math.round(totals.fb), color:"#a080e0", bg:"rgba(160,128,224,0.1)",  border:"rgba(160,128,224,0.22)", badge: totals.fb >= 8  ? "⭐" : null },
-    ];
-
-    let msg = null;
-    if      (totals.p >= 25)                   msg = { text: "עשיר בחלבון! 💪",             color: "#c8a832" };
-    else if (totals.fb >= 10)                  msg = { text: "עשיר בסיבים תזונתיים! 🌿",    color: "#a080e0" };
-    else if (totals.p >= 15 && totals.fb >= 6) msg = { text: "ארוחה מאוזנת ✨",             color: "#6abf69" };
-
-    // The frame around this now belongs to the panel art; this just fills the
-    // slot the panel positions it into.
+// ─── Honest composition overview ───────────────────────────
+function CompositionStats({ all }) {
+    // Ingredient quantities are assembled by hand and differ by bowl size, so
+    // the old generic per-item nutrition table produced the same precise-looking
+    // macros for 750ml and 1500ml bowls. Until weighed recipes are validated,
+    // this panel reports only facts the builder actually knows.
     return (
-        <div style={{ width: "100%", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-            {/* Kcal total */}
-            <div style={{ textAlign: "center", marginBottom: "8px" }}>
-                <span style={{ fontSize: "22px", fontWeight: 900, color: "#ffffff", letterSpacing: "-0.5px" }}>
-                    ~{Math.round(totals.kcal)}
+        <div
+            aria-label={`${all.length} בחירות בהזמנה`}
+            style={{ width: "100%", display: "flex", flexDirection: "column", justifyContent: "center", textAlign: "center" }}
+        >
+            <div style={{ fontSize: "11px", fontWeight: 900, color: "rgba(240,208,96,0.72)", letterSpacing: "0.08em" }}>
+                ההרכב שלכם
+            </div>
+            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: "6px", marginTop: "3px" }}>
+                <span style={{ fontSize: "32px", fontWeight: 950, color: "#ffffff", lineHeight: 1, textShadow: "0 0 18px rgba(200,168,78,0.35)" }}>
+                    {all.length}
                 </span>
-                <span style={{ fontSize: "12px", fontWeight: 700, color: "rgba(255,255,255,0.38)", marginRight: "4px" }}> קק״ל</span>
+                <span style={{ fontSize: "13px", fontWeight: 800, color: "rgba(255,255,255,0.62)" }}>בחירות שביצעתם</span>
             </div>
-            {/* Macro pills */}
-            <div style={{ display: "flex", gap: "5px" }}>
-                {stats.map(s => (
-                    <div key={s.key} style={{
-                        // No border: these now sit inside the NutBox's gold
-                        // frame, and an outlined card inside an outlined frame
-                        // is the same border-inside-border density that made
-                        // the combo panel feel cramped. The tinted fill alone
-                        // still separates the four macros.
-                        flex: 1, background: s.bg,
-                        borderRadius: "9px", padding: "6px 2px 5px",
-                        display: "flex", flexDirection: "column",
-                        alignItems: "center", gap: "2px", position: "relative",
-                    }}>
-                        {s.badge && (
-                            <div style={{ position: "absolute", top: "-7px", left: "50%", transform: "translateX(-50%)", fontSize: "12px", lineHeight: 1 }}>
-                                {s.badge}
-                            </div>
-                        )}
-                        <span style={{ fontSize: "18px", fontWeight: 900, color: s.color, lineHeight: 1 }}>{s.val}</span>
-                        <span style={{ fontSize: "9px", fontWeight: 800, color: s.color, opacity: 0.7, letterSpacing: "0.05em" }}>g</span>
-                        <span style={{ fontSize: "10px", fontWeight: 700, color: "rgba(255,255,255,0.45)", lineHeight: 1.1 }}>{s.label}</span>
-                    </div>
-                ))}
-            </div>
-            {msg && (
-                <div style={{ textAlign: "center", marginTop: "7px", fontSize: "10px", fontWeight: 800, color: msg.color, opacity: 0.9, letterSpacing: "0.02em" }}>
-                    {msg.text}
-                </div>
-            )}
-            <div style={{ textAlign: "center", marginTop: "6px", fontSize: "10px", fontWeight: 500, color: "rgba(255,255,255,0.28)", letterSpacing: "0.03em" }}>
-                * הערכה בלבד · לא מהווה ייעוץ תזונתי
+            <div style={{ marginTop: "9px", fontSize: "9.5px", lineHeight: 1.4, fontWeight: 600, color: "rgba(255,255,255,0.38)" }}>
+                הערכים התזונתיים משתנים לפי גודל המנה, הכמויות וההכנה בפועל
             </div>
         </div>
     );
@@ -997,7 +949,7 @@ const S = {
       aspect ratio — hence 3% / 23% rather than 6% / 43%.
     */
     /*
-      The single framed plaque: nutrition above, bowl below, one gold border.
+      The single framed plaque: composition overview above, bowl below, one gold border.
       Replaces the two separately-framed panels, which meant two borders and two
       sets of corner filigree stacked down the screen.
 

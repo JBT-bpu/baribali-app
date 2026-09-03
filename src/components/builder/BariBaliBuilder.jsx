@@ -1021,6 +1021,8 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
   const bowlCap = isTortilla ? TORTILLA_MAX : BOWL_MAX;
   const capApplies = !!cur && countsTowardIngredientPickLimit(cur);
   const bowlFull = capApplies && ingredientPickCount >= bowlCap;
+  const currentSubtitle = capApplies ? `עד ${bowlCap} לבחירה` : cur.subtitle;
+  const currentIntro = capApplies ? `בחרו עד ${bowlCap} מרכיבי בסיס וירקות.` : cur.intro;
 
   return (
     <div style={S.root} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
@@ -1108,9 +1110,9 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
           >
             <span style={{ fontSize: "clamp(15px, 4.5vw, 22px)" }} aria-hidden="true">{cur.emoji}</span>
             <span style={{ fontFamily: "var(--font-display), 'Secular One', sans-serif", fontSize: "clamp(16px, 4.8vw, 23px)", color: "#ffffff", textShadow: "0 2px 6px rgba(0,0,0,0.6)" }}>{cur.title}</span>
-            {cur.subtitle && <>
+            {currentSubtitle && <>
               <span style={{ fontSize: "clamp(11px, 3vw, 14px)", color: "rgba(255,255,255,0.5)", fontWeight: 400 }} aria-hidden="true">·</span>
-              <span style={{ fontSize: "clamp(11px, 3vw, 14px)", fontWeight: 700, color: "rgba(255,255,255,0.72)" }}>{cur.subtitle}</span>
+              <span style={{ fontSize: "clamp(11px, 3vw, 14px)", fontWeight: 700, color: "rgba(255,255,255,0.72)" }}>{currentSubtitle}</span>
             </>}
           </h1>
 
@@ -1236,15 +1238,15 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
           )}
 
           {/* Empty state intro */}
-          {curSel.length === 0 && cur.intro && (
-            <div style={S.introCard}><span style={{ fontSize: "13px" }}>{cur.emoji}</span><span style={S.introText}>{cur.intro}</span></div>
+          {curSel.length === 0 && currentIntro && (
+            <div style={S.introCard}><span style={{ fontSize: "13px" }}>{cur.emoji}</span><span style={S.introText}>{currentIntro}</span></div>
           )}
 
           {/* Bowl at capacity — says why the chips below are unavailable */}
           {bowlFull && (
             <div style={S.capNotice} role="status">
               <span style={{ fontSize: "16px" }}>🥣</span>
-              <span>הקערה מלאה ({all.length}/{bowlCap}) — הסירו מרכיב כדי להוסיף אחר</span>
+              <span>הקערה מלאה ({ingredientPickCount}/{bowlCap}) — הסירו מרכיב כדי להוסיף אחר</span>
             </div>
           )}
 
@@ -1328,7 +1330,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
             {/* Left: counts */}
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <span style={{ fontSize: "17px", fontWeight: 900, color: "#ffffff", textShadow: "0 2px 4px rgba(0,0,0,0.5)" }}>{all.length}</span>
-              <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)", fontWeight: 600 }}>מרכיבים</span>
+              <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)", fontWeight: 600 }}>בחירות</span>
               <div style={{ width: "1px", height: "14px", background: "rgba(200,168,78,0.25)" }} />
               <span style={{ fontSize: "17px", fontWeight: 900, color: "#f0d060", textShadow: "0 2px 6px rgba(200,168,78,0.4)" }}>₪{displayTotal}</span>
             </div>

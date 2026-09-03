@@ -1,9 +1,8 @@
-import { NUTRI } from "../../../data/salad-data.js";
 import BariModal from "../../ui/bari/BariModal";
+import { effectiveItemPrice } from "../../../lib/menuConfig";
 
 const TAG_MAP = {
     protein:  { he: "חלבון",   icon: "💪", color: "#c8a832", bg: "rgba(200,168,78,0.15)"  },
-    vegan:    { he: "טבעוני",  icon: "🌱", color: "#4caf50", bg: "rgba(76,175,80,0.15)"   },
     grain:    { he: "דגנים",   icon: "🌾", color: "#a0877a", bg: "rgba(160,135,122,0.15)" },
     veggie:   { he: "ירק",     icon: "🥬", color: "#66bb6a", bg: "rgba(102,187,106,0.15)" },
     herb:     { he: "עשבים",   icon: "🌿", color: "#81c784", bg: "rgba(129,199,132,0.15)" },
@@ -12,16 +11,9 @@ const TAG_MAP = {
     spicy:    { he: "חריף",    icon: "🌶️", color: "#ef5350", bg: "rgba(239,83,80,0.15)"  },
 };
 
-const MACROS = [
-    { key: "p",  label: "חלבון",    color: "#c8a832" },
-    { key: "c",  label: "פחמימות",  color: "#4caf82" },
-    { key: "f",  label: "שומן",     color: "#64b5f6" },
-    { key: "fb", label: "סיבים",    color: "#a5d6a7" },
-];
-
 export default function DetailSheet({ item, isAdded, onToggle, onClose }) {
-    const n = NUTRI[item.id];
     const tags = (item.tags || []).map(t => TAG_MAP[t]).filter(Boolean);
+    const itemPrice = effectiveItemPrice(item.id, item.price || 0);
 
     return (
         <BariModal open onClose={onClose} variant="sheet">
@@ -32,49 +24,25 @@ export default function DetailSheet({ item, isAdded, onToggle, onClose }) {
                     {/* Icon */}
                     <div style={S.iconWrap}>
                         <div style={S.glowBg} />
-                        <div style={S.iconBox}>
+                        <div style={S.iconBox} aria-hidden="true">
                             {item.icon && item.icon.startsWith("/")
-                                ? <img src={item.icon} alt={item.he} style={{ width: "88px", height: "88px", objectFit: "contain", filter: "drop-shadow(0 8px 24px rgba(0,0,0,0.65)) drop-shadow(0 0 18px rgba(200,168,78,0.25))" }} />
+                                ? <img src={item.icon} alt="" style={{ width: "88px", height: "88px", objectFit: "contain", filter: "drop-shadow(0 8px 24px rgba(0,0,0,0.65)) drop-shadow(0 0 18px rgba(200,168,78,0.25))" }} />
                                 : <span style={{ fontSize: "88px", lineHeight: 1, filter: "drop-shadow(0 8px 24px rgba(0,0,0,0.65)) drop-shadow(0 0 18px rgba(200,168,78,0.25))" }}>{item.icon}</span>}
                         </div>
                     </div>
 
                     {/* Info column */}
                     <div style={S.infoCol}>
-                        {/* Name + kcal on same line */}
-                        <div style={S.nameKcalRow}>
+                        <div style={S.nameRow}>
                             <span style={S.itemName}>{item.he}</span>
-                            {n && n.kcal > 0 && (
-                                <>
-                                    <span style={S.kcalDivider} />
-                                    <span style={S.kcalBadge}>
-                                        <span style={S.kcalNum}>{n.kcal}</span>
-                                        <span style={S.kcalUnit}>קק״ל</span>
-                                    </span>
-                                </>
-                            )}
                         </div>
                         {item.desc && <div style={S.itemDesc}>{item.desc}</div>}
 
                         {/* Price */}
-                        {item.price > 0 && (
+                        {itemPrice > 0 && (
                             <div style={{ marginTop: "4px" }}>
-                                <span style={S.pricePill}>+₪{item.price}</span>
+                                <span style={S.pricePill}>+₪{itemPrice}</span>
                             </div>
-                        )}
-
-                        {/* Macros */}
-                        {n && n.kcal > 0 && (
-                            <>
-                                <div style={S.macroGrid}>
-                                    {MACROS.map(m => (
-                                        <div key={m.key} style={S.macroPill}>
-                                            <span style={{ ...S.macroVal, color: m.color }}>{n[m.key]}</span>
-                                            <span style={S.macroLabel}>{m.label}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </>
                         )}
                     </div>
                 </div>
@@ -90,22 +58,19 @@ export default function DetailSheet({ item, isAdded, onToggle, onClose }) {
                     </div>
                 )}
 
-                {/* Fun fact */}
-                {n?.fact && (
-                    <div style={S.factBox}>
-                        <div style={S.factTitle}>💡 הידעת?</div>
-                        <div style={S.factText}>{n.fact}</div>
-                    </div>
-                )}
+                <div style={S.nutritionNote}>
+                    <div style={S.nutritionNoteTitle}>מידע תזונתי</div>
+                    <div style={S.nutritionNoteText}>הערכים משתנים לפי גודל המנה, הכמויות וההכנה בפועל. לשאלות, פנו לצוות.</div>
+                </div>
 
                 {/* CTAs */}
                 <div style={S.ctaWrap}>
                     {onToggle && (
-                        <button onClick={onToggle} style={isAdded ? S.ctaRemove : S.ctaAdd}>
+                        <button type="button" onClick={onToggle} style={isAdded ? S.ctaRemove : S.ctaAdd}>
                             {isAdded ? "✕ הסר מהסלט" : "+ הוסף לסלט"}
                         </button>
                     )}
-                    <button onClick={onClose} style={S.closeBtn}>סגור</button>
+                    <button type="button" onClick={onClose} style={S.closeBtn}>סגור</button>
                 </div>
             </div>
             <style>{KF}</style>
@@ -140,22 +105,12 @@ const S = {
         flex: 1, minWidth: 0,
         display: "flex", flexDirection: "column", gap: "2px",
     },
-    nameKcalRow: {
+    nameRow: {
         display: "flex", alignItems: "center", gap: "8px",
     },
     itemName: {
         fontSize: "19px", fontWeight: 900, color: "#e8f5e9",
         textShadow: "0 1px 6px rgba(0,0,0,0.5)", lineHeight: 1.2,
-    },
-    kcalDivider: {
-        display: "inline-block",
-        width: "1px", height: "16px", borderRadius: "1px",
-        background: "rgba(255,255,255,0.15)",
-        flexShrink: 0,
-    },
-    kcalBadge: {
-        display: "inline-flex", alignItems: "baseline", gap: "2px",
-        flexShrink: 0,
     },
     itemDesc: {
         fontSize: "11px", color: "rgba(255,255,255,0.42)",
@@ -166,31 +121,6 @@ const S = {
         background: "rgba(200,168,78,0.15)",
         border: "1px solid rgba(200,168,78,0.35)",
         padding: "2px 8px", borderRadius: "20px",
-    },
-    kcalNum: {
-        fontSize: "20px", fontWeight: 900, color: "#f0d060",
-        textShadow: "0 0 12px rgba(200,168,78,0.45)", lineHeight: 1,
-    },
-    kcalUnit: {
-        fontSize: "11px", fontWeight: 700, color: "rgba(200,168,78,0.6)",
-    },
-    macroGrid: {
-        display: "grid", gridTemplateColumns: "1fr 1fr",
-        gap: "4px", marginTop: "6px",
-    },
-    macroPill: {
-        display: "flex", flexDirection: "column", alignItems: "center",
-        padding: "4px 6px", borderRadius: "8px",
-        background: "rgba(255,255,255,0.04)",
-        border: "1px solid rgba(255,255,255,0.07)",
-    },
-    macroVal: {
-        fontSize: "14px", fontWeight: 900, lineHeight: 1,
-    },
-    macroLabel: {
-        fontSize: "10px", fontWeight: 600,
-        color: "rgba(255,255,255,0.4)",
-        marginTop: "1px",
     },
 
     // ── Tags ──────────────────────────────────────────────────
@@ -204,18 +134,18 @@ const S = {
         display: "inline-flex", alignItems: "center", gap: "3px",
     },
 
-    // ── Fact ─────────────────────────────────────────────────
-    factBox: {
+    // ── Nutrition boundary ──────────────────────────────────
+    nutritionNote: {
         margin: "0 16px 12px", padding: "11px 14px", borderRadius: "14px",
         background: "linear-gradient(135deg, rgba(200,168,78,0.07), rgba(200,168,78,0.02))",
         border: "1px solid rgba(200,168,78,0.13)",
     },
-    factTitle: {
+    nutritionNoteTitle: {
         fontSize: "10px", fontWeight: 800,
         color: "rgba(200,168,78,0.6)",
         marginBottom: "4px", letterSpacing: "0.04em",
     },
-    factText: {
+    nutritionNoteText: {
         fontSize: "12px", color: "rgba(255,255,255,0.68)",
         lineHeight: 1.65, fontWeight: 500,
     },

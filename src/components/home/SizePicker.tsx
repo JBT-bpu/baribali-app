@@ -29,9 +29,9 @@ import { effectiveSizePrice } from '@/lib/menuConfig';
  */
 
 const SIZE_CARDS = [
-    { id: 'S', name: 'קטן', ml: 750,  img: '/homepage-assets/size-s.png', tag: 'לתיאבון קליל', servings: '1–2 מנות', price: effectiveSizePrice(750) },
-    { id: 'M', name: 'בינוני', ml: 1000, img: '/homepage-assets/size-m.png', tag: 'המאוזן המושלם', servings: '2–3 מנות', price: effectiveSizePrice(1000) },
-    { id: 'L', name: 'גדול', ml: 1500, img: '/homepage-assets/size-l.png', tag: 'לרעבים אמיתיים', servings: '3–4 מנות', price: effectiveSizePrice(1500) },
+    { id: 'S', name: 'קטן', ml: 750,  img: '/homepage-assets/size-s.png', tag: 'קומפקטי', price: effectiveSizePrice(750) },
+    { id: 'M', name: 'בינוני', ml: 1000, img: '/homepage-assets/size-m.png', tag: 'הקלאסי', price: effectiveSizePrice(1000) },
+    { id: 'L', name: 'גדול', ml: 1500, img: '/homepage-assets/size-l.png', tag: 'הכי גדול שלנו', price: effectiveSizePrice(1500) },
 ];
 
 // Relative visual heights for the size-comparison cups — not to scale with real
@@ -298,7 +298,7 @@ export default function SizePicker({ onSelect, onBack, dive = false, initialSize
                             ref={element => { cardRefs.current[i] = element; }}
                             type="button"
                             className="sizePickerCard"
-                            aria-label={`גודל ${card.name} (${card.id}), ${card.ml} מיליליטר, ${card.tag}, ${card.price} שקלים, ${card.servings}${isActive ? ', נבחר' : ''}`}
+                            aria-label={`גודל ${card.name} (${card.id}), ${card.ml} מיליליטר, ${card.tag}, ${card.price} שקלים${isActive ? ', נבחר' : ''}`}
                             aria-pressed={isActive}
                             tabIndex={isActive ? 0 : -1}
                             disabled={closing || out || diving}
@@ -358,7 +358,7 @@ export default function SizePicker({ onSelect, onBack, dive = false, initialSize
                                             ₪{card.price}
                                         </div>
                                         <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-gold-deep)' }}>
-                                            {card.ml} מ״ל · {card.servings}
+                                            {card.ml} מ״ל
                                         </div>
                                     </div>
                                 </div>

@@ -38,6 +38,14 @@ const builder = readFileSync(new URL(
     '../../src/components/builder/BariBaliBuilder.jsx',
     import.meta.url,
 ), 'utf8');
+const detailSheet = readFileSync(new URL(
+    '../../src/components/builder/ui/DetailSheet.jsx',
+    import.meta.url,
+), 'utf8');
+const menuData = readFileSync(new URL(
+    '../../src/data/salad-data.js',
+    import.meta.url,
+), 'utf8');
 const buildPage = readFileSync(new URL(
     '../../src/app/build/page.tsx',
     import.meta.url,
@@ -367,4 +375,49 @@ test('the pre-JavaScript builder fallback visibly and politely explains loading'
         'the animated settling veil must still disappear for reduced motion');
     assert.match(bowlDrop, /animation: reducedMotion \? 'none' : `bbVeilIn/,
         'the picker-side veil must still close instantly without animation for reduced motion');
+});
+
+test('customer-facing menu copy stays inside the facts the builder can verify', () => {
+    assert.match(summary, /function CompositionStats\(\{ all \}\)/,
+        'the summary must use a factual composition overview');
+    assert.match(summary, /הערכים התזונתיים משתנים לפי גודל המנה, הכמויות וההכנה בפועל/);
+    assert.match(summary, /מרכיבים כל הזמנה לפי הבחירות שלכם/);
+    assert.doesNotMatch(summary, /\bNUTRI\b|NutriStats|חומרי גלם טריים בלבד/,
+        'the summary must not synthesize nutrition values or absolute sourcing claims');
+
+    assert.match(detailSheet, /const itemPrice = effectiveItemPrice\(item\.id, item\.price \|\| 0\)/,
+        'ingredient details must use the same authoritative price layer as checkout');
+    assert.match(detailSheet, /הערכים משתנים לפי גודל המנה, הכמויות וההכנה בפועל\. לשאלות, פנו לצוות\./);
+    assert.doesNotMatch(detailSheet, /\bNUTRI\b|\bkcal\b|proteinG|carbs|fatG|\.fact/,
+        'ingredient details must not display unvalidated nutrition figures or facts');
+    assert.doesNotMatch(detailSheet, /vegan:\s*\{\s*he:\s*"טבעוני"/,
+        'unverified dietary metadata must not become a customer-facing badge');
+
+    assert.doesNotMatch(menuData, /export const NUTRI/,
+        'generic portion data must not be available for accidental customer display');
+    assert.doesNotMatch(menuData, /קלוריות שליליות|איבופרופן|דטוקס|ניקוי מבפנים|הגוף הנקי|פצצת חלבון|קשת הבריאות|טרי מהשדה/);
+    assert.doesNotMatch(menuData, /he:\s*"ללא גלוטן"|desc:\s*"טורטייה ללא גלוטן"/,
+        'an unverified shared-kitchen product must not be represented as gluten-free');
+    assert.doesNotMatch(menuData, /desc:\s*"[^"]*₪/,
+        'catalog descriptions must not duplicate prices outside the effective price layer');
+
+    assert.match(builder, /const currentSubtitle = capApplies \? `עד \$\{bowlCap\} לבחירה` : cur\.subtitle/);
+    assert.match(builder, /const currentIntro = capApplies \? `בחרו עד \$\{bowlCap\} מרכיבי בסיס וירקות\.` : cur\.intro/,
+        'the visible ingredient limit must follow the active product cap');
+    assert.match(builder, /הקערה מלאה \(\{ingredientPickCount\}\/\{bowlCap\}\)/,
+        'the cap notice must use the same capped-item count that enforces the limit');
+    assert.doesNotMatch(builder, /הקערה מלאה \(\{all\.length\}\/\{bowlCap\}\)/);
+    assert.match(summary, /\{all\.length\} בחירות/,
+        'summary counts must not label preparation choices as ingredients');
+    assert.match(summary, /בחירות שביצעתם/);
+    assert.match(summary, /aria-label=\{`\$\{all\.length\} בחירות בהזמנה`\}/,
+        'the shared salad/tortilla summary must use a product-neutral accessible label');
+    assert.match(summary, /ההזמנה שלכם/);
+    assert.match(summary, /מחיר בסיס/);
+    assert.doesNotMatch(summary, /הסלט שלכם|סלט בסיס|בחירות בסלט/);
+    assert.match(seal, /\{order\.items\} בחירות/,
+        'the accepted-order seal must describe its all-choice count truthfully');
+    assert.doesNotMatch(sizePicker, /servings/,
+        'size choices must not invent serving-count guidance');
+    assert.match(sizePicker, /tag: 'קומפקטי'[\s\S]*?tag: 'הקלאסי'[\s\S]*?tag: 'הכי גדול שלנו'/);
 });

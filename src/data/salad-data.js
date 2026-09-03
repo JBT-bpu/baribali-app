@@ -2,8 +2,8 @@
 
 export const STEPS = [
     {
-        id: "veggies", title: "בחרו ירקות", subtitle: "כמה שרוצים", emoji: "🥗",
-        intro: "בחרו את הבסיס והירקות לסלט — אין הגבלה!",
+        id: "veggies", title: "בחרו ירקות", subtitle: "לבחירה", emoji: "🥗",
+        intro: "בחרו את הבסיס והירקות לסלט.",
         subgroups: [
             {
                 label: "עלים ובסיס", shortLabel: "עלים", layer: "base", items: [
@@ -33,7 +33,7 @@ export const STEPS = [
             },
             {
                 label: "דגנים וקטניות", shortLabel: "דגנים", layer: "grain", items: [
-                    { id: "quinoa", he: "קינואה", icon: "/icons/quinoa_white.webp", price: 2, tags: ["grain", "protein", "fiber"], desc: "קינואה מבושלת +₪2" },
+                    { id: "quinoa", he: "קינואה", icon: "/icons/quinoa_white.webp", price: 2, tags: ["grain", "protein", "fiber"], desc: "קינואה מבושלת" },
                     { id: "brown_rice", he: "אורז מלא", icon: "/icons/rice_brown.webp", price: 0, tags: ["grain", "fiber"], desc: "אורז מלא מבושל" },
                     { id: "bulgur", he: "בורגול", icon: "/icons/couscous.webp", price: 0, tags: ["grain", "fiber"], desc: "בורגול עדין" },
                     { id: "black_lentils", he: "עדשים שחורות", icon: "/icons/beans_black.webp", price: 0, tags: ["protein", "fiber", "grain"], desc: "עדשים שחורות מבושלות" },
@@ -98,9 +98,9 @@ export const STEPS = [
                     { id: "sweet_chili", he: "צ'ילי מתוק", icon: "/icons/sriracha.webp", price: 3, tags: ["spicy", "sweet"], desc: "רוטב צ'ילי מתוק תאילנדי" },
                     { id: "teriyaki", he: "טריאקי", icon: "/icons/sauce_dark.webp", price: 3, tags: ["sweet"], desc: "רוטב טריאקי יפני" },
                     { id: "soy_s", he: "סויה", icon: "/icons/soy_sauce.webp", price: 3, tags: [], desc: "רוטב סויה סיני" },
-                    { id: "caesar", he: "קיסר", icon: "/icons/dressing_caesar.webp", price: 5, tags: [], desc: "רוטב קיסר קלאסי ₪5" },
-                    { id: "pesto", he: "פסטו", icon: "/icons/pesto_basil.webp", price: 4, tags: ["herb"], desc: "פסטו בזיליקום ₪4" },
-                    { id: "zhug", he: "סחוג", icon: "/icons/jalapeno_sliced.webp", price: 4, tags: ["spicy"], desc: "סחוג תימני חריף 🔥 ₪4" },
+                    { id: "caesar", he: "קיסר", icon: "/icons/dressing_caesar.webp", price: 5, tags: [], desc: "רוטב קיסר קלאסי" },
+                    { id: "pesto", he: "פסטו", icon: "/icons/pesto_basil.webp", price: 4, tags: ["herb"], desc: "פסטו בזיליקום" },
+                    { id: "zhug", he: "סחוג", icon: "/icons/jalapeno_sliced.webp", price: 4, tags: ["spicy"], desc: "סחוג תימני חריף 🔥" },
                 ]
             },
         ],
@@ -167,12 +167,12 @@ export const TORTILLA_STEPS = [
                 { id: "wrap_wheat",  he: "קמח מלא",    icon: "/icons/wrap_wheat.webp",   price: 0, tags: ["wrap", "fiber"],   desc: "טורטייה חיטה מלאה" },
                 { id: "wrap_spinach",he: "תרד",         icon: "/icons/wrap_spinach.webp", price: 0, tags: ["wrap", "green"],   desc: "טורטייה תרד ירוקה" },
                 { id: "wrap_corn",   he: "תירס",        icon: "/icons/wrap_tomato.webp",  price: 0, tags: ["wrap"],            desc: "טורטייה קמח תירס" },
-                { id: "wrap_gf",     he: "ללא גלוטן",  icon: "/icons/wrap_turmeric.webp",price: 3, tags: ["wrap"],            desc: "טורטייה ללא גלוטן +₪3" },
+                { id: "wrap_gf",     he: "טורטייה מיוחדת", icon: "/icons/wrap_turmeric.webp", price: 3, tags: ["wrap"], desc: "טורטייה מיוחדת" },
             ]
         }],
     },
     {
-        id: "t_fillings", title: "מילויים", subtitle: "כמה שרוצים", emoji: "🥗",
+        id: "t_fillings", title: "מילויים", subtitle: "לבחירה", emoji: "🥗",
         intro: "בחרו ירקות ומילויים לטורטייה",
         subgroups: [
             {
@@ -249,92 +249,6 @@ export const TORTILLA_STEPS = [
     },
 ];
 
-// ─── NUTRITION DATABASE ─────────────────────────────────────
-// Values per typical salad portion (~60-80g). Grains/legumes = cooked weight.
-// Sauces = ~1 tbsp (15ml). kcal, protein(g), carbs(g), fat(g), fiber(g).
-export const NUTRI = {
-    // ── Leaves & base ──
-    lettuce: { kcal: 8, p: 0.6, c: 1.5, f: 0.1, fb: 0.6, fact: "החסה היא מהירקות הראשונים שאנשים גידלו — כבר לפני 4,500 שנה במצרים העתיקה" },
-    baby_leaf: { kcal: 12, p: 1.0, c: 1.8, f: 0.2, fb: 0.9, fact: "עלי בייבי נקטפים תוך 21 יום בלבד מהשתילה — הם הירק הצעיר ביותר בצלחת" },
-    cabbage_white: { kcal: 18, p: 1.0, c: 4.0, f: 0.1, fb: 1.8, fact: "ברוסיה, כרוב כבוש הוא המרכיב הלאומי — הם צורכים כ-20 קילו לאדם בשנה" },
-    cabbage_purple: { kcal: 22, p: 1.1, c: 5.0, f: 0.2, fb: 1.6, fact: "הצבע הסגול מגיע מאנתוציאנינים — אותם נוגדי חמצון שנמצאים גם ביין אדום" },
-    sprouts: { kcal: 15, p: 1.8, c: 1.5, f: 0.1, fb: 0.8, fact: "נבטים מכילים פי 100 יותר אנזימים מירקות בוגרים — הם מפעל תזונה זעיר" },
-    // ── Fresh veggies ──
-    tomato: { kcal: 14, p: 0.7, c: 3.0, f: 0.2, fb: 0.9, fact: "עד המאה ה-18, אירופאים חשבו שעגבניות רעילות וגידלו אותן רק לנוי" },
-    cucumber: { kcal: 8, p: 0.4, c: 1.8, f: 0.1, fb: 0.3, fact: "מלפפון מכיל 96% מים — מרטיב יותר מכוס מים כי מכיל גם אלקטרוליטים" },
-    bell_pepper: { kcal: 20, p: 0.7, c: 4.5, f: 0.2, fb: 1.3, fact: "גמבה אדומה מכילה פי 3 יותר ויטמין C מתפוז — היא אלופת הויטמינים" },
-    carrot: { kcal: 25, p: 0.6, c: 5.8, f: 0.1, fb: 1.7, fact: "גזרים היו במקור סגולים — הגזר הכתום פותח בהולנד לכבוד בית המלוכה" },
-    red_onion: { kcal: 16, p: 0.4, c: 3.6, f: 0.1, fb: 0.6, fact: "בצל סגול מכיל כמות כפולה של נוגדי חמצון בהשוואה לבצל לבן" },
-    green_onion: { kcal: 5, p: 0.3, c: 1.0, f: 0.1, fb: 0.4, fact: "בצל ירוק הוא הירק הוותיק ביותר בסין — מגדלים אותו שם כבר 5,000 שנה" },
-    radish: { kcal: 10, p: 0.4, c: 2.0, f: 0.1, fb: 1.0, fact: "הצנון שייך למשפחת הכרוביים — הוא קרוב משפחה של ברוקולי וכרובית" },
-    celery: { kcal: 6, p: 0.3, c: 1.2, f: 0.1, fb: 0.8, fact: "ללעוס סלרי שורף יותר קלוריות מאשר הסלרי עצמו מכיל — הוא מזון עם קלוריות שליליות" },
-    fresh_beet: { kcal: 28, p: 0.8, c: 6.0, f: 0.1, fb: 1.4, fact: "סלק מכיל ניטראטים טבעיים שמגבירים זרימת דם — ספורטאים שותים מיץ סלק לפני תחרויות" },
-    mushrooms: { kcal: 15, p: 2.2, c: 1.5, f: 0.2, fb: 0.7, fact: "פטריות הן לא צמחים ולא בעלי חיים — הן ממלכה ביולוגית נפרדת לגמרי" },
-    corn: { kcal: 55, p: 2.0, c: 12, f: 0.7, fb: 1.2, fact: "לכל קלח תירס יש תמיד מספר זוגי של שורות גרגרים — בדרך כלל 16" },
-    green_peas: { kcal: 45, p: 3.0, c: 8.0, f: 0.2, fb: 2.5, fact: "גרגור מנדל גילה את חוקי התורשה הגנטית בזכות ניסויים באפונה ב-1866" },
-    hot_pepper: { kcal: 6, p: 0.3, c: 1.2, f: 0.1, fb: 0.4, fact: "קפסאיצין, החומר החריף, גורם למוח לשחרר אנדורפינים — לכן חריף ממכר" },
-    // ── Grains & legumes ──
-    quinoa: { kcal: 90, p: 3.5, c: 16, f: 1.5, fb: 2.2, fact: "קינואה היא לא דגן אלא זרע — קרובת משפחה של תרד ומנגולד" },
-    brown_rice: { kcal: 82, p: 1.8, c: 17, f: 0.7, fb: 1.4, fact: "אורז מלא שומר על קליפת הסובין שמכילה 60% מהמינרלים שבגרגר" },
-    bulgur: { kcal: 76, p: 2.8, c: 15, f: 0.2, fb: 3.2, fact: "בורגול הוא מהמזונות המעובדים הוותיקים בעולם — כבר לפני 4,000 שנה" },
-    black_lentils: { kcal: 80, p: 6.5, c: 12, f: 0.3, fb: 4.0, fact: "עדשים שחורות נקראות גם בלוגה בגלל דמיונן לקוויאר — מכילות הכי הרבה ברזל" },
-    green_lentils: { kcal: 75, p: 6.0, c: 12, f: 0.3, fb: 3.8, fact: "עדשים הן הקטנייה הכי מהירה לבישול — לא דורשות השרייה ומוכנות ב-20 דקות" },
-    chickpeas: { kcal: 95, p: 5.5, c: 15, f: 1.8, fb: 4.5, fact: "חומוס מגדלים ביותר מ-50 מדינות — הודו מייצרת 70% מהחומוס בעולם" },
-    fusilli_pasta: { kcal: 95, p: 3.5, c: 19, f: 0.5, fb: 1.0, fact: "הצורה המסולסלת של פוזילי תוכננה כדי ללכוד רוטב בתוך הספירלות" },
-    // ── Baked ──
-    roasted_eggplant: { kcal: 35, p: 0.8, c: 5.0, f: 1.5, fb: 2.0, fact: "חציל הוא בוטנית פרי ולא ירק — הוא שייך למשפחת הסולניים כמו עגבנייה" },
-    baked_sweet_potato: { kcal: 65, p: 1.0, c: 15, f: 0.1, fb: 2.5, fact: "בטטה כתומה מכילה בטא-קרוטן שהגוף הופך לויטמין A — מספיק מנה אחת ליום" },
-    baked_potato: { kcal: 70, p: 1.5, c: 16, f: 0.1, fb: 1.5, fact: "תפוח אדמה היה הירק הראשון שגדל בחלל — על מעבורת קולומביה ב-1995" },
-    // ── Toppings ──
-    cilantro: { kcal: 2, p: 0.2, c: 0.3, f: 0.0, fb: 0.2, fact: "ל-14% מהאוכלוסייה יש גן שגורם לכוסברה להרגיש כמו סבון — זה גנטי לגמרי" },
-    parsley: { kcal: 4, p: 0.3, c: 0.6, f: 0.1, fb: 0.3, fact: "פטרוזיליה מכילה יותר ויטמין C מלימון — כפית אחת נותנת 5% מהצריכה היומית" },
-    pickles: { kcal: 8, p: 0.3, c: 1.5, f: 0.1, fb: 0.5, fact: "קליאופטרה האמינה שמלפפונים חמוצים שומרים על יופי — והפכה אותם לחלק מתפריטה" },
-    cranberries: { kcal: 45, p: 0.1, c: 11, f: 0.2, fb: 0.8, fact: "חמוציות צפות על פני המים — לכן קוטפים אותן על ידי הצפת השדות" },
-    black_olives: { kcal: 36, p: 0.3, c: 1.5, f: 3.2, fb: 0.8, fact: "עצי זית יכולים לחיות אלפי שנים — יש עצים ביוון שגילם מעל 3,000 שנה" },
-    green_olives: { kcal: 30, p: 0.3, c: 1.0, f: 2.8, fb: 0.9, fact: "זית ירוק וזית שחור הם אותו פרי בדיוק — ההבדל הוא רק מועד הקטיף" },
-    sunflower_seeds: { kcal: 90, p: 3.2, c: 3.0, f: 7.5, fb: 1.3, fact: "חמניות עוקבות אחרי השמש במהלך היום — תופעה שנקראת הליוטרופיזם" },
-    sesame: { kcal: 85, p: 2.5, c: 3.5, f: 7.0, fb: 1.7, fact: "שומשום הוא אחד הגידולים הוותיקים בעולם — מוזכר בפפירוסים מצריים מלפני 3,500 שנה" },
-    chia: { kcal: 70, p: 2.5, c: 6.0, f: 4.5, fb: 5.0, fact: "זרעי צ'יה סופחים פי 12 מנפחם מים — רצים אצטקים אכלו אותם למרחקים ארוכים" },
-    zaatar: { kcal: 10, p: 0.5, c: 1.5, f: 0.5, fb: 0.8, fact: "זעתר הוא עשב קדוש בתרבות הערבית — אמהות היו מורחות אותו על ראש תינוקות לברכה" },
-    // ── Proteins ──
-    egg: { kcal: 78, p: 6.3, c: 0.6, f: 5.3, fb: 0, fact: "ביצה קשה מכילה את כל 9 חומצות האמינו החיוניות — היא חלבון מושלם מהטבע" },
-    tuna: { kcal: 45, p: 10, c: 0, f: 0.5, fb: 0, fact: "טונה יכולה לשחות במהירות של 75 קמ\"ש — היא אחד הדגים המהירים באוקיינוס" },
-    tofu_olive: { kcal: 85, p: 8.0, c: 2.0, f: 5.0, fb: 0.3, fact: "טופו הומצא בסין לפני 2,000 שנה — לפי האגדה, בטעות כשחלב סויה התקרש" },
-    feta5: { kcal: 55, p: 7.0, c: 1.0, f: 2.5, fb: 0, fact: "פטה 5% פותחה בישראל — ברוב העולם פטה מכילה 20-25% שומן" },
-    baby_mozzarella: { kcal: 70, p: 6.0, c: 0.5, f: 5.0, fb: 0, fact: "מוצרלה אמיתית מיוצרת מחלב תאואים — גבינת בופלה קמפנית שמוגנת באיטליה" },
-    // ── Sauces (per tablespoon ~15ml) ──
-    olive_oil: { kcal: 120, p: 0, c: 0, f: 14, fb: 0, fact: "שמן זית כתית מעולה מכיל אולאוקנתל — חומר אנטי דלקתי שפועל כמו איבופרופן" },
-    lemon: { kcal: 4, p: 0.1, c: 1.3, f: 0, fb: 0, fact: "לימון נקי שומנים ושיט — מלחים בריטים אכלו אותו למניעת צפדינה ולכן נקראו לימיז" },
-    tahini: { kcal: 90, p: 2.6, c: 3.0, f: 8.0, fb: 0.7, fact: "טחינה היא המזון עם הכי הרבה סידן מהצומח — יותר מחלב ביחס למשקל" },
-    balsamic: { kcal: 14, p: 0.1, c: 2.7, f: 0, fb: 0, fact: "בלסמי מסורתי ממודנה מיושן 12-25 שנה בחביות — בקבוק יכול לעלות מאות יורו" },
-    thousand: { kcal: 60, p: 0.2, c: 4.0, f: 5.0, fb: 0, fact: "אלף האיים נקרא כך על שם איי Thousand Islands בגבול ארה\"ב-קנדה" },
-    garlic_s: { kcal: 55, p: 0.3, c: 2.0, f: 5.0, fb: 0, fact: "שום הוא קרוב משפחה של שושן — הפרח שלו יפהפה ולבן" },
-    citrus_vin: { kcal: 45, p: 0.1, c: 3.0, f: 3.5, fb: 0, fact: "ויניגרט הוא הרוטב הצרפתי הקלאסי ביותר — השם מגיע מ-vinaigre (חומץ)" },
-    sweet_chili: { kcal: 40, p: 0.2, c: 9.0, f: 0.1, fb: 0.1, fact: "רוטב צ'ילי מתוק מקורו בתאילנד — שם הוא נקרא נאם צ'ים גאי ומגישים אותו עם כל דבר" },
-    teriyaki: { kcal: 35, p: 0.5, c: 7.0, f: 0, fb: 0, fact: "טריאקי בעברית ביפנית פירושו ברק — מתאר את הזיגוג המבריק שהרוטב יוצר" },
-    soy_s: { kcal: 8, p: 1.0, c: 1.0, f: 0, fb: 0, fact: "רוטב סויה הומצא בסין לפני 2,200 שנה — הוא אחד התבלינים הנפוצים ביותר בעולם" },
-    caesar: { kcal: 80, p: 0.5, c: 0.5, f: 8.5, fb: 0, fact: "רוטב קיסר הומצא ב-1924 בטיחואנה, מקסיקו — על ידי שף איטלקי-אמריקאי, לא ברומא" },
-    pesto: { kcal: 75, p: 1.5, c: 1.0, f: 7.0, fb: 0.3, fact: "פסטו מקורי מג'נובה מכיל בזיליקום, צנובר, שום, פרמז'ן ושמן זית — בלי שום דבר אחר" },
-    zhug: { kcal: 15, p: 0.3, c: 1.5, f: 1.0, fb: 0.5, fact: "סחוג הוא תימני — עולי תימן הביאו אותו לישראל והוא הפך למוצר ישראלי קלאסי" },
-    // ── Finish ──
-    mix_no_sauce: { kcal: 0, p: 0, c: 0, f: 0, fb: 0, fact: "ערבוב סלט מפזר את הרוטב באופן שווה ומפחית צורך בכמות רוטב גדולה" },
-    no_mix: { kcal: 0, p: 0, c: 0, f: 0, fb: 0, fact: "סלט לא מעורבב נשמר פריך יותר זמן — הרוטב לא מרכך את העלים" },
-    bread: { kcal: 70, p: 2.5, c: 13, f: 0.8, fb: 0.7, fact: "לחם הוא מהמזונות הוותיקים ביותר — מצאו שרידי לחם בן 14,000 שנה בירדן" },
-    croutons_s: { kcal: 55, p: 1.0, c: 8.0, f: 2.5, fb: 0.3, fact: "קרוטונים הומצאו כדי למנוע בזבוז לחם ישן — מילה צרפתית שמשמעה פריך" },
-    none_side: { kcal: 0, p: 0, c: 0, f: 0, fb: 0, fact: "" },
-    // ── Premium upgrades ──
-    halloumi_p: { kcal: 110, p: 7.0, c: 1.0, f: 9.0, fb: 0, fact: "חלומי מקורו בקפריסין ומוגן כ-PDO באיחוד האירופי — רק שם מותר לייצר חלומי אמיתי" },
-    tofu_teri_p: { kcal: 95, p: 8.0, c: 4.0, f: 5.0, fb: 0.3, fact: "טופו סופח טעמים כמו ספונג — לכן הוא מושלם לצליה עם רטבים חזקים כמו טריאקי" },
-    tuna_p: { kcal: 45, p: 10, c: 0, f: 0.5, fb: 0, fact: "טונה צהובת סנפיר יכולה לגדול עד 2.5 מטר ולשקול 200 קילו" },
-    feta_p: { kcal: 55, p: 7.0, c: 1.0, f: 2.5, fb: 0, fact: "גבינת פטה מוזכרת באודיסאה של הומרוס — הקיקלופ פוליפמוס ייצר אותה" },
-    egg_p: { kcal: 78, p: 6.3, c: 0.6, f: 5.3, fb: 0, fact: "תרנגולת מטילה כ-300 ביצים בשנה — כמעט ביצה אחת כל יום" },
-    parmesan_p: { kcal: 55, p: 5.0, c: 0.5, f: 3.8, fb: 0, fact: "פרמז'ן מיושן לפחות 12 חודשים — גלגל שלם שוקל כ-40 קילו ושווה אלפי יורו" },
-    honey_p: { kcal: 45, p: 0, c: 12, f: 0, fb: 0, fact: "דבש הוא המזון היחיד שלא מתקלקל לעולם — מצאו דבש בן 3,000 שנה בפירמידות" },
-    jala_p: { kcal: 85, p: 2.0, c: 6.0, f: 6.0, fb: 0.8, fact: "ג'עלה היא חטיף ערבי עתיק מבצק פילו ופיסטוק — השם מגיע מהטורקית" },
-    bread_p: { kcal: 70, p: 2.5, c: 13, f: 0.8, fb: 0.7, fact: "ישראל היא מהמדינות עם הצריכה הגבוהה ביותר של לחם לנפש בעולם" },
-    croutons_p: { kcal: 55, p: 1.0, c: 8.0, f: 2.5, fb: 0.3, fact: "קרוטונים פופולריים בצרפת מהמאה ה-17 — במקור נקראו croûte (קרום)" },
-};
-
 // ─── COMBO BADGES ───────────────────────────────────────────
 
 /*
@@ -361,39 +275,22 @@ const stepItemIds = stepId => new Set(
         .flatMap(s => s.subgroups.flatMap(g => g.items.map(i => i.id)))
 );
 
-const sum = (items, key) => items.reduce((t, i) => t + ((NUTRI[i.id] || {})[key] || 0), 0);
 const cnt = (tags, t) => tags.filter(x => x === t).length;
 
 export const COMBOS = [
-    { id: "protein_power", icon: "💪", emblem: art("protein_power"), he: "עתיר חלבון",
-      check: tags => cnt(tags, "protein") >= 3 },
     {
         id: "rainbow", icon: "🌈", emblem: art("rainbow"), he: "צבעוני", check: (_, items) => {
             const c = new Set(items.flatMap(i => (i.tags || []).filter(t => ["red", "green", "orange", "purple", "yellow", "white", "brown"].includes(t))));
             return c.size >= 4;
         }
     },
-    {
-        id: "vegan", icon: "🌱", emblem: art("vegan"), he: "טבעוני", check: (_, items) => {
-            const noAnimal = !items.some(i => ["egg", "tuna", "feta5", "baby_mozzarella", "tuna_p", "feta_p", "egg_p", "halloumi_p", "parmesan_p"].includes(i.id));
-            return items.length >= 4 && noAnimal && !items.some(i => (i.tags || []).includes("dairy"));
-        }
-    },
-    { id: "fiber_bomb", icon: "🌾", emblem: art("fiber_bomb"), he: "עשיר בסיבים",
-      check: tags => cnt(tags, "fiber") >= 4 },
     { id: "spicy", icon: "🔥", emblem: art("spicy"), he: "חריף",
       check: tags => cnt(tags, "spicy") >= 2 },
     { id: "crunchy", icon: "🥜", emblem: art("crunchy"), he: "קראנצ'י",
       check: tags => cnt(tags, "crunch") >= 4 },
-    {
-        id: "balanced", icon: "⚖️", emblem: art("balanced"), he: "ארוחה מאוזנת", check: (tags, items) => {
-            return ["base", "protein", "fiber", "fresh"].every(t => tags.includes(t)) && items.length >= 6;
-        }
-    },
-    // 10g of fibre is roughly a third of an adult daily reference intake — a
-    // real nutritional result rather than a participation award.
-    { id: "excellent", icon: "⭐", emblem: art("excellent"), he: "מעולה",
-      check: (_, items) => sum(items, "fb") >= 10 },
+    // Nutrient and dietary badges stay disabled until weighed recipes and
+    // ingredient-level dietary metadata are verified. Tag counts alone cannot
+    // substantiate "high protein/fibre", "balanced" or "vegan" claims.
     // Only 5 items in the whole catalog carry "herb", so 2 is already deliberate.
     { id: "herb", icon: "🌿", emblem: art("herb"), he: "עשבי תיבול",
       check: tags => cnt(tags, "herb") >= 2 },
@@ -403,21 +300,10 @@ export const COMBOS = [
             return has(["feta5", "feta_p"]) && has(["black_olives", "green_olives"]);
         }
     },
-    // A SUBSTANTIAL bowl that is still light — that is the achievement. At
-    // 4 items / 350 kcal it fired on virtually any small bowl (a 4-item bowl
-    // runs 40-120 kcal, and even a full 12-item bowl is only ~450), so it was
-    // effectively automatic. 6 items and 300 kcal makes it mean something.
-    { id: "light", icon: "🪶", emblem: art("light"), he: "קליל",
-      check: (_, items) => items.length >= 6 && sum(items, "kcal") <= 300 },
     { id: "loaded", icon: "🥗", emblem: art("loaded"), he: "גדוש",
       check: (_, items) => items.length >= 12 },
     { id: "all_green", icon: "🥬", emblem: art("all_green"), he: "ירוק לגמרי",
       check: tags => cnt(tags, "green") >= 6 },
-    // Only 5 items in the catalog carry "fresh", so 3 is already a deliberate
-    // choice. Requiring 4 would mean picking nearly the entire pool by
-    // coincidence — rare to the point of being unreachable in practice.
-    { id: "farm_fresh", icon: "🌅", emblem: art("farm_fresh"), he: "טרי מהשדה",
-      check: tags => cnt(tags, "fresh") >= 3 },
     {
         id: "sauce_lover", icon: "🫗", emblem: art("sauce_lover"), he: "אוהב רטבים", check: (_, items) => {
             // Sauces are a catalog STEP, not a tag, so the id set is derived.
@@ -463,7 +349,7 @@ export function getSuggestions(allTags, all) {
     if (all.length >= 2 && !has("protein")) s.push({ text: "הוסיפו חלבון?", icon: "💪" });
     if (all.length >= 3 && cnt("crunch") === 0) s.push({ text: "חסר קראנצ'?", icon: "🥜" });
     if (all.length >= 4 && !has("herb") && !has("flavor")) s.push({ text: "הוסיפו טעם?", icon: "🌿" });
-    if (all.length >= 5 && !has("fat")) s.push({ text: "שומן בריא?", icon: "🌿" });
+    if (all.length >= 5 && !has("fat")) s.push({ text: "בא לכם עוד עומק?", icon: "🌿" });
     return s.slice(0, 2);
 }
 
@@ -484,13 +370,13 @@ export const PRESETS = [
         items: ["cabbage_purple", "baby_leaf", "carrot", "cucumber", "corn", "green_onion", "tofu_olive", "sesame", "teriyaki"],
     },
     {
-        id: "protein_beast", icon: "💪", he: "פצצת חלבון",
-        desc: "עדשים שחורות, קינואה, חומוס, פטריות וביצה קשה — מכונת חלבון. כ-35 גרם חלבון למנה, בלי להתפשר על טעם.",
+        id: "protein_beast", icon: "💪", he: "קערת הכוח",
+        desc: "עדשים שחורות, קינואה, חומוס, פטריות וביצה קשה — שילוב נדיב של קטניות, דגנים ומרקמים.",
         items: ["lettuce", "mushrooms", "quinoa", "black_lentils", "chickpeas", "egg", "sunflower_seeds", "tahini"],
     },
     {
-        id: "rainbow", icon: "🌈", he: "קשת הבריאות",
-        desc: "שבעה צבעים בקערה אחת — עגבניה, גזר, סלק, גמבה, תירס, כרוב סגול ואפונה. ויטמינים מכל הקשת, בנגיסה אחת.",
+        id: "rainbow", icon: "🌈", he: "קשת צבעונית",
+        desc: "שבעה צבעים בקערה אחת — עגבניה, גזר, סלק, גמבה, תירס, כרוב סגול ואפונה. חגיגה צבעונית בכל ביס.",
         items: ["baby_leaf", "tomato", "carrot", "bell_pepper", "fresh_beet", "corn", "cabbage_purple", "green_peas", "citrus_vin"],
     },
     {
@@ -500,12 +386,12 @@ export const PRESETS = [
     },
     {
         id: "warm_earth", icon: "🍠", he: "חום וחמים",
-        desc: "חציל קלוי בתנור, בטטה אפויה, ביצה קשה וזעתר — עומק, חמימות וריח של מזרח-תיכוני אמיתי. מנחם ומזין.",
+        desc: "חציל קלוי בתנור, בטטה אפויה, ביצה קשה וזעתר — עומק, חמימות וריח של מזרח-תיכוני אמיתי. מנחם ומלא טעם.",
         items: ["lettuce", "roasted_eggplant", "baked_sweet_potato", "chickpeas", "red_onion", "parsley", "zaatar", "egg", "tahini"],
     },
     {
         id: "garden_fresh", icon: "🌿", he: "גן ירוק",
-        desc: "נבטים, כוסברה, פטרוזיליה, בצל ירוק וסלרי עם לימון סחוט טרי. קליל, מרענן, בלי אשמה — הסלט של הגוף הנקי.",
+        desc: "נבטים, כוסברה, פטרוזיליה, בצל ירוק וסלרי עם לימון סחוט טרי — ירוק, פריך ומרענן.",
         items: ["baby_leaf", "sprouts", "cucumber", "celery", "green_onion", "tomato", "cilantro", "parsley", "lemon"],
     },
     {
@@ -514,13 +400,13 @@ export const PRESETS = [
         items: ["baby_leaf", "fusilli_pasta", "tomato", "cucumber", "bell_pepper", "black_olives", "parsley", "balsamic", "feta5"],
     },
     {
-        id: "detox_bowl", icon: "🥦", he: "בול דטוקס",
-        desc: "נבטים, סלק טרי, גזר, אפונה ירוקה וזרעי צ'יה עם לימון סחוט טרי. ניקוי מבפנים — ירוק, נקי, מאפס.",
+        id: "detox_bowl", icon: "🥦", he: "בול ירוק",
+        desc: "נבטים, סלק טרי, גזר, אפונה ירוקה וזרעי צ'יה עם לימון סחוט טרי — צבעוני, פריך ומלא אופי.",
         items: ["baby_leaf", "sprouts", "fresh_beet", "carrot", "celery", "chia", "green_peas", "lemon", "green_onion"],
     },
     {
         id: "crunchy_master", icon: "🥜", he: "מלך הקראנץ'",
-        desc: "כרוב לבן וסגול, גזר מגורד, צנון, חמוצים, גרעיני חמנייה ושומשום עם ויניגרט הדרים. פריך, מרענן — טרי שעות.",
+        desc: "כרוב לבן וסגול, גזר מגורד, צנון, חמוצים, גרעיני חמנייה ושומשום עם ויניגרט הדרים. פריך ומרענן, ביס אחרי ביס.",
         items: ["cabbage_white", "cabbage_purple", "carrot", "celery", "radish", "pickles", "sunflower_seeds", "sesame", "citrus_vin"],
     },
     {
