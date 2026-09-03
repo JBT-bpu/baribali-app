@@ -1,23 +1,34 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { enforceRateLimit } from '@/lib/rateLimit';
 
-export const revalidate = 86400; // cache 24h
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+const GOOGLE_TIMEOUT_MS = 5_000;
+const NO_STORE_HEADERS = {
+    'Cache-Control': 'private, no-store, max-age=0',
+} as const;
 
 export interface Review {
     author: string;
+    authorUri: string;
+    authorPhotoUri: string;
     rating: number;
     text: string;
     time: string;
+    reviewUri: string;
+    reportUri: string;
 }
 
-// ── Static fallback — replace with your real Google reviews ──────────────────
-const STATIC_REVIEWS: Review[] = [
-    { author: 'מיכל כ.', rating: 5, text: 'הסלט הכי טרי וטעים שאכלתי! המרכיבים תמיד טריים והשירות מדהים. חוזרת כל שבוע!', time: 'לפני שבוע' },
-    { author: 'דני ל.', rating: 5, text: 'מקום מדהים, הסלטים טעימים ומגוון עצום של מרכיבים. ממליץ בחום לכולם!', time: 'לפני 2 שבועות' },
-    { author: 'שרה מ.', rating: 5, text: 'הכי אהבתי שאפשר לבנות בדיוק מה שרוצים. הטונה עם האבוקדו וטחינה — פשוט שילוב מושלם.', time: 'לפני חודש' },
-    { author: 'אורי ב.', rating: 5, text: 'מהיר, טעים, ובמחיר סביר. הסלט מגיע ארוז יפה ותמיד טרי. מומלץ מאוד!', time: 'לפני 3 ימים' },
-    { author: 'נועה ר.', rating: 5, text: 'כל פעם שאני רוצה ארוחת צהריים בריאה זה הכתובת. הצוות מקסים והסלט תמיד מדויק!', time: 'לפני שבועיים' },
-    { author: 'יוסי ג.', rating: 4, text: 'סלט טעים ומגוון. המקום נקי והשירות מהיר. אין ספק שחוזר!', time: 'לפני חודש' },
-];
+function isHttpsUrl(value: unknown): value is string {
+    if (typeof value !== 'string') return false;
+
+    try {
+        return new URL(value).protocol === 'https:';
+    } catch {
+        return false;
+    }
+}
 
 // ── Google Places API (New) fetch ────────────────────────────────────────────
 async function fetchGoogleReviews(): Promise<Review[] | null> {
@@ -26,11 +37,18 @@ async function fetchGoogleReviews(): Promise<Review[] | null> {
 
     if (!apiKey || !placeId) return null;
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), GOOGLE_TIMEOUT_MS);
+
     try {
-        const url = `https://places.googleapis.com/v1/places/${placeId}?fields=reviews&languageCode=he`;
+        const url = `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}?languageCode=he`;
         const res = await fetch(url, {
-            headers: { 'X-Goog-Api-Key': apiKey },
-            next: { revalidate: 86400 },
+            headers: {
+                'X-Goog-Api-Key': apiKey,
+                'X-Goog-FieldMask': 'reviews',
+            },
+            cache: 'no-store',
+            signal: controller.signal,
         });
 
         if (!res.ok) return null;
@@ -40,28 +58,67 @@ async function fetchGoogleReviews(): Promise<Review[] | null> {
             rating: number;
             text?: { text: string };
             relativePublishTimeDescription?: string;
-            authorAttribution?: { displayName: string };
+            authorAttribution?: {
+                displayName?: string;
+                uri?: string;
+                photoUri?: string;
+            };
+            googleMapsUri?: string;
+            flagContentUri?: string;
         }[] = data.reviews ?? [];
 
         return raw
-            .filter(r => r.rating >= 4 && r.text?.text)
+            // Show genuine reviews without quietly filtering out criticism.
+            // Reviews missing Google's required attribution/source links are
+            // omitted instead of being rendered without their provenance.
+            .filter(r => Number.isFinite(r.rating)
+                && r.rating >= 1
+                && r.rating <= 5
+                && Boolean(r.text?.text?.trim())
+                && Boolean(r.authorAttribution?.displayName?.trim())
+                && isHttpsUrl(r.authorAttribution?.uri)
+                && isHttpsUrl(r.authorAttribution?.photoUri)
+                && isHttpsUrl(r.googleMapsUri)
+                && isHttpsUrl(r.flagContentUri))
             .map(r => ({
-                author: r.authorAttribution?.displayName ?? 'לקוח',
-                rating: r.rating,
-                text:   r.text!.text,
-                time:   r.relativePublishTimeDescription ?? '',
+                author: r.authorAttribution!.displayName!.trim(),
+                authorUri: r.authorAttribution!.uri!,
+                authorPhotoUri: r.authorAttribution!.photoUri!,
+                rating: Math.round(r.rating),
+                text:   r.text!.text.trim(),
+                time:   r.relativePublishTimeDescription?.trim() ?? '',
+                reviewUri: r.googleMapsUri!,
+                reportUri: r.flagContentUri!,
             }));
     } catch {
         return null;
+    } finally {
+        clearTimeout(timeoutId);
     }
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+    // This public endpoint can trigger a billed Places request. The provider
+    // response itself may not be cached, so blunt direct endpoint hammering.
+    const limited = enforceRateLimit(req, 'reviews', 20, 60_000);
+    if (limited) {
+        limited.headers.set('Cache-Control', NO_STORE_HEADERS['Cache-Control']);
+        return limited;
+    }
+
     const google = await fetchGoogleReviews();
-    const reviews = google && google.length > 0 ? google : STATIC_REVIEWS;
+    if (google?.length) {
+        return NextResponse.json(
+            { reviews: google, source: 'google' },
+            { headers: NO_STORE_HEADERS },
+        );
+    }
 
-    // Shuffle so order varies each cache cycle
-    const shuffled = [...reviews].sort(() => Math.random() - 0.5);
-
-    return NextResponse.json({ reviews: shuffled, source: google ? 'google' : 'static' });
+    // Missing credentials, an upstream failure and a genuine empty result all
+    // fail closed to no testimonial. The client fills the same visual footprint
+    // with a clearly brand-owned product fact rather than inventing customers.
+    return NextResponse.json(
+        { reviews: [], source: 'unavailable' },
+        { headers: NO_STORE_HEADERS },
+    );
 }

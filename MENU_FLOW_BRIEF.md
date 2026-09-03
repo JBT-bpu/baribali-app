@@ -23,7 +23,7 @@
 | Route | Current purpose | Notes |
 |---|---|---|
 | `/` | Guest-or-Google front door | Signed-in users continue automatically. Guest is a full, unpunished choice. |
-| `/home2` | Customer home | Orderable salad card, locked coming-soon cards, size picker, closed state, latest-order shortcut, reviews and bottom navigation. |
+| `/home2` | Customer home | Orderable salad card, locked coming-soon cards, size picker, closed state, latest-order shortcut, one fully attributed review supplied by Google Maps when available (otherwise a product-info card), and bottom navigation. |
 | `/build?type=salad\|tortilla&size=<S\|M\|L>` | Builder and summary | Ingredient wizard and checkout live in one client component tree. |
 | `/order/[id]` | Live order tracking | Polls status, shows payment state and flashes the tab title when ready in the background. |
 | `/orders` | Order history | Signed-in history, status links, **הזמן שוב** and **שנה והזמן**. Guests receive a clear sign-in/return path. |

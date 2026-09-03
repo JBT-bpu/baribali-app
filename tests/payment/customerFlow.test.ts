@@ -54,6 +54,14 @@ const bowlDrop = readFileSync(new URL(
     '../../src/components/transition/BowlDrop.tsx',
     import.meta.url,
 ), 'utf8');
+const reviewsRoute = readFileSync(new URL(
+    '../../src/app/api/reviews/route.ts',
+    import.meta.url,
+), 'utf8');
+const reviewsStrip = readFileSync(new URL(
+    '../../src/components/ui/ReviewsStrip.tsx',
+    import.meta.url,
+), 'utf8');
 
 test('customer order hand-off keeps its client-side source invariants', () => {
     const submitStart = summary.indexOf('const submitOrder = async');
@@ -454,4 +462,43 @@ test('pickup time choices expose selection and full states on a phone-sized targ
         'an available slot must flow into the controlled selection');
     assert.match(summary, /pickupTime: pickupForSubmit/,
         'the reconciled selected time must reach the order payload');
+});
+
+test('home reviews never impersonate customers and retain Google provenance', () => {
+    assert.doesNotMatch(reviewsRoute, /STATIC_REVIEWS|source:\s*'static'|Math\.random/,
+        'the API must not invent or shuffle customer testimonials');
+    assert.doesNotMatch(reviewsRoute, /מיכל כ\.|דני ל\.|שרה מ\.|אורי ב\.|נועה ר\.|יוסי ג\./,
+        'the removed fallback identities must stay out of source');
+    assert.match(reviewsRoute, /export const dynamic = 'force-dynamic'/);
+    assert.match(reviewsRoute, /export const revalidate = 0/);
+    assert.match(reviewsRoute, /cache: 'no-store'/,
+        'Places content must not be retained in the Next data cache');
+    assert.match(reviewsRoute, /enforceRateLimit\(req, 'reviews', 20, 60_000\)/,
+        'the public proxy must blunt requests that could consume paid Places quota');
+    assert.equal(reviewsRoute.match(/headers: NO_STORE_HEADERS/g)?.length, 2,
+        'both positive and unavailable API responses must opt out of response caching');
+    assert.match(reviewsRoute, /setTimeout\(\(\) => controller\.abort\(\), GOOGLE_TIMEOUT_MS\)/);
+    assert.match(reviewsRoute, /const GOOGLE_TIMEOUT_MS = 5_000/);
+    assert.match(reviewsRoute, /authorUri:[\s\S]*?authorPhotoUri:[\s\S]*?reviewUri:[\s\S]*?reportUri:/,
+        'a displayed review must carry author, source and reporting attribution');
+    assert.doesNotMatch(reviewsRoute, /rating >= 4/,
+        'the API must not silently hide critical reviews');
+
+    assert.match(reviewsStrip, /payload\?\.source !== 'google'/,
+        'the client must accept testimonials only from the Google response variant');
+    assert.match(reviewsStrip, /data-review-source=\{review \? 'google' : 'product'\}/);
+    assert.match(reviewsStrip, /המחיר מול העיניים/);
+    assert.match(reviewsStrip, /בוחרים גודל ותוספות, ורואים את המחיר מתעדכן לפני שליחת ההזמנה\./,
+        'the unavailable state must remain a clearly brand-owned product fact');
+    assert.doesNotMatch(reviewsStrip, /setInterval|Auto-cycle|Dot indicators/,
+        'the compact strip must not auto-rotate or expose pointer-only carousel dots');
+    assert.match(reviewsStrip, /aria-label=\{`דירוג \$\{rating\} מתוך 5 כוכבים`\}/);
+    assert.match(reviewsStrip, /aria-hidden="true"[\s\S]*?'★'\.repeat\(rating\)/,
+        'decorative star glyphs must not duplicate the accessible rating');
+    assert.match(reviewsStrip, /review\.authorUri[\s\S]*?review\.authorPhotoUri/);
+    assert.match(reviewsStrip, /review\.reviewUri[\s\S]*?Google Maps/);
+    assert.match(reviewsStrip, /review\.reportUri[\s\S]*?>דיווח</,
+        'Google review content must keep a visible source and reporting path');
+    assert.match(reviewsStrip, /מוצגת לפי רלוונטיות/,
+        'the UI must explain Google\'s default review ordering');
 });

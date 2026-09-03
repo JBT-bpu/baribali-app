@@ -22,7 +22,7 @@ BariBali is a mobile-first, Hebrew (RTL) salad and tortilla builder for a **real
 - **PWA**: manifest (`src/app/manifest.ts`) implemented — installable/"Add to Home Screen"
 - **Lint**: ESLint 9 flat config (`eslint.config.mjs`), script is `eslint .`
 
-There are 57 focused Node/`tsx` regression tests covering Hyp, settlement and migration invariants, pricing/order authority, generic-webhook rejection, kitchen controls/simulation and critical customer-flow source invariants. There is still no CI pipeline.
+There are 61 focused Node/`tsx` regression tests covering Hyp, settlement and migration invariants, pricing/order authority, generic-webhook rejection, kitchen controls/simulation and critical customer-flow/source-trust invariants. There is still no CI pipeline.
 
 ## 3. Directory structure (current)
 
@@ -69,7 +69,7 @@ src/
 **Guest-first is a deliberate, explicit product principle**: an account is never required to order, and where offered, it's presented as an equally-weighted option, never a gate.
 
 1. **`/`**: signed-out visitors see the guest-or-Google front door on each external entry; signed-in members continue to `/home2`. Internal navigation targets `/home2`, so guests are not repeatedly gated mid-session.
-2. **`/home2`**: product selector, closed notice, latest-order shortcut for signed-in members, reviews and a three-item bottom nav (`/home2`, `/orders`, `/profile`). Salad is the currently orderable card and opens the S/M/L picker. Tortilla is locked as coming soon on home, although `/build?type=tortilla` remains a functional deep-link code path.
+2. **`/home2`**: product selector, closed notice, latest-order shortcut for signed-in members, one fully attributed review supplied by Google Maps when configured (otherwise a clearly brand-owned product-info card), and a three-item bottom nav (`/home2`, `/orders`, `/profile`). Salad is the currently orderable card and opens the S/M/L picker. Tortilla is locked as coming soon on home, although `/build?type=tortilla` remains a functional deep-link code path.
 3. **`/build`**: `BariBaliBuilder` — step-by-step ingredient picker, combo badges, presets, live price and Lottie preview. Important: tortilla currently reuses `STEPS` minus `finish`; the imported `TORTILLA_STEPS` catalog is not rendered.
 4. **Summary/checkout** (`SummaryView`, same route): ingredient recap, an honest composition overview, notes and live pickup slots. Exact nutrition is intentionally withheld until weighed recipes are validated. The payment-choice control is demo-only. With real Supabase, a configured gateway proceeds online automatically; without a configured gateway the server records pay-at-pickup. `POST /api/orders` rebuilds the canonical item snapshots and price before either branch.
 5. **`/order/[id]`**: live-polling status page; document-title flash when ready while backgrounded.
@@ -233,7 +233,7 @@ authoritative for the exact commit list.
 
 ## 10. Improvement backlog (not started, no priority commitment)
 
-- **Testing/CI**: 57 focused regression tests, no CI. The largest gaps are component/browser automation, end-to-end provider flows and database-backed concurrency tests.
+- **Testing/CI**: 61 focused regression tests, no CI. The largest gaps are component/browser automation, end-to-end provider flows and database-backed concurrency tests.
 - **Observability**: no error tracking, no structured logging on payment/webhook routes.
 - **Ops**: a local password-gated admin exists for prices/discounts/customers, but there is no production reporting dashboard. Schema/policy SQL and migrations are tracked; execution, advisor runs and backup/PITR verification remain manual.
 - **Code quality**: `zustand` installed but unused — a `BariBaliBuilder.jsx` state-lifting refactor is on the table whenever there's appetite.
