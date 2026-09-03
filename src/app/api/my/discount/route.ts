@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { isSupabaseConfigured } from '@/lib/supabase';
+import { supabaseConfigurationState } from '@/lib/supabaseServerConfig';
 import {
     CustomerDiscountLookupError,
     getCustomerDiscount,
 } from '@/lib/customerTags';
 import type { Discount } from '@/lib/discounts';
 import { enforceRateLimit } from '@/lib/rateLimit';
+import { supabaseConfigurationErrorResponse } from '@/lib/supabaseRoute';
 
 function discountUnavailable() {
     return NextResponse.json({
@@ -29,7 +30,9 @@ export async function GET(req: NextRequest) {
 
     const auth = req.headers.get('authorization');
     if (!auth?.startsWith('Bearer ')) return NextResponse.json({ discount: null });
-    if (!isSupabaseConfigured()) return NextResponse.json({ discount: null });
+    const configuration = supabaseConfigurationState();
+    if (configuration === 'misconfigured') return supabaseConfigurationErrorResponse();
+    if (configuration === 'demo') return NextResponse.json({ discount: null });
 
     let admin;
     try {
@@ -39,7 +42,7 @@ export async function GET(req: NextRequest) {
         admin = getSupabaseAdmin();
     } catch (error) {
         console.error('[GET /api/my/discount] Admin client unavailable:', error);
-        return discountUnavailable();
+        return supabaseConfigurationErrorResponse();
     }
 
     const { data, error } = await admin.auth.getUser(auth.slice(7));

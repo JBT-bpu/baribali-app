@@ -2,18 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { NextRequest } from 'next/server';
+import { isolateSupabaseTestEnvironment } from './testEnvironment';
 
 test('kitchen rehearsal creates and selectively clears simulated orders in demo mode', async () => {
-    const savedEnv = {
-        url: process.env.NEXT_PUBLIC_SUPABASE_URL,
-        anon: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-        service: process.env.SUPABASE_SERVICE_ROLE_KEY,
-        kitchenPassword: process.env.KITCHEN_PASSWORD,
-    };
-    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
-    delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
-    delete process.env.KITCHEN_PASSWORD;
+    const restoreEnvironment = isolateSupabaseTestEnvironment();
 
     const [{ POST, DELETE }, demoStore] = await Promise.all([
         import('../../src/app/api/kitchen/simulate/route'),
@@ -49,13 +41,6 @@ test('kitchen rehearsal creates and selectively clears simulated orders in demo 
         assert.deepEqual(demoStore.listDemoOrders().map(order => order.id), [regular.id]);
     } finally {
         demoStore.resetDemoStore();
-        if (savedEnv.url === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_URL;
-        else process.env.NEXT_PUBLIC_SUPABASE_URL = savedEnv.url;
-        if (savedEnv.anon === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-        else process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = savedEnv.anon;
-        if (savedEnv.service === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY;
-        else process.env.SUPABASE_SERVICE_ROLE_KEY = savedEnv.service;
-        if (savedEnv.kitchenPassword === undefined) delete process.env.KITCHEN_PASSWORD;
-        else process.env.KITCHEN_PASSWORD = savedEnv.kitchenPassword;
+        restoreEnvironment();
     }
 });

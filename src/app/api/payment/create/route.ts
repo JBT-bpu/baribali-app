@@ -10,6 +10,8 @@ import {
 import { paymentProvider } from '@/lib/payment';
 import { enforceRateLimit } from '@/lib/rateLimit';
 import { getSupabaseAdmin } from '@/lib/serverSupabase';
+import { supabaseConfigurationState } from '@/lib/supabaseServerConfig';
+import { supabaseConfigurationErrorResponse } from '@/lib/supabaseRoute';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -85,6 +87,15 @@ export async function POST(req: NextRequest) {
     const limited = enforceRateLimit(req, 'payment-create', 12, 60_000);
     if (limited) return limited;
 
+    const configuration = supabaseConfigurationState();
+    if (configuration === 'misconfigured') return supabaseConfigurationErrorResponse();
+    if (configuration === 'demo') {
+        return NextResponse.json({
+            error: 'Payment is unavailable in demo mode',
+            code: 'PAYMENT_UNAVAILABLE_IN_DEMO',
+        }, { status: 503 });
+    }
+
     let body: unknown;
     try {
         body = await req.json();
@@ -129,7 +140,7 @@ export async function POST(req: NextRequest) {
         console.error('[POST /api/payment/create] order lookup unavailable', {
             name: error instanceof Error ? error.name : 'unknown',
         });
-        return NextResponse.json({ error: 'Payment could not be initialized' }, { status: 503 });
+        return supabaseConfigurationErrorResponse();
     }
 
     if (order.total <= 0 || order.payment_status === 'no_payment_required') {

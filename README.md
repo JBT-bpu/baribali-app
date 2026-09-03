@@ -52,7 +52,8 @@ src/
 │   └── ui/                     # ReviewsStrip, GoldField, GoogleSignInButton
 ├── data/salad-data.js          # Ingredient catalog, prices, nutrition, combo rules, presets
 └── lib/
-    ├── supabase.ts             # Anon + service-role clients and demo/config detection
+    ├── supabase.ts             # Public client + explicit demo/config detection
+    ├── serverSupabase.ts       # Strict server-only admin client (no anon fallback)
     ├── pricing.ts              # Server-side canonical price computation
     ├── kitchenAuth.ts          # HMAC session gate for kitchen endpoints
     └── hypPay.ts               # Hyp APISign SIGN/VERIFY client
@@ -60,9 +61,15 @@ src/
 
 ## Environment Variables
 
-See `.env.example` for the full list. Without Supabase variables the app uses
-its in-memory demo store; real persistence and authentication require the
-Supabase URL, publishable/anon key, and service-role key.
+See `.env.example` for the full list. With no Supabase variables, local/test
+development uses the in-memory demo store. Production instead fails closed;
+an intentionally public demo deploy must explicitly set
+`NEXT_PUBLIC_BARIBALI_DEMO_MODE=true`. Real persistence and authentication
+require the Supabase URL, publishable/anon key, and server secret/service-role
+key. Because `NEXT_PUBLIC_*` values are embedded at build time, changing them
+requires a new deployment. The Next config stops the build if it recognizes a
+secret/service-role key in a public variable (or a public key in a server-only
+variable), and its error names the variable without printing the credential.
 
 ## Development
 

@@ -14,6 +14,11 @@ const config = [
     },
     ...nextCoreWebVitals,
     {
+        // Keep these overrides inside the same source-file scope where the
+        // Next preset registers the React/React Hooks plugins. A global rule
+        // block is also evaluated for non-source files and ESLint 9 then has
+        // no plugin available for the names below.
+        files: ['**/*.{js,jsx,mjs,ts,tsx,mts,cts}'],
         rules: {
             'react/no-unescaped-entities': 'off',
             '@next/next/no-img-element': 'off',

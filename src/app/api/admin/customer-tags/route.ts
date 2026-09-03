@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { isAdminAuthorized } from '@/lib/adminAuth';
 import { findDiscount } from '@/lib/discounts';
 import { setCustomerTag, removeCustomerTag } from '@/lib/customerTags';
+import { supabaseConfigurationState } from '@/lib/supabaseServerConfig';
+import { loadSupabaseAdmin, supabaseConfigurationErrorResponse } from '@/lib/supabaseRoute';
 
 /**
  * Assign or clear a customer's standing discount "tag" (manager admin only).
@@ -14,6 +16,15 @@ import { setCustomerTag, removeCustomerTag } from '@/lib/customerTags';
 export async function POST(req: NextRequest) {
     if (!isAdminAuthorized(req)) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    if (supabaseConfigurationState() !== 'configured') {
+        return supabaseConfigurationErrorResponse();
+    }
+    try {
+        await loadSupabaseAdmin();
+    } catch (error) {
+        console.error('[POST /api/admin/customer-tags] Admin client unavailable:', error);
+        return supabaseConfigurationErrorResponse();
     }
 
     let body: { userId?: unknown; discountCode?: unknown };

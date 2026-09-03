@@ -1,27 +1,25 @@
 import { createClient } from '@supabase/supabase-js';
+import {
+    isSupabaseConfigured,
+    publicSupabaseKey,
+} from './supabaseConfig';
+
+export {
+    isSupabaseConfigured,
+    isSupabaseDemoMode,
+    supabaseConfigurationState,
+} from './supabaseConfig';
 
 const PLACEHOLDER = 'https://placeholder.supabase.co';
 
-const url      = process.env.NEXT_PUBLIC_SUPABASE_URL      || PLACEHOLDER;
-const anonKey  = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder';
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const configured = isSupabaseConfigured();
+const url = configured ? process.env.NEXT_PUBLIC_SUPABASE_URL!.trim() : PLACEHOLDER;
+const publicKey = configured ? publicSupabaseKey()! : 'placeholder';
 
-// Safe to call client-side too — only reads the NEXT_PUBLIC_ url, same as
-// the anon client above. Centralizes the check that used to live inline
-// in kitchen/page.tsx; API routes use this to fall back to the in-memory
-// demo store (see src/lib/demoStore.ts) instead of hitting Supabase.
-export function isSupabaseConfigured(): boolean {
-    const u = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    return Boolean(u && !u.includes('your-project'));
-}
-
-// Browser / client-side client (uses anon key, respects RLS)
-export const supabase = createClient(url, anonKey);
-
-// Server-side client (uses service role, bypasses RLS — API routes only)
-export const supabaseAdmin = serviceKey
-    ? createClient(url, serviceKey)
-    : supabase; // fallback to anon if service key not set
+// Browser/client client only (publishable or legacy anon key, respects RLS).
+// Server code must call getSupabaseAdmin() from serverSupabase.ts; there is no
+// admin export here and therefore no possible fallback to this public client.
+export const supabase = createClient(url, publicKey);
 
 /*
  * Schema and policy SQL belongs in `supabase/`, not in an executable-looking

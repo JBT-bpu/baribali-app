@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isKitchenAuthorized } from '@/lib/kitchenAuth';
 import { readShopState, writeShopState } from '@/lib/shopState';
-import { shopOverrideForTargetOpen, shopStatus, type ShopOverride } from '@/lib/shopHours';
+import {
+    SHOP_STATE_UNAVAILABLE_ERROR_CODE,
+    shopOverrideForTargetOpen,
+    shopStatus,
+    type ShopOverride,
+} from '@/lib/shopHours';
+import { supabaseConfigurationState } from '@/lib/supabaseServerConfig';
+import { loadSupabaseAdmin, supabaseConfigurationErrorResponse } from '@/lib/supabaseRoute';
 
 /**
  * Is the shop open, and the staff control for saying otherwise.
@@ -17,8 +24,28 @@ import { shopOverrideForTargetOpen, shopStatus, type ShopOverride } from '@/lib/
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+async function configurationError() {
+    const configuration = supabaseConfigurationState();
+    if (configuration === 'misconfigured') return true;
+    if (configuration === 'demo') return false;
+    try {
+        await loadSupabaseAdmin();
+        return false;
+    } catch (error) {
+        console.error('[api/shop] Admin client unavailable:', error);
+        return true;
+    }
+}
+
 export async function GET() {
+    if (await configurationError()) return supabaseConfigurationErrorResponse();
     const state = await readShopState();
+    if (!state.available) {
+        return NextResponse.json({
+            error: 'Live shop state is temporarily unavailable',
+            code: SHOP_STATE_UNAVAILABLE_ERROR_CODE,
+        }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
+    }
     const status = shopStatus(new Date(), state.override, state.note);
     return NextResponse.json(
         { ...status, override: state.override, storeAvailable: state.available },
@@ -30,6 +57,7 @@ export async function PATCH(req: NextRequest) {
     if (!isKitchenAuthorized(req)) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    if (await configurationError()) return supabaseConfigurationErrorResponse();
 
     let body: unknown;
     try { body = await req.json(); } catch { return NextResponse.json({ error: 'Bad request' }, { status: 400 }); }

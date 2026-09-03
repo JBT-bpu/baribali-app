@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { supabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
+import { isSupabaseDemoMode } from '@/lib/supabase';
 import { findDiscount, type Discount } from '@/lib/discounts';
 
 /**
@@ -10,7 +10,7 @@ import { findDiscount, type Discount } from '@/lib/discounts';
  * code is worth stays config-in-code in discounts.json, so `findDiscount`
  * remains the single source of truth for a discount's value and active state.
  *
- * Server-only (imports supabaseAdmin / service role). Never import into a
+ * Server-only in use. Never import into a
  * client component — the checkout reads a customer's own tag through the
  * token-gated /api/my/discount route instead.
  *
@@ -70,17 +70,20 @@ export async function lookupCustomerDiscount(
     client?: CustomerDiscountLookupClient,
 ): Promise<CustomerDiscountLookupResult> {
     if (!userId) return noCustomerDiscount();
-    if (!client && !isSupabaseConfigured()) return noCustomerDiscount();
+    if (!client && isSupabaseDemoMode()) return noCustomerDiscount();
 
-    // supabaseAdmin falls back to the public anon client when this secret is
-    // absent. That fallback is unsafe here: RLS can make an entitled customer
-    // look exactly like a customer with no tag.
-    if (!client && !process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()) {
-        return lookupFailure('CUSTOMER_TAG_ADMIN_REQUIRED');
+    let queryClient = client;
+    if (!queryClient) {
+        try {
+            const { getSupabaseAdmin } = await import('@/lib/serverSupabase');
+            queryClient = getSupabaseAdmin();
+        } catch (error) {
+            return lookupFailure('CUSTOMER_TAG_ADMIN_REQUIRED', error);
+        }
     }
 
     try {
-        const { data, error } = await (client ?? supabaseAdmin)
+        const { data, error } = await queryClient
             .from('customer_tags')
             .select('discount_code')
             .eq('user_id', userId)
@@ -120,9 +123,10 @@ export async function getCustomerDiscount(
 
 /** Map of user_id → assigned discount_code for a set of customers (one query). */
 export async function getCustomerTagMap(userIds: string[]): Promise<Record<string, string>> {
-    if (!userIds.length || !isSupabaseConfigured()) return {};
+    if (!userIds.length || isSupabaseDemoMode()) return {};
     try {
-        const { data, error } = await supabaseAdmin
+        const { getSupabaseAdmin } = await import('@/lib/serverSupabase');
+        const { data, error } = await getSupabaseAdmin()
             .from('customer_tags')
             .select('user_id, discount_code')
             .in('user_id', userIds);
@@ -137,9 +141,10 @@ export async function getCustomerTagMap(userIds: string[]): Promise<Record<strin
 
 /** Assign (upsert) a discount code to a customer. Returns false on failure. */
 export async function setCustomerTag(userId: string, code: string): Promise<boolean> {
-    if (!isSupabaseConfigured()) return false;
+    if (isSupabaseDemoMode()) return false;
     try {
-        const { error } = await supabaseAdmin
+        const { getSupabaseAdmin } = await import('@/lib/serverSupabase');
+        const { error } = await getSupabaseAdmin()
             .from('customer_tags')
             .upsert({ user_id: userId, discount_code: code, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
         return !error;
@@ -150,9 +155,10 @@ export async function setCustomerTag(userId: string, code: string): Promise<bool
 
 /** Remove a customer's tag. Returns false on failure. */
 export async function removeCustomerTag(userId: string): Promise<boolean> {
-    if (!isSupabaseConfigured()) return false;
+    if (isSupabaseDemoMode()) return false;
     try {
-        const { error } = await supabaseAdmin.from('customer_tags').delete().eq('user_id', userId);
+        const { getSupabaseAdmin } = await import('@/lib/serverSupabase');
+        const { error } = await getSupabaseAdmin().from('customer_tags').delete().eq('user_id', userId);
         return !error;
     } catch {
         return false;

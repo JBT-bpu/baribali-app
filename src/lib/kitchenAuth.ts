@@ -15,8 +15,9 @@ import crypto from 'crypto';
  * signed with a key derived from the password itself — so rotating the
  * password instantly invalidates every outstanding session, no store needed.
  *
- * If KITCHEN_PASSWORD is unset the board runs open (local/demo dev), matching
- * the previous no-op-when-unconfigured behavior. Production sets it on Vercel.
+ * If KITCHEN_PASSWORD is unset the board runs open only in local/test
+ * development. Production fails closed so a missing deployment variable can
+ * never expose staff actions.
  */
 
 export const KITCHEN_COOKIE = 'bb_kitchen_session';
@@ -27,11 +28,28 @@ export const KITCHEN_COOKIE = 'bb_kitchen_session';
 export const KITCHEN_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 function kitchenPassword(): string | undefined {
-    return process.env.KITCHEN_PASSWORD || undefined;
+    return process.env.KITCHEN_PASSWORD?.trim() || undefined;
+}
+
+export type KitchenAuthConfigurationState = 'configured' | 'open-local' | 'misconfigured';
+
+export function resolveKitchenAuthConfiguration(input: {
+    nodeEnv?: string;
+    password?: string;
+}): KitchenAuthConfigurationState {
+    if (input.password?.trim()) return 'configured';
+    return input.nodeEnv === 'production' ? 'misconfigured' : 'open-local';
+}
+
+export function kitchenAuthConfigurationState(): KitchenAuthConfigurationState {
+    return resolveKitchenAuthConfiguration({
+        nodeEnv: process.env.NODE_ENV,
+        password: process.env.KITCHEN_PASSWORD,
+    });
 }
 
 export function kitchenAuthEnabled(): boolean {
-    return !!kitchenPassword();
+    return kitchenAuthConfigurationState() === 'configured';
 }
 
 // HMAC key = SHA-256 of the password. Tying it to the password means a changed
@@ -45,11 +63,13 @@ function sign(payload: string): string {
 }
 
 export function createSessionToken(): string {
+    if (!kitchenAuthEnabled()) throw new Error('KITCHEN_AUTH_NOT_CONFIGURED');
     const expiry = String(Date.now() + KITCHEN_SESSION_TTL_MS);
     return `${expiry}.${sign(expiry)}`;
 }
 
 export function verifySessionToken(token: string | undefined | null): boolean {
+    if (!kitchenAuthEnabled()) return false;
     if (!token) return false;
     const dot = token.lastIndexOf('.');
     if (dot <= 0) return false;
@@ -77,6 +97,8 @@ export function checkKitchenPassword(candidate: unknown): boolean {
  * true) when no password is configured; otherwise requires a valid session.
  */
 export function isKitchenAuthorized(req: NextRequest): boolean {
-    if (!kitchenAuthEnabled()) return true;
+    const state = kitchenAuthConfigurationState();
+    if (state === 'open-local') return true;
+    if (state !== 'configured') return false;
     return verifySessionToken(req.cookies.get(KITCHEN_COOKIE)?.value);
 }

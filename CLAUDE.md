@@ -6,7 +6,7 @@
 
 BariBali is a **mobile-first, Hebrew (RTL)** salad + tortilla builder for a **real, pre-launch restaurant** (not a demo/portfolio). Customers build a bowl/wrap ingredient by ingredient, choose a pickup time, and pay online (Hyp Pay) or at pickup. A staff **kitchen board** shows live orders. Ordering is **guest-first** — an account (Google sign-in) is always optional, never required.
 
-Deployed on Vercel, auto-deploys from `main` (GitHub `JBT-bpu/baribali-app`, private). **Production currently runs in demo mode** — real Supabase/Hyp env vars aren't set on Vercel yet, so it uses an in-memory store.
+Deployed on Vercel, auto-deploys from `main` (GitHub `JBT-bpu/baribali-app`, private). **The current `main` deployment runs in demo mode** because the real Supabase/Hyp env vars are not set on Vercel. The unmerged payment-foundation branch changes production to fail closed, so configure those variables before deploying it.
 
 ## 2. Tech stack
 
@@ -29,9 +29,9 @@ npm run check      # typecheck + lint + focused tests + production build
 npm run fresh      # rimraf .next && next dev — use if the dev cache corrupts
 ```
 
-- **Demo vs real mode** hinges on `isSupabaseConfigured()` in `src/lib/supabase.ts`. Without real creds the app is fully usable against process-global in-memory demo stores (`src/lib/demoStore.ts`, `src/lib/shopState.ts`) so separate local Next route graphs agree. This is single-process development state, not durable serverless persistence.
+- **Supabase configuration has three explicit states:** configured, demo and misconfigured. Empty local/test environments use the process-global demo stores (`src/lib/demoStore.ts`, `src/lib/shopState.ts`); production fails closed unless an intentionally public demo deploy sets exactly `NEXT_PUBLIC_BARIBALI_DEMO_MODE=true`. Server routes separately require a secret/service-role key and never fall back to the browser key. This demo state is single-process development data, not durable serverless persistence.
 - **Lint baseline: 0 errors / 10 warnings.** Hold that line — don't add warnings; the 10 are pre-existing `react-hooks/set-state-in-effect` findings.
-- **Focused tests use Node's built-in test runner through pinned `tsx`.** The current 123-test suite covers payment, pricing/order validation and idempotency, kitchen controls and critical customer-flow/source-trust invariants; it is not app-wide, so manual smoke-testing remains required for affected UI flows.
+- **Focused tests use Node's built-in test runner through pinned `tsx`.** The current 130-test suite covers payment, pricing/order validation and idempotency, configuration guardrails, kitchen controls and critical customer-flow/source-trust invariants; it is not app-wide, so manual smoke-testing remains required for affected UI flows.
 
 ## 4. Where things live
 
@@ -53,7 +53,8 @@ src/
 │  ├─ ui/bari/              design system: BariButton, BariPanel, BariModal, BariBadge, BariBottomNav
 │  └─ ui/                   ReviewsStrip, GoldField, GoogleSignInButton
 ├─ data/salad-data.js       ingredient catalog, prices, combos, presets, SIZE_CONFIG, STEPS, TORTILLA_STEPS
-└─ lib/                     supabase, serverSupabase, auth, pricing, hypPay, kitchenAuth,
+└─ lib/                     supabase, supabaseConfig, supabaseServerConfig, serverSupabase,
+                            auth, pricing, hypPay, kitchenAuth,
                             orderSubmission*, rateLimit, reorder, demoStore, motionHooks, utils
 ```
 
@@ -80,7 +81,7 @@ src/
 - **`TORTILLA_STEPS` is imported but never used.** `BariBaliBuilder` renders the salad step set for tortillas too, so a "tortilla" today = salad ingredients on a wrap base price (₪42). Tortilla orders are distinguished **only by base price**, not by their item ids (this is why `src/lib/reorder.ts` detects type from the base).
 - **`/kitchen` auth is live in production** — `KITCHEN_PASSWORD` is set on Vercel (verified: the deployed `/kitchen` renders the login screen and `/api/kitchen/orders` returns 401 anonymously). Unset locally = board runs open, which is the intended dev behaviour.
 - **Hyp uses its dedicated APISign VERIFY return route.** The generic Tranzila/YaadPay webhook still has no signature verification and can only produce `paid_unverified`; it explicitly refuses Hyp payloads. Do not enable Hyp server notifications until the test-terminal payload contract is obtained and implemented.
-- **The durable order-creation and payment ledgers are not live yet.** They exist on `codex/payment-foundation`; neither migration has been applied and the branch is not deployed. Apply/verify order idempotency before enabling real Supabase order creation, because the route deliberately fails closed when that ledger/RPC is missing.
+- **The durable order-creation and payment ledgers are not live yet.** They exist on `codex/payment-foundation`; none of the three forward migrations has been applied and the branch is not deployed. Apply/verify order idempotency before enabling real Supabase order creation, because the route deliberately fails closed when that ledger/RPC is missing.
 - **`/privacy` and `/terms` are drafts** with `[bracketed]` business-detail placeholders that must be filled before launch.
 - **Rate limiting** (`src/lib/rateLimit.ts`) is in-memory/per-process — a deterrent, approximate on serverless (no shared store).
 - **No CI** yet; focused payment tests run locally with `npm test`.

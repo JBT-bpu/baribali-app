@@ -1,4 +1,4 @@
-import { supabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
+import { supabaseConfigurationState } from '@/lib/supabase';
 import { type ShopOverride } from '@/lib/shopHours';
 
 /**
@@ -7,15 +7,11 @@ import { type ShopOverride } from '@/lib/shopHours';
  *
  * Server-only (service role). One row, id = 1.
  *
- * DEGRADES TO THE SCHEDULE. Every read that fails — table missing, database
- * unreachable, permissions wrong — returns "no override", which means the shop
- * follows its normal hours. That is the safe direction: a broken read must not
- * be able to close a shop that is standing open, and must not be able to open
- * one that is shut on a Saturday (the schedule still says closed).
- *
- * It also means the feature can ship before the migration is applied. Until the
- * table exists the board's toggle simply reports that it is unavailable, and
- * the schedule runs everything.
+ * Every failed read — table missing, database unreachable, permissions wrong —
+ * carries `available: false`. Customer and order routes use that signal to fail
+ * closed, because silently losing a staff "closed now" override can accept an
+ * order the kitchen cannot fulfil. Demo mode still has an explicit available
+ * in-memory state.
  */
 
 const TABLE = 'shop_state';
@@ -53,13 +49,16 @@ let warned = false;
 function warnOnce(message: string) {
     if (warned) return;
     warned = true;
-    console.warn(`[shopState] ${message} — falling back to the schedule.`);
+    console.warn(`[shopState] ${message} — live shop state is unavailable.`);
 }
 
 export async function readShopState(): Promise<StoredShopState> {
-    if (!isSupabaseConfigured()) return { ...demoState(), available: true };
+    const configuration = supabaseConfigurationState();
+    if (configuration === 'demo') return { ...demoState(), available: true };
+    if (configuration === 'misconfigured') return NO_OVERRIDE;
     try {
-        const { data, error } = await supabaseAdmin
+        const { getSupabaseAdmin } = await import('@/lib/serverSupabase');
+        const { data, error } = await getSupabaseAdmin()
             .from(TABLE)
             .select('override, note')
             .eq('id', 1)
@@ -75,12 +74,15 @@ export async function readShopState(): Promise<StoredShopState> {
 }
 
 export async function writeShopState(override: ShopOverride, note: string | null): Promise<boolean> {
-    if (!isSupabaseConfigured()) {
+    const configuration = supabaseConfigurationState();
+    if (configuration === 'demo') {
         Object.assign(demoState(), { override, note });
         return true;
     }
+    if (configuration === 'misconfigured') return false;
     try {
-        const { error } = await supabaseAdmin
+        const { getSupabaseAdmin } = await import('@/lib/serverSupabase');
+        const { error } = await getSupabaseAdmin()
             .from(TABLE)
             .upsert({ id: 1, override, note, updated_at: new Date().toISOString() }, { onConflict: 'id' });
         if (error) { warnOnce(error.message); return false; }

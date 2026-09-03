@@ -5,6 +5,7 @@ import { NextRequest } from 'next/server';
 
 import { STEPS } from '../../src/data/salad-data.js';
 import { effectiveItemPrice, effectiveSizePrice } from '../../src/lib/menuConfig';
+import { isolateSupabaseTestEnvironment } from './testEnvironment';
 
 interface TestItem { id: string; he: string; icon: string; price: number }
 interface TestStep { subgroups: { items: TestItem[] }[] }
@@ -49,14 +50,7 @@ function request(body: unknown, source: string) {
 }
 
 test('orders route canonicalizes and idempotently records demo orders', async t => {
-    const savedEnv = {
-        url: process.env.NEXT_PUBLIC_SUPABASE_URL,
-        anon: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-        service: process.env.SUPABASE_SERVICE_ROLE_KEY,
-    };
-    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
-    delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const restoreEnvironment = isolateSupabaseTestEnvironment();
 
     const [{ POST }, demoStore, shopState] = await Promise.all([
         import('../../src/app/api/orders/route'),
@@ -220,11 +214,6 @@ test('orders route canonicalizes and idempotently records demo orders', async t 
     } finally {
         demoStore.resetDemoStore();
         await shopState.writeShopState(null, null);
-        if (savedEnv.url === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_URL;
-        else process.env.NEXT_PUBLIC_SUPABASE_URL = savedEnv.url;
-        if (savedEnv.anon === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-        else process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = savedEnv.anon;
-        if (savedEnv.service === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY;
-        else process.env.SUPABASE_SERVICE_ROLE_KEY = savedEnv.service;
+        restoreEnvironment();
     }
 });

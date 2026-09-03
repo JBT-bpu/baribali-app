@@ -1,15 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
+import { supabaseConfigurationState } from '@/lib/supabaseServerConfig';
 import { isKitchenAuthorized } from '@/lib/kitchenAuth';
 import { customerMap } from '@/lib/customerNames';
 import { listDemoOrders } from '@/lib/demoStore';
+import { loadSupabaseAdmin, supabaseConfigurationErrorResponse } from '@/lib/supabaseRoute';
 
 export async function GET(req: NextRequest) {
     if (!isKitchenAuthorized(req)) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!isSupabaseConfigured()) {
+    const configuration = supabaseConfigurationState();
+    if (configuration === 'misconfigured') return supabaseConfigurationErrorResponse();
+    if (configuration === 'demo') {
         const demoStatuses = new Set([
             'paid',
             'pay_at_pickup',
@@ -25,7 +28,15 @@ export async function GET(req: NextRequest) {
     const since = new Date();
     since.setHours(0, 0, 0, 0); // today only
 
-    const { data, error } = await supabaseAdmin
+    let admin;
+    try {
+        admin = await loadSupabaseAdmin();
+    } catch (error) {
+        console.error('[GET /api/kitchen/orders] Admin client unavailable:', error);
+        return supabaseConfigurationErrorResponse();
+    }
+
+    const { data, error } = await admin
         .from('orders')
         .select('*')
         .gte('created_at', since.toISOString())

@@ -1,5 +1,3 @@
-import { supabaseAdmin } from '@/lib/supabase';
-
 /**
  * Resolves a signed-in customer's display name/email from their user id.
  *
@@ -23,7 +21,8 @@ async function resolveOne(userId: string): Promise<Customer> {
 
     let result: Customer = { name: null, email: null };
     try {
-        const { data } = await supabaseAdmin.auth.admin.getUserById(userId);
+        const { getSupabaseAdmin } = await import('@/lib/serverSupabase');
+        const { data } = await getSupabaseAdmin().auth.admin.getUserById(userId);
         const meta = (data.user?.user_metadata ?? {}) as Record<string, unknown>;
         result = {
             name: (meta.full_name as string) ?? (meta.name as string) ?? null,

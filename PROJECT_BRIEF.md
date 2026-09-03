@@ -22,7 +22,7 @@ BariBali is a mobile-first, Hebrew (RTL) salad and tortilla builder for a **real
 - **PWA**: manifest (`src/app/manifest.ts`) implemented — installable/"Add to Home Screen"
 - **Lint**: ESLint 9 flat config (`eslint.config.mjs`), script is `eslint .`
 
-There are 123 focused Node/`tsx` regression tests covering Hyp, settlement and migration invariants, pricing/order authority and idempotency, hard-reload checkout recovery, generic-webhook rejection, kitchen controls/simulation and critical customer-flow/source-trust invariants. There is still no CI pipeline.
+There are 130 focused Node/`tsx` regression tests covering Hyp, settlement and migration invariants, pricing/order authority and idempotency, environment/configuration guardrails, hard-reload checkout recovery, generic-webhook rejection, kitchen controls/simulation and critical customer-flow/source-trust invariants. There is still no CI pipeline.
 
 ## 3. Directory structure (current)
 
@@ -52,7 +52,10 @@ src/
 │   └── ui/                     # ReviewsStrip, GoldField, GoogleSignInButton
 ├── data/salad-data.js          # Ingredient catalog, fallback prices, combo rules, presets, SIZE_CONFIG
 └── lib/
-    ├── supabase.ts             # Anon + service-role clients and demo/config detection
+    ├── supabase.ts             # Browser publishable/anon client only
+    ├── supabaseConfig.ts       # Client-safe configured/demo/misconfigured resolver
+    ├── supabaseServerConfig.ts # Server env resolver, including secret/service-role key
+    ├── serverSupabase.ts       # Strict server-only admin client; no anon fallback
     ├── auth.ts                 # Client-side auth: signInWithGoogle, useUser, getAccessToken, displayName/avatarUrl
     ├── pricing.ts               # Server-side canonical price computation (computeOrderTotal)
     ├── hypPay.ts                # Hyp Pay SIGN/VERIFY request builders
@@ -235,7 +238,7 @@ Git history is authoritative for exact detail — commit messages are descriptiv
 `main` is pushed, in sync and live at `d44fe06` as of 2026-09-03. The current `codex/payment-foundation` branch is local and unpushed. Production auto-deploys from `main` but is **still in demo mode** because the real Supabase/Hyp variables are not set on Vercel. Remaining:
 
 1. **Fill the `[bracketed]` placeholders in the legal pages** before launch (business/legal name, ח.פ., address, contact email/phone, VAT-inclusive?, payment provider name, cancellation/refund policy, allergen statement, jurisdiction city, effective date, min age and retention period).
-2. Add real Supabase/Hyp Pay env vars to **Vercel** to take production out of demo mode.
+2. Add real Supabase/Hyp Pay env vars to **Vercel** before deploying this branch. Current `main` falls into demo mode without them; the branch intentionally fails closed instead. A public demo deploy now requires the exact opt-in `NEXT_PUBLIC_BARIBALI_DEMO_MODE=true`, which must not coexist with credentials.
 3. Production domain — not yet decided.
 4. Verify whether the emailed Hyp terminal credentials are test or production and map their exact fields before updating credential status.
 5. Menu/navigation follow-up — see `MENU_FLOW_BRIEF.md` / `MENU_RESTRUCTURE_REPLY.md`. The three-item nav, `/orders` split, reorder and dead-route cleanup are done; softening the repeated external-entry gate and unifying the builder remain open product decisions.
@@ -244,13 +247,13 @@ Git history is authoritative for exact detail — commit messages are descriptiv
 8. **Consider a database-level guard on `payment_status`** after Hyp lands, so it cannot reach `paid` except through a verified path. The RLS fix closes the door from outside; this would mean a bug in one server route can't hand out free food either.
 
 **Current unmerged work:** `codex/payment-foundation` contains the durable
-order-submission and payment foundations plus the order-validation, settlement
-and kitchen hardening passes. It is unpushed, unapplied to Supabase and
+order-submission and payment foundations plus the order-validation, settlement,
+kitchen and production-configuration hardening passes. It is unpushed, unapplied to Supabase and
 undeployed. Git history is authoritative for the exact commit list.
 
 ## 10. Improvement backlog (not started, no priority commitment)
 
-- **Testing/CI**: 123 focused regression tests, no CI. The largest gaps are component/browser automation, end-to-end provider flows and database-backed concurrency tests.
+- **Testing/CI**: 130 focused regression tests, no CI. The largest gaps are component/browser automation, end-to-end provider flows and database-backed concurrency tests.
 - **Observability**: no error tracking, no structured logging on payment/webhook routes.
 - **Ops**: a local password-gated admin exists for prices/discounts/customers, but there is no production reporting dashboard. Schema/policy SQL and migrations are tracked; execution, advisor runs and backup/PITR verification remain manual.
 - **Code quality**: `zustand` installed but unused — a `BariBaliBuilder.jsx` state-lifting refactor is on the table whenever there's appetite.
@@ -259,4 +262,4 @@ undeployed. Git history is authoritative for the exact commit list.
 
 ## 11. Environment variables
 
-Canonical list in `.env.example` at repo root. Categories: Supabase (URL/publishable/service-role keys), kitchen-board and local-admin passwords, payment-provider selection plus Tranzila/YaadPay/Hyp credentials, Google Places API (reviews strip), and app base URL (payment redirects).
+Canonical list in `.env.example` at repo root. Categories: Supabase (URL, publishable/anon key, secret/service-role key and explicit demo opt-in), kitchen-board and local-admin passwords, payment-provider selection plus Tranzila/YaadPay/Hyp credentials, Google Places API (reviews strip), and app base URL (payment redirects). Production rejects incomplete/mixed Supabase configuration, and `next.config.js` stops the build if it recognizes a private key in a `NEXT_PUBLIC_` slot or a public key in a server-only slot.

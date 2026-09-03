@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
+import { supabaseConfigurationState } from '@/lib/supabaseServerConfig';
 import { isAdminAuthorized } from '@/lib/adminAuth';
 import { getCustomerTagMap } from '@/lib/customerTags';
 import { customerMap } from '@/lib/customerNames';
+import { loadSupabaseAdmin, supabaseConfigurationErrorResponse } from '@/lib/supabaseRoute';
 
 // Read-only customer/orders view for the manager admin. Aggregates the orders
 // table (live Supabase data — the one part that can't be config-in-code).
@@ -10,11 +11,21 @@ export async function GET(req: NextRequest) {
     if (!isAdminAuthorized(req)) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    if (!isSupabaseConfigured()) {
+    const configuration = supabaseConfigurationState();
+    if (configuration === 'misconfigured') return supabaseConfigurationErrorResponse();
+    if (configuration === 'demo') {
         return NextResponse.json({ error: 'Not available in demo mode' }, { status: 503 });
     }
 
-    const { data: orders, error } = await supabaseAdmin
+    let admin;
+    try {
+        admin = await loadSupabaseAdmin();
+    } catch (error) {
+        console.error('[GET /api/admin/customers] Admin client unavailable:', error);
+        return supabaseConfigurationErrorResponse();
+    }
+
+    const { data: orders, error } = await admin
         .from('orders')
         .select('user_id, total, created_at')
         .order('created_at', { ascending: false })

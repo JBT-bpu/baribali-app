@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { isSupabaseConfigured } from '@/lib/supabase';
+import { isSupabaseDemoMode } from '@/lib/supabase';
 import { orderSizeLabel } from '@/lib/reorder';
 import OrderTabs from './OrderTabs';
 import ActiveOrder from './ActiveOrder';
@@ -106,7 +106,7 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
     const [now, setNow] = useState(new Date());
-    const isDemo = !isSupabaseConfigured();
+    const isDemo = isSupabaseDemoMode();
 
     // A board that can't reach the server must never look like a quiet board:
     // during a rush the kitchen would sit idle while orders piled up.

@@ -1,5 +1,9 @@
 import { cookies } from 'next/headers';
-import { kitchenAuthEnabled, verifySessionToken, KITCHEN_COOKIE } from '@/lib/kitchenAuth';
+import {
+    kitchenAuthConfigurationState,
+    verifySessionToken,
+    KITCHEN_COOKIE,
+} from '@/lib/kitchenAuth';
 import KitchenBoard from './KitchenBoard';
 import KitchenLogin from './KitchenLogin';
 
@@ -9,12 +13,15 @@ export const dynamic = 'force-dynamic';
 
 // Server-side gate: the session cookie is httpOnly (unreadable from client JS),
 // so authorization is decided here before any board markup or data-fetching
-// code reaches the browser. When no KITCHEN_PASSWORD is configured the board
-// runs open (local/demo dev).
+// code reaches the browser. A missing password is open only outside production;
+// a production deployment with no password stays on the locked screen.
 export default async function KitchenPage() {
-    const authEnabled = kitchenAuthEnabled();
+    const authState = kitchenAuthConfigurationState();
+    const authEnabled = authState !== 'open-local';
 
-    if (authEnabled) {
+    if (authState === 'misconfigured') return <KitchenLogin />;
+
+    if (authState === 'configured') {
         const token = (await cookies()).get(KITCHEN_COOKIE)?.value;
         if (!verifySessionToken(token)) {
             return <KitchenLogin />;

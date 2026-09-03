@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
+import { supabaseConfigurationState } from '@/lib/supabaseServerConfig';
 import { isKitchenAuthorized } from '@/lib/kitchenAuth';
 import { STEPS } from '@/data/salad-data.js';
 import { effectiveItemPrice, effectiveSizePrice } from '@/lib/menuConfig';
 import { createDemoOrder, removeDemoSimulationOrders } from '@/lib/demoStore';
+import { loadSupabaseAdmin, supabaseConfigurationErrorResponse } from '@/lib/supabaseRoute';
 
 /**
  * Test orders for rehearsing the kitchen board (the chime, a tab appearing, the
@@ -84,7 +85,9 @@ export async function POST(req: NextRequest) {
     if (!isKitchenAuthorized(req)) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    if (!isSupabaseConfigured()) {
+    const configuration = supabaseConfigurationState();
+    if (configuration === 'misconfigured') return supabaseConfigurationErrorResponse();
+    if (configuration === 'demo') {
         const simulated = buildOrder();
         const order = createDemoOrder({
             orderNum: simulated.order_num,
@@ -98,7 +101,15 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ id: order.id, orderNum: order.order_num, demo: true });
     }
 
-    const { data, error } = await supabaseAdmin
+    let admin;
+    try {
+        admin = await loadSupabaseAdmin();
+    } catch (error) {
+        console.error('[POST /api/kitchen/simulate] Admin client unavailable:', error);
+        return supabaseConfigurationErrorResponse();
+    }
+
+    const { data, error } = await admin
         .from('orders')
         .insert(buildOrder())
         .select('id, order_num')
@@ -116,11 +127,21 @@ export async function DELETE(req: NextRequest) {
     if (!isKitchenAuthorized(req)) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    if (!isSupabaseConfigured()) {
+    const configuration = supabaseConfigurationState();
+    if (configuration === 'misconfigured') return supabaseConfigurationErrorResponse();
+    if (configuration === 'demo') {
         return NextResponse.json({ removed: removeDemoSimulationOrders(), demo: true });
     }
 
-    const { data, error } = await supabaseAdmin
+    let admin;
+    try {
+        admin = await loadSupabaseAdmin();
+    } catch (error) {
+        console.error('[DELETE /api/kitchen/simulate] Admin client unavailable:', error);
+        return supabaseConfigurationErrorResponse();
+    }
+
+    const { data, error } = await admin
         .from('orders')
         .delete()
         .like('order_num', 'SIM-%')

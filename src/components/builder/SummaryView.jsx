@@ -134,7 +134,7 @@ import BariBadge from "../ui/bari/BariBadge";
 import BariModal from "../ui/bari/BariModal";
 import BariPlaque, { BariPlaqueKeyframes } from "../ui/bari/BariPlaque";
 import { PLAQUE } from "../ui/bari/plaqueGeometry";
-import { isSupabaseConfigured } from "../../lib/supabase";
+import { isSupabaseDemoMode } from "../../lib/supabase";
 import { getAccessToken } from "../../lib/auth";
 import { requiresHostedPayment } from "../../lib/customerPayment";
 import {
@@ -155,7 +155,7 @@ import {
 } from "../../lib/shopHours";
 import { useShopStatus } from "../../lib/useShopStatus";
 
-const DEMO_MODE = !isSupabaseConfigured();
+const DEMO_MODE = isSupabaseDemoMode();
 const SHOW_FAILURE_TEST = DEMO_MODE && process.env.NODE_ENV !== "production";
 
 function freshPaymentKey() {

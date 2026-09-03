@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { supabaseConfigurationState } from '@/lib/supabaseServerConfig';
 import { paymentProvider } from '@/lib/payment';
+import { loadSupabaseAdmin, supabaseConfigurationErrorResponse } from '@/lib/supabaseRoute';
 
 /*
   Payment webhook — called by Tranzila/YaadPay after payment completes.
@@ -34,6 +35,18 @@ export async function POST(req: NextRequest) {
         }, { status: 409 });
     }
 
+    if (supabaseConfigurationState() !== 'configured') {
+        return supabaseConfigurationErrorResponse();
+    }
+
+    let admin;
+    try {
+        admin = await loadSupabaseAdmin();
+    } catch (error) {
+        console.error('[POST /api/payment/webhook] Admin client unavailable:', error);
+        return supabaseConfigurationErrorResponse();
+    }
+
     const body = await req.text();
     const params = new URLSearchParams(body);
 
@@ -58,13 +71,17 @@ export async function POST(req: NextRequest) {
 
     if (!orderNum) return NextResponse.json({ ok: false, error: 'No order number in webhook' });
 
-    const { data: order, error } = await supabaseAdmin
+    const { data: order, error } = await admin
         .from('orders')
         .select('id, total, payment_status')
         .eq('order_num', orderNum)
-        .single();
+        .maybeSingle();
 
-    if (error || !order) {
+    if (error) {
+        console.error('[POST /api/payment/webhook] Order lookup failed:', error.message);
+        return new NextResponse('RETRY', { status: 503 });
+    }
+    if (!order) {
         return NextResponse.json({ ok: false, error: 'Unknown order' });
     }
 
@@ -82,10 +99,14 @@ export async function POST(req: NextRequest) {
         success = false;
     }
 
-    await supabaseAdmin
+    const { error: updateError } = await admin
         .from('orders')
         .update({ payment_status: success ? 'paid_unverified' : 'failed' })
         .eq('order_num', orderNum);
+    if (updateError) {
+        console.error('[POST /api/payment/webhook] Settlement update failed:', updateError.message);
+        return new NextResponse('RETRY', { status: 503 });
+    }
 
     // Providers expect a plain 200 OK
     return new NextResponse('OK', { status: 200 });
@@ -98,6 +119,15 @@ export async function GET() {
             ok: false,
             error: 'Hyp notifications are not configured on this endpoint',
         }, { status: 409 });
+    }
+    if (supabaseConfigurationState() !== 'configured') {
+        return supabaseConfigurationErrorResponse();
+    }
+    try {
+        await loadSupabaseAdmin();
+    } catch (error) {
+        console.error('[GET /api/payment/webhook] Admin client unavailable:', error);
+        return supabaseConfigurationErrorResponse();
     }
     return new NextResponse('OK', { status: 200 });
 }

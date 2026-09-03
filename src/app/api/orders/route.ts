@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { isSupabaseConfigured } from '@/lib/supabase';
+import { supabaseConfigurationState } from '@/lib/supabaseServerConfig';
 import { computeOrderTotal } from '@/lib/pricing';
 import {
     createDemoOrderOnce,
@@ -14,7 +14,11 @@ import {
     CustomerDiscountLookupError,
     getCustomerDiscount,
 } from '@/lib/customerTags';
-import { shopStatus, checkPickup } from '@/lib/shopHours';
+import {
+    SHOP_STATE_UNAVAILABLE_ERROR_CODE,
+    shopStatus,
+    checkPickup,
+} from '@/lib/shopHours';
 import { readShopState } from '@/lib/shopState';
 import {
     initialOrderPaymentStatus,
@@ -23,6 +27,7 @@ import {
     parseOrderSubmissionIntent,
     resolveOrderPricingDecision,
 } from '@/lib/orderSubmissionServer';
+import { supabaseConfigurationErrorResponse } from '@/lib/supabaseRoute';
 
 const ORDER_INTENT_VERSION = 1;
 
@@ -117,7 +122,9 @@ export async function POST(req: NextRequest) {
             }, { status: 400 });
         }
 
-        const demoMode = !isSupabaseConfigured();
+        const configuration = supabaseConfigurationState();
+        if (configuration === 'misconfigured') return supabaseConfigurationErrorResponse();
+        const demoMode = configuration === 'demo';
         let admin: SupabaseClient | null = null;
         if (!demoMode) {
             try {
@@ -127,7 +134,7 @@ export async function POST(req: NextRequest) {
                 admin = getSupabaseAdmin();
             } catch (error) {
                 console.error('[POST /api/orders] Admin client unavailable:', error);
-                return idempotencyUnavailable();
+                return supabaseConfigurationErrorResponse();
             }
         }
         const parsed = parseOrderSubmissionIntent(input, demoMode);
@@ -201,7 +208,14 @@ export async function POST(req: NextRequest) {
         // The server, not the visible client clock, owns opening and pickup
         // acceptance. A manual open override may legitimately accept null.
         const now = new Date();
-        const shop = shopStatus(now, (await readShopState()).override);
+        const storedShopState = await readShopState();
+        if (!storedShopState.available) {
+            return NextResponse.json({
+                error: 'לא הצלחנו לוודא כרגע שהמטבח פתוח. נסו שוב בעוד רגע.',
+                code: SHOP_STATE_UNAVAILABLE_ERROR_CODE,
+            }, { status: 503 });
+        }
+        const shop = shopStatus(now, storedShopState.override);
         if (!shop.open) {
             return NextResponse.json({
                 error: shop.reason === 'override_closed'

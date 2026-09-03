@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
     checkKitchenPassword,
     createSessionToken,
-    kitchenAuthEnabled,
+    kitchenAuthConfigurationState,
     KITCHEN_COOKIE,
     KITCHEN_SESSION_TTL_MS,
 } from '@/lib/kitchenAuth';
@@ -13,10 +13,16 @@ export async function POST(req: NextRequest) {
     const limited = enforceRateLimit(req, 'kitchen-login', 8, 60_000);
     if (limited) return limited;
 
-    // No password configured — the board runs open, so there's nothing to log
-    // into. Report that so the client can just proceed.
-    if (!kitchenAuthEnabled()) {
+    const authState = kitchenAuthConfigurationState();
+    // No password is an intentional convenience only outside production.
+    if (authState === 'open-local') {
         return NextResponse.json({ ok: true, open: true });
+    }
+    if (authState === 'misconfigured') {
+        return NextResponse.json({
+            error: 'לוח המטבח אינו מוגדר כרגע',
+            code: 'KITCHEN_AUTH_CONFIGURATION_ERROR',
+        }, { status: 503 });
     }
 
     let password: unknown;

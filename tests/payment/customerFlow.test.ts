@@ -186,8 +186,8 @@ test('long-open customer screens refresh time-sensitive shop state safely', () =
     assert.match(slotsRoute, /export const revalidate = 0/);
     assert.match(slotsRoute, /serviceDate = shopDateKey\(now\)/,
         'capacity responses must identify their Israel service date');
-    assert.equal(slotsRoute.match(/headers: NO_STORE_HEADERS/g)?.length, 2,
-        'both slot responses must explicitly opt out of caching');
+    assert.equal(slotsRoute.match(/headers: NO_STORE_HEADERS/g)?.length, 3,
+        'closed, capacity and capacity-error responses must explicitly opt out of caching');
 });
 
 test('the shared size picker is a keyboard-complete modal', () => {

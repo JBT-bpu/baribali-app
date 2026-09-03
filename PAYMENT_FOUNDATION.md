@@ -65,7 +65,7 @@ the missing `orders.user_id` index.
 ## Before applying the migration
 
 1. Confirm the complete `public.orders` shape, including the nullable discount
-   fields. Both migrations contain guards and abort when required types differ.
+   fields. The forward migrations contain guards and abort when required types differ.
 2. Take a database backup or confirm the project's recovery option.
 3. Apply first to a restored test/staging project, not directly to production.
 4. Run Supabase database and security advisors after applying.

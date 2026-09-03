@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
+import { supabaseConfigurationState } from '@/lib/supabaseServerConfig';
 import { listDemoOrders } from '@/lib/demoStore';
 import { enforceRateLimit } from '@/lib/rateLimit';
 import { pickupSlots, shopDateKey, SHOP_TZ } from '@/lib/shopHours';
+import { loadSupabaseAdmin, supabaseConfigurationErrorResponse } from '@/lib/supabaseRoute';
 
 const SLOT_CAPACITY = 5;      // max orders per slot
 const TIMEZONE = SHOP_TZ;
@@ -63,6 +64,19 @@ export async function GET(req: NextRequest) {
     const limited = enforceRateLimit(req, 'slots', 40, 60_000);
     if (limited) return limited;
 
+    const configuration = supabaseConfigurationState();
+    if (configuration === 'misconfigured') return supabaseConfigurationErrorResponse();
+
+    let admin = null;
+    if (configuration === 'configured') {
+        try {
+            admin = await loadSupabaseAdmin();
+        } catch (error) {
+            console.error('[GET /api/slots] Admin client unavailable:', error);
+            return supabaseConfigurationErrorResponse();
+        }
+    }
+
     const now = new Date();
     const offered = pickupSlots(now);
     const slotTimes = offered.map(s => s.id);
@@ -76,17 +90,24 @@ export async function GET(req: NextRequest) {
     const today = getIsraelMidnightUTC(now);
 
     let existing: { pickup_time: string | null }[] = [];
-    if (!isSupabaseConfigured()) {
+    if (configuration === 'demo') {
         existing = listDemoOrders()
             .filter(o => o.status !== 'collected' && o.created_at >= today.toISOString() && o.pickup_time && slotTimes.includes(o.pickup_time))
             .map(o => ({ pickup_time: o.pickup_time }));
     } else {
-        const { data } = await supabaseAdmin
+        const { data, error } = await admin!
             .from('orders')
             .select('pickup_time')
             .gte('created_at', today.toISOString())
             .neq('status', 'collected')
             .in('pickup_time', slotTimes);
+        if (error) {
+            console.error('[GET /api/slots] Capacity query failed:', error.message);
+            return NextResponse.json({
+                error: 'Pickup capacity is temporarily unavailable',
+                code: 'SLOT_CAPACITY_UNAVAILABLE',
+            }, { status: 503, headers: NO_STORE_HEADERS });
+        }
         existing = data ?? [];
     }
 

@@ -1,7 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { shopStatus, type ShopOverride, type ShopStatus } from './shopHours';
+import {
+    SHOP_STATE_UNAVAILABLE_ERROR_CODE,
+    shopStatus,
+    type ShopOverride,
+    type ShopStatus,
+} from './shopHours';
+import { SUPABASE_CONFIGURATION_ERROR_CODE } from './supabaseConfig';
 
 /**
  * Is the shop open — as the customer's browser understands it.
@@ -62,9 +68,43 @@ export function useShopStatus(): LiveShopStatus {
         };
 
         fetch('/api/shop', { cache: 'no-store', signal: controller.signal })
-            .then(r => (r.ok ? r.json() : null))
-            .then((data: (ShopStatus & { override?: ShopOverride; storeAvailable?: boolean }) | null) => {
+            .then(async response => {
+                const data = await response.json().catch(() => null);
+                if (response.ok) return { kind: 'status' as const, data };
+                if (
+                    response.status === 503
+                    && (
+                        data?.code === SUPABASE_CONFIGURATION_ERROR_CODE
+                        || data?.code === SHOP_STATE_UNAVAILABLE_ERROR_CODE
+                    )
+                ) return { kind: 'configuration-error' as const, data: null };
+                return { kind: 'fallback' as const, data: null };
+            })
+            .then(result => {
                 if (cancelled) return;
+                if (result.kind === 'configuration-error') {
+                    const note = 'ההזמנות אינן זמינות כרגע';
+                    lastKnownOverrideRef.current = { override: 'closed', note };
+                    const unavailable = shopStatus(
+                        new Date(),
+                        'closed',
+                        note,
+                    );
+                    setState({
+                        ...unavailable,
+                        override: 'closed',
+                        loading: false,
+                        live: true,
+                        refreshedAt: Date.now(),
+                    });
+                    return;
+                }
+                const data = result.kind === 'status'
+                    ? result.data as (ShopStatus & {
+                        override?: ShopOverride;
+                        storeAvailable?: boolean;
+                    }) | null
+                    : null;
                 if (data && typeof data.open === 'boolean') {
                     const override = data.override === 'open' || data.override === 'closed'
                         ? data.override

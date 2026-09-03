@@ -1,28 +1,51 @@
 import 'server-only';
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseConfigurationState } from '@/lib/supabaseConfig';
+import {
+    serverSupabaseKey,
+    supabaseConfigurationState,
+} from '@/lib/supabaseServerConfig';
 
 let adminClient: SupabaseClient | null = null;
+let adminClientUrl: string | null = null;
+let adminClientKey: string | null = null;
+
+export function serverSupabaseConfigurationState(): SupabaseConfigurationState {
+    return supabaseConfigurationState();
+}
+
+export class SupabaseAdminConfigurationError extends Error {
+    readonly code = 'SUPABASE_ADMIN_NOT_CONFIGURED';
+
+    constructor(public readonly state: SupabaseConfigurationState) {
+        super('SUPABASE_ADMIN_NOT_CONFIGURED');
+        this.name = 'SupabaseAdminConfigurationError';
+    }
+}
 
 /**
  * Payment and order settlement must never fall back to the browser anon key.
  * A missing server credential is a deployment error, not demo mode.
  */
 export function getSupabaseAdmin(): SupabaseClient {
-    if (adminClient) return adminClient;
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+    const serverKey = serverSupabaseKey();
+    const state = serverSupabaseConfigurationState();
 
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (!url || url.includes('your-project') || !serviceKey) {
-        throw new Error('SUPABASE_ADMIN_NOT_CONFIGURED');
+    if (state !== 'configured' || !url || !serverKey) {
+        throw new SupabaseAdminConfigurationError(state);
     }
 
-    adminClient = createClient(url, serviceKey, {
+    if (adminClient && adminClientUrl === url && adminClientKey === serverKey) return adminClient;
+
+    adminClient = createClient(url, serverKey, {
         auth: {
             autoRefreshToken: false,
             persistSession: false,
         },
     });
+    adminClientUrl = url;
+    adminClientKey = serverKey;
     return adminClient;
 }

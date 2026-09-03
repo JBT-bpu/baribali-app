@@ -8,6 +8,8 @@ import {
     lookupCustomerDiscount,
     type CustomerDiscountLookupClient,
 } from '../../src/lib/customerTags';
+import { supabaseConfigurationState } from '../../src/lib/supabaseServerConfig';
+import { isolateSupabaseTestEnvironment } from './testEnvironment';
 
 const ordersRouteSource = readFileSync(new URL(
     '../../src/app/api/orders/route.ts',
@@ -132,12 +134,13 @@ test('malformed rows fail closed while unknown catalog codes remain a valid no-d
 });
 
 test('configured lookups refuse the implicit anon fallback', { concurrency: false }, async () => {
-    const savedUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const savedServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const restoreEnvironment = isolateSupabaseTestEnvironment({
+        NEXT_PUBLIC_SUPABASE_URL: 'https://example.supabase.co',
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_example',
+    });
 
     try {
-        process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co';
-        delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+        assert.equal(supabaseConfigurationState(), 'misconfigured');
 
         const result = await lookupCustomerDiscount(
             '44444444-4444-4444-8444-444444444444',
@@ -145,30 +148,20 @@ test('configured lookups refuse the implicit anon fallback', { concurrency: fals
         assert.equal(result.ok, false);
         if (!result.ok) assert.equal(result.error.code, 'CUSTOMER_TAG_ADMIN_REQUIRED');
     } finally {
-        if (savedUrl === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_URL;
-        else process.env.NEXT_PUBLIC_SUPABASE_URL = savedUrl;
-        if (savedServiceKey === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY;
-        else process.env.SUPABASE_SERVICE_ROLE_KEY = savedServiceKey;
+        restoreEnvironment();
     }
 });
 
 test('demo mode still resolves to no standing discount without querying Supabase', { concurrency: false }, async () => {
-    const savedUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const savedServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const restoreEnvironment = isolateSupabaseTestEnvironment();
 
     try {
-        delete process.env.NEXT_PUBLIC_SUPABASE_URL;
-        delete process.env.SUPABASE_SERVICE_ROLE_KEY;
-
         assert.equal(
             await getCustomerDiscount('55555555-5555-4555-8555-555555555555'),
             null,
         );
     } finally {
-        if (savedUrl === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_URL;
-        else process.env.NEXT_PUBLIC_SUPABASE_URL = savedUrl;
-        if (savedServiceKey === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY;
-        else process.env.SUPABASE_SERVICE_ROLE_KEY = savedServiceKey;
+        restoreEnvironment();
     }
 });
 
