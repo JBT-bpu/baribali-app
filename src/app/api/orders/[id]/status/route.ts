@@ -23,12 +23,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
             return NextResponse.json({ ok: true });
         }
 
-        const { error } = await supabaseAdmin
+        const { data, error } = await supabaseAdmin
             .from('orders')
             .update({ status })
-            .eq('id', id);
+            .eq('id', id)
+            .select('id')
+            .maybeSingle();
 
         if (error) throw error;
+        // Supabase UPDATE is not an error when its filter matches zero rows.
+        // Treat that the same as the demo store so the kitchen cannot keep a
+        // locally restored/updated ticket that no longer exists on the server.
+        if (!data) return NextResponse.json({ error: 'Order not found' }, { status: 404 });
 
         return NextResponse.json({ ok: true });
     } catch (err) {

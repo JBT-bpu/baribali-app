@@ -76,13 +76,10 @@ export const URGENCY_COLOR: Record<Urgency, string | null> = {
  * same thing to the person handing over food, and they used to render
  * identically — same text, same green tick.
  *
- * `paid_unverified` is what a confirmed payment becomes when the Hyp webhook
- * cannot be signature-verified, which is every online payment today. The whole
- * design compensates by having staff confirm at the register — and that control
- * had no surface anywhere in the app, so nobody was being asked to perform it.
- * It matters more once payment is digital-only: at that point every order on the
- * board is unverified, and this pill is the only thing standing between the shop
- * and a disputed charge.
+ * `paid_unverified` is the legacy/generic-webhook state for a payment that was
+ * reported successful without cryptographic verification. Hyp browser returns
+ * now use their dedicated VERIFY path; any older or fallback unverified order
+ * still needs staff to confirm it at the register before handoff.
  */
 export type PayTone = 'settled' | 'verify' | 'owed';
 
@@ -100,6 +97,14 @@ export function paymentLabel(payment: string | undefined): { text: string; tone:
         case 'failed': return { text: 'תשלום נכשל — לגבות באיסוף', tone: 'owed', owed: true };
         default: return null;
     }
+}
+
+/** The handoff tap itself is the staff acknowledgement for unsettled money. */
+export function handoffActionLabel(payment: string | undefined): string {
+    const pay = paymentLabel(payment);
+    if (pay?.tone === 'verify') return 'וידאתי בקופה — נמסר ללקוח ✓';
+    if (pay?.owed) return 'התשלום נגבה — נמסר ללקוח ✓';
+    return 'נמסר ללקוח ✓';
 }
 
 /** Tabs run by pickup time; same slot falls back to who ordered first. */

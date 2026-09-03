@@ -3,6 +3,7 @@ import { supabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 import { isKitchenAuthorized } from '@/lib/kitchenAuth';
 import { STEPS } from '@/data/salad-data.js';
 import { effectiveItemPrice, effectiveSizePrice } from '@/lib/menuConfig';
+import { createDemoOrder, removeDemoSimulationOrders } from '@/lib/demoStore';
 
 /**
  * Test orders for rehearsing the kitchen board (the chime, a tab appearing, the
@@ -84,7 +85,17 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     if (!isSupabaseConfigured()) {
-        return NextResponse.json({ error: 'Simulation needs a real database' }, { status: 503 });
+        const simulated = buildOrder();
+        const order = createDemoOrder({
+            orderNum: simulated.order_num,
+            items: simulated.items,
+            total: simulated.total,
+            pickupTime: simulated.pickup_time,
+            notes: simulated.notes,
+            size: simulated.size,
+            paymentStatus: 'pay_at_pickup',
+        });
+        return NextResponse.json({ id: order.id, orderNum: order.order_num, demo: true });
     }
 
     const { data, error } = await supabaseAdmin
@@ -106,7 +117,7 @@ export async function DELETE(req: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     if (!isSupabaseConfigured()) {
-        return NextResponse.json({ error: 'Simulation needs a real database' }, { status: 503 });
+        return NextResponse.json({ removed: removeDemoSimulationOrders(), demo: true });
     }
 
     const { data, error } = await supabaseAdmin

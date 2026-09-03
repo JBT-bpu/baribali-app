@@ -191,6 +191,20 @@ export interface ShopStatus {
     /** Today's scheduled window, for "we open at 9:00" messages. */
     opensAt: string | null;
     closesAt: string | null;
+    /** The schedule alone, before a staff override is applied. */
+    scheduledOpen: boolean;
+}
+
+/**
+ * Resolve an explicit staff intent against the schedule at write time. Matching
+ * the schedule clears a stale exception; disagreeing with it needs an override.
+ */
+export function shopOverrideForTargetOpen(
+    status: Pick<ShopStatus, 'scheduledOpen'>,
+    targetOpen: boolean,
+): ShopOverride {
+    if (status.scheduledOpen === targetOpen) return null;
+    return targetOpen ? 'open' : 'closed';
 }
 
 /** Schedule + override, resolved. Pure, so both sides and the harness agree. */
@@ -199,16 +213,17 @@ export function shopStatus(now: Date, override: ShopOverride = null, note: strin
     const { open, close } = hoursFor(day);
     const opensAt = open === null ? null : toHHMM(open);
     const closesAt = close === null ? null : toHHMM(close);
+    const scheduledOpen = open !== null && close !== null && nowMins >= open && nowMins <= close;
 
     // The override wins in both directions — that is the entire point of it.
-    if (override === 'closed') return { open: false, reason: 'override_closed', note, opensAt, closesAt };
-    if (override === 'open') return { open: true, reason: 'override_open', note, opensAt, closesAt };
+    if (override === 'closed') return { open: false, reason: 'override_closed', note, opensAt, closesAt, scheduledOpen };
+    if (override === 'open') return { open: true, reason: 'override_open', note, opensAt, closesAt, scheduledOpen };
 
-    if (open === null || close === null) return { open: false, reason: 'closed_day', note, opensAt, closesAt };
+    if (open === null || close === null) return { open: false, reason: 'closed_day', note, opensAt, closesAt, scheduledOpen };
 
-    if (nowMins < open) return { open: false, reason: 'before_open', note, opensAt, closesAt };
-    if (nowMins > close) return { open: false, reason: 'after_close', note, opensAt, closesAt };
-    return { open: true, reason: 'open', note, opensAt, closesAt };
+    if (nowMins < open) return { open: false, reason: 'before_open', note, opensAt, closesAt, scheduledOpen };
+    if (nowMins > close) return { open: false, reason: 'after_close', note, opensAt, closesAt, scheduledOpen };
+    return { open: true, reason: 'open', note, opensAt, closesAt, scheduledOpen };
 }
 
 /**

@@ -7,8 +7,9 @@ import { type Order, urgencyOf, URGENCY_COLOR } from './types';
  * The queue, always visible. One tab per open order, ordered by pickup time.
  *
  * Pickup time is the largest thing on a tab because it is what the worker plans
- * around. Urgency is a single small dot and lateness a short line of text —
- * never a flashing card, which is unusable on a surface someone works at.
+ * around. Urgency is a compact text marker and lateness a short line of text —
+ * never a flashing card, which is unusable on a surface someone works at. The
+ * words matter: colour alone is too easy to miss at arm's length.
  *
  * Tabs never re-select on their own: a new order changes this strip, never the
  * order being worked on (see KitchenBoard).
@@ -63,6 +64,7 @@ export default function OrderTabs({
                 const active = o.id === activeId;
                 const { level, lateBy } = urgencyOf(o.pickup_time);
                 const dot = URGENCY_COLOR[level];
+                const urgencyText = level === 'soon' ? 'קרוב' : level === 'urgent' ? 'דחוף' : level === 'late' ? 'מאוחר' : null;
                 const st = STATUS_GLYPH[o.status] ?? STATUS_GLYPH.waiting;
                 const isNew = newIds.includes(o.id);
 
@@ -80,10 +82,13 @@ export default function OrderTabs({
                             ...(level === 'late' ? { borderColor: '#e53935' } : {}),
                         }}
                     >
-                        {/* Urgency + "new" markers, top corner, static */}
+                        {/* A real row, not an overlay: on a 12-ticket strip the
+                            badges otherwise collide with the pickup time. */}
                         <span style={S.markers}>
                             {isNew && <span style={S.newDot}>חדש</span>}
-                            {dot && <span style={{ ...S.dot, background: dot }} aria-hidden />}
+                            {dot && urgencyText && (
+                                <span style={{ ...S.urgency, color: dot, borderColor: dot }}>{urgencyText}</span>
+                            )}
                         </span>
 
                         <span style={{ ...S.time, color: active ? '#fff' : 'rgba(255,255,255,0.9)' }}>
@@ -114,7 +119,8 @@ const S: Record<string, React.CSSProperties> = {
         position: 'relative', flex: '1 1 0', minWidth: '130px', maxWidth: '220px',
         display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '2px',
         padding: '12px 14px', borderRadius: '12px', cursor: 'pointer',
-        background: 'rgba(255,255,255,0.05)', border: '2px solid rgba(255,255,255,0.12)',
+        background: 'rgba(255,255,255,0.05)',
+        borderWidth: '2px', borderStyle: 'solid', borderColor: 'rgba(255,255,255,0.12)',
         fontFamily: "var(--font-heebo), 'Heebo', sans-serif", textAlign: 'right',
         transition: 'background 0.15s ease, border-color 0.15s ease',
     },
@@ -124,8 +130,14 @@ const S: Record<string, React.CSSProperties> = {
     tabReady: {
         background: 'rgba(76,175,80,0.12)', borderColor: 'rgba(76,175,80,0.45)',
     },
-    markers: { position: 'absolute', top: '8px', left: '10px', display: 'flex', alignItems: 'center', gap: '6px' },
-    dot: { width: '10px', height: '10px', borderRadius: '50%', display: 'block' },
+    markers: {
+        alignSelf: 'stretch', minHeight: '18px', display: 'flex', alignItems: 'center',
+        justifyContent: 'flex-end', gap: '6px',
+    },
+    urgency: {
+        padding: '1px 6px', borderRadius: '6px', border: '1px solid',
+        background: 'rgba(0,0,0,0.28)', fontSize: '10px', fontWeight: 900,
+    },
     newDot: {
         fontSize: '10px', fontWeight: 900, padding: '1px 6px', borderRadius: '6px',
         background: 'rgba(76,175,80,0.9)', color: '#04140a',

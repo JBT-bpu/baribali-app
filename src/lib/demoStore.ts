@@ -4,8 +4,8 @@
  * order → payment-choice → status → kitchen loop be exercised locally
  * without any real backend.
  *
- * Deliberately local/single-process only: this is a module-level Map, which
- * works fine against `npm run dev` (one long-lived Node process) but will
+ * Deliberately local/single-process only: this is a process-global Map, which
+ * lets Next's separate route module graphs share one demo session but will
  * NOT reliably persist across requests on Vercel's serverless functions
  * (separate invocations don't share memory). That's an accepted limitation,
  * not a bug — this store is a development convenience, not a persistence
@@ -36,7 +36,14 @@ export interface DemoOrder {
     created_at: string;
 }
 
-const store = new Map<string, DemoOrder>();
+// Next compiles route handlers into separate module graphs. A module-local Map
+// therefore lets an order created by /api/orders disappear when
+// /api/kitchen/orders reads from its own copy of this module. Keep the dev-only
+// store on the process global so every route bundle sees the same demo loop.
+const demoGlobal = globalThis as typeof globalThis & {
+    __baribaliDemoOrders?: Map<string, DemoOrder>;
+};
+const store = demoGlobal.__baribaliDemoOrders ??= new Map<string, DemoOrder>();
 
 export function createDemoOrder(input: {
     items: DemoOrderItem[];
@@ -45,11 +52,12 @@ export function createDemoOrder(input: {
     notes?: string | null;
     size?: string | null;
     paymentStatus?: PaymentStatus;
+    orderNum?: string;
 }): DemoOrder {
     const id = crypto.randomUUID();
     const order: DemoOrder = {
         id,
-        order_num: `BB-${((Date.now() % 9000) + 1000)}`,
+        order_num: input.orderNum ?? `BB-${((Date.now() % 9000) + 1000)}`,
         items: input.items,
         total: input.total,
         pickup_time: input.pickupTime ?? null,
@@ -80,4 +88,15 @@ export function updateDemoOrderStatus(id: string, status: OrderStatus): DemoOrde
 
 export function resetDemoStore(): void {
     store.clear();
+}
+
+/** Clears rehearsal tickets without touching real-looking demo orders. */
+export function removeDemoSimulationOrders(): number {
+    let removed = 0;
+    for (const [id, order] of store) {
+        if (!order.order_num.startsWith('SIM-')) continue;
+        store.delete(id);
+        removed += 1;
+    }
+    return removed;
 }

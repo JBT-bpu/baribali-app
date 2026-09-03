@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isKitchenAuthorized } from '@/lib/kitchenAuth';
 import { readShopState, writeShopState } from '@/lib/shopState';
-import { shopStatus, type ShopOverride } from '@/lib/shopHours';
+import { shopOverrideForTargetOpen, shopStatus, type ShopOverride } from '@/lib/shopHours';
 
 /**
  * Is the shop open, and the staff control for saying otherwise.
@@ -34,14 +34,26 @@ export async function PATCH(req: NextRequest) {
     let body: unknown;
     try { body = await req.json(); } catch { return NextResponse.json({ error: 'Bad request' }, { status: 400 }); }
 
-    const raw = (body as { override?: unknown })?.override;
-    // Three valid values, and 'null' arrives as a real null from JSON.
-    if (raw !== null && raw !== 'open' && raw !== 'closed') {
-        return NextResponse.json({ error: "override must be 'open', 'closed' or null" }, { status: 400 });
+    const payload = body && typeof body === 'object' ? body as Record<string, unknown> : {};
+    const now = new Date();
+    let override: ShopOverride;
+    if (payload.targetOpen !== undefined) {
+        if (typeof payload.targetOpen !== 'boolean') {
+            return NextResponse.json({ error: 'targetOpen must be boolean' }, { status: 400 });
+        }
+        // Resolve the staff's desired visible state NOW, not from the board's
+        // potentially stale poll just before an opening-hours boundary.
+        override = shopOverrideForTargetOpen(shopStatus(now), payload.targetOpen);
+    } else {
+        const raw = payload.override;
+        // Backward-compatible direct override for maintenance callers.
+        if (raw !== null && raw !== 'open' && raw !== 'closed') {
+            return NextResponse.json({ error: "override must be 'open', 'closed' or null" }, { status: 400 });
+        }
+        override = raw as ShopOverride;
     }
-    const override = raw as ShopOverride;
 
-    const rawNote = (body as { note?: unknown })?.note;
+    const rawNote = payload.note;
     const note = typeof rawNote === 'string' && rawNote.trim() ? rawNote.trim().slice(0, 120) : null;
 
     const written = await writeShopState(override, note);
@@ -54,6 +66,6 @@ export async function PATCH(req: NextRequest) {
         );
     }
 
-    const status = shopStatus(new Date(), override, note);
+    const status = shopStatus(now, override, note);
     return NextResponse.json({ ...status, override }, { headers: { 'Cache-Control': 'no-store' } });
 }

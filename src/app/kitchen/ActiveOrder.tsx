@@ -1,7 +1,7 @@
 'use client';
 
 import { groupByZone, type ZoneId } from '@/lib/orderZones';
-import { type Order, type OrderStatus, type PayTone, urgencyOf, minutesUntilPickup, paymentLabel } from './types';
+import { type Order, type OrderStatus, type PayTone, urgencyOf, minutesUntilPickup, paymentLabel, handoffActionLabel } from './types';
 
 /**
  * The order the worker is on.
@@ -47,7 +47,7 @@ const CHIP: Record<ChipTier, { minHeight: number; icon: number; name: number; pa
 };
 
 export default function ActiveOrder({
-    order, sizeLabel, onStatus, checked, onToggleItem,
+    order, sizeLabel, onStatus, checked, onToggleItem, statusBusy,
 }: {
     order: Order;
     /** Which bowl to reach for — the board maps the stored base price to this. */
@@ -55,6 +55,7 @@ export default function ActiveOrder({
     onStatus: (status: OrderStatus) => void;
     checked: string[];
     onToggleItem: (itemId: string) => void;
+    statusBusy: boolean;
 }) {
     const grouped = groupByZone(order.items);
     const main = grouped.filter(g => MAIN_ZONES.includes(g.zone.id));
@@ -215,13 +216,27 @@ export default function ActiveOrder({
                 happened on the previous screen, so nothing competes here. */}
             <div style={S.actions}>
                 {order.status !== 'ready' && (
-                    <button type="button" style={S.primaryBtn} onClick={() => onStatus('ready')}>
+                    <button
+                        type="button"
+                        disabled={statusBusy}
+                        style={{ ...S.primaryBtn, ...(statusBusy ? S.actionBusy : {}) }}
+                        onClick={() => onStatus('ready')}
+                    >
                         מוכן לאיסוף ✓
                     </button>
                 )}
                 {order.status === 'ready' && (
-                    <button type="button" style={S.deliverBtn} onClick={() => onStatus('collected')}>
-                        נמסר ללקוח ✓
+                    <button
+                        type="button"
+                        disabled={statusBusy}
+                        style={{
+                            ...S.deliverBtn,
+                            ...(pay && pay.tone !== 'settled' ? S.deliverPaymentBtn : {}),
+                            ...(statusBusy ? S.actionBusy : {}),
+                        }}
+                        onClick={() => onStatus('collected')}
+                    >
+                        {handoffActionLabel(order.payment_status)}
                     </button>
                 )}
             </div>
@@ -361,4 +376,9 @@ const S: Record<string, React.CSSProperties> = {
         color: '#fff', fontSize: '20px', fontWeight: 900,
         fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
     },
+    deliverPaymentBtn: {
+        background: 'rgba(255,183,77,0.22)', border: '2px solid rgba(255,183,77,0.78)',
+        color: '#fff4df',
+    },
+    actionBusy: { opacity: 0.55, cursor: 'wait' },
 };

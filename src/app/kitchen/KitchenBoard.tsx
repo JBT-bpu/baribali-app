@@ -47,6 +47,24 @@ function playKitchenChime(ctx: AudioContext) {
 }
 
 const CHECK_KEY = 'bb-kitchen-checks';
+const MIN_ACTION_LOCK_MS = 750;
+const REQUEST_TIMEOUT_MS = 12000;
+
+async function fetchWithTimeout(
+    input: Parameters<typeof fetch>[0],
+    init?: RequestInit,
+): Promise<Response> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    try {
+        return await fetch(input, { ...init, signal: controller.signal });
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+type ActionKind = 'shop' | 'status' | 'simulation';
+type ActionToken = { kind: ActionKind; id: number };
 
 /**
  * The board's ground: the owner's 16:9 brand plate, darkened. Sharp, not
@@ -95,6 +113,47 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
     const [loadError, setLoadError] = useState(false);
     const [lastOk, setLastOk] = useState<Date | null>(null);
     const [actionError, setActionError] = useState<string | null>(null);
+    const actionTokenSeqRef = useRef(0);
+    const latestActionByKindRef = useRef<Record<ActionKind, number>>({ shop: 0, status: 0, simulation: 0 });
+    const visibleActionErrorRef = useRef<ActionToken | null>(null);
+    const actionErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const startAction = useCallback((kind: ActionKind): ActionToken => {
+        const token = { kind, id: ++actionTokenSeqRef.current };
+        latestActionByKindRef.current[kind] = token.id;
+        return token;
+    }, []);
+    const showActionError = useCallback((token: ActionToken, message: string, duration = 8000) => {
+        // An older request of the same kind must not overwrite its retry.
+        if (latestActionByKindRef.current[token.kind] !== token.id) return;
+        if (actionErrorTimerRef.current) clearTimeout(actionErrorTimerRef.current);
+        visibleActionErrorRef.current = token;
+        setActionError(message);
+        actionErrorTimerRef.current = setTimeout(() => {
+            if (visibleActionErrorRef.current?.id !== token.id) return;
+            visibleActionErrorRef.current = null;
+            actionErrorTimerRef.current = null;
+            setActionError(null);
+        }, duration);
+    }, []);
+    const clearActionError = useCallback((token: ActionToken) => {
+        const visible = visibleActionErrorRef.current;
+        // A successful retry clears an older error from the same operation,
+        // while unrelated successes leave the important banner in place.
+        if (!visible || visible.kind !== token.kind || visible.id > token.id) return;
+        if (actionErrorTimerRef.current) clearTimeout(actionErrorTimerRef.current);
+        actionErrorTimerRef.current = null;
+        visibleActionErrorRef.current = null;
+        setActionError(null);
+    }, []);
+    useEffect(() => () => {
+        if (actionErrorTimerRef.current) clearTimeout(actionErrorTimerRef.current);
+    }, []);
+    const [statusBusy, setStatusBusy] = useState(false);
+    const statusBusyRef = useRef(false);
+    const statusUnlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    useEffect(() => () => {
+        if (statusUnlockTimerRef.current) clearTimeout(statusUnlockTimerRef.current);
+    }, []);
     /**
      * The last reversible action. `to` is the status the undo restores.
      *
@@ -106,7 +165,14 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
      * was still being made, and there was no way back to `preparing` from the
      * board at all.
      */
-    const [undo, setUndo] = useState<{ id: string; orderNum: string; to: OrderStatus; label: string } | null>(null);
+    const [undo, setUndo] = useState<{
+        id: string;
+        orderNum: string;
+        to: OrderStatus;
+        from: OrderStatus;
+        label: string;
+        order: Order;
+    } | null>(null);
     const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     useEffect(() => () => { if (undoTimer.current) clearTimeout(undoTimer.current); }, []);
 
@@ -118,6 +184,8 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
 
     const ordersRef = useRef<Order[]>([]);
     useEffect(() => { ordersRef.current = orders; }, [orders]);
+    const loadSeqRef = useRef(0);
+    const ordersLoadInFlightRef = useRef<Promise<void> | null>(null);
     // Read inside loadOrders without making it a dependency (which would restart
     // the poll on every tab tap).
     const activeIdRef = useRef<string | null>(null);
@@ -135,11 +203,17 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
     const bgUrl = bgVariant === 'a' || bgVariant === 'b' ? `/kitchen-assets/bg-${bgVariant}.webp` : KITCHEN_BG;
     const [simLeft, setSimLeft] = useState(0);
     const simTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-    useEffect(() => () => { if (simTimer.current) clearTimeout(simTimer.current); }, []);
+    const simRun = useRef(0);
+    const simInFlight = useRef<Promise<Response> | null>(null);
+    useEffect(() => () => {
+        simRun.current += 1;
+        if (simTimer.current) clearTimeout(simTimer.current);
+    }, []);
 
     // ── New-order alert ──
     const [newIds, setNewIds] = useState<string[]>([]);
     const [audioBlocked, setAudioBlocked] = useState(false);
+    const [audioReady, setAudioReady] = useState(false);
     const knownIdsRef = useRef<Set<string>>(new Set());
     const seededRef = useRef(false);
     const audioCtxRef = useRef<AudioContext | null>(null);
@@ -149,37 +223,74 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
     // (9:00–16:00) runs by itself; this is for the day it does not apply.
     const [shop, setShop] = useState<ShopStatus | null>(null);
     const [shopBusy, setShopBusy] = useState(false);
-
-    const loadShop = useCallback(async () => {
-        try {
-            const res = await fetch('/api/shop');
-            if (res.ok) setShop(await res.json());
-        } catch { /* the board's own error banner covers connectivity */ }
+    const shopBusyRef = useRef(false);
+    const shopUnlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const shopSeqRef = useRef(0);
+    const shopLoadInFlightRef = useRef<Promise<void> | null>(null);
+    useEffect(() => () => {
+        if (shopUnlockTimerRef.current) clearTimeout(shopUnlockTimerRef.current);
     }, []);
 
-    const setOverride = useCallback(async (override: 'open' | 'closed' | null) => {
-        setShopBusy(true);
+    const loadShop = useCallback(async () => {
+        // A slow connection must not starve forever under the 4s poll. Reuse
+        // the current GET; the next interval starts a new one after it settles.
+        if (shopLoadInFlightRef.current) return shopLoadInFlightRef.current;
+        const generation = shopSeqRef.current;
+        const request = (async () => {
+            try {
+                const res = await fetchWithTimeout('/api/shop');
+                if (!res.ok) return;
+                const next = await res.json();
+                if (generation === shopSeqRef.current && !shopBusyRef.current) setShop(next);
+            } catch { /* the board's own error banner covers connectivity */ }
+        })();
+        shopLoadInFlightRef.current = request;
         try {
-            const res = await fetch('/api/shop', {
+            await request;
+        } finally {
+            if (shopLoadInFlightRef.current === request) shopLoadInFlightRef.current = null;
+        }
+    }, []);
+
+    const setShopOpen = useCallback(async (targetOpen: boolean) => {
+        if (shopBusyRef.current) return;
+        const startedAt = Date.now();
+        const action = startAction('shop');
+        shopBusyRef.current = true;
+        setShopBusy(true);
+        shopSeqRef.current += 1; // invalidate any GET that began before the tap
+        try {
+            const res = await fetchWithTimeout('/api/shop', {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ override }),
+                body: JSON.stringify({ targetOpen }),
             });
-            if (res.ok) { setShop(await res.json()); setActionError(null); }
+            if (res.ok) {
+                const next = await res.json();
+                shopSeqRef.current += 1; // invalidate GETs that raced the write
+                setShop(next);
+                clearActionError(action);
+            }
             else {
                 // Never let a failed close look like a successful one — someone
                 // who taps "closed" and sees nothing will walk away believing it.
                 const data = await res.json().catch(() => null);
-                setActionError(data?.error ?? 'לא הצלחנו לעדכן את מצב החנות');
-                setTimeout(() => setActionError(null), 8000);
+                showActionError(action, data?.error ?? 'לא הצלחנו לעדכן את מצב החנות');
             }
         } catch {
-            setActionError('לא הצלחנו לעדכן את מצב החנות');
-            setTimeout(() => setActionError(null), 8000);
+            showActionError(action, 'לא הצלחנו לעדכן את מצב החנות');
         } finally {
-            setShopBusy(false);
+            // The control changes meaning in place (open ↔ closed). Keep it
+            // locked across a normal double-tap even when localhost/API is
+            // faster than the user's second touch.
+            const delay = Math.max(0, MIN_ACTION_LOCK_MS - (Date.now() - startedAt));
+            shopUnlockTimerRef.current = setTimeout(() => {
+                shopBusyRef.current = false;
+                shopUnlockTimerRef.current = null;
+                setShopBusy(false);
+            }, delay);
         }
-    }, []);
+    }, [clearActionError, showActionError, startAction]);
 
     const onUnauthorized = useCallback(() => { if (authEnabled) router.refresh(); }, [authEnabled, router]);
     const logout = useCallback(async () => {
@@ -196,19 +307,59 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
         try {
             if (!audioCtxRef.current) {
                 const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-                if (Ctor) audioCtxRef.current = new Ctor();
+                if (Ctor) {
+                    audioCtxRef.current = new Ctor();
+                    audioCtxRef.current.onstatechange = () => {
+                        const ready = audioCtxRef.current?.state === 'running';
+                        setAudioReady(ready);
+                        if (ready) setAudioBlocked(false);
+                    };
+                }
             }
             const ctx = audioCtxRef.current;
-            if (ctx?.state === 'suspended') ctx.resume().catch(() => {});
-            if (ctx?.state === 'running') setAudioBlocked(false);
+            if (ctx?.state === 'suspended') {
+                ctx.resume().then(() => {
+                    if (ctx.state === 'running') {
+                        setAudioReady(true);
+                        setAudioBlocked(false);
+                    }
+                }).catch(() => {});
+            }
+            if (ctx?.state === 'running') {
+                setAudioReady(true);
+                setAudioBlocked(false);
+            }
             return ctx;
         } catch { return null; }
     }, []);
 
+    const enableAudio = useCallback(async () => {
+        const ctx = ensureAudio();
+        if (!ctx) { setAudioBlocked(true); return; }
+        try {
+            if (ctx.state === 'suspended') await ctx.resume();
+            if (ctx.state !== 'running') throw new Error('audio did not start');
+            setAudioReady(true);
+            setAudioBlocked(false);
+            playKitchenChime(ctx); // audible proof, not a silent status claim
+        } catch {
+            setAudioReady(false);
+            setAudioBlocked(true);
+        }
+    }, [ensureAudio]);
+
     useEffect(() => {
         const onFirstTouch = () => { ensureAudio(); };
         window.addEventListener('pointerdown', onFirstTouch);
-        return () => window.removeEventListener('pointerdown', onFirstTouch);
+        return () => {
+            window.removeEventListener('pointerdown', onFirstTouch);
+            const ctx = audioCtxRef.current;
+            if (ctx) {
+                ctx.onstatechange = null;
+                ctx.close().catch(() => {});
+                audioCtxRef.current = null;
+            }
+        };
     }, [ensureAudio]);
 
     const acknowledge = useCallback(() => { setNewIds([]); ensureAudio(); }, [ensureAudio]);
@@ -254,47 +405,70 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
         return () => clearInterval(t);
     }, []);
 
-    const loadOrders = useCallback(async () => {
+    const loadOrders = useCallback(async (forceFresh = false) => {
+        const existing = ordersLoadInFlightRef.current;
+        if (existing) {
+            await existing;
+            if (!forceFresh) return;
+            // Another caller may already have started the requested fresh read.
+            if (ordersLoadInFlightRef.current) return ordersLoadInFlightRef.current;
+        }
+
+        const generation = loadSeqRef.current;
+        const request = (async () => {
+            try {
+                const res = await fetchWithTimeout('/api/kitchen/orders');
+                if (res.status === 401) { onUnauthorized(); return; }
+                if (!res.ok) {
+                    if (generation === loadSeqRef.current) setLoadError(true);
+                    return;
+                }
+                const list = (await res.json() as Order[]).sort(byPickupThenReceived);
+                // Mutations advance the generation. A read from before one may
+                // not resurrect a removed row or overwrite an optimistic state.
+                if (generation !== loadSeqRef.current || statusBusyRef.current) return;
+                setOrders(list);
+                setLoadError(false);
+                setLastOk(new Date());
+
+                // Pick an order only when nothing is selected, or when the selected
+                // one has left the board. A new arrival must never pull the worker
+                // off what is in their hands.
+                const current = activeIdRef.current;
+                if (!current || !list.some(o => o.id === current)) {
+                    setActiveId(list.length ? list[0].id : null);
+                }
+
+                // Anything not seen before is an arrival. The first load seeds the
+                // set silently — opening the board mid-service must not alarm.
+                const ids = list.map(o => o.id);
+                if (!seededRef.current) {
+                    knownIdsRef.current = new Set(ids);
+                    seededRef.current = true;
+                } else {
+                    const arrivals = ids.filter(i => !knownIdsRef.current.has(i));
+                    if (arrivals.length > 0) setNewIds(prev => [...new Set([...prev, ...arrivals])]);
+                    knownIdsRef.current = new Set(ids);
+                }
+                // Ridden along with the order poll rather than given its own effect
+                // and interval. Two reasons: the board then notices a shop closed
+                // from ANOTHER device (the owner's phone) within one poll, and it
+                // avoids a second synchronous setState-in-effect, which the repo's
+                // lint baseline does not have room for.
+                loadShop();
+            } catch {
+                // A dropped or indefinitely stalled connection must surface as
+                // an outage rather than a permanently quiet/loading board.
+                if (generation === loadSeqRef.current && !statusBusyRef.current) setLoadError(true);
+            } finally {
+                if (generation === loadSeqRef.current && !statusBusyRef.current) setLoading(false);
+            }
+        })();
+        ordersLoadInFlightRef.current = request;
         try {
-            const res = await fetch('/api/kitchen/orders');
-            if (res.status === 401) { onUnauthorized(); return; }
-            if (!res.ok) { setLoadError(true); return; }
-            const list = (await res.json() as Order[]).sort(byPickupThenReceived);
-            setOrders(list);
-            setLoadError(false);
-            setLastOk(new Date());
-
-            // Pick an order only when nothing is selected, or when the selected
-            // one has left the board. A new arrival must never pull the worker
-            // off what is in their hands.
-            const current = activeIdRef.current;
-            if (!current || !list.some(o => o.id === current)) {
-                setActiveId(list.length ? list[0].id : null);
-            }
-
-            // Anything not seen before is an arrival. The first load seeds the
-            // set silently — opening the board mid-service must not alarm.
-            const ids = list.map(o => o.id);
-            if (!seededRef.current) {
-                knownIdsRef.current = new Set(ids);
-                seededRef.current = true;
-            } else {
-                const arrivals = ids.filter(i => !knownIdsRef.current.has(i));
-                if (arrivals.length > 0) setNewIds(prev => [...new Set([...prev, ...arrivals])]);
-                knownIdsRef.current = new Set(ids);
-            }
-            // Ridden along with the order poll rather than given its own effect
-            // and interval. Two reasons: the board then notices a shop closed
-            // from ANOTHER device (the owner's phone) within one poll, and it
-            // avoids a second synchronous setState-in-effect, which the repo's
-            // lint baseline does not have room for.
-            loadShop();
-        } catch {
-            // A dropped connection used to throw out of here, silently freezing
-            // the board (and sticking the first load on "loading" forever).
-            setLoadError(true);
+            await request;
         } finally {
-            setLoading(false);
+            if (ordersLoadInFlightRef.current === request) ordersLoadInFlightRef.current = null;
         }
     }, [onUnauthorized, loadShop]);
 
@@ -330,22 +504,42 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
         navigator.vibrate?.(10);
     }, [persist]);
 
-    const updateStatus = useCallback(async (id: string, status: OrderStatus) => {
+    const updateStatus = useCallback(async (
+        id: string,
+        status: OrderStatus,
+        restoreFrom?: Order,
+        recordUndo = true,
+        rollbackTo?: OrderStatus,
+    ) => {
+        // These large action buttons replace each other in the same spot. Lock
+        // immediately so a fast double-tap cannot send ready and then collected
+        // before the first write has settled.
+        if (statusBusyRef.current) return;
+        const startedAt = Date.now();
+        const action = startAction('status');
+        statusBusyRef.current = true;
+        setStatusBusy(true);
+        // Invalidate any order read that began before this mutation.
+        loadSeqRef.current += 1;
+
         // Touching an order acknowledges the alert — no extra tap to silence it.
         setNewIds(prev => prev.filter(n => n !== id));
-        const previous = ordersRef.current.find(o => o.id === id)?.status;
+        const currentOrder = ordersRef.current.find(o => o.id === id) ?? restoreFrom;
+        const previous = rollbackTo ?? currentOrder?.status;
 
         // Both of the one-way actions get an undo, restoring the status they
         // came from. 30s rather than 20: noticing "that was the wrong ticket"
         // takes longer than noticing a mis-tap, and the bar costs one row.
-        const num = ordersRef.current.find(o => o.id === id)?.order_num ?? '';
-        if (status === 'collected' || status === 'ready') {
+        const num = currentOrder?.order_num ?? '';
+        if (recordUndo && currentOrder && (status === 'collected' || status === 'ready')) {
             if (undoTimer.current) clearTimeout(undoTimer.current);
             setUndo({
                 id,
                 orderNum: num,
                 to: status === 'collected' ? 'ready' : (previous ?? 'preparing'),
+                from: status,
                 label: status === 'collected' ? 'סומנה כנמסרה' : 'סומנה כמוכנה — הלקוח קיבל הודעה',
+                order: currentOrder,
             });
             undoTimer.current = setTimeout(() => setUndo(u => (u?.id === id ? null : u)), 30000);
         }
@@ -353,53 +547,134 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
         // Collected orders leave the board entirely, so the worker needs
         // somewhere to land.
         if (status === 'collected') {
-            const rest = ordersRef.current.filter(o => o.id !== id);
+            const rest = ordersRef.current.filter(o => o.id !== id && o.status !== 'collected');
             setActiveId(rest.length ? rest[0].id : null);
         }
 
-        setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o)); // optimistic
+        setOrders(prev => {
+            if (prev.some(o => o.id === id)) {
+                return prev.map(o => o.id === id ? { ...o, status } : o);
+            }
+            // Undo may run after the poll has already removed a collected row.
+            return restoreFrom ? [...prev, { ...restoreFrom, status }].sort(byPickupThenReceived) : prev;
+        }); // optimistic
         try {
-            const res = await fetch(`/api/orders/${id}/status`, {
+            const res = await fetchWithTimeout(`/api/orders/${id}/status`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status }),
             });
-            if (res.status === 401) { onUnauthorized(); return; }
+            if (res.status === 401) {
+                onUnauthorized();
+                throw new Error('unauthorized');
+            }
             if (!res.ok) throw new Error('status write failed');
-            setActionError(null);
+            // A poll that began during the write may have read the old status.
+            // Invalidate it and reassert the accepted server transition.
+            loadSeqRef.current += 1;
+            setOrders(prev => {
+                if (prev.some(o => o.id === id)) {
+                    return prev.map(o => o.id === id ? { ...o, status } : o);
+                }
+                return currentOrder
+                    ? [...prev, { ...currentOrder, status }].sort(byPickupThenReceived)
+                    : prev;
+            });
+            clearActionError(action);
         } catch {
             // Leaving the optimistic value up meant the board could show "מוכן"
             // while the customer's order was never actually marked ready.
-            if (previous) setOrders(prev => prev.map(o => o.id === id ? { ...o, status: previous } : o));
-            setActionError('עדכון הסטטוס נכשל — נסו שוב');
-            setTimeout(() => setActionError(null), 5000);
+            if (previous) {
+                setOrders(prev => {
+                    if (prev.some(o => o.id === id)) {
+                        return prev.map(o => o.id === id ? { ...o, status: previous } : o);
+                    }
+                    return currentOrder
+                        ? [...prev, { ...currentOrder, status: previous }].sort(byPickupThenReceived)
+                        : prev;
+                });
+            }
+            if (status === 'collected') {
+                setActiveId(id);
+            } else if (previous === 'collected') {
+                const rest = ordersRef.current.filter(o => o.id !== id && o.status !== 'collected');
+                setActiveId(rest.length ? rest[0].id : null);
+            }
+            setUndo(current => current?.id === id ? null : current);
+            showActionError(action, 'עדכון הסטטוס נכשל — נסו שוב', 5000);
+        } finally {
+            const delay = Math.max(0, MIN_ACTION_LOCK_MS - (Date.now() - startedAt));
+            statusUnlockTimerRef.current = setTimeout(() => {
+                statusBusyRef.current = false;
+                statusUnlockTimerRef.current = null;
+                setStatusBusy(false);
+            }, delay);
         }
-    }, [onUnauthorized]);
+    }, [clearActionError, onUnauthorized, showActionError, startAction]);
 
     // One order every 10s, so each arrival lands like a real one.
     const runSimulation = useCallback((count: number) => {
         if (simLeft > 0) return;
+        const action = startAction('simulation');
+        const run = ++simRun.current;
         setSimLeft(count);
         let left = count;
         const step = async () => {
-            await fetch('/api/kitchen/simulate', { method: 'POST' }).catch(() => {});
-            loadOrders();
-            left -= 1;
-            setSimLeft(left);
-            if (left > 0) simTimer.current = setTimeout(step, 10000);
+            try {
+                const request = fetchWithTimeout('/api/kitchen/simulate', { method: 'POST' });
+                simInFlight.current = request;
+                const res = await request;
+                if (simInFlight.current === request) simInFlight.current = null;
+                if (!res.ok) throw new Error('simulation write failed');
+                if (run !== simRun.current) return;
+                loadSeqRef.current += 1;
+                await loadOrders(true);
+                if (run !== simRun.current) return;
+                left -= 1;
+                setSimLeft(left);
+                clearActionError(action);
+                if (left > 0) simTimer.current = setTimeout(step, 10000);
+            } catch {
+                simInFlight.current = null;
+                if (run !== simRun.current) return;
+                setSimLeft(0);
+                showActionError(action, 'יצירת הזמנת הסימולציה נכשלה — הסימולציה נעצרה');
+            }
         };
         step();
-    }, [simLeft, loadOrders]);
+    }, [clearActionError, loadOrders, showActionError, simLeft, startAction]);
 
     const clearSimulation = useCallback(async () => {
+        const action = startAction('simulation');
+        simRun.current += 1;
+        loadSeqRef.current += 1; // invalidate a GET that began before Clear
         if (simTimer.current) clearTimeout(simTimer.current);
         setSimLeft(0);
-        await fetch('/api/kitchen/simulate', { method: 'DELETE' }).catch(() => {});
-        setNewIds([]);
-        loadOrders();
-    }, [loadOrders]);
+        try {
+            // If Clear landed while a POST was already on the wire, delete only
+            // after that write settles so it cannot leave one rehearsal ticket.
+            const inFlight = simInFlight.current;
+            if (inFlight) await inFlight.catch(() => null);
+            const res = await fetchWithTimeout('/api/kitchen/simulate', { method: 'DELETE' });
+            if (!res.ok) throw new Error('simulation delete failed');
+            setNewIds([]);
+            setUndo(current => {
+                if (!current?.orderNum.startsWith('SIM-')) return current;
+                if (undoTimer.current) clearTimeout(undoTimer.current);
+                return null;
+            });
+            clearActionError(action);
+            loadSeqRef.current += 1;
+            await loadOrders(true);
+        } catch {
+            showActionError(action, 'ניקוי הזמנות הסימולציה נכשל — נסו שוב');
+        }
+    }, [clearActionError, loadOrders, showActionError, startAction]);
 
-    const active = orders.find(o => o.id === activeId) ?? null;
+    // A collected order is terminal. Retain it locally just long enough for
+    // rollback/undo, but never leave a tab that can reopen it before the poll.
+    const visibleOrders = orders.filter(order => order.status !== 'collected');
+    const active = visibleOrders.find(o => o.id === activeId) ?? null;
 
     return (
         <div style={{ ...K.root, backgroundImage: (K.root.backgroundImage as string).replace(KITCHEN_BG, bgUrl) }}>
@@ -417,7 +692,14 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
                 <div style={K.headerMeta}>
                     {isDemo && <span style={K.demoBadge}>DEMO</span>}
                     <span style={K.clock}>{now.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}</span>
-                    <span style={K.activeCount}>{orders.length} הזמנות</span>
+                    <span style={K.activeCount}>{visibleOrders.length} הזמנות</span>
+                    {audioReady ? (
+                        <span style={K.soundReady}>🔊 צליל פעיל</span>
+                    ) : (
+                        <button type="button" style={{ ...K.headerBtn, ...K.soundBtn }} onClick={enableAudio}>
+                            🔊 הפעל צליל
+                        </button>
+                    )}
                     <button
                         type="button"
                         style={K.headerBtn}
@@ -448,7 +730,7 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
                     {shop && (
                         <button
                             type="button"
-                            onClick={() => setOverride(shop.open ? 'closed' : null)}
+                            onClick={() => setShopOpen(!shop.open)}
                             disabled={shopBusy}
                             style={{ ...K.headerBtn, ...(shop.open ? K.shopOpen : K.shopShut), opacity: shopBusy ? 0.5 : 1 }}
                             title={shop.opensAt ? `שעות היום ${shop.opensAt}–${shop.closesAt}` : 'סגור היום'}
@@ -480,7 +762,7 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
                     </div>
                     {shop.reason === 'override_closed' && (
                         <button type="button" style={{ ...K.undoBtn, marginInlineStart: 'auto' }}
-                            disabled={shopBusy} onClick={() => setOverride(null)}>
+                            disabled={shopBusy} onClick={() => setShopOpen(true)}>
                             פתח מחדש
                         </button>
                     )}
@@ -491,13 +773,16 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
             {undo && (
                 <div style={K.undoBar} role="status">
                     <span>הזמנה {undo.orderNum} {undo.label}</span>
-                    <button type="button" style={K.undoBtn}
+                    <button type="button" style={K.undoBtn} disabled={statusBusy}
                         onClick={() => {
                             const u = undo;
                             setUndo(null);
                             if (undoTimer.current) clearTimeout(undoTimer.current);
+                            // A deliberate restore is not a newly arrived ticket.
+                            knownIdsRef.current.add(u.id);
+                            setNewIds(ids => ids.filter(id => id !== u.id));
                             setActiveId(u.id);      // put it back in the worker's hands
-                            updateStatus(u.id, u.to);
+                            updateStatus(u.id, u.to, u.order, false, u.from);
                         }}>
                         ↩ בטל
                     </button>
@@ -513,7 +798,7 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
                 </button>
             )}
             {audioBlocked && newIds.length > 0 && (
-                <button type="button" onClick={acknowledge} style={K.audioHint}>
+                <button type="button" onClick={enableAudio} style={K.audioHint}>
                     🔇 הצליל חסום — לחצו כאן פעם אחת כדי לאפשר התראות קוליות
                 </button>
             )}
@@ -538,13 +823,13 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
             )}
 
             {loading && <div style={K.loadingMsg}>טוען הזמנות...</div>}
-            {!loading && !loadError && orders.length === 0 && (
+            {!loading && !loadError && visibleOrders.length === 0 && (
                 <div style={K.emptyMsg}>אין הזמנות פעילות כרגע ✓</div>
             )}
 
-            {orders.length > 0 && (
+            {visibleOrders.length > 0 && (
                 <>
-                    <OrderTabs orders={orders} activeId={activeId} onSelect={setActiveId} newIds={newIds} />
+                    <OrderTabs orders={visibleOrders} activeId={activeId} onSelect={setActiveId} newIds={newIds} />
                     {active && (
                         <ActiveOrder
                             key={active.id}
@@ -553,6 +838,7 @@ export default function KitchenBoard({ authEnabled }: { authEnabled: boolean }) 
                             onStatus={s => updateStatus(active.id, s)}
                             checked={checks[active.id] ?? []}
                             onToggleItem={itemId => toggleItem(active.id, itemId)}
+                            statusBusy={statusBusy}
                         />
                     )}
                 </>
@@ -616,13 +902,20 @@ const K: Record<string, React.CSSProperties> = {
         background: 'rgba(255,152,0,0.2)', border: '1px solid rgba(255,152,0,0.5)', color: '#ffcc80',
     },
     headerBtn: {
-        padding: '8px 14px', borderRadius: '10px', cursor: 'pointer',
+        minHeight: '46px', padding: '8px 14px', borderRadius: '10px', cursor: 'pointer',
         background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)',
         color: '#fff', fontSize: '14px', fontWeight: 800,
         fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
     },
     simBtn: {
         background: 'rgba(156,39,176,0.18)', border: '1px solid rgba(186,104,200,0.55)', color: '#e1bee7',
+    },
+    soundBtn: {
+        background: 'rgba(255,183,77,0.18)', border: '1px solid rgba(255,183,77,0.65)', color: '#ffe0a6',
+    },
+    soundReady: {
+        padding: '6px 10px', borderRadius: '9px', fontSize: '12px', fontWeight: 900,
+        background: 'rgba(76,175,80,0.14)', border: '1px solid rgba(76,175,80,0.42)', color: '#c8f7c9',
     },
     shopOpen: { background: 'rgba(76,175,80,0.16)', border: '1px solid rgba(76,175,80,0.55)', color: '#c8f7c9' },
     shopShut: { background: 'rgba(229,57,53,0.18)', border: '1px solid rgba(229,57,53,0.6)', color: '#ff9a97' },
@@ -666,7 +959,7 @@ const K: Record<string, React.CSSProperties> = {
         color: 'rgba(255,255,255,0.85)', fontSize: '15px', fontWeight: 700, flexShrink: 0,
     },
     undoBtn: {
-        marginInlineStart: 'auto', padding: '10px 18px', borderRadius: '10px', cursor: 'pointer',
+        marginInlineStart: 'auto', minHeight: '46px', padding: '10px 18px', borderRadius: '10px', cursor: 'pointer',
         background: 'rgba(255,255,255,0.14)', border: '1px solid rgba(255,255,255,0.3)',
         color: '#fff', fontSize: '15px', fontWeight: 800,
         fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
