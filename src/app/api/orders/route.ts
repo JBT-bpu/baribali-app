@@ -9,14 +9,18 @@ import {
 } from '@/lib/demoStore';
 import { enforceRateLimit } from '@/lib/rateLimit';
 import { isPaymentConfigured } from '@/lib/payment';
-import { findDiscount, discountAmount } from '@/lib/discounts';
-import { getCustomerDiscount } from '@/lib/customerTags';
+import { findDiscount, type Discount } from '@/lib/discounts';
+import {
+    CustomerDiscountLookupError,
+    getCustomerDiscount,
+} from '@/lib/customerTags';
 import { shopStatus, checkPickup } from '@/lib/shopHours';
 import { readShopState } from '@/lib/shopState';
 import {
     isValidSubmissionKey,
     orderSubmissionFingerprint,
     parseOrderSubmissionIntent,
+    resolveOrderPricingDecision,
 } from '@/lib/orderSubmissionServer';
 
 const ORDER_INTENT_VERSION = 1;
@@ -26,6 +30,7 @@ interface StoredOrder {
     order_num: string;
     created_at: string;
     payment_status: string;
+    total: number;
 }
 
 interface OrderCreationRow {
@@ -50,17 +55,26 @@ function idempotencyUnavailable() {
     }, { status: 503 });
 }
 
+function customerDiscountUnavailable() {
+    return NextResponse.json({
+        error: 'לא הצלחנו לאמת כרגע את הטבת החשבון. נסו שוב בעוד רגע.',
+        code: 'CUSTOMER_DISCOUNT_UNAVAILABLE',
+    }, { status: 503 });
+}
+
 function recordedOrderResponse(
     order: StoredOrder | DemoOrder,
-    options: { demo: boolean; replayed: boolean },
+    options: { demo: boolean; replayed: boolean; priceAdjusted?: boolean },
 ) {
     const paymentStatus = order.payment_status;
     return NextResponse.json({
         id: order.id,
         orderNum: order.order_num,
         createdAt: order.created_at,
+        total: order.total,
         ...(options.demo ? { demo: true } : {}),
         replayed: options.replayed,
+        ...(options.priceAdjusted ? { priceAdjusted: true } : {}),
         payAtPickup: paymentStatus === 'pay_at_pickup',
         paymentStatus,
         ...(options.demo ? { paymentFailed: paymentStatus === 'failed' } : {}),
@@ -155,7 +169,7 @@ export async function POST(req: NextRequest) {
 
                 const { data: priorOrder, error: priorOrderError } = await admin!
                     .from('orders')
-                    .select('id, order_num, created_at, payment_status')
+                    .select('id, order_num, created_at, payment_status, total')
                     .eq('id', requestRecord.order_id)
                     .single();
 
@@ -214,21 +228,50 @@ export async function POST(req: NextRequest) {
         // the high-entropy submission secret and must survive an expired token.
         const userId = await verifiedUserId(req, admin);
         const typedDiscount = findDiscount(intent.discountCode);
-        const assignedDiscount = await getCustomerDiscount(userId);
-        const typedAmount = discountAmount(computed.total, typedDiscount);
-        const assignedAmount = discountAmount(computed.total, assignedDiscount);
-        const discount = assignedAmount >= typedAmount ? assignedDiscount : typedDiscount;
-        const discAmount = Math.max(assignedAmount, typedAmount);
-        const finalTotal = computed.total - discAmount;
+        let assignedDiscount: Discount | null;
+        try {
+            // The strict service-role client matters here: an anon fallback is
+            // blocked by RLS and would look exactly like "no standing tag".
+            assignedDiscount = await getCustomerDiscount(userId, admin ?? undefined);
+        } catch (error) {
+            console.error(
+                '[POST /api/orders] Customer discount lookup failed:',
+                error instanceof CustomerDiscountLookupError ? error.code : 'unexpected error',
+            );
+            return customerDiscountUnavailable();
+        }
+        const pricing = resolveOrderPricingDecision({
+            subtotal: computed.total,
+            submittedTotal: intent.total,
+            typedDiscount,
+            assignedDiscount,
+        });
+        const {
+            discount,
+            discountAmount: discAmount,
+            total: finalTotal,
+        } = pricing;
 
-        if (finalTotal !== intent.total) {
+        if (!pricing.accepted) {
             console.error(
                 '[POST /api/orders] Price mismatch: client sent',
                 intent.total,
                 'server computed',
                 finalTotal,
             );
-            return NextResponse.json({ error: 'Price mismatch' }, { status: 400 });
+            return NextResponse.json({
+                error: `המחיר עודכן ל־₪${finalTotal}. עברו על הסכום ולחצו שוב לאישור.`,
+                code: 'ORDER_TOTAL_CHANGED',
+                expectedTotal: finalTotal,
+                subtotal: computed.total,
+                discountAmount: discAmount,
+                discount: discount ? {
+                    code: discount.code,
+                    type: discount.type,
+                    value: discount.value,
+                    note: discount.note ?? null,
+                } : null,
+            }, { status: 409 });
         }
 
         if (demoMode) {
@@ -250,6 +293,7 @@ export async function POST(req: NextRequest) {
             return recordedOrderResponse(result.order, {
                 demo: true,
                 replayed: !result.created,
+                priceAdjusted: pricing.acceptance === 'missed-stronger-standing-discount',
             });
         }
 
@@ -301,12 +345,40 @@ export async function POST(req: NextRequest) {
             return idempotencyUnavailable();
         }
 
+        // A concurrent request may have won with the same stable intent while
+        // mutable auth/tag state produced a different quote in this request.
+        // Return the actually persisted amount for a replay, never this
+        // request's freshly computed amount.
+        if (row.result === 'replayed') {
+            const { data: replayedOrder, error: replayedOrderError } = await admin!
+                .from('orders')
+                .select('id, order_num, created_at, payment_status, total')
+                .eq('id', row.result_order_id)
+                .single();
+            if (replayedOrderError || !replayedOrder) {
+                console.error(
+                    '[POST /api/orders] Concurrent replay recovery failed:',
+                    replayedOrderError?.message ?? 'missing order',
+                );
+                return idempotencyUnavailable();
+            }
+            return recordedOrderResponse(replayedOrder as StoredOrder, {
+                demo: false,
+                replayed: true,
+            });
+        }
+
         return recordedOrderResponse({
             id: row.result_order_id,
             order_num: row.result_order_num,
             created_at: row.result_created_at,
             payment_status: row.result_payment_status,
-        }, { demo: false, replayed: row.result === 'replayed' });
+            total: finalTotal,
+        }, {
+            demo: false,
+            replayed: false,
+            priceAdjusted: pricing.acceptance === 'missed-stronger-standing-discount',
+        });
     } catch (err) {
         console.error('[POST /api/orders]', err);
         return NextResponse.json({ error: 'Failed to create order' }, { status: 500 });

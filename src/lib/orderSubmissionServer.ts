@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto';
 
+import { discountAmount, type Discount } from '@/lib/discounts';
+
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_ITEMS = 100;
 const MAX_ITEM_ID_LENGTH = 128;
@@ -139,4 +141,72 @@ export function orderSubmissionFingerprint(intent: OrderSubmissionIntent): strin
         paymentChoice: intent.paymentChoice,
     });
     return createHash('sha256').update(canonical, 'utf8').digest('hex');
+}
+
+export type OrderPricingAcceptance =
+    | 'exact'
+    | 'missed-stronger-standing-discount'
+    | 'rejected';
+
+export interface OrderPricingDecision {
+    discount: Discount | null;
+    discountAmount: number;
+    total: number;
+    accepted: boolean;
+    acceptance: OrderPricingAcceptance;
+}
+
+interface OrderPricingDecisionInput {
+    subtotal: number;
+    submittedTotal: number;
+    typedDiscount: Discount | null;
+    assignedDiscount: Discount | null;
+}
+
+/**
+ * Resolves the server-authoritative price and narrowly decides whether the
+ * submitted price can be accepted. Besides an exact match, the only allowed
+ * mismatch is the client's exact typed-code quote when a stronger standing
+ * discount was discovered after the client submitted.
+ */
+export function resolveOrderPricingDecision({
+    subtotal,
+    submittedTotal,
+    typedDiscount,
+    assignedDiscount,
+}: OrderPricingDecisionInput): OrderPricingDecision {
+    const typedAmount = discountAmount(subtotal, typedDiscount);
+    const assignedAmount = discountAmount(subtotal, assignedDiscount);
+    const discount = assignedAmount >= typedAmount ? assignedDiscount : typedDiscount;
+    const authoritativeDiscountAmount = Math.max(assignedAmount, typedAmount);
+    const total = subtotal - authoritativeDiscountAmount;
+
+    if (submittedTotal === total) {
+        return {
+            discount,
+            discountAmount: authoritativeDiscountAmount,
+            total,
+            accepted: true,
+            acceptance: 'exact',
+        };
+    }
+
+    const typedOnlyTotal = subtotal - typedAmount;
+    if (assignedAmount > typedAmount && submittedTotal === typedOnlyTotal) {
+        return {
+            discount,
+            discountAmount: authoritativeDiscountAmount,
+            total,
+            accepted: true,
+            acceptance: 'missed-stronger-standing-discount',
+        };
+    }
+
+    return {
+        discount,
+        discountAmount: authoritativeDiscountAmount,
+        total,
+        accepted: false,
+        acceptance: 'rejected',
+    };
 }

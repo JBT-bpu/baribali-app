@@ -567,8 +567,8 @@ test('checkout controls stay truthful, stateful and touchable in demo mode', () 
         'payment choices must expose one named and described group');
     assert.equal(summary.match(/aria-pressed=\{paymentChoice === "(?:now|pickup)"\}/g)?.length, 2,
         'both payment choices must expose their selected state');
-    assert.equal(summary.match(/disabled=\{submitting \|\| recoveryPending\}/g)?.length, 2,
-        'both choices must stop changing while their order is being submitted or recovered');
+    assert.equal(summary.match(/aria-pressed=\{paymentChoice === "(?:now|pickup)"\}\s+disabled=\{checkoutLocked\}/g)?.length, 2,
+        'both payment choices must stop changing during submission, recovery, or price reconfirmation');
     assert.equal(summary.match(/PAY\.selectedCheck\} aria-hidden="true">✓/g)?.length, 2,
         'both choices must have a visible selected cue beyond colour');
     assert.match(summary, /opt: \{ position: "relative", flex: 1, minHeight: "64px"/,

@@ -93,6 +93,7 @@ test('orders route canonicalizes and idempotently records demo orders', async t 
 
             assert.equal(response.status, 200);
             const payload = await response.json();
+            assert.equal(payload.total, total);
             const stored = demoStore.getDemoOrder(payload.id);
             assert.ok(stored);
             assert.deepEqual(stored.items, [{
@@ -121,6 +122,7 @@ test('orders route canonicalizes and idempotently records demo orders', async t 
             assert.equal(replayPayload.replayed, true);
             assert.equal(replayPayload.id, firstPayload.id);
             assert.equal(replayPayload.orderNum, firstPayload.orderNum);
+            assert.equal(replayPayload.total, firstPayload.total);
             assert.equal(demoStore.listDemoOrders().length, 1);
         });
 
@@ -199,7 +201,15 @@ test('orders route canonicalizes and idempotently records demo orders', async t 
                 orderBody(key, { total: total + 1 }),
                 'order-rejected-key',
             ));
-            assert.equal(rejected.status, 400);
+            assert.equal(rejected.status, 409);
+            assert.deepEqual(await rejected.json(), {
+                error: `המחיר עודכן ל־₪${total}. עברו על הסכום ולחצו שוב לאישור.`,
+                code: 'ORDER_TOTAL_CHANGED',
+                expectedTotal: total,
+                subtotal: total,
+                discountAmount: 0,
+                discount: null,
+            });
             assert.equal(demoStore.listDemoOrders().length, 0);
 
             const accepted = await POST(request(orderBody(key), 'order-rejected-key'));

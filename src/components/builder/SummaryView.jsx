@@ -204,6 +204,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     const [submitting, setSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState("");
     const [autoDiscount, setAutoDiscount] = useState(null); // standing "tag" discount for signed-in customers
+    const [priceReconfirmation, setPriceReconfirmation] = useState(null);
     const [hasPendingPayment, setHasPendingPayment] = useState(false);
     const [hasPendingSubmission, setHasPendingSubmission] = useState(false);
     // Once the order exists, retries must reopen payment for that same order.
@@ -325,6 +326,9 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     const effectiveDiscount = typedAmount > autoAmount ? appliedDiscount : autoDiscount;
     const discAmount = Math.max(autoAmount, typedAmount);
     const finalTotal = total - discAmount;
+    // If the server reports a changed authoritative quote, show that amount
+    // and require one more explicit tap before creating the order.
+    const checkoutTotal = priceReconfirmation?.total ?? finalTotal;
     // Confirmed-closed: we heard back from the server and it said no.
     const shopBlocked = !shop.open && (shop.live || shop.override === 'closed');
     // During ordinary opening hours an order needs one of the offered slots.
@@ -336,7 +340,8 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
         && pickupAvailability.slots.some(slot => slot.capacityPending);
     const pickupBlocked = shop.open && shop.reason !== 'override_open' && !effectivePickupTime;
     const recoveryPending = hasPendingPayment || hasPendingSubmission;
-    const checkoutLocked = submitting || recoveryPending;
+    const requestLocked = submitting || recoveryPending;
+    const checkoutLocked = requestLocked || Boolean(priceReconfirmation);
     const pickupBlockLabel = pickupAvailability.slots === null || pickupCheckingMoreSlots
         ? "בודקים שעות איסוף"
         : pickupHasAvailableSlot
@@ -353,6 +358,17 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
         if (!picker) return;
         picker.scrollIntoView({ block: 'center' });
         window.requestAnimationFrame(() => picker.focus({ preventScroll: true }));
+    };
+    const leaveSummary = () => {
+        // ORDER_TOTAL_CHANGED is a conclusive rejection: no order exists yet.
+        // If the customer prefers to edit instead of confirming the new quote,
+        // the corrected retry record can be safely discarded.
+        if (priceReconfirmation && orderSubmissionRef.current) {
+            clearOrderSubmission(orderSubmissionRef.current);
+            orderSubmissionRef.current = null;
+            setPriceReconfirmation(null);
+        }
+        onBack();
     };
     const applyPromo = () => {
         const d = findDiscount(promoInput);
@@ -504,7 +520,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
 
             orderBody = {
                 items: all.map(i => ({ id: i.id, he: i.he, icon: i.icon, price: effectiveItemPrice(i.id, i.price || 0) })),
-                total: finalTotal,
+                total: checkoutTotal,
                 pickupTime: pickupForSubmit,
                 notes,
                 size: base,
@@ -554,6 +570,48 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
             const data = await res.json().catch(() => null);
 
             if (!res.ok) {
+                const priceChanged = res.status === 409
+                    && data?.code === 'ORDER_TOTAL_CHANGED'
+                    && Number.isSafeInteger(data.expectedTotal)
+                    && data.expectedTotal >= 0;
+                if (priceChanged) {
+                    // The server has not created an order. Keep the same
+                    // idempotency key, persist only its corrected quote, update
+                    // the visible total, and wait for a second customer tap.
+                    const correctedBody = { ...orderBody, total: data.expectedTotal };
+                    submission = claimOrderSubmission(
+                        orderSubmissionIntent(correctedBody),
+                        submission,
+                        {
+                            requestBody: correctedBody,
+                            cartIntent: recoveryCartIntent,
+                        },
+                    );
+                    orderSubmissionRef.current = submission;
+                    setHasPendingSubmission(false);
+
+                    const serverDiscount = data.discount;
+                    if (
+                        serverDiscount
+                        && typeof serverDiscount.code === 'string'
+                        && (serverDiscount.type === 'percent' || serverDiscount.type === 'amount')
+                        && typeof serverDiscount.value === 'number'
+                    ) {
+                        setAutoDiscount(
+                            serverDiscount.code === appliedDiscount?.code
+                                ? null
+                                : serverDiscount,
+                        );
+                    } else {
+                        setAutoDiscount(null);
+                    }
+                    setPriceReconfirmation({ total: data.expectedTotal });
+                    failSubmit(typeof data.error === 'string'
+                        ? data.error
+                        : `המחיר עודכן ל־₪${data.expectedTotal}. עברו על הסכום ולחצו שוב לאישור.`);
+                    return;
+                }
+
                 // A definite client rejection means this key did not create this
                 // intent (the server checks its ledger first). 429/5xx remain
                 // ambiguous because a previous request may already have won.
@@ -562,6 +620,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                     clearOrderSubmission(submission);
                     orderSubmissionRef.current = null;
                     setHasPendingSubmission(false);
+                    setPriceReconfirmation(null);
                 }
                 failSubmit(
                     res.status === 409 && typeof data?.error === 'string'
@@ -581,6 +640,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                 clearOrderSubmission(submission);
                 orderSubmissionRef.current = null;
                 setHasPendingSubmission(false);
+                setPriceReconfirmation(null);
                 return;
             }
             // No id/order number means nothing was conclusively recorded. Keep
@@ -606,6 +666,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                 pendingPaymentRef.current = pendingPayment;
                 setHasPendingSubmission(false);
                 setHasPendingPayment(true);
+                setPriceReconfirmation(null);
                 await launchPendingPayment(pendingPayment);
                 return;
             }
@@ -615,10 +676,15 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
             clearOrderSubmission(submission);
             orderSubmissionRef.current = null;
             setHasPendingSubmission(false);
+            setPriceReconfirmation(null);
             submitLockRef.current = false;
             setSubmitting(false);
             setAcceptedOrder({
-                total: typeof orderBody.total === 'number' ? orderBody.total : finalTotal,
+                total: typeof data.total === 'number'
+                    ? data.total
+                    : typeof orderBody.total === 'number'
+                        ? orderBody.total
+                        : checkoutTotal,
                 items: Array.isArray(orderBody.items) ? orderBody.items.length : all.length,
                 pickupTime: pickupForSubmit,
                 orderNum: data.orderNum ?? null,
@@ -655,9 +721,9 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                         <button
                             type="button"
                             aria-label="חזרה לעריכת ההזמנה"
-                            disabled={checkoutLocked}
-                            style={{ ...S.backBtn, ...(checkoutLocked ? { cursor: 'not-allowed', opacity: 0.45 } : {}) }}
-                            onClick={onBack}
+                            disabled={requestLocked}
+                            style={{ ...S.backBtn, ...(requestLocked ? { cursor: 'not-allowed', opacity: 0.45 } : {}) }}
+                            onClick={leaveSummary}
                         >→</button>
                         <div style={{ flex: 1, display: "flex", alignItems: "center", gap: "5px" }}>
                             <span style={{ fontSize: "17px" }}>📋</span>
@@ -665,7 +731,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                         </div>
                         <div style={S.pricePill}>
                             <span style={S.priceS}>₪</span>
-                            <span style={S.priceV}>{finalTotal}</span>
+                            <span style={S.priceV}>{checkoutTotal}</span>
                         </div>
                     </div>
                 </div>
@@ -901,7 +967,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
 
                         <div style={S.sumTotal}>
                             <span style={{ fontSize: "16px", fontWeight: 700, color: "rgba(255,255,255,0.55)" }}>סה"כ</span>
-                            <span style={{ fontFamily: "var(--font-display), 'Secular One', sans-serif" }}>₪{finalTotal}</span>
+                            <span style={{ fontFamily: "var(--font-display), 'Secular One', sans-serif" }}>₪{checkoutTotal}</span>
                         </div>
                     </BariPanel>
 
@@ -917,9 +983,9 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                                 <button
                                     type="button"
                                     aria-pressed={paymentChoice === "now"}
-                                    disabled={submitting || recoveryPending}
+                                    disabled={checkoutLocked}
                                     onClick={() => setPaymentChoice("now")}
-                                    style={{ ...PAY.opt, ...(paymentChoice === "now" ? PAY.optActive : {}), ...((submitting || recoveryPending) ? PAY.optDisabled : {}) }}
+                                    style={{ ...PAY.opt, ...(paymentChoice === "now" ? PAY.optActive : {}), ...(checkoutLocked ? PAY.optDisabled : {}) }}
                                 >
                                     {paymentChoice === "now" && <span style={PAY.selectedCheck} aria-hidden="true">✓</span>}
                                     <span style={{ fontSize: "20px" }} aria-hidden="true">💳</span>
@@ -928,9 +994,9 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                                 <button
                                     type="button"
                                     aria-pressed={paymentChoice === "pickup"}
-                                    disabled={submitting || recoveryPending}
+                                    disabled={checkoutLocked}
                                     onClick={() => setPaymentChoice("pickup")}
-                                    style={{ ...PAY.opt, ...(paymentChoice === "pickup" ? PAY.optActive : {}), ...((submitting || recoveryPending) ? PAY.optDisabled : {}) }}
+                                    style={{ ...PAY.opt, ...(paymentChoice === "pickup" ? PAY.optActive : {}), ...(checkoutLocked ? PAY.optDisabled : {}) }}
                                 >
                                     {paymentChoice === "pickup" && <span style={PAY.selectedCheck} aria-hidden="true">✓</span>}
                                     <span style={{ fontSize: "20px" }} aria-hidden="true">🏪</span>
@@ -942,9 +1008,9 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                             {SHOW_FAILURE_TEST && (
                                 <button
                                     type="button"
-                                    disabled={submitting || recoveryPending || shopBlocked || pickupBlocked}
+                                    disabled={checkoutLocked || shopBlocked || pickupBlocked}
                                     onClick={() => submitOrder("fail")}
-                                    style={{ ...PAY.failTest, ...((submitting || recoveryPending || shopBlocked || pickupBlocked) ? PAY.optDisabled : {}) }}
+                                    style={{ ...PAY.failTest, ...((checkoutLocked || shopBlocked || pickupBlocked) ? PAY.optDisabled : {}) }}
                                 >
                                     🧪 דמה כשל תשלום (לבדיקה)
                                 </button>
@@ -1006,8 +1072,8 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                         style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif", opacity: (submitting || (!recoveryPending && (shopBlocked || pickupBlocked))) ? 0.6 : 1 }}
                         onClick={() => submitOrder()}
                     >
-                        <span>{submitting ? "שולח…" : hasPendingPayment ? "פתח תשלום" : hasPendingSubmission ? "בדקו הזמנה קודמת" : shopBlocked ? "סגור כרגע" : pickupBlocked ? pickupBlockLabel : submitError ? "נסו שוב" : "שלח הזמנה"}</span>
-                        {!recoveryPending && <span style={S.orderBtnPrice}>₪{finalTotal}</span>}
+                        <span>{submitting ? "שולח…" : hasPendingPayment ? "פתח תשלום" : hasPendingSubmission ? "בדקו הזמנה קודמת" : shopBlocked ? "סגור כרגע" : pickupBlocked ? pickupBlockLabel : priceReconfirmation ? "אישור המחיר המעודכן" : submitError ? "נסו שוב" : "שלח הזמנה"}</span>
+                        {!recoveryPending && <span style={S.orderBtnPrice}>₪{checkoutTotal}</span>}
                     </BariButton>
                     {/* Consent disclosure — links open the legal docs before ordering */}
                     <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.45)", textAlign: "center", lineHeight: 1.6, marginTop: "8px", fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }}>

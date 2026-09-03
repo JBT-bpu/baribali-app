@@ -199,6 +199,34 @@ test('hard reload restores the exact ambiguous request for the same draft', () =
     assert.deepEqual(restored?.requestBody, body);
 });
 
+test('a server price correction keeps the submission key and persists the corrected body', () => {
+    const storage = new MemoryStorage();
+    const originalBody = makeBody({ total: 54 });
+    const intent = orderSubmissionIntent(originalBody);
+    const first = claimOrderSubmission(intent, null, {
+        storage,
+        now: () => 16_000,
+        randomUUID: () => UUID_A,
+        requestBody: originalBody,
+    });
+    const correctedBody = { ...originalBody, total: 59 };
+    const corrected = claimOrderSubmission(orderSubmissionIntent(correctedBody), first, {
+        storage,
+        now: () => 16_001,
+        randomUUID: () => { throw new Error('a total-only correction must reuse the key'); },
+        requestBody: correctedBody,
+    });
+    const restored = claimOrderSubmission(intent, null, {
+        storage,
+        now: () => 16_002,
+        randomUUID: () => { throw new Error('the corrected record must already exist'); },
+    });
+
+    assert.equal(corrected.submissionKey, UUID_A);
+    assert.equal(restored.submissionKey, UUID_A);
+    assert.equal(restored.requestBody?.total, 59);
+});
+
 test('pending payment identity survives reload and tracking clears only its order', () => {
     const storage = new MemoryStorage();
     const body = makeBody();
@@ -329,6 +357,13 @@ test('checkout persists ambiguity and payment identity until tracking takes over
     assert.ok(intent < claim && claim < request);
     assert.ok(attachedKey > request);
     assert.match(summarySource, /definitiveRejection[\s\S]*?clearOrderSubmission\(submission\)/);
+    const priceCorrection = summarySource.indexOf("data?.code === 'ORDER_TOTAL_CHANGED'", request);
+    const definitiveRejection = summarySource.indexOf('const definitiveRejection', request);
+    assert.ok(priceCorrection > request && priceCorrection < definitiveRejection,
+        'a price correction must preserve and update the key before generic 4xx cleanup');
+    assert.match(summarySource, /correctedBody[\s\S]*?claimOrderSubmission\([\s\S]*?requestBody: correctedBody/);
+    assert.match(summarySource, /total: typeof data\.total === 'number'/,
+        'the confirmation must prefer the server-recorded total');
     assert.match(summarySource, /if \(data\?\.paymentFailed\)[\s\S]*?clearOrderSubmission\(submission\)/);
     assert.equal(summarySource.match(/clearOrderSubmission\(submission\)/g)?.length, 3,
         'only definitive rejection, payment failure, and on-page confirmation clear the key');
