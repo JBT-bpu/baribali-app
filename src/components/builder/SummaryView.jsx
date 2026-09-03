@@ -153,6 +153,7 @@ import {
     resolvePickupSelection,
     shopDateKey,
 } from "../../lib/shopHours";
+import { useHistoryBackedOverlay } from "../../hooks/useHistoryBackedOverlay";
 import { useShopStatus } from "../../lib/useShopStatus";
 
 const DEMO_MODE = isSupabaseDemoMode();
@@ -175,6 +176,11 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     const [showMixing, setShowMixing] = useState(false);
     const [notesError, setNotesError] = useState("");
     const [notesOpen, setNotesOpen] = useState(false);
+    const { openOverlay: openNotes, closeOverlay: closeNotes } = useHistoryBackedOverlay({
+        id: "summary-notes",
+        open: notesOpen,
+        onOpenChange: setNotesOpen,
+    });
     const [notesFocused, setNotesFocused] = useState(false);
     const [highlightedStep, setHighlightedStep] = useState(null);
     const [pickupTime, setPickupTime] = useState(null);
@@ -918,14 +924,14 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                     </div>
 
                     {/* Notes — opens in a sheet instead of an inline collapse */}
-                    <button type="button" disabled={checkoutLocked} style={{ ...S.notesToggle, ...(checkoutLocked ? { cursor: 'not-allowed', opacity: 0.55 } : {}) }} onClick={() => setNotesOpen(true)} aria-haspopup="dialog">
+                    <button type="button" disabled={checkoutLocked} style={{ ...S.notesToggle, ...(checkoutLocked ? { cursor: 'not-allowed', opacity: 0.55 } : {}) }} onClick={openNotes} aria-haspopup="dialog">
                         <span>📝 הערה לבשלן</span>
                         {notes.length > 0 && (
                             <BariBadge className="mr-auto">✓ נוספה</BariBadge>
                         )}
                         {notes.length === 0 && <span style={{ marginRight: "auto", fontSize: "12px", color: "rgba(255,255,255,0.3)" }}>▾</span>}
                     </button>
-                    <BariModal open={notesOpen} onClose={() => setNotesOpen(false)} variant="sheet" title="📝 הערה לבשלן">
+                    <BariModal open={notesOpen} onClose={closeNotes} variant="sheet" title="📝 הערה לבשלן">
                         <div style={{ padding: "0 16px 16px" }}>
                             <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "6px" }}>
                                 <span style={{ fontSize: "10px", color: notes.length > MAX_NOTES_LENGTH * 0.8 ? "#e57373" : "rgba(255,255,255,0.35)" }}>
@@ -951,7 +957,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                                 autoFocus
                             />
                             {notesError && <div role="alert" style={{ fontSize: "10px", color: "#ef5350", marginTop: "4px" }}>⚠️ {notesError}</div>}
-                            <BariButton variant="primary" fullWidth style={{ marginTop: "14px" }} onClick={() => setNotesOpen(false)}>סיימתי</BariButton>
+                            <BariButton variant="primary" fullWidth style={{ marginTop: "14px" }} onClick={closeNotes}>סיימתי</BariButton>
                         </div>
                     </BariModal>
 

@@ -29,6 +29,7 @@ import { effectiveItemPrice, effectiveBase, effectiveSizePrice } from "../../lib
 import { resolveChefPreset } from "../../lib/chefPresets";
 import { countsTowardIngredientPickLimit, INGREDIENT_PICK_LIMIT } from "../../lib/orderRules";
 import { isSoundOn, readSoundPref, setSoundPref } from "../../lib/soundPref";
+import { useHistoryBackedOverlay } from "../../hooks/useHistoryBackedOverlay";
 
 const BOWL_MAX = INGREDIENT_PICK_LIMIT.salad;
 const TORTILLA_MAX = INGREDIENT_PICK_LIMIT.tortilla;
@@ -336,7 +337,20 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
   const [badgeFlash, setBadgeFlash] = useState(null);
   const [shownBadges, setShownBadges] = useState(new Set());
   const [detailCtx, setDetailCtx] = useState(null); // { item, stepId, maxPicks }
+  const handleDetailOpenChange = useCallback((open) => {
+    if (!open) setDetailCtx(null);
+  }, []);
+  const { openOverlay: openDetailSheet, closeOverlay: closeDetailSheet } = useHistoryBackedOverlay({
+    id: "builder-detail",
+    open: Boolean(detailCtx),
+    onOpenChange: handleDetailOpenChange,
+  });
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const { openOverlay: openClearConfirm, closeOverlay: closeClearConfirm } = useHistoryBackedOverlay({
+    id: "builder-clear-confirm",
+    open: showClearConfirm,
+    onOpenChange: setShowClearConfirm,
+  });
   const [draftNotice, setDraftNotice] = useState(false);
   // The ingredient-info hint used to reappear on every single mount, forever —
   // a returning customer on their twentieth order still lost 78px at the top of
@@ -612,15 +626,15 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
   }, [activeBase, steps]);
 
   // ─── Clear draft ───
-  const requestClearDraft = useCallback(() => setShowClearConfirm(true), []);
+  const requestClearDraft = useCallback(() => openClearConfirm(), [openClearConfirm]);
   const confirmClearDraft = useCallback(() => {
     localStorage.removeItem("baribali-draft");
     setSels({});
     setNotes("");
     setStep(isTortilla ? 0 : -1);
     haptic("remove");
-    setShowClearConfirm(false);
-  }, [isTortilla]);
+    closeClearConfirm();
+  }, [closeClearConfirm, isTortilla]);
 
   // ─── Directional transitions ───
   const goTo = useCallback((target) => {
@@ -1034,7 +1048,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
             </div>
           )}
         </div>
-        <ClearConfirmModal open={showClearConfirm} onConfirm={confirmClearDraft} onCancel={() => setShowClearConfirm(false)} />
+        <ClearConfirmModal open={showClearConfirm} onConfirm={confirmClearDraft} onCancel={closeClearConfirm} />
         {mounted && <style>{KF}</style>}
       </div>
     );
@@ -1078,12 +1092,12 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
         <DetailSheet
           item={detailCtx.item}
           isAdded={(sels[detailCtx.stepId] || []).some(i => i.id === detailCtx.item.id)}
-          onToggle={() => { toggle(detailCtx.stepId, detailCtx.item, detailCtx.maxPicks); setDetailCtx(null); }}
-          onClose={() => setDetailCtx(null)}
+          onToggle={() => { toggle(detailCtx.stepId, detailCtx.item, detailCtx.maxPicks); closeDetailSheet(); }}
+          onClose={closeDetailSheet}
         />
       )}
 
-      <ClearConfirmModal open={showClearConfirm} onConfirm={confirmClearDraft} onCancel={() => setShowClearConfirm(false)} />
+      <ClearConfirmModal open={showClearConfirm} onConfirm={confirmClearDraft} onCancel={closeClearConfirm} />
 
       <div style={{ ...S.main, opacity: anim === "enter" ? 0 : 1, transition: "opacity 0.4s" }}>
 
@@ -1325,8 +1339,9 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                             surrounding selection when the finger was released. */}
                         <button
                           type="button"
-                          onClick={() => { dismissHint(); setDetailCtx({ item, stepId: cur.id, maxPicks: cur.maxPicks }); haptic("tap"); }}
+                          onClick={() => { dismissHint(); setDetailCtx({ item, stepId: cur.id, maxPicks: cur.maxPicks }); openDetailSheet(); haptic("tap"); }}
                           aria-label={`מידע על ${item.he}`}
+                          aria-haspopup="dialog"
                           style={S.chipInfo}
                         >ℹ</button>
                       </div>

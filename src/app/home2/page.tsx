@@ -22,6 +22,7 @@ import { useShopStatus } from '@/lib/useShopStatus';
 import { reopenLine } from '@/lib/shopHours';
 import { isPaymentVerificationReturn } from '@/lib/customerPayment';
 import type { OrderProduct } from '@/lib/orderRules';
+import { useHistoryBackedOverlay } from '@/hooks/useHistoryBackedOverlay';
 
 // The product pick is the hero-select roster (HeroSelector); choosing the salad
 // hero opens the shared SizePicker overlay (also used by the builder).
@@ -169,6 +170,11 @@ export default function HomeV2() {
     const [lastOrder, setLastOrder]   = useState<HistoryOrder | null>(null);
     const [heroIdx, setHeroIdx]       = useState(0); // active hero → background parallax
     const nudgeRef = useRef(0); // swipe impulse shared with the particle field
+    const { openOverlay: openLoginSheet, closeOverlay: closeLoginSheet } = useHistoryBackedOverlay({
+        id: 'home-login',
+        open: loginSheet,
+        onOpenChange: setLoginSheet,
+    });
 
     // The guest-or-Google gate now lives on the app's front door (src/app/page.tsx),
     // not as an overlay here.
@@ -327,10 +333,11 @@ export default function HomeV2() {
             }}>
                 <button
                     type="button"
-                    onClick={() => { navigator.vibrate?.(8); user ? router.push('/profile') : setLoginSheet(true); }}
+                    onClick={() => { navigator.vibrate?.(8); user ? router.push('/profile') : openLoginSheet(); }}
                     aria-label={user ? 'הפרופיל שלי' : 'התחברות'}
+                    aria-haspopup={user ? undefined : 'dialog'}
                     style={{
-                        width: '38px', height: '38px', borderRadius: '50%', flexShrink: 0,
+                        width: '44px', height: '44px', borderRadius: '50%', flexShrink: 0,
                         border: '2px solid rgba(200,168,78,0.4)', cursor: 'pointer',
                         background: avatar ? `url(${avatar}) center / cover` : 'rgba(255,255,255,0.08)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -343,7 +350,7 @@ export default function HomeV2() {
                 <Image src="/homepage-assets/logo.webp" alt="BariBali" width={220} height={140}
                     style={{ width: '150px', height: 'auto', filter: 'drop-shadow(0 0 32px rgba(240,200,50,0.5)) drop-shadow(0 4px 14px rgba(0,0,0,0.65))' }} priority />
 
-                <div style={{ width: '38px', flexShrink: 0 }} aria-hidden />
+                <div style={{ width: '44px', flexShrink: 0 }} aria-hidden />
             </div>
 
             {/* ── Product hero-select roster (+ members' one-tap reorder) ── */}
@@ -372,7 +379,7 @@ export default function HomeV2() {
             {/* Login bottom sheet — a quick, in-place offer, never a gate.
                 Reachable from the header profile chip; ordering never routes
                 through here. */}
-            <BariModal open={loginSheet} onClose={() => setLoginSheet(false)} variant="sheet" title="כניסה לחשבון">
+            <BariModal open={loginSheet} onClose={closeLoginSheet} variant="sheet" title="כניסה לחשבון">
                 <div style={{
                     position: 'relative',
                     padding: '8px 24px max(28px, env(safe-area-inset-bottom))',
@@ -387,7 +394,7 @@ export default function HomeV2() {
                     <BariButton
                         variant="ghost"
                         size="sm"
-                        onClick={() => setLoginSheet(false)}
+                        onClick={closeLoginSheet}
                         style={{ position: 'relative', border: 'none', color: 'rgba(255,255,255,0.4)', fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }}
                     >
                         ביטול

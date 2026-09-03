@@ -162,6 +162,9 @@ test('order tracking announces each real status transition without poll spam', (
     const effectStart = tracking.indexOf('// Track real status transitions.');
     const nextEffect = tracking.indexOf('// Flash the tab title', effectStart);
     const statusEffect = tracking.slice(effectStart, nextEffect);
+    const loadingStart = tracking.indexOf('function Loading(');
+    const loadedView = tracking.slice(0, loadingStart);
+    const loadingView = tracking.slice(loadingStart);
 
     assert.ok(effectStart >= 0 && nextEffect > effectStart,
         'the status-transition effect must remain identifiable');
@@ -194,10 +197,26 @@ test('order tracking announces each real status transition without poll spam', (
         'current-step semantics belong to the process item, not its decorative artwork');
     assert.match(tracking, /<div id="order-status-summary" style=\{labelStyle\}>[\s\S]*?<span style=\{P\.srOnly\}>סטטוס ההזמנה: <\/span>[\s\S]*?\{step\.label\}/,
         'the visible status label must remain a concise, browseable non-live summary');
-    assert.equal(tracking.match(/role="status"/g)?.length, 1,
-        'tracking must keep one live status region so transitions are not announced twice');
-    assert.equal(tracking.match(/aria-live="polite"/g)?.length, 1,
-        'tracking must keep one polite announcement channel');
+    assert.equal(loadedView.match(/role="status"/g)?.length, 1,
+        'the loaded tracking view must keep one live status region so transitions are not announced twice');
+    assert.equal(loadedView.match(/aria-live="polite"/g)?.length, 1,
+        'the loaded tracking view must keep one polite announcement channel');
+    assert.match(
+        loadingView,
+        /<div role="status" aria-live="polite" aria-atomic="true" style=\{P\.srOnly\}>[\s\S]*?\{offline \? 'אין חיבור — מנסים שוב…' : 'טוענים את פרטי ההזמנה…'\}/,
+        'the initial tracking state must expose a useful status while its request is busy',
+    );
+    assert.match(loadingView, /<div style=\{P\.board\} aria-busy="true">/,
+        'the visual tracking placeholder must expose its busy state without suppressing the sibling live region');
+    assert.equal(loadingView.match(/role="status"/g)?.length, 1,
+        'the loading failure copy must stay in its one status region instead of creating duplicate announcements');
+    assert.equal(loadingView.match(/aria-live="polite"/g)?.length, 1,
+        'the loading view must keep one polite announcement channel');
+    assert.doesNotMatch(loadingView, /role="alert"/);
+    assert.match(tracking, /aria-hidden="true"[\s\S]*?אין חיבור — מנסים שוב…/,
+        'the visible offline copy must defer to the loading status region for assistive technology');
+    assert.match(tracking, /bottomPill: \{ minHeight: '44px'/,
+        'the back-to-menu link must retain a mobile-sized touch target');
 });
 
 test('long-open customer screens refresh time-sensitive shop state safely', () => {
@@ -350,6 +369,10 @@ test('the home hero roster is a keyboard-complete mobile choice', () => {
         'turning on a future product must route that product rather than silently choosing salad');
     assert.match(home, /const chooseProduct = useCallback\(\(product: OrderProduct\)[\s\S]*?product === 'salad'[\s\S]*?router\.push\(`\/build\?type=\$\{encodeURIComponent\(product\)\}`\)/,
         'home must keep the active product identity through navigation');
+    assert.match(home, /aria-label=\{user \? 'הפרופיל שלי' : 'התחברות'\}[\s\S]*?width: '44px', height: '44px'/,
+        'the header account control must keep a full mobile touch target');
+    assert.match(home, /<div style=\{\{ width: '44px', flexShrink: 0 \}\} aria-hidden \/>/,
+        'the balancing spacer must track the account target so the logo stays centred');
 });
 
 test('builder size changes keep rendered, URL, history and reset state aligned', () => {

@@ -527,10 +527,13 @@ function Loading({ offline }: { offline: boolean }) {
     });
     return (
         <div style={P.root}>
+            <div role="status" aria-live="polite" aria-atomic="true" style={P.srOnly}>
+                {offline ? 'אין חיבור — מנסים שוב…' : 'טוענים את פרטי ההזמנה…'}
+            </div>
             <BariGlowBackground />
             <GoldField zIndex={0} />
 
-            <div style={P.board}>
+            <div style={P.board} aria-busy="true">
                 <div style={P.boardArt} aria-hidden="true" />
 
                 <div style={{ ...P.heroRing }}>
@@ -546,10 +549,13 @@ function Loading({ offline }: { offline: boolean }) {
                     instead of shimmering silently for ever. It takes the card's
                     second line — the same place the loaded page reports it. */}
                 {offline && (
-                    <div style={{
-                        ...slot(TRACK.card.top + 0.090, 0.045, TRACK.card.left, TRACK.card.right),
-                        ...P.statusSub, ...P.statusSubOffline,
-                    }}>
+                    <div
+                        aria-hidden="true"
+                        style={{
+                            ...slot(TRACK.card.top + 0.090, 0.045, TRACK.card.left, TRACK.card.right),
+                            ...P.statusSub, ...P.statusSubOffline,
+                        }}
+                    >
                         <span style={{ ...P.liveDot, ...P.liveDotOffline }} /> אין חיבור — מנסים שוב…
                     </div>
                 )}
@@ -731,8 +737,10 @@ const P: Record<string, React.CSSProperties> = {
     },
     liveDotOffline: { background: '#ffb74d', boxShadow: '0 0 6px rgba(255,183,77,0.9)', animation: 'none' },
 
-    // Sits on the green pill the art draws at the bottom.
-    bottomPill: { display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'clamp(11px, 3.5vw, 14px)', fontWeight: 800, color: '#ffe9a8', textDecoration: 'none', letterSpacing: '0.02em' },
+    // Sits on the green pill the art draws at the bottom. The artwork's slot
+    // is only ~22px tall on a phone, so the link grows its transparent hit box
+    // to the 44px mobile target and shifts the text back over the painted pill.
+    bottomPill: { minHeight: '44px', transform: 'translateY(-8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'clamp(11px, 3.5vw, 14px)', fontWeight: 800, color: '#ffe9a8', textDecoration: 'none', letterSpacing: '0.02em' },
 
     /* Shimmer loading */
     shimmerCircle: {
