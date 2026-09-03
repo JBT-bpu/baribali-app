@@ -139,7 +139,10 @@ import { getAccessToken } from "../../lib/auth";
 import {
     claimOrderSubmission,
     clearOrderSubmission,
+    markOrderSubmissionPaymentPending,
+    orderSubmissionCartIntent,
     orderSubmissionIntent,
+    restoreOrderSubmission,
 } from "../../lib/orderSubmission";
 import {
     mergePickupCapacity,
@@ -201,6 +204,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     const [submitError, setSubmitError] = useState("");
     const [autoDiscount, setAutoDiscount] = useState(null); // standing "tag" discount for signed-in customers
     const [hasPendingPayment, setHasPendingPayment] = useState(false);
+    const [hasPendingSubmission, setHasPendingSubmission] = useState(false);
     // Once the order exists, retries must reopen payment for that same order.
     // Re-running POST /api/orders would create a second kitchen order.
     const pendingPaymentRef = useRef(null);
@@ -213,6 +217,40 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     // can both observe `submitting === false`. This ref closes before any state
     // update or await, so only one request can enter the order-creation path.
     const submitLockRef = useRef(false);
+    const recoveryCartIntent = useMemo(() => orderSubmissionCartIntent({
+        items: all,
+        size: base,
+        productType,
+        notes,
+    }), [all, base, notes, productType]);
+
+    // A hard reload reconstructs the ingredient draft but loses SummaryView's
+    // pickup/payment React state. Recover the exact in-flight request for this
+    // cart, or the already-created order's payment identity, from this tab's
+    // short-lived session record. No request is sent automatically.
+    useEffect(() => {
+        const recovered = restoreOrderSubmission(recoveryCartIntent);
+        orderSubmissionRef.current = recovered;
+        pendingPaymentRef.current = recovered?.pendingPayment ?? null;
+
+        const timer = window.setTimeout(() => {
+            if (!recovered) {
+                setHasPendingPayment(false);
+                setHasPendingSubmission(false);
+                return;
+            }
+            if (recovered.pendingPayment) {
+                setHasPendingPayment(true);
+                setHasPendingSubmission(false);
+                setSubmitError("ההזמנה כבר נקלטה. לחצו כדי להמשיך לאותו תשלום.");
+            } else {
+                setHasPendingPayment(false);
+                setHasPendingSubmission(true);
+                setSubmitError("מצאנו ניסיון הזמנה קודם. לחצו כדי לבדוק אם ההזמנה נקלטה.");
+            }
+        }, 0);
+        return () => window.clearTimeout(timer);
+    }, [recoveryCartIntent]);
 
     // Capacity and the five-minute window are external state. If they invalidate
     // an explicit choice, clear the stored value as well as the rendered one so
@@ -241,8 +279,8 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     // build page is restored from bfcache, React state otherwise preserves the
     // full-screen "sending" seal forever. The order already exists at this
     // point, so recover the existing payment retry — never POST /api/orders
-    // again. A hard reload is deliberately not restored from global storage:
-    // doing that safely needs an order-scoped URL marker and expiry policy.
+    // again. A hard reload follows the same rule using the short-lived,
+    // order-scoped session record restored above.
     useEffect(() => {
         const recoverFromPaymentPage = (event) => {
             if (!event.persisted || !pendingPaymentRef.current) return;
@@ -296,6 +334,8 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
         && !pickupHasAvailableSlot
         && pickupAvailability.slots.some(slot => slot.capacityPending);
     const pickupBlocked = shop.open && shop.reason !== 'override_open' && !effectivePickupTime;
+    const recoveryPending = hasPendingPayment || hasPendingSubmission;
+    const checkoutLocked = submitting || recoveryPending;
     const pickupBlockLabel = pickupAvailability.slots === null || pickupCheckingMoreSlots
         ? "בודקים שעות איסוף"
         : pickupHasAvailableSlot
@@ -383,6 +423,12 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
             // The server only permits a new key after the old initialization
             // was closed before a checkout page could be returned.
             pendingPayment.idempotencyKey = freshPaymentKey();
+            if (orderSubmissionRef.current) {
+                orderSubmissionRef.current = markOrderSubmissionPaymentPending(
+                    orderSubmissionRef.current,
+                    pendingPayment,
+                );
+            }
         }
 
         const message = networkError?.name === 'AbortError'
@@ -398,54 +444,52 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
         if (submitLockRef.current) return;
         submitLockRef.current = true;  // close synchronously before state/await
         const choice = choiceOverride ?? paymentChoice;
-        const isFailureTest = choice === "fail";
+        const recoveredSubmission = orderSubmissionRef.current?.requestBody
+            ? orderSubmissionRef.current
+            : null;
+        const isFailureTest = !recoveredSubmission && choice === "fail";
         setSubmitting(true);
         setSubmitError("");
         setAcceptedOrder(null);
         if (navigator.vibrate) navigator.vibrate(isFailureTest ? [30, 40, 30] : [15, 40, 30]);
         if (!isFailureTest) setShowMixing(true);
 
-        // A previous click may already have created the order. In that case
-        // retry only the idempotent payment-page request for the same order.
+        // Once the order exists, skip order creation entirely and retry the
+        // idempotent payment-page request restored from memory/sessionStorage.
         if (pendingPaymentRef.current) {
             await launchPendingPayment(pendingPaymentRef.current);
             return;
         }
 
-        // Re-resolve at click time as well as at render time. Capacity can
-        // change between two React commits; never send a hidden expired/full
-        // value just because the reconciliation UI has not painted yet.
-        const pickupForSubmit = resolvePickupSelection(
-            pickupTime,
-            pickupAvailability.slots,
-            shop.open,
-        );
-        if (shop.open && shop.reason !== 'override_open' && !pickupForSubmit) {
-            failSubmit(
-                pickupTime
-                    ? "זמן האיסוף השתנה. בחרו שעה פנויה ונסו שוב."
-                    : pickupAvailability.slots === null || pickupCheckingMoreSlots
-                        ? "זמני האיסוף עדיין מתעדכנים. המתינו רגע ונסו שוב."
-                        : pickupHasAvailableSlot
-                            ? "בחרו שעת איסוף ונסו שוב."
-                            : "אין כרגע שעת איסוף פנויה.",
+        let submission = recoveredSubmission;
+        let orderBody = recoveredSubmission?.requestBody ?? null;
+        let pickupForSubmit = typeof orderBody?.pickupTime === 'string'
+            ? orderBody.pickupTime
+            : null;
+
+        if (!orderBody) {
+            // Re-resolve at click time as well as at render time. Capacity can
+            // change between two React commits; never send a hidden expired/full
+            // value just because the reconciliation UI has not painted yet.
+            pickupForSubmit = resolvePickupSelection(
+                pickupTime,
+                pickupAvailability.slots,
+                shop.open,
             );
-            return;
-        }
+            if (shop.open && shop.reason !== 'override_open' && !pickupForSubmit) {
+                failSubmit(
+                    pickupTime
+                        ? "זמן האיסוף השתנה. בחרו שעה פנויה ונסו שוב."
+                        : pickupAvailability.slots === null || pickupCheckingMoreSlots
+                            ? "זמני האיסוף עדיין מתעדכנים. המתינו רגע ונסו שוב."
+                            : pickupHasAvailableSlot
+                                ? "בחרו שעת איסוף ונסו שוב."
+                                : "אין כרגע שעת איסוף פנויה.",
+                );
+                return;
+            }
 
-        // A hung request never rejects, so without this the customer sat on the
-        // mixing overlay indefinitely with no way out — a real outcome on a
-        // flaky mobile connection. 20s, then treat it as a failure they can
-        // retry. AbortController rather than AbortSignal.timeout for the wider
-        // browser floor. Declared out here so `catch` can clear it too.
-        const ctl = new AbortController();
-        const timeoutId = setTimeout(() => ctl.abort(), 20000);
-
-        try {
-            // This is the exact business payload. Its canonical intent is derived
-            // before adding the transport-only submission key, so retries of the
-            // same order reuse one key while any changed choice gets a fresh one.
-            const orderBody = {
+            orderBody = {
                 items: all.map(i => ({ id: i.id, he: i.he, icon: i.icon, price: effectiveItemPrice(i.id, i.price || 0) })),
                 total: finalTotal,
                 pickupTime: pickupForSubmit,
@@ -453,18 +497,33 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                 size: base,
                 productType,
                 // Only the customer's explicitly applied code belongs to the
-                // request intent. A standing account discount is server-owned
-                // mutable state and is resolved independently on every request.
+                // request intent. A standing account discount is server-owned.
                 ...(appliedDiscount?.code ? { discountCode: appliedDiscount.code } : {}),
                 ...(DEMO_MODE ? { paymentChoice: choice } : {}),
             };
-            const orderIntent = orderSubmissionIntent(orderBody);
-            const submission = claimOrderSubmission(
-                orderIntent,
-                orderSubmissionRef.current,
-                { randomUUID: freshPaymentKey },
-            );
-            orderSubmissionRef.current = submission;
+        }
+
+        // A hung request never rejects. Persist the exact request before fetch;
+        // a hard reload can then retry the same key/body before applying today's
+        // mutable opening, pickup and pricing state.
+        const ctl = new AbortController();
+        const timeoutId = setTimeout(() => ctl.abort(), 20000);
+
+        try {
+            if (!submission) {
+                const orderIntent = orderSubmissionIntent(orderBody);
+                submission = claimOrderSubmission(
+                    orderIntent,
+                    null,
+                    {
+                        randomUUID: freshPaymentKey,
+                        requestBody: orderBody,
+                        cartIntent: recoveryCartIntent,
+                    },
+                );
+                orderSubmissionRef.current = submission;
+            }
+            setHasPendingSubmission(true);
 
             // Signed-in customers get the order linked to their account (order
             // history on /orders); guests order exactly the same without it.
@@ -482,19 +541,15 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
             const data = await res.json().catch(() => null);
 
             if (!res.ok) {
-                if (data?.code === 'SUBMISSION_KEY_CONFLICT') {
+                // A definite client rejection means this key did not create this
+                // intent (the server checks its ledger first). 429/5xx remain
+                // ambiguous because a previous request may already have won.
+                const definitiveRejection = res.status >= 400 && res.status < 500 && res.status !== 429;
+                if (definitiveRejection) {
                     clearOrderSubmission(submission);
                     orderSubmissionRef.current = null;
+                    setHasPendingSubmission(false);
                 }
-                // A 409 is a deliberate, explainable refusal — the shop is
-                // closed, or the pickup time has passed — and the server writes
-                // that reason in Hebrew for the customer. It used to be
-                // discarded here in favour of "לא הצלחנו לשלוח את ההזמנה. נסו
-                // שוב", which turned "we open at 09:00" into advice to retry
-                // something that could not succeed until morning.
-                //
-                // Only 409. Other failures are not customer-actionable and
-                // their messages are not written to be read by one.
                 failSubmit(
                     res.status === 409 && typeof data?.error === 'string'
                         ? data.error
@@ -512,45 +567,46 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                 setPaymentFailed(true);
                 clearOrderSubmission(submission);
                 orderSubmissionRef.current = null;
+                setHasPendingSubmission(false);
                 return;
             }
-            // No id/order number means nothing was actually recorded — never
-            // present that as a confirmed order.
+            // No id/order number means nothing was conclusively recorded. Keep
+            // the recovery record because this malformed success is ambiguous.
             if (!data?.id && !data?.orderNum) {
-                failSubmit("לא הצלחנו לשלוח את ההזמנה. נסו שוב.");
+                setHasPendingSubmission(true);
+                failSubmit("לא הצלחנו לאמת שההזמנה נקלטה. נסו שוב.");
                 return;
             }
 
-            // The server returned a durable order identity. Any later retry is a
-            // payment retry for that order, so the pre-order submission is done.
-            clearOrderSubmission(submission);
-            orderSubmissionRef.current = null;
-
-            // Online payment only when a gateway is configured. Otherwise the
-            // order is already pay-at-pickup (server set payAtPickup) — skip
-            // the redirect and let the confirmation screen show.
+            // Online payment: persist both identities before the first payment
+            // request. A hard reload now resumes this order/payment directly.
             if (data.id && !data.demo && !data.payAtPickup) {
-                pendingPaymentRef.current = {
+                const pendingPayment = {
                     orderId: data.id,
                     orderNum: data.orderNum ?? null,
                     idempotencyKey: freshPaymentKey(),
                 };
+                orderSubmissionRef.current = markOrderSubmissionPaymentPending(
+                    submission,
+                    pendingPayment,
+                );
+                pendingPaymentRef.current = pendingPayment;
+                setHasPendingSubmission(false);
                 setHasPendingPayment(true);
-                await launchPendingPayment(pendingPaymentRef.current);
+                await launchPendingPayment(pendingPayment);
                 return;
             }
 
-            // THE ONE PLACE an order becomes "accepted". Everything above either
-            // returned or threw; reaching here means the server responded ok,
-            // did not report a payment failure, and recorded an id or an order
-            // number. Only the server's values go in — `total` is `finalTotal`
-            // because that is what was submitted and re-derived server-side, and
-            // the rest is read straight off the response.
+            // Pay-at-pickup/demo reached a definitive on-page confirmation, so
+            // this short-lived submission recovery record has finished its job.
+            clearOrderSubmission(submission);
+            orderSubmissionRef.current = null;
+            setHasPendingSubmission(false);
             submitLockRef.current = false;
             setSubmitting(false);
             setAcceptedOrder({
-                total: finalTotal,
-                items: all.length,
+                total: typeof orderBody.total === 'number' ? orderBody.total : finalTotal,
+                items: Array.isArray(orderBody.items) ? orderBody.items.length : all.length,
                 pickupTime: pickupForSubmit,
                 orderNum: data.orderNum ?? null,
                 orderId: data.id ?? null,
@@ -559,6 +615,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
             });
         } catch (err) {
             clearTimeout(timeoutId);
+            if (submission) setHasPendingSubmission(true);
             failSubmit(err?.name === 'AbortError'
                 ? "השליחה נמשכה זמן רב מדי. בדקו את החיבור ונסו שוב."
                 : "אין חיבור לרשת. בדקו את החיבור ונסו שוב.");
@@ -582,7 +639,13 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                 <div style={S.header}>
                     <img src={headerImage} alt="" aria-hidden="true" style={{ width: "100%", display: "block", height: "72px", objectFit: "cover", objectPosition: "center top", flexShrink: 0 }} />
                     <div style={S.headerTop}>
-                        <button type="button" aria-label="חזרה לעריכת ההזמנה" style={S.backBtn} onClick={onBack}>←</button>
+                        <button
+                            type="button"
+                            aria-label="חזרה לעריכת ההזמנה"
+                            disabled={checkoutLocked}
+                            style={{ ...S.backBtn, ...(checkoutLocked ? { cursor: 'not-allowed', opacity: 0.45 } : {}) }}
+                            onClick={onBack}
+                        >←</button>
                         <div style={{ flex: 1, display: "flex", alignItems: "center", gap: "5px" }}>
                             <span style={{ fontSize: "17px" }}>📋</span>
                             <span style={{ fontFamily: "var(--font-display), 'Secular One', sans-serif", fontSize: "17px", color: "#e8f5e9" }}>ההזמנה שלכם</span>
@@ -715,7 +778,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                                         </div>
                                     ); })}
                                     {onEdit && (
-                                        <button type="button" aria-label={`עריכת ${s.title}`} onClick={() => onEdit(STEPS.findIndex(st => st.id === s.id))}
+                                        <button type="button" aria-label={`עריכת ${s.title}`} disabled={checkoutLocked} onClick={() => onEdit(STEPS.findIndex(st => st.id === s.id))}
                                             style={{
                                                 width: "64px", height: "72px",
                                                 background: "rgba(255,255,255,0.02)",
@@ -723,7 +786,8 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                                                 borderRadius: "9px",
                                                 display: "flex", flexDirection: "column",
                                                 alignItems: "center", justifyContent: "center",
-                                                cursor: "pointer", gap: "3px",
+                                                cursor: checkoutLocked ? "not-allowed" : "pointer", gap: "3px",
+                                                opacity: checkoutLocked ? 0.45 : 1,
                                             }}>
                                             <span style={{ fontSize: "14px", opacity: 0.5 }}>✏️</span>
                                             <span style={{ fontSize: "10px", fontWeight: 700, color: "rgba(200,168,78,0.55)" }}>ערוך</span>
@@ -735,7 +799,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                     </div>
 
                     {/* Notes — opens in a sheet instead of an inline collapse */}
-                    <button type="button" style={S.notesToggle} onClick={() => setNotesOpen(true)} aria-haspopup="dialog">
+                    <button type="button" disabled={checkoutLocked} style={{ ...S.notesToggle, ...(checkoutLocked ? { cursor: 'not-allowed', opacity: 0.55 } : {}) }} onClick={() => setNotesOpen(true)} aria-haspopup="dialog">
                         <span>📝 הערה לבשלן</span>
                         {notes.length > 0 && (
                             <BariBadge className="mr-auto">✓ נוספה</BariBadge>
@@ -751,6 +815,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                             </div>
                             <textarea
                                 value={notes}
+                                disabled={checkoutLocked}
                                 onChange={handleNotesChange}
                                 onFocus={() => setNotesFocused(true)}
                                 onBlur={() => setNotesFocused(false)}
@@ -775,6 +840,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                     <PickupTimePicker
                         value={effectivePickupTime}
                         onChange={selectPickupTime}
+                        disabled={checkoutLocked}
                         shop={shop}
                         localSlots={pickupAvailability.localSlots}
                         slots={pickupAvailability.slots}
@@ -800,12 +866,13 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                         <div style={{ display: "flex", gap: "6px", alignItems: "center", marginTop: "8px" }}>
                             <input
                                 value={promoInput}
+                                disabled={checkoutLocked}
                                 onChange={e => { setPromoInput(e.target.value); setPromoError(""); }}
                                 placeholder="קוד הנחה"
                                 aria-label="קוד הנחה"
                                 style={{ flex: 1, minHeight: "44px", padding: "8px 10px", borderRadius: "8px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.15)", color: "#fff", fontSize: "13px", fontWeight: 600, fontFamily: "var(--font-heebo), 'Heebo', sans-serif", outline: "none" }}
                             />
-                            <button type="button" onClick={applyPromo} style={{ minHeight: "44px", padding: "8px 14px", borderRadius: "8px", background: "rgba(200,168,78,0.2)", border: "1px solid rgba(200,168,78,0.4)", color: "#f0d060", fontSize: "13px", fontWeight: 800, cursor: "pointer", fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }}>החל</button>
+                            <button type="button" disabled={checkoutLocked} onClick={applyPromo} style={{ minHeight: "44px", padding: "8px 14px", borderRadius: "8px", background: "rgba(200,168,78,0.2)", border: "1px solid rgba(200,168,78,0.4)", color: "#f0d060", fontSize: "13px", fontWeight: 800, cursor: checkoutLocked ? "not-allowed" : "pointer", opacity: checkoutLocked ? 0.55 : 1, fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }}>החל</button>
                         </div>
                         {promoError && <div role="alert" style={{ fontSize: "11px", color: "#ff7575", fontWeight: 600, marginTop: "4px" }}>{promoError}</div>}
                         {effectiveDiscount && discAmount > 0 && (
@@ -836,9 +903,9 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                                 <button
                                     type="button"
                                     aria-pressed={paymentChoice === "now"}
-                                    disabled={submitting}
+                                    disabled={submitting || recoveryPending}
                                     onClick={() => setPaymentChoice("now")}
-                                    style={{ ...PAY.opt, ...(paymentChoice === "now" ? PAY.optActive : {}), ...(submitting ? PAY.optDisabled : {}) }}
+                                    style={{ ...PAY.opt, ...(paymentChoice === "now" ? PAY.optActive : {}), ...((submitting || recoveryPending) ? PAY.optDisabled : {}) }}
                                 >
                                     {paymentChoice === "now" && <span style={PAY.selectedCheck} aria-hidden="true">✓</span>}
                                     <span style={{ fontSize: "20px" }} aria-hidden="true">💳</span>
@@ -847,9 +914,9 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                                 <button
                                     type="button"
                                     aria-pressed={paymentChoice === "pickup"}
-                                    disabled={submitting}
+                                    disabled={submitting || recoveryPending}
                                     onClick={() => setPaymentChoice("pickup")}
-                                    style={{ ...PAY.opt, ...(paymentChoice === "pickup" ? PAY.optActive : {}), ...(submitting ? PAY.optDisabled : {}) }}
+                                    style={{ ...PAY.opt, ...(paymentChoice === "pickup" ? PAY.optActive : {}), ...((submitting || recoveryPending) ? PAY.optDisabled : {}) }}
                                 >
                                     {paymentChoice === "pickup" && <span style={PAY.selectedCheck} aria-hidden="true">✓</span>}
                                     <span style={{ fontSize: "20px" }} aria-hidden="true">🏪</span>
@@ -861,9 +928,9 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                             {SHOW_FAILURE_TEST && (
                                 <button
                                     type="button"
-                                    disabled={submitting || shopBlocked || pickupBlocked}
+                                    disabled={submitting || recoveryPending || shopBlocked || pickupBlocked}
                                     onClick={() => submitOrder("fail")}
-                                    style={{ ...PAY.failTest, ...((submitting || shopBlocked || pickupBlocked) ? PAY.optDisabled : {}) }}
+                                    style={{ ...PAY.failTest, ...((submitting || recoveryPending || shopBlocked || pickupBlocked) ? PAY.optDisabled : {}) }}
                                 >
                                     🧪 דמה כשל תשלום (לבדיקה)
                                 </button>
@@ -915,12 +982,12 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                         variant="primary"
                         fullWidth
                         aria-busy={submitting}
-                        disabled={submitting || (!hasPendingPayment && (shopBlocked || pickupBlocked))}
-                        style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif", opacity: (submitting || (!hasPendingPayment && (shopBlocked || pickupBlocked))) ? 0.6 : 1 }}
+                        disabled={submitting || (!recoveryPending && (shopBlocked || pickupBlocked))}
+                        style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif", opacity: (submitting || (!recoveryPending && (shopBlocked || pickupBlocked))) ? 0.6 : 1 }}
                         onClick={() => submitOrder()}
                     >
-                        <span>{submitting ? "שולח…" : hasPendingPayment ? "פתח תשלום" : shopBlocked ? "סגור כרגע" : pickupBlocked ? pickupBlockLabel : submitError ? "נסו שוב" : "שלח הזמנה"}</span>
-                        <span style={S.orderBtnPrice}>₪{finalTotal}</span>
+                        <span>{submitting ? "שולח…" : hasPendingPayment ? "פתח תשלום" : hasPendingSubmission ? "בדקו הזמנה קודמת" : shopBlocked ? "סגור כרגע" : pickupBlocked ? pickupBlockLabel : submitError ? "נסו שוב" : "שלח הזמנה"}</span>
+                        {!recoveryPending && <span style={S.orderBtnPrice}>₪{finalTotal}</span>}
                     </BariButton>
                     {/* Consent disclosure — links open the legal docs before ordering */}
                     <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.45)", textAlign: "center", lineHeight: 1.6, marginTop: "8px", fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }}>
@@ -1193,7 +1260,7 @@ function usePickupAvailability(shop) {
     return { localSlots, slots, status: capacity.status };
 }
 
-function PickupTimePicker({ value, onChange, shop, localSlots, slots, capacityStatus, selectionNotice, checkingMoreSlots }) {
+function PickupTimePicker({ value, onChange, disabled = false, shop, localSlots, slots, capacityStatus, selectionNotice, checkingMoreSlots }) {
 
     // Two different ways to have nothing to offer, and only one of them is the
     // schedule. `generatePickupSlots` reads WEEK, which is in the bundle and
@@ -1250,13 +1317,14 @@ function PickupTimePicker({ value, onChange, shop, localSlots, slots, capacitySt
                     <button
                         type="button"
                         key={slot.id}
-                        disabled={slot.full}
+                        disabled={disabled || slot.full}
                         aria-pressed={value === slot.id}
-                        onClick={() => !slot.full && onChange(slot.id)}
+                        onClick={() => !disabled && !slot.full && onChange(slot.id)}
                         style={{
                             ...PT.chip,
                             ...(value === slot.id ? PT.chipActive : {}),
                             ...(slot.full ? PT.chipFull : {}),
+                            ...(disabled && !slot.full ? { cursor: 'not-allowed', opacity: 0.55 } : {}),
                         }}
                     >
                         {value === slot.id && <span style={PT.selectedCheck} aria-hidden="true">✓</span>}

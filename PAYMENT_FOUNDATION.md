@@ -36,6 +36,11 @@ project.
   response, reload or concurrent retry returns the same kitchen order. The API
   deliberately returns 503 rather than falling back to a non-idempotent insert
   when this database contract is unavailable.
+- The browser stores the exact unresolved order request in tab-scoped
+  `sessionStorage` for 30 minutes. Once the order exists, that record carries
+  its order ID and payment idempotency key instead. A hard reload never sends
+  automatically: the customer explicitly resumes the same request/payment,
+  and mutable checkout controls stay locked until it is resolved.
 
 The migrations are:
 
@@ -124,7 +129,8 @@ npm test
 npm run build
 ```
 
-The unit suite covers SIGN/VERIFY parsing, credential-safe failures, immediate
-transaction-ID capture, URL persistence, concurrent initialization, retries,
-duplicate callbacks, unknown references, and verification-pending behavior.
+The 83-test focused suite covers SIGN/VERIFY parsing, credential-safe failures,
+immediate transaction-ID capture, URL persistence, concurrent initialization,
+order/request replay across hard reloads, duplicate callbacks, unknown
+references, and verification-pending behavior.
 It does not replace a real test-terminal round trip or migration execution.

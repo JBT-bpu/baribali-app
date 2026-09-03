@@ -31,7 +31,7 @@ npm run fresh      # rimraf .next && next dev — use if the dev cache corrupts
 
 - **Demo vs real mode** hinges on `isSupabaseConfigured()` in `src/lib/supabase.ts`. Without real creds the app is fully usable against an in-memory demo store (`src/lib/demoStore.ts`).
 - **Lint baseline: 0 errors / 12 warnings.** Hold that line — don't add warnings; the 12 are pre-existing (mostly `react-hooks/set-state-in-effect` and unused `no-img-element` disables).
-- **Focused tests use Node's built-in test runner through pinned `tsx`.** The current 81-test suite covers payment, pricing/order validation and idempotency, kitchen controls and critical customer-flow/source-trust invariants; it is not app-wide, so manual smoke-testing remains required for affected UI flows.
+- **Focused tests use Node's built-in test runner through pinned `tsx`.** The current 83-test suite covers payment, pricing/order validation and idempotency, kitchen controls and critical customer-flow/source-trust invariants; it is not app-wide, so manual smoke-testing remains required for affected UI flows.
 
 ## 4. Where things live
 
@@ -60,7 +60,7 @@ src/
 ## 5. Core flows
 
 - **Order:** `/` guest-or-Google door → `/home2` → in-page size picker → `/build?size=S|M|L&type=` (`BariBaliBuilder`) → `SummaryView` → `POST /api/orders` → Hyp Pay redirect (or order seal if pay-at-pickup) → `/order/[id]`.
-  **Price and the persisted `{ id, he, icon, price }` item snapshots are rebuilt server-side from the canonical catalog (`src/lib/pricing.ts` `computeOrderTotal`) — client-supplied item fields are never trusted.** The same boundary enforces unique IDs and the builder's ingredient/protein/sauce/finish limits. A 30-minute browser submission key plus the server-only `order_creation_requests` ledger makes response-loss/reload retries return the original order; never restore a direct-insert fallback.
+  **Price and the persisted `{ id, he, icon, price }` item snapshots are rebuilt server-side from the canonical catalog (`src/lib/pricing.ts` `computeOrderTotal`) — client-supplied item fields are never trusted.** The same boundary enforces unique IDs and the builder's ingredient/protein/sauce/finish limits. A 30-minute tab-scoped record preserves the exact request and, once created, its order/payment identity; together with the server-only `order_creation_requests` ledger, response-loss and hard-reload retries resume the original order instead of creating another. Never restore a direct-insert fallback.
 - **Auth:** guest-first. Supabase Google OAuth (`src/lib/auth.ts`); `user_id` on an order is set **only** from a server-verified access token, never client-claimed. Guests order identically with `user_id = null`.
 - **Reorder:** `/orders` history cards or the latest-order strip on `/home2` → "order again" / "change and order" (`src/lib/reorder.ts`).
 - **Kitchen:** `/kitchen` gated by a **server-only** `KITCHEN_PASSWORD` exchanged for an httpOnly, HMAC-signed session cookie (`src/lib/kitchenAuth.ts`).

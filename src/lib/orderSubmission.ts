@@ -14,6 +14,15 @@ export interface OrderSubmissionRecord {
     intent: string;
     submissionKey: string;
     createdAt: number;
+    /** Stable basket identity used to recover after SummaryView remounts. */
+    cartIntent?: string;
+    /** Exact body originally sent, excluding authorization and submissionKey. */
+    requestBody?: Record<string, unknown>;
+    pendingPayment?: {
+        orderId: string;
+        orderNum: string | null;
+        idempotencyKey: string;
+    };
 }
 
 interface ClaimOptions {
@@ -21,10 +30,18 @@ interface ClaimOptions {
     now?: () => number;
     randomUUID?: () => string;
     ttlMs?: number;
+    requestBody?: unknown;
+    cartIntent?: string;
 }
 
 interface ClearOptions {
     storage?: OrderSubmissionStorage | null;
+}
+
+interface RestoreOptions {
+    storage?: OrderSubmissionStorage | null;
+    now?: () => number;
+    ttlMs?: number;
 }
 
 function browserStorage(): OrderSubmissionStorage | null {
@@ -103,13 +120,17 @@ function normalizePaymentChoice(value: unknown): 'now' | 'pickup' | 'fail' | nul
     throw new TypeError('Order payment choice is invalid');
 }
 
-/**
- * Stable identity for customer intent, derived from the complete order body.
- * Mutable client prices and item presentation are deliberately excluded: the
- * server re-derives them, so a refresh must not turn one ambiguous submission
- * into a second order. Ordered ids and customer-entered choices remain exact.
- */
-export function orderSubmissionIntent(body: unknown): string {
+interface SemanticOrderFields {
+    itemIds: string[];
+    size: number;
+    productType: 'salad' | 'tortilla';
+    pickupTime: string | null;
+    notes: string | null;
+    discountCode: string | null;
+    paymentChoice: 'now' | 'pickup' | 'fail' | null;
+}
+
+function semanticOrderFields(body: unknown): SemanticOrderFields {
     if (!body || typeof body !== 'object' || Array.isArray(body)) {
         throw new TypeError('Order body must be an object');
     }
@@ -132,8 +153,7 @@ export function orderSubmissionIntent(body: unknown): string {
         throw new TypeError('Order product type is invalid');
     }
 
-    const semanticIntent = {
-        version: 1,
+    return {
         itemIds,
         size: input.size,
         productType: input.productType,
@@ -142,9 +162,50 @@ export function orderSubmissionIntent(body: unknown): string {
         discountCode: optionalString(input.discountCode, 'Order discount code', value => value.trim().toUpperCase()),
         paymentChoice: normalizePaymentChoice(input.paymentChoice),
     };
+}
+
+/**
+ * Stable identity for customer intent, derived from the complete order body.
+ * Mutable client prices and item presentation are deliberately excluded: the
+ * server re-derives them, so a refresh must not turn one ambiguous submission
+ * into a second order. Ordered ids and customer-entered choices remain exact.
+ */
+export function orderSubmissionIntent(body: unknown): string {
+    const fields = semanticOrderFields(body);
+    const semanticIntent = {
+        version: 1,
+        ...fields,
+    };
     const encoded = canonicalJson(semanticIntent, new WeakSet());
     if (encoded === undefined) throw new TypeError('Order intent must be a JSON value');
     return `order-v1:${encoded}`;
+}
+
+/**
+ * Identity of the persisted builder draft, excluding checkout-only choices
+ * that are lost on a hard reload (pickup, promo and demo payment route).
+ */
+export function orderSubmissionCartIntent(body: unknown): string {
+    const fields = semanticOrderFields(body);
+    const encoded = canonicalJson({
+        version: 1,
+        itemIds: fields.itemIds,
+        size: fields.size,
+        productType: fields.productType,
+        notes: fields.notes,
+    }, new WeakSet());
+    if (encoded === undefined) throw new TypeError('Order cart intent must be a JSON value');
+    return `order-cart-v1:${encoded}`;
+}
+
+function cloneRequestBody(value: unknown): Record<string, unknown> | undefined {
+    if (value === undefined) return undefined;
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        throw new TypeError('Order request body must be an object');
+    }
+    const encoded = canonicalJson(value, new WeakSet());
+    if (!encoded) throw new TypeError('Order request body must be serializable');
+    return JSON.parse(encoded) as Record<string, unknown>;
 }
 
 function parseRecord(value: unknown): OrderSubmissionRecord | null {
@@ -157,10 +218,35 @@ function parseRecord(value: unknown): OrderSubmissionRecord | null {
         || typeof parsed.createdAt !== 'number'
         || !Number.isFinite(parsed.createdAt)
     ) return null;
+
+    const requestBody = parsed.requestBody;
+    if (
+        requestBody !== undefined
+        && (!requestBody || typeof requestBody !== 'object' || Array.isArray(requestBody))
+    ) return null;
+
+    const pendingPayment = parsed.pendingPayment;
+    if (
+        pendingPayment !== undefined
+        && (
+            !pendingPayment
+            || typeof pendingPayment !== 'object'
+            || !UUID_PATTERN.test(pendingPayment.orderId)
+            || !UUID_PATTERN.test(pendingPayment.idempotencyKey)
+            || (
+                pendingPayment.orderNum !== null
+                && typeof pendingPayment.orderNum !== 'string'
+            )
+        )
+    ) return null;
+
     return {
         intent: parsed.intent,
         submissionKey: parsed.submissionKey,
         createdAt: parsed.createdAt,
+        ...(typeof parsed.cartIntent === 'string' ? { cartIntent: parsed.cartIntent } : {}),
+        ...(requestBody ? { requestBody: requestBody as Record<string, unknown> } : {}),
+        ...(pendingPayment ? { pendingPayment } : {}),
     };
 }
 
@@ -201,6 +287,34 @@ function removeStored(storage: OrderSubmissionStorage | null): void {
     }
 }
 
+function withClaimDetails(
+    record: OrderSubmissionRecord,
+    options: ClaimOptions,
+): OrderSubmissionRecord {
+    const requestBody = options.requestBody === undefined
+        ? record.requestBody
+        : cloneRequestBody(options.requestBody);
+    const cartIntent = options.cartIntent
+        ?? (requestBody ? orderSubmissionCartIntent(requestBody) : record.cartIntent);
+    return {
+        ...record,
+        ...(cartIntent ? { cartIntent } : {}),
+        ...(requestBody ? { requestBody } : {}),
+    };
+}
+
+function replaceStored(
+    storage: OrderSubmissionStorage | null,
+    record: OrderSubmissionRecord,
+): void {
+    const stored = readStored(storage);
+    const remaining = stored.filter(candidate => !(
+        candidate.intent === record.intent
+        && candidate.submissionKey === record.submissionKey
+    ));
+    writeStored(storage, [...remaining, record]);
+}
+
 /**
  * Reuse the key for the same fresh intent from memory first, then sessionStorage.
  * A changed basket/pickup/payment intent always receives a new key.
@@ -220,23 +334,80 @@ export function claimOrderSubmission(
     const freshStored = allStored.filter(record => isFresh(record, now, ttlMs));
 
     if (current?.intent === intent && isFresh(current, now, ttlMs)) {
+        const enriched = withClaimDetails(current, options);
         const withoutCurrent = freshStored.filter(record => record.intent !== intent);
-        writeStored(storage, [...withoutCurrent, current]);
-        return current;
+        writeStored(storage, [...withoutCurrent, enriched]);
+        return enriched;
     }
 
     const stored = freshStored.find(record => record.intent === intent);
     if (stored) {
-        if (freshStored.length !== allStored.length) writeStored(storage, freshStored);
-        return stored;
+        const enriched = withClaimDetails(stored, options);
+        const withoutStored = freshStored.filter(record => record.intent !== intent);
+        writeStored(storage, [...withoutStored, enriched]);
+        return enriched;
     }
 
     const submissionKey = (options.randomUUID ?? (() => globalThis.crypto.randomUUID()))();
     if (!UUID_PATTERN.test(submissionKey)) throw new TypeError('randomUUID returned an invalid UUID');
 
-    const record = { intent, submissionKey, createdAt: now };
+    const record = withClaimDetails({ intent, submissionKey, createdAt: now }, options);
     writeStored(storage, [...freshStored, record]);
     return record;
+}
+
+/** Most recent unresolved request belonging to the currently restored draft. */
+export function restoreOrderSubmission(
+    cartIntent: string,
+    options: RestoreOptions = {},
+): OrderSubmissionRecord | null {
+    if (!cartIntent) return null;
+    const storage = resolveStorage(options.storage);
+    const now = (options.now ?? Date.now)();
+    const ttlMs = options.ttlMs ?? ORDER_SUBMISSION_TTL_MS;
+    const allStored = readStored(storage);
+    const freshStored = allStored.filter(record => isFresh(record, now, ttlMs));
+    if (freshStored.length !== allStored.length) {
+        if (freshStored.length === 0) removeStored(storage);
+        else writeStored(storage, freshStored);
+    }
+    return freshStored
+        .filter(record => record.cartIntent === cartIntent && record.requestBody)
+        .sort((a, b) => b.createdAt - a.createdAt)[0] ?? null;
+}
+
+/** Persist the order/payment identity before trying to leave for the provider. */
+export function markOrderSubmissionPaymentPending(
+    record: OrderSubmissionRecord,
+    pendingPayment: NonNullable<OrderSubmissionRecord['pendingPayment']>,
+    options: ClearOptions = {},
+): OrderSubmissionRecord {
+    if (
+        !UUID_PATTERN.test(pendingPayment.orderId)
+        || !UUID_PATTERN.test(pendingPayment.idempotencyKey)
+        || (pendingPayment.orderNum !== null && typeof pendingPayment.orderNum !== 'string')
+    ) throw new TypeError('Pending payment identity is invalid');
+
+    const updated: OrderSubmissionRecord = {
+        ...record,
+        pendingPayment: { ...pendingPayment },
+    };
+    replaceStored(resolveStorage(options.storage), updated);
+    return updated;
+}
+
+/** Tracking is the terminal hand-off: this order no longer needs checkout recovery. */
+export function clearOrderSubmissionForOrder(
+    orderId: string,
+    options: ClearOptions = {},
+): void {
+    if (!UUID_PATTERN.test(orderId)) return;
+    const storage = resolveStorage(options.storage);
+    const stored = readStored(storage);
+    const remaining = stored.filter(record => record.pendingPayment?.orderId !== orderId);
+    if (remaining.length === stored.length) return;
+    if (remaining.length === 0) removeStored(storage);
+    else writeStored(storage, remaining);
 }
 
 /** Remove only the record that this response definitively settled. */

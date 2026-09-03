@@ -8,6 +8,7 @@ import { fireGoldConfetti } from '@/lib/confetti';
 import { customerPaymentPresentation } from '@/lib/customerPayment';
 import { orderSizeLabel } from '@/lib/reorder';
 import { resolvePickupMoment } from '@/lib/shopHours';
+import { clearOrderSubmissionForOrder } from '@/lib/orderSubmission';
 import { TRACK, slot, xPct, yPct } from './trackingArt';
 
 type OrderStatus = 'waiting' | 'preparing' | 'ready' | 'collected';
@@ -140,6 +141,14 @@ export default function OrderStatusView({ id, paymentHint = null }: { id: string
     const prevStatusRef = useRef<OrderStatus | null>(null);
     const [ringScale, setRingScale] = useState(false);
     const [labelSlide, setLabelSlide] = useState(false);
+
+    // Reaching the durable tracking route completes checkout recovery. Until
+    // this point the originating tab keeps the order/payment keys so a hard
+    // reload or Back can resume the same hosted payment instead of creating a
+    // second order. Clear only the record tied to this order.
+    useEffect(() => {
+        clearOrderSubmissionForOrder(id);
+    }, [id]);
     // The celebratory cat Lottie is gone from this page: the "ready" state now
     // shows its own medallion, so all four of the step artworks get used and the
     // set stays coherent. That also drops lottie-react and a JSON fetch from a

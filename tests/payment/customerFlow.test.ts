@@ -439,8 +439,8 @@ test('customer-facing menu copy stays inside the facts the builder can verify', 
 test('pickup time choices expose selection and full states on a phone-sized target', () => {
     assert.match(summary, /style=\{PT\.row\}[\s\S]*?role="group"[\s\S]*?aria-label="בחירת זמן איסוף"/,
         'pickup slots must be one labelled choice group');
-    assert.match(summary, /<button[\s\S]*?type="button"[\s\S]*?key=\{slot\.id\}[\s\S]*?disabled=\{slot\.full\}[\s\S]*?aria-pressed=\{value === slot\.id\}/,
-        'each slot must be a native stateful button that keeps full slots disabled');
+    assert.match(summary, /<button[\s\S]*?type="button"[\s\S]*?key=\{slot\.id\}[\s\S]*?disabled=\{disabled \|\| slot\.full\}[\s\S]*?aria-pressed=\{value === slot\.id\}/,
+        'each slot must be a native stateful button that keeps full or recovery-locked slots disabled');
     assert.match(summary, /value === slot\.id && <span style=\{PT\.selectedCheck\} aria-hidden="true">✓<\/span>/,
         'the selected state must have a visible cue beyond colour');
     assert.match(summary, /chip: \{[^}]*minHeight: "44px"/,
@@ -458,7 +458,7 @@ test('pickup time choices expose selection and full states on a phone-sized targ
         'disabled status labels must not inherit low opacity from the entire button');
     assert.match(summary, /slot\.isPeak && !slot\.full && <span style=\{PT\.peakTag\}>עמוס<\/span>/,
         'peak demand must be conveyed in text rather than by an unexplained red dot');
-    assert.match(summary, /onClick=\{\(\) => !slot\.full && onChange\(slot\.id\)\}/,
+    assert.match(summary, /onClick=\{\(\) => !disabled && !slot\.full && onChange\(slot\.id\)\}/,
         'an available slot must flow into the controlled selection');
     assert.match(summary, /pickupTime: pickupForSubmit/,
         'the reconciled selected time must reach the order payload');
@@ -512,8 +512,8 @@ test('checkout controls stay truthful, stateful and touchable in demo mode', () 
         'payment choices must expose one named and described group');
     assert.equal(summary.match(/aria-pressed=\{paymentChoice === "(?:now|pickup)"\}/g)?.length, 2,
         'both payment choices must expose their selected state');
-    assert.equal(summary.match(/disabled=\{submitting\}/g)?.length, 2,
-        'both choices must stop changing while their order is being submitted');
+    assert.equal(summary.match(/disabled=\{submitting \|\| recoveryPending\}/g)?.length, 2,
+        'both choices must stop changing while their order is being submitted or recovered');
     assert.equal(summary.match(/PAY\.selectedCheck\} aria-hidden="true">✓/g)?.length, 2,
         'both choices must have a visible selected cue beyond colour');
     assert.match(summary, /opt: \{ position: "relative", flex: 1, minHeight: "64px"/,
@@ -530,8 +530,10 @@ test('checkout controls stay truthful, stateful and touchable in demo mode', () 
     assert.match(summary, /notesToggle: \{ width: "100%", minHeight: "44px"/);
     assert.match(summary, /aria-label="קוד הנחה"[\s\S]*?minHeight: "44px", padding: "8px 10px"/,
         'the promo input must meet the mobile target floor');
-    assert.match(summary, /<button type="button" onClick=\{applyPromo\}[\s\S]*?minHeight: "44px", padding: "8px 14px"/,
+    assert.match(summary, /<button type="button" disabled=\{checkoutLocked\} onClick=\{applyPromo\}[\s\S]*?minHeight: "44px", padding: "8px 14px"/,
         'the promo apply button must meet the mobile target floor');
+    assert.match(summary, /<PickupTimePicker[\s\S]*?disabled=\{checkoutLocked\}/,
+        'an unresolved order must lock checkout-only choices until its exact request is resolved');
     assert.match(summary, /promoError && <div role="alert"/);
     assert.match(summary, /<div role="status" aria-live="polite" style=\{\{ \.\.\.S\.sumPriceLine/,
         'an applied discount must be announced as well as shown');
