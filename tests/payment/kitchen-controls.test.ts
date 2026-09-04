@@ -31,6 +31,10 @@ const kitchenLogin = readFileSync(new URL(
     '../../src/app/kitchen/KitchenLogin.tsx',
     import.meta.url,
 ), 'utf8');
+const activeOrder = readFileSync(new URL(
+    '../../src/app/kitchen/ActiveOrder.tsx',
+    import.meta.url,
+), 'utf8');
 const orderTabs = readFileSync(new URL(
     '../../src/app/kitchen/OrderTabs.tsx',
     import.meta.url,
@@ -64,6 +68,17 @@ test('kitchen order tabs use an RTL roving focus model', () => {
         'collecting an order must move focus to the replacement tab');
     assert.match(kitchenBoard, /id=\{EMPTY_ORDERS_FOCUS_ID\} role="status" tabIndex=\{-1\}/,
         'collecting the final order must leave focus on a meaningful empty state');
+});
+
+test('the waiting-ticket decision stays visible on a short wall tablet', () => {
+    assert.match(activeOrder, /<div style=\{S\.acceptScroll\}>[\s\S]*?<div style=\{S\.acceptItems\}>[\s\S]*?<\/div>\s*<\/div>\s*<button type="button" style=\{S\.acceptBtn\}/,
+        'ticket facts must scroll separately from the accept action');
+    assert.match(activeOrder, /acceptCard: \{[\s\S]*?maxHeight: '100%', minHeight: 0, boxSizing: 'border-box'/,
+        'the waiting card must fit within the board panel');
+    assert.match(activeOrder, /acceptScroll: \{[\s\S]*?flex: 1, minHeight: 0,[\s\S]*?overflowY: 'auto'/,
+        'long waiting-ticket details need their own bounded scroll region');
+    assert.match(activeOrder, /acceptBtn: \{[\s\S]*?minHeight: '84px', flexShrink: 0/,
+        'the primary kitchen decision must never shrink or scroll away');
 });
 
 test('shop target clears an override when the live schedule can take over', () => {

@@ -113,46 +113,52 @@ export default function ActiveOrder({
         return (
             <div style={S.acceptRoot}>
                 <div style={S.acceptCard}>
-                    <div style={S.acceptTag}>🔔 הזמנה חדשה</div>
+                    {/* On a 768px wall tablet, the closed-shop banner can leave
+                        less vertical room than a detailed waiting ticket needs.
+                        Scroll the facts, never the decision: the accept action
+                        remains visible and the ticket's top is always reachable. */}
+                    <div style={S.acceptScroll}>
+                        <div style={S.acceptTag}>🔔 הזמנה חדשה</div>
 
-                    <div style={S.acceptHead}>
-                        <span style={S.acceptNum}>{order.order_num}</span>
-                        {order.customer_name && <span style={S.acceptName}>· {order.customer_name}</span>}
-                    </div>
-
-                    <div style={{ ...S.acceptTime, color: level === 'late' ? '#ff8a80' : '#fff' }}>
-                        {order.pickup_time ? `איסוף ${order.pickup_time}` : 'ללא שעת איסוף'}
-                        {lateBy > 0
-                            ? <span style={S.headLate}> · באיחור {lateBy} דק׳</span>
-                            : mins !== null && <span style={S.headMins}> · נשארו {mins} דק׳</span>}
-                    </div>
-
-                    <div style={S.acceptFacts}>
-                        {sizeLabel && <span style={S.fact}>🥣 {sizeLabel}</span>}
-                        <span style={S.fact}>{order.items.length} מרכיבים</span>
-                        {pay && (
-                            <span style={{ ...S.fact, ...PAY_TONE[pay.tone] }}>
-                                {PAY_GLYPH[pay.tone]} {pay.text}
-                            </span>
-                        )}
-                    </div>
-
-                    {/* Anything special is seen BEFORE committing to the order */}
-                    {order.notes && (
-                        <div style={S.notes} role="alert">
-                            <span style={{ fontSize: '22px' }}>⚠️</span>
-                            <span>{order.notes}</span>
+                        <div style={S.acceptHead}>
+                            <span style={S.acceptNum}>{order.order_num}</span>
+                            {order.customer_name && <span style={S.acceptName}>· {order.customer_name}</span>}
                         </div>
-                    )}
 
-                    {/* Read-only here — so the worker can check stock before accepting */}
-                    <div style={S.acceptItems}>
-                        {grouped.map(g => (
-                            <div key={g.zone.id} style={S.acceptZoneRow}>
-                                <span style={S.acceptZoneName}>{g.zone.title}</span>
-                                <span style={S.acceptZoneItems}>{g.items.map(i => i.he).join(' · ')}</span>
+                        <div style={{ ...S.acceptTime, color: level === 'late' ? '#ff8a80' : '#fff' }}>
+                            {order.pickup_time ? `איסוף ${order.pickup_time}` : 'ללא שעת איסוף'}
+                            {lateBy > 0
+                                ? <span style={S.headLate}> · באיחור {lateBy} דק׳</span>
+                                : mins !== null && <span style={S.headMins}> · נשארו {mins} דק׳</span>}
+                        </div>
+
+                        <div style={S.acceptFacts}>
+                            {sizeLabel && <span style={S.fact}>🥣 {sizeLabel}</span>}
+                            <span style={S.fact}>{order.items.length} מרכיבים</span>
+                            {pay && (
+                                <span style={{ ...S.fact, ...PAY_TONE[pay.tone] }}>
+                                    {PAY_GLYPH[pay.tone]} {pay.text}
+                                </span>
+                            )}
+                        </div>
+
+                        {/* Anything special is seen BEFORE committing to the order */}
+                        {order.notes && (
+                            <div style={S.notes} role="alert">
+                                <span style={{ fontSize: '22px' }}>⚠️</span>
+                                <span>{order.notes}</span>
                             </div>
-                        ))}
+                        )}
+
+                        {/* Read-only here — so the worker can check stock before accepting */}
+                        <div style={S.acceptItems}>
+                            {grouped.map(g => (
+                                <div key={g.zone.id} style={S.acceptZoneRow}>
+                                    <span style={S.acceptZoneName}>{g.zone.title}</span>
+                                    <span style={S.acceptZoneItems}>{g.items.map(i => i.he).join(' · ')}</span>
+                                </div>
+                            ))}
+                        </div>
                     </div>
 
                     <button type="button" style={S.acceptBtn} onClick={() => onStatus('preparing')}>
@@ -261,13 +267,17 @@ const PAY_GLYPH: Record<PayTone, string> = { settled: '✓', verify: '🔍', owe
 
 const S: Record<string, React.CSSProperties> = {
     // ── Accept screen ──
-    acceptRoot: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', minHeight: 0, overflowY: 'auto' },
+    acceptRoot: { flex: 1, display: 'flex', alignItems: 'safe center', justifyContent: 'center', padding: '16px', minHeight: 0, overflow: 'hidden' },
     acceptCard: {
-        width: '100%', maxWidth: '720px',
+        width: '100%', maxWidth: '720px', maxHeight: '100%', minHeight: 0, boxSizing: 'border-box',
         display: 'flex', flexDirection: 'column', gap: '14px',
         padding: '24px 28px', borderRadius: '18px',
         background: 'rgba(76,175,80,0.08)', border: '2px solid rgba(76,175,80,0.45)',
         boxShadow: '0 18px 50px rgba(0,0,0,0.5)',
+    },
+    acceptScroll: {
+        display: 'flex', flexDirection: 'column', gap: '14px', flex: 1, minHeight: 0,
+        overflowY: 'auto', paddingInlineEnd: '4px', overscrollBehavior: 'contain',
     },
     acceptTag: {
         alignSelf: 'flex-start', padding: '6px 16px', borderRadius: '999px',
@@ -293,7 +303,7 @@ const S: Record<string, React.CSSProperties> = {
     acceptZoneName: { flexShrink: 0, minWidth: '120px', fontSize: '14px', fontWeight: 900, color: 'rgba(255,255,255,0.5)' },
     acceptZoneItems: { fontSize: '18px', fontWeight: 700, color: '#fff', lineHeight: 1.5 },
     acceptBtn: {
-        width: '100%', minHeight: '84px', borderRadius: '14px', cursor: 'pointer',
+        width: '100%', minHeight: '84px', flexShrink: 0, borderRadius: '14px', cursor: 'pointer',
         background: 'linear-gradient(135deg, #43a047, #66bb6a)', border: 'none',
         color: '#04140a', fontSize: '26px', fontWeight: 900,
         fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
