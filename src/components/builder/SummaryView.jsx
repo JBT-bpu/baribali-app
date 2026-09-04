@@ -155,6 +155,7 @@ import {
 } from "../../lib/shopHours";
 import { useHistoryBackedOverlay } from "../../hooks/useHistoryBackedOverlay";
 import { useShopStatus } from "../../lib/useShopStatus";
+import { estimateNutritionRange } from "../../lib/nutritionSimulator";
 
 const DEMO_MODE = isSupabaseDemoMode();
 const SHOW_FAILURE_TEST = DEMO_MODE && process.env.NODE_ENV !== "production";
@@ -168,7 +169,7 @@ function freshPaymentKey() {
     return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-export default function SummaryView({ sels, total, all, comboBadges, notes, setNotes, onBack, onEdit, onNewOrder, checkoutDraft, setCheckoutDraft, base = BASE, productType = 'salad', sizeLabel = null }) {
+export default function SummaryView({ sels, total, all, comboBadges, notes, setNotes, onBack, onEdit, onNewOrder, checkoutDraft, setCheckoutDraft, base = BASE, productType = 'salad', sizeLabel = null, sizeMl = 1000 }) {
     // Schedule + the live staff override. The server checks this again at POST
     // /api/orders and is the authority; this is so the screen stops pretending.
     const shop = useShopStatus();
@@ -410,6 +411,10 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
         setPromoError(d ? "" : "קוד לא תקף");
     };
     const grouped = STEPS.map(s => ({ s, items: sels[s.id] || [] })).filter(g => g.items.length > 0);
+    const nutritionEstimate = useMemo(
+        () => productType === 'salad' ? estimateNutritionRange(all, sizeMl) : null,
+        [all, productType, sizeMl],
+    );
 
     // Ingredients bucketed into the bowl's three rows, keeping the order they
     // were chosen in within each row.
@@ -809,7 +814,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                             single frame, so both live inside it as positioned slots
                             rather than as two stacked panels with their own borders. */}
                         <div style={S.panel}>
-                            <div style={S.panelNut}><CompositionStats all={all} /></div>
+                            <div style={S.panelNut}><CompositionStats all={all} estimate={nutritionEstimate} /></div>
                             {bowlRows.map((items, t) => {
                                 if (!items.length) return null;
                                 const row = BOWL_ROWS[t];
@@ -854,6 +859,18 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                         <div style={S.sumBowlMeta}>
                             <span>{all.length} בחירות</span>
                         </div>
+                        {nutritionEstimate && (
+                            <details style={S.nutritionDetails}>
+                                <summary style={S.nutritionSummary}>איך BariMeter מחשב את הטווח?</summary>
+                                <div style={S.nutritionExplanation}>
+                                    הסימולציה משלבת את גודל הקערה עם מנות טיפוסיות של המרכיבים שבחרתם.
+                                    {nutritionEstimate.drivers.length > 0 && (
+                                        <> הגורמים המשפיעים ביותר כאן: <strong style={{ color: "#edd87e" }}>{nutritionEstimate.drivers.join(" · ")}</strong>.</>
+                                    )}
+                                    {nutritionEstimate.coverage < 100 && <> חלק מהבחירות עדיין אינן כלולות במודל.</>}
+                                </div>
+                            </details>
+                        )}
                     </div>
 
                     {comboBadges.length > 0 && (
@@ -1182,28 +1199,63 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     );
 }
 
-// ─── Honest composition overview ───────────────────────────
-function CompositionStats({ all }) {
-    // Ingredient quantities are assembled by hand and differ by bowl size, so
-    // the old generic per-item nutrition table produced the same precise-looking
-    // macros for 750ml and 1500ml bowls. Until weighed recipes are validated,
-    // this panel reports only facts the builder actually knows.
+// ─── BariMeter: deliberately broad order-level simulation ───────────────
+function CompositionStats({ all, estimate }) {
+    if (!estimate) {
+        return (
+            <div
+                aria-label={`${all.length} בחירות בהזמנה`}
+                style={{ width: "100%", display: "flex", flexDirection: "column", justifyContent: "center", textAlign: "center" }}
+            >
+                <div style={{ fontSize: "11px", fontWeight: 900, color: "rgba(240,208,96,0.72)", letterSpacing: "0.08em" }}>
+                    ההרכב שלכם
+                </div>
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: "6px", marginTop: "3px" }}>
+                    <span style={{ fontSize: "32px", fontWeight: 950, color: "#ffffff", lineHeight: 1 }}>{all.length}</span>
+                    <span style={{ fontSize: "13px", fontWeight: 800, color: "rgba(255,255,255,0.62)" }}>בחירות שביצעתם</span>
+                </div>
+            </div>
+        );
+    }
+
+    const stats = [
+        { key: 'protein', label: 'חלבון', color: '#e9c85f', bg: 'rgba(233,200,95,0.12)' },
+        { key: 'carbs', label: 'פחמ׳', color: '#55c6c4', bg: 'rgba(85,198,196,0.11)' },
+        { key: 'fat', label: 'שומן', color: '#7ed37d', bg: 'rgba(126,211,125,0.11)' },
+        { key: 'fiber', label: 'סיבים', color: '#b69af2', bg: 'rgba(182,154,242,0.11)' },
+    ];
+
     return (
         <div
-            aria-label={`${all.length} בחירות בהזמנה`}
+            aria-label={`סימולציה תזונתית: ${estimate.calories.low} עד ${estimate.calories.high} קילוקלוריות`}
             style={{ width: "100%", display: "flex", flexDirection: "column", justifyContent: "center", textAlign: "center" }}
         >
-            <div style={{ fontSize: "11px", fontWeight: 900, color: "rgba(240,208,96,0.72)", letterSpacing: "0.08em" }}>
-                ההרכב שלכם
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                <span style={{ fontSize: "10px", fontWeight: 950, color: "#f0d060", letterSpacing: "0.08em" }}>BariMeter</span>
+                <span style={{ padding: "2px 6px", borderRadius: "999px", background: "rgba(85,198,196,0.12)", border: "1px solid rgba(85,198,196,0.26)", color: "#83d8d6", fontSize: "7.5px", fontWeight: 900 }}>סימולציה</span>
             </div>
-            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: "6px", marginTop: "3px" }}>
-                <span style={{ fontSize: "32px", fontWeight: 950, color: "#ffffff", lineHeight: 1, textShadow: "0 0 18px rgba(200,168,78,0.35)" }}>
-                    {all.length}
+            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: "4px", marginTop: "3px" }}>
+                <span dir="ltr" style={{ display: "inline-block", fontSize: "23px", fontWeight: 950, color: "#ffffff", lineHeight: 1, letterSpacing: "-0.04em", textShadow: "0 0 18px rgba(200,168,78,0.38)" }}>
+                    {estimate.calories.low}–{estimate.calories.high}
                 </span>
-                <span style={{ fontSize: "13px", fontWeight: 800, color: "rgba(255,255,255,0.62)" }}>בחירות שביצעתם</span>
+                <span style={{ fontSize: "9px", fontWeight: 800, color: "rgba(255,255,255,0.46)" }}>קק״ל</span>
             </div>
-            <div style={{ marginTop: "9px", fontSize: "9.5px", lineHeight: 1.4, fontWeight: 600, color: "rgba(255,255,255,0.38)" }}>
-                הערכים התזונתיים משתנים לפי גודל המנה, הכמויות וההכנה בפועל
+            <div aria-hidden="true" style={S.nutritionMeter}>
+                <div style={S.nutritionMeterFill} />
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "4px", marginTop: "7px" }}>
+                {stats.map(stat => {
+                    const value = estimate.macros[stat.key];
+                    return (
+                        <div key={stat.key} style={{ background: stat.bg, borderRadius: "8px", padding: "5px 1px 4px", minWidth: 0 }}>
+                            <div style={{ fontSize: "12px", lineHeight: 1, fontWeight: 950, color: stat.color, direction: "ltr" }}>{value.low}–{value.high}<small style={{ fontSize: "7px", marginLeft: "1px" }}>g</small></div>
+                            <div style={{ marginTop: "3px", fontSize: "8px", lineHeight: 1, fontWeight: 800, color: "rgba(255,255,255,0.48)" }}>{stat.label}</div>
+                        </div>
+                    );
+                })}
+            </div>
+            <div style={{ marginTop: "6px", fontSize: "7.8px", lineHeight: 1.3, fontWeight: 650, color: "rgba(255,255,255,0.36)" }}>
+                הערכה לפי מנות טיפוסיות · הכמויות וההכנה בפועל משתנות
             </div>
         </div>
     );
@@ -1323,6 +1375,11 @@ const S = {
         display: "flex", flexDirection: "column", justifyContent: "center",
     },
     sumBowlMeta: { marginTop: "10px", display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", fontWeight: 600, color: "rgba(255,255,255,0.5)", letterSpacing: "0.03em" },
+    nutritionMeter: { position: "relative", width: "74%", height: "3px", margin: "6px auto 0", borderRadius: "999px", overflow: "hidden", background: "rgba(255,255,255,0.08)", boxShadow: "inset 0 1px 2px rgba(0,0,0,0.45)" },
+    nutritionMeterFill: { position: "absolute", inset: 0, borderRadius: "inherit", background: "linear-gradient(90deg, #55c6c4 0%, #7ed37d 38%, #e9c85f 72%, #f0d060 100%)", transformOrigin: "right center", animation: "bariMeterFill 0.9s cubic-bezier(.2,.8,.2,1) 0.45s both, bariMeterGlow 2.8s ease-in-out 1.4s infinite" },
+    nutritionDetails: { width: "100%", marginTop: "8px", padding: "0 12px", borderRadius: "11px", background: "rgba(9,31,14,0.66)", border: "1px solid rgba(200,168,78,0.16)", color: "rgba(255,255,255,0.56)", fontSize: "10.5px", lineHeight: 1.55 },
+    nutritionSummary: { minHeight: "40px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "rgba(240,208,96,0.72)", fontWeight: 800, listStylePosition: "inside" },
+    nutritionExplanation: { padding: "0 4px 10px", textAlign: "right" },
     // 16px inner gutter + a smaller badge glyph (below): four bordered pills in
     // a bordered box used to fill the row edge-to-edge with nothing to spare,
     // which is what made it read as crowded.
@@ -1579,5 +1636,10 @@ const PT = {
 const KF = `
 @keyframes popBounce { 0%{transform:scale(0.3);opacity:0} 60%{transform:scale(1.15)} 100%{transform:scale(1);opacity:1} }
 @keyframes pFadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+@keyframes bariMeterFill { from{transform:scaleX(0);opacity:0.25} to{transform:scaleX(1);opacity:1} }
+@keyframes bariMeterGlow { 0%,100%{filter:brightness(0.9);box-shadow:0 0 4px rgba(240,208,96,0.15)} 50%{filter:brightness(1.25);box-shadow:0 0 10px rgba(240,208,96,0.5)} }
+@media (prefers-reduced-motion: reduce) {
+  [style*="bariMeterFill"], [style*="bariMeterGlow"] { animation: none !important; }
+}
 ::-webkit-scrollbar{display:none}
 `;

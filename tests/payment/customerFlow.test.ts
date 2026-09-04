@@ -630,12 +630,14 @@ test('checkout describes the server-confirmed payment handoff before submission'
 });
 
 test('customer-facing menu copy stays inside the facts the builder can verify', () => {
-    assert.match(summary, /function CompositionStats\(\{ all \}\)/,
-        'the summary must use a factual composition overview');
-    assert.match(summary, /הערכים התזונתיים משתנים לפי גודל המנה, הכמויות וההכנה בפועל/);
+    assert.match(summary, /function CompositionStats\(\{ all, estimate \}\)/,
+        'the summary must keep nutrition simulation isolated in its own overview');
+    assert.match(summary, /BariMeter/);
+    assert.match(summary, /הערכה לפי מנות טיפוסיות · הכמויות וההכנה בפועל משתנות/);
+    assert.match(summary, /סימולציה תזונתית/);
     assert.match(summary, /מרכיבים כל הזמנה לפי הבחירות שלכם/);
-    assert.doesNotMatch(summary, /\bNUTRI\b|NutriStats|חומרי גלם טריים בלבד/,
-        'the summary must not synthesize nutrition values or absolute sourcing claims');
+    assert.doesNotMatch(summary, /עשיר בחלבון|ארוחה מאוזנת|חומרי גלם טריים בלבד/,
+        'the summary must not turn an estimate into a health or sourcing claim');
 
     assert.match(detailSheet, /const itemPrice = effectiveItemPrice\(item\.id, item\.price \|\| 0\)/,
         'ingredient details must use the same authoritative price layer as checkout');

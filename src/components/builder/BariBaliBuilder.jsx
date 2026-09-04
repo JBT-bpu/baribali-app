@@ -1142,7 +1142,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
     );
   }
 
-  if (summary) return <SummaryView sels={sels} total={total} all={all} comboBadges={comboBadges} notes={notes} setNotes={setNotes} onBack={back} onEdit={editFromSummary} onNewOrder={resetAll} checkoutDraft={checkoutDraft} setCheckoutDraft={setCheckoutDraft} base={activeBase} productType={isTortilla ? 'tortilla' : 'salad'} sizeLabel={selectedSize ? SIZE_CONFIG[selectedSize].label : null} />;
+  if (summary) return <SummaryView sels={sels} total={total} all={all} comboBadges={comboBadges} notes={notes} setNotes={setNotes} onBack={back} onEdit={editFromSummary} onNewOrder={resetAll} checkoutDraft={checkoutDraft} setCheckoutDraft={setCheckoutDraft} base={activeBase} productType={isTortilla ? 'tortilla' : 'salad'} sizeLabel={selectedSize ? SIZE_CONFIG[selectedSize].label : null} sizeMl={selectedSize ? SIZE_CONFIG[selectedSize].ml : 1000} />;
 
   const slideX = anim === "out" ? (slideDir > 0 ? "-60px" : "60px") : anim === "in" ? "0" : undefined;
 
