@@ -6,6 +6,7 @@ import {
     customerPaymentPresentation,
     requiresHostedPayment,
 } from '../../src/lib/customerPayment';
+import { paymentStartDecision } from '../../src/lib/paymentOrderState';
 
 function source(path: string): string {
     return readFileSync(new URL(path, import.meta.url), 'utf8');
@@ -46,9 +47,10 @@ test('every payment entry point rejects no-charge orders as a final safeguard', 
         '../../supabase/migrations/20260902184747_payment_foundation.sql',
     ).replace(/\s+/g, ' ').toLowerCase();
 
-    assert.match(createRoute, /order\.total <= 0 \|\| order\.payment_status === 'no_payment_required'/);
+    assert.equal(paymentStartDecision(0, 'pending'), 'not_required');
+    assert.equal(paymentStartDecision(72, 'no_payment_required'), 'not_required');
     assert.ok(
-        createRoute.indexOf("order.total <= 0 || order.payment_status === 'no_payment_required'")
+        createRoute.indexOf('const startDecision = paymentStartDecision')
             < createRoute.indexOf("if (provider === 'hyp')"),
         'the shared no-charge preflight must run before the Hyp branch',
     );

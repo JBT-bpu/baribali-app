@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseConfigurationState } from '@/lib/supabaseServerConfig';
 import { paymentProvider } from '@/lib/payment';
+import { settleLegacyOrder } from '@/lib/paymentOrderState';
 import { loadSupabaseAdmin, supabaseConfigurationErrorResponse } from '@/lib/supabaseRoute';
 
 /*
   Payment webhook — called by Tranzila/YaadPay after payment completes.
-  Marks order payment_status = 'paid_unverified' (not 'paid') and status =
-  'waiting' (ready for kitchen).
+  Marks order payment_status = 'paid_unverified' (not 'paid').
 
   IMPORTANT — no cryptographic signature verification: Tranzila does not issue
   a shared secret/HMAC in this project's current setup, only a terminal name.
@@ -85,9 +85,13 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: false, error: 'Unknown order' });
     }
 
-    // Only transition orders still pending — blocks replay against an order
-    // that's already been settled (paid_unverified, paid, or failed).
-    if (order.payment_status !== 'pending') {
+    // A decline may claim only pending. A success may also correct failed: if
+    // both callbacks race, an actual charge must win. Verified/unverified paid
+    // states and non-hosted orders remain absorbing.
+    if (
+        order.payment_status !== 'pending'
+        && !(success && order.payment_status === 'failed')
+    ) {
         return new NextResponse('OK', { status: 200 });
     }
 
@@ -99,13 +103,21 @@ export async function POST(req: NextRequest) {
         success = false;
     }
 
-    const { error: updateError } = await admin
-        .from('orders')
-        .update({ payment_status: success ? 'paid_unverified' : 'failed' })
-        .eq('order_num', orderNum);
-    if (updateError) {
-        console.error('[POST /api/payment/webhook] Settlement update failed:', updateError.message);
+    const transition = await settleLegacyOrder(admin, {
+        orderId: order.id,
+        success,
+    });
+    if (transition.kind === 'error') {
+        console.error('[POST /api/payment/webhook] Settlement update failed:', transition.message);
         return new NextResponse('RETRY', { status: 503 });
+    }
+
+    // The SELECT above can become stale before this UPDATE obtains the row
+    // lock. PostgreSQL re-checks both filters after a concurrent writer wins;
+    // zero returned rows therefore means a terminal state already replaced
+    // `pending`. ACK the replay without overwriting that newer truth.
+    if (transition.kind === 'stale') {
+        return new NextResponse('OK', { status: 200 });
     }
 
     // Providers expect a plain 200 OK

@@ -8,6 +8,10 @@ import {
     PaymentPersistenceError,
 } from '@/lib/paymentAttempts';
 import { paymentProvider } from '@/lib/payment';
+import {
+    confirmPendingLegacyPayment,
+    paymentStartDecision,
+} from '@/lib/paymentOrderState';
 import { enforceRateLimit } from '@/lib/rateLimit';
 import { getSupabaseAdmin } from '@/lib/serverSupabase';
 import { supabaseConfigurationState } from '@/lib/supabaseServerConfig';
@@ -143,17 +147,25 @@ export async function POST(req: NextRequest) {
         return supabaseConfigurationErrorResponse();
     }
 
-    if (order.total <= 0 || order.payment_status === 'no_payment_required') {
+    const startDecision = paymentStartDecision(order.total, order.payment_status);
+    if (startDecision === 'not_required') {
         return NextResponse.json({
             error: 'No payment is required for this order',
             code: 'PAYMENT_NOT_REQUIRED',
             retryWithNewKey: false,
         }, { status: 409 });
     }
-    if (order.payment_status === 'paid' || order.payment_status === 'paid_unverified') {
+    if (startDecision === 'already_settled') {
         return NextResponse.json({
             error: 'Order already paid',
             code: 'PAYMENT_ALREADY_SETTLED',
+            retryWithNewKey: false,
+        }, { status: 409 });
+    }
+    if (startDecision === 'state_changed') {
+        return NextResponse.json({
+            error: 'Order is not awaiting payment',
+            code: 'PAYMENT_STATE_CHANGED',
             retryWithNewKey: false,
         }, { status: 409 });
     }
@@ -211,10 +223,26 @@ export async function POST(req: NextRequest) {
             ? buildYaadPayUrl(order.order_num, order.total, successUrl, failUrl)
             : buildTranzilaUrl(order.order_num, order.total, successUrl, failUrl);
 
-        await admin
-            .from('orders')
-            .update({ status: 'waiting', payment_status: 'pending' })
-            .eq('id', orderId);
+        const initialization = await confirmPendingLegacyPayment(admin, orderId);
+
+        if (initialization.kind === 'error') {
+            console.error('[POST /api/payment/create] legacy payment state write failed:', initialization.message);
+            return NextResponse.json({
+                error: 'Payment could not be initialized',
+                code: 'PAYMENT_PERSISTENCE_ERROR',
+                retryWithNewKey: false,
+            }, { status: 503 });
+        }
+        if (initialization.kind === 'stale') {
+            // Settlement (or another authoritative decision) won after the
+            // order lookup. Never return a second chargeable URL from a stale
+            // snapshot, and never move kitchen progress back to `waiting`.
+            return NextResponse.json({
+                error: 'Order payment state changed',
+                code: 'PAYMENT_STATE_CHANGED',
+                retryWithNewKey: false,
+            }, { status: 409 });
+        }
 
         return NextResponse.json({ paymentUrl });
     } catch (error) {

@@ -35,6 +35,18 @@ project.
   A legacy `paid_unverified` row has no trustworthy transaction provenance,
   so even a valid later VERIFY leaves it for manual review rather than hiding
   a possible second charge.
+- Legacy Tranzila/YaadPay settlement and payment-page creation use an atomic
+  compare-and-set. Failure may claim only `pending`; success may also promote
+  `failed`, so an actual charge wins in either callback order while paid states
+  remain absorbing. A create request that loses its `pending` guard receives no
+  hosted URL, and neither path rewinds the kitchen workflow to `waiting`.
+  PostgREST write errors fail closed instead of being mistaken for successful
+  initialization.
+- That guard prevents state downgrades; it does not give the legacy providers
+  Hyp's durable checkout-attempt identity. A settlement can still arrive after
+  the guard and before the generated URL reaches the browser. Keep these
+  providers disabled for a digital-only launch unless they are moved onto an
+  attempt ledger with provider-specific transaction correlation.
 - `order_creation_requests` is a server-only key/hash ledger. Its RPC claims a
   browser submission key and inserts the order in one transaction, so a lost
   response, reload or concurrent retry returns the same kitchen order. The API
@@ -179,11 +191,11 @@ npm test
 npm run build
 ```
 
-The 163-test focused suite covers SIGN/VERIFY parsing, credential-safe failures,
+The 169-test focused suite covers SIGN/VERIFY parsing, credential-safe failures,
 immediate transaction-ID capture, URL persistence, concurrent initialization,
 order/request replay across hard reloads, duplicate callbacks, unknown
 references, verification-pending behavior, server pickup validation and the
-five-position capacity rule. The complete forward chain was also rehearsed on
+five-position capacity rule, plus generic-provider settlement/create races. The complete forward chain was also rehearsed on
 the connected 77-row database inside one transaction: five same-slot orders,
 replay and sixth-order rejection all passed, then `ROLLBACK` restored all 77
 rows and removed every temporary object. This does not replace a true
