@@ -1430,8 +1430,10 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                           onClick={() => { dismissHint(); setDetailCtx({ item, stepId: cur.id, maxPicks: cur.maxPicks }); openDetailSheet(); haptic("tap"); }}
                           aria-label={`מידע על ${item.he}`}
                           aria-haspopup="dialog"
-                          style={S.chipInfo}
-                        >ℹ</button>
+                          style={S.chipInfoHit}
+                        >
+                          <span aria-hidden="true" style={S.chipInfoGlyph}>ℹ</span>
+                        </button>
                       </div>
                     );
                   })}
@@ -1587,7 +1589,7 @@ const S = {
   sugPill: { display: "flex", alignItems: "center", gap: "4px", padding: "3px 9px", borderRadius: "9px", background: "rgba(200,168,78,0.22)", border: "1px solid rgba(200,168,78,0.4)" },
 
   anchorRow: { display: "flex", gap: "5px", padding: "6px 16px", overflowX: "auto", scrollbarWidth: "none", borderBottom: "1px solid rgba(200,168,78,0.3)", background: "rgba(0,0,0,0.55)", boxShadow: "inset 0 -1px 0 rgba(200,168,78,0.12)" },
-  anchorTab: { padding: "5px 12px", borderRadius: "8px", border: "1px solid rgba(200,168,78,0.4)", background: "linear-gradient(145deg, rgba(18,52,18,0.95), rgba(12,36,12,0.92))", color: "rgba(255,255,255,0.8)", fontSize: "11px", fontWeight: 700, cursor: "pointer", flexShrink: 0, transition: "all 0.15s", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", textShadow: "0 1px 2px rgba(0,0,0,0.5)" },
+  anchorTab: { minHeight: "44px", padding: "8px 12px", borderRadius: "8px", border: "1px solid rgba(200,168,78,0.4)", background: "linear-gradient(145deg, rgba(18,52,18,0.95), rgba(12,36,12,0.92))", color: "rgba(255,255,255,0.8)", fontSize: "11px", fontWeight: 700, cursor: "pointer", flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", textShadow: "0 1px 2px rgba(0,0,0,0.5)" },
 
   content: { flex: 1, overflowY: "auto", overflowX: "hidden", padding: "4px 16px", scrollbarWidth: "none" },
 
@@ -1605,15 +1607,23 @@ const S = {
     color: "rgba(255,255,255,0.75)", fontSize: "11px", fontWeight: 800,
     fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
   },
-  chipInfo: {
-    position: "absolute", bottom: "3px", right: "3px",
-    // 24px is the WCAG 2.5.8 minimum target size; it was 20px.
+  // A full thumb-sized target overlays the card corner while the visible glyph
+  // stays compact. The target never crosses the card boundary, so neighbouring
+  // ingredients remain unambiguous even in the three-column phone grid.
+  chipInfoHit: {
+    position: "absolute", bottom: 0, right: 0,
+    width: "44px", height: "44px", borderRadius: "0 0 16px 0",
+    display: "flex", alignItems: "flex-end", justifyContent: "flex-end",
+    background: "transparent", border: 0,
+    cursor: "pointer", padding: "0 3px 3px 0",
+    fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
+  },
+  chipInfoGlyph: {
     width: "24px", height: "24px", borderRadius: "50%",
     display: "flex", alignItems: "center", justifyContent: "center",
     background: "rgba(0,0,0,0.42)", border: "1px solid rgba(255,255,255,0.28)",
     color: "rgba(255,255,255,0.8)", fontSize: "11px", fontWeight: 900,
-    lineHeight: 1, cursor: "pointer", padding: 0,
-    fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
+    lineHeight: 1, pointerEvents: "none",
   },
   capNotice: { display: "flex", alignItems: "center", gap: "8px", padding: "10px 12px", margin: "4px 0 8px", borderRadius: "12px", background: "rgba(255,183,77,0.12)", border: "1px solid rgba(255,183,77,0.42)", fontSize: "12px", fontWeight: 700, color: "#ffcc80", lineHeight: 1.5 },
   introText: { fontSize: "12px", color: "rgba(255,255,255,0.65)", fontWeight: 500, textShadow: "0 1px 2px rgba(0,0,0,0.5)" },

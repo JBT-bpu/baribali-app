@@ -460,6 +460,8 @@ test('the builder step header remains usable on a narrow phone', () => {
         'all five progress controls must shrink without clipping and retain a full touch target');
     assert.match(builder, /@media \(max-width: 349px\)[\s\S]*?\.builder-progress-label \{ display:none !important; \}/,
         'narrow phones must be able to hide visual labels while retaining each aria-label');
+    assert.match(builder, /anchorTab: \{ minHeight: "44px"/,
+        'vegetable subgroup shortcuts must retain a full mobile touch target');
     assert.match(builder, /target\.closest\([\s\S]*?\[data-horizontal-scroll\]/,
         'step swipes must ignore controls and horizontally scrolling regions');
     assert.doesNotMatch(builder, /onChipTouchStart|onChipTouchEnd|longPressRef/,
@@ -470,6 +472,10 @@ test('the builder step header remains usable on a narrow phone', () => {
     const infoControl = builder.indexOf('aria-label={`מידע על ${item.he}`}', checkbox);
     assert.ok(checkbox >= 0 && checkboxClose > checkbox && infoControl > checkboxClose,
         'ingredient selection and its info disclosure must be sibling controls, not nested ARIA descendants');
+    assert.match(builder, /aria-label=\{`מידע על \$\{item\.he\}`\}[\s\S]*?style=\{S\.chipInfoHit\}[\s\S]*?<span aria-hidden="true" style=\{S\.chipInfoGlyph\}>ℹ<\/span>/,
+        'the information target must expose a compact decorative glyph without duplicating its accessible name');
+    assert.match(builder, /chipInfoHit: \{[\s\S]*?width: "44px", height: "44px"/,
+        'ingredient information must retain a full thumb-sized target');
 });
 
 test('chef recipes disclose their authoritative price before selection', () => {
