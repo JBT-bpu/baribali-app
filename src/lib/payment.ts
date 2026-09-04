@@ -11,6 +11,9 @@
  */
 
 export type PaymentProvider = 'hyp' | 'yaadpay' | 'tranzila';
+export type PublicPaymentState =
+    | { paymentMode: 'hosted'; paymentProvider: PaymentProvider }
+    | { paymentMode: 'pickup' | 'unavailable'; paymentProvider: null };
 
 export function paymentProvider(): PaymentProvider {
     const configured = (process.env.PAYMENT_PROVIDER ?? 'tranzila').trim().toLowerCase();
@@ -33,5 +36,21 @@ export function isPaymentConfigured(): boolean {
         case 'tranzila':
             // The .env.example ships a placeholder; treat that as unconfigured.
             return !!process.env.TRANZILA_TERMINAL && process.env.TRANZILA_TERMINAL !== 'your_terminal_name';
+    }
+}
+
+/**
+ * The only payment information a customer needs before submitting an order.
+ * Invalid provider configuration is an explicit unavailable state so the UI
+ * can fail closed; credentials and configuration details never leave here.
+ */
+export function publicPaymentState(): PublicPaymentState {
+    try {
+        if (!isPaymentConfigured()) {
+            return { paymentMode: 'pickup', paymentProvider: null };
+        }
+        return { paymentMode: 'hosted', paymentProvider: paymentProvider() };
+    } catch {
+        return { paymentMode: 'unavailable', paymentProvider: null };
     }
 }

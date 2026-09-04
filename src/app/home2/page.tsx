@@ -23,6 +23,7 @@ import { reopenLine } from '@/lib/shopHours';
 import { isPaymentVerificationReturn } from '@/lib/customerPayment';
 import type { OrderProduct } from '@/lib/orderRules';
 import { useHistoryBackedOverlay } from '@/hooks/useHistoryBackedOverlay';
+import { markBuilderNavigationFromHome } from '@/lib/builderNavigation';
 
 // The product pick is the hero-select roster (HeroSelector); choosing the salad
 // hero opens the shared SizePicker overlay (also used by the builder).
@@ -37,10 +38,9 @@ interface HistoryOrder {
 
 const getServerPaymentVerifying = () => false;
 const getPaymentVerifying = () => isPaymentVerificationReturn(window.location.search);
-// The visible home UI already waits for the existing `ready` hydration gate.
-// useSyncExternalStore therefore supplies the query state before the first
-// visible client render while keeping /home2 statically generated; popstate
-// also covers a provider-return entry restored from browser history.
+// useSyncExternalStore keeps /home2's server snapshot deterministic, then
+// synchronizes the provider-return query state after hydration. Popstate also
+// covers a return entry restored from browser history.
 const subscribeToLocation = (onChange: () => void) => {
     window.addEventListener('popstate', onChange);
     return () => window.removeEventListener('popstate', onChange);
@@ -166,7 +166,6 @@ export default function HomeV2() {
     // ── Screen state ──
     const [sizePicker, setSizePicker] = useState(false);
     const [loginSheet, setLoginSheet] = useState(false);
-    const [ready, setReady]           = useState(false);
     const [lastOrder, setLastOrder]   = useState<HistoryOrder | null>(null);
     const [heroIdx, setHeroIdx]       = useState(0); // active hero → background parallax
     const nudgeRef = useRef(0); // swipe impulse shared with the particle field
@@ -179,7 +178,7 @@ export default function HomeV2() {
     // The guest-or-Google gate now lives on the app's front door (src/app/page.tsx),
     // not as an overlay here.
 
-    useEffect(() => { setReady(true); router.prefetch('/build'); }, [router]);
+    useEffect(() => { router.prefetch('/build'); }, [router]);
 
     // The picker is a modal state on the home page, so Android/browser Back
     // should dismiss it before leaving the page. Keeping that state in history
@@ -230,6 +229,7 @@ export default function HomeV2() {
         if (!product) return;
         navigator.vibrate?.([15, 40, 30]);
         stashReorder(lastOrder.items.map(i => i.id), 'same', product);
+        markBuilderNavigationFromHome();
         router.push(buildReorderHref(lastOrder));
     }, [lastOrder, router]);
 
@@ -263,11 +263,13 @@ export default function HomeV2() {
             openSizePicker();
             return;
         }
+        markBuilderNavigationFromHome();
         router.push(`/build?type=${encodeURIComponent(product)}`);
     }, [openSizePicker, router]);
 
     const handleSizeSelect = useCallback((size: string) => {
         try { sessionStorage.setItem('bb-drop', '1'); } catch { /* private mode — just skip the intro */ }
+        markBuilderNavigationFromHome();
         // Plain router navigation, deliberately: startViewTransition cross-fades
         // the whole document, which fought the wipe (it read as "fade to black,
         // then the builder appears"). The wipe already covers the swap. replace
@@ -276,8 +278,6 @@ export default function HomeV2() {
         if (window.history.state?.bbOverlay === SIZE_PICKER_HISTORY_STATE) router.replace(target);
         else router.push(target);
     }, [router]);
-
-    if (!ready) return <div style={{ minHeight: '100dvh', background: '#020a02' }} />;
 
     const avatar = user ? avatarUrl(user) : null;
 

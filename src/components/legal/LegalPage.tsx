@@ -13,8 +13,9 @@ export const LEGAL_PAGES: { href: string; label: string }[] = [
 
 /**
  * Shared readable layout for the legal/info pages. Server-rendered static
- * content — good for SEO, works with no JS. Bracketed [להשלים]/[לאימות] tokens
- * are business-specific fields the owner must verify before relying on these.
+ * content — good for SEO and works with no JavaScript. Customer-facing pages
+ * must contain only publishable copy; business follow-ups belong in the launch
+ * checklist rather than appearing as editorial notes in the rendered document.
  */
 export default function LegalPage({ title, lastUpdated, children }: { title: string; lastUpdated: string; children: ReactNode }) {
     return (

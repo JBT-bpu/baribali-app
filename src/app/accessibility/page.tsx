@@ -6,10 +6,9 @@ export const metadata: Metadata = {
     description: 'הצהרת הנגישות של אפליקציית BariBali.',
 };
 
-// [להשלים] = accessibility coordinator details + confirmed audit date.
 export default function AccessibilityPage() {
     return (
-        <LegalPage title="נגישות" lastUpdated="25.7.2026">
+        <LegalPage title="נגישות" lastUpdated="4.9.2026">
             <p>
                 בריאבלי (BariBali) רואה חשיבות רבה במתן שירות שוויוני ונגיש לכלל הלקוחות, לרבות אנשים עם מוגבלות.
                 אנו פועלים להנגיש את האפליקציה בהתאם לתקנות שוויון זכויות לאנשים עם מוגבלות (התאמות נגישות לשירות)
@@ -31,9 +30,8 @@ export default function AccessibilityPage() {
                 </p>
             </Section>
 
-            <Section heading="רכז/ת נגישות ופניות">
-                <p>לפניות בנושא נגישות ניתן לפנות אל: <strong>[שם רכז/ת הנגישות — להשלים]</strong>, טלפון 03-6557355, דוא״ל alonka382m@gmail.com. נטפל בפנייתך בהקדם.</p>
-                <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.45)' }}><strong>[להשלים:]</strong> תאריך בדיקת הנגישות בפועל ופרטי בעל המקצוע שביצע אותה.</p>
+            <Section heading="פניות בנושא נגישות">
+                <p>לפניות בנושא נגישות ניתן ליצור איתנו קשר בטלפון 03-6557355 או בדוא״ל alonka382m@gmail.com. נטפל בפנייתך בהקדם.</p>
             </Section>
         </LegalPage>
     );

@@ -8,9 +8,8 @@ export const metadata: Metadata = {
 
 export default function ContactPage() {
     return (
-        <LegalPage title="יצירת קשר" lastUpdated="25.7.2026">
+        <LegalPage title="יצירת קשר" lastUpdated="4.9.2026">
             <Section heading="בריאבלי (BariBali)">
-                <p>עוסק מורשה מס׳ <strong>[מספר עוסק מורשה — להשלים]</strong></p>
                 <p>כתובת: אבן גבירול 61, תל אביב–יפו</p>
                 <p>טלפון: <a href="tel:03-6557355" style={{ color: 'var(--color-gold-light)' }}>03-6557355</a></p>
                 <p>דוא״ל: <a href="mailto:alonka382m@gmail.com" style={{ color: 'var(--color-gold-light)' }}>alonka382m@gmail.com</a></p>

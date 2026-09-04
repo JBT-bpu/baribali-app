@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 
 export default function CancellationsPage() {
     return (
-        <LegalPage title="ביטולים והחזרים" lastUpdated="25.7.2026">
+        <LegalPage title="ביטולים והחזרים" lastUpdated="4.9.2026">
             <p>
                 מדיניות זו חלה על ביטול הזמנות והחזרים בבריאבלי (BariBali). מדובר במזון טרי המוכן במיוחד לפי הזמנתך
                 ועלול להתקלקל, ולכן חלות מגבלות על ביטול לאחר תחילת ההכנה. המדיניות כפופה לחוק הגנת הצרכן,
@@ -38,10 +38,6 @@ export default function CancellationsPage() {
             <Section heading="6. יצירת קשר לביטולים">
                 <p>לכל בקשת ביטול או החזר: 03-6557355 · alonka382m@gmail.com · אבן גבירול 61, תל אביב–יפו.</p>
             </Section>
-
-            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.45)' }}>
-                <strong>[לאימות משפטי:]</strong> הניסוח הסופי טעון התאמה לדיני הגנת הצרכן ולמאפיין של מזון טרי שהוכן במיוחד.
-            </p>
         </LegalPage>
     );
 }

@@ -9,6 +9,7 @@ import {
 } from '@/lib/shopHours';
 import { supabaseConfigurationState } from '@/lib/supabaseServerConfig';
 import { loadSupabaseAdmin, supabaseConfigurationErrorResponse } from '@/lib/supabaseRoute';
+import { publicPaymentState } from '@/lib/payment';
 
 /**
  * Is the shop open, and the staff control for saying otherwise.
@@ -48,7 +49,7 @@ export async function GET() {
     }
     const status = shopStatus(new Date(), state.override, state.note);
     return NextResponse.json(
-        { ...status, override: state.override, storeAvailable: state.available },
+        { ...status, override: state.override, storeAvailable: state.available, ...publicPaymentState() },
         { headers: { 'Cache-Control': 'no-store' } },
     );
 }
@@ -95,5 +96,5 @@ export async function PATCH(req: NextRequest) {
     }
 
     const status = shopStatus(now, override, note);
-    return NextResponse.json({ ...status, override }, { headers: { 'Cache-Control': 'no-store' } });
+    return NextResponse.json({ ...status, override, ...publicPaymentState() }, { headers: { 'Cache-Control': 'no-store' } });
 }

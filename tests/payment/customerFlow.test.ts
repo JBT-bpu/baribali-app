@@ -22,6 +22,14 @@ const shopHook = readFileSync(new URL(
     '../../src/lib/useShopStatus.ts',
     import.meta.url,
 ), 'utf8');
+const shopRoute = readFileSync(new URL(
+    '../../src/app/api/shop/route.ts',
+    import.meta.url,
+), 'utf8');
+const paymentConfig = readFileSync(new URL(
+    '../../src/lib/payment.ts',
+    import.meta.url,
+), 'utf8');
 const slotsRoute = readFileSync(new URL(
     '../../src/app/api/slots/route.ts',
     import.meta.url,
@@ -56,6 +64,10 @@ const menuData = readFileSync(new URL(
 ), 'utf8');
 const buildPage = readFileSync(new URL(
     '../../src/app/build/page.tsx',
+    import.meta.url,
+), 'utf8');
+const builderNavigation = readFileSync(new URL(
+    '../../src/lib/builderNavigation.ts',
     import.meta.url,
 ), 'utf8');
 const bowlDrop = readFileSync(new URL(
@@ -238,8 +250,8 @@ test('long-open customer screens refresh time-sensitive shop state safely', () =
     assert.match(summary, /controller\.abort\(\);[\s\S]*?\}, \[refreshKey, shop\.loading, shop\.refreshedAt\]\)/);
     assert.match(summary, /const effectivePickupTime = resolvePickupSelection\(pickupTime, pickupAvailability\.slots, shop\.open\)/,
         'expired or newly-full selections must be rejected before render and submit');
-    assert.match(summary, /const \[pickupTime, setPickupTime\] = useState\(null\)/,
-        'checkout must require an explicit pickup choice');
+    assert.match(summary, /const pickupTime = checkoutDraft\.pickupTime/,
+        'checkout must require and preserve an explicit pickup choice');
     assert.match(summary, /const reconciled = reconcilePickupChoice\([\s\S]*?setPickupTime\(reconciled\.value\);[\s\S]*?setPickupSelectionNotice\(reconciled\.notice\)/,
         'live capacity changes must reconcile both the stored choice and its explanation');
     assert.match(summary, /status: current\.slots === null \? 'error' : 'stale'/,
@@ -382,8 +394,8 @@ test('builder size changes keep rendered, URL, history and reset state aligned',
         'same-route Back and Forward must mirror their committed size into the builder');
     assert.match(builder, /const url = new URL\(window\.location\.href\);[\s\S]*?url\.searchParams\.set\("size", SIZE_PARAM_BY_ML\[nextSize\]\)/,
         'committing a size must preserve unrelated query and hash data');
-    assert.match(builder, /delete nextState\.bbOverlay;[\s\S]*?window\.history\.replaceState\(nextState, "", window\.location\.href\)/,
-        'commit must remove only its own overlay marker while retaining Next history state');
+    assert.match(builder, /window\.addEventListener\("popstate", finishAfterOverlay, \{ once: true \}\);[\s\S]*?window\.history\.back\(\);[\s\S]*?return;/,
+        'commit must consume its temporary overlay entry before replacing the builder URL');
     assert.match(builder, /router\.replace\(`\$\{url\.pathname\}\$\{url\.search\}\$\{url\.hash\}`, \{ scroll: false \}\)/,
         'the App Router and visible URL must receive the committed choice without scrolling');
 
@@ -528,12 +540,93 @@ test('unavailable build deep links stop before mounting the order builder', () =
 });
 
 test('unavailable historical products cannot leak into an active reorder', () => {
+    const restoreStart = builder.indexOf('// ─── Load a reorder');
+    const strictReplayGuard = builder.indexOf('if (restoredProductRef.current === type) return;', restoreStart);
+    const strictReplayMark = builder.indexOf('restoredProductRef.current = type;', restoreStart);
+    const consumeReorder = builder.indexOf('const reorder = takeReorder(type);', restoreStart);
+
+    assert.ok(
+        restoreStart >= 0
+        && strictReplayGuard > restoreStart
+        && strictReplayMark > strictReplayGuard
+        && consumeReorder > strictReplayMark,
+        'Strict Mode replay must stop before consuming the one-shot reorder or loading an old draft',
+    );
     assert.match(builder, /const reorder = takeReorder\(type\)/,
         'the builder must consume only a reorder payload scoped to its own product');
     assert.match(home, /lastOrder && isOrderReorderable\(lastOrder\) && <ReorderStrip/,
         'home must not advertise one-tap reorder for a product that is off sale');
     assert.match(ordersPage, /const reorderable = isOrderReorderable\(o\)[\s\S]*?המנה הזו אינה זמינה כרגע להזמנה חוזרת/,
         'history must replace unavailable reorder actions with a truthful state');
+});
+
+test('the home page renders useful content on the server instead of a hydration blank', () => {
+    assert.doesNotMatch(home, /\[ready, setReady\]/,
+        'home should not add a client-only readiness render');
+    assert.doesNotMatch(home, /if \(!ready\) return/,
+        'home should not replace its server output with a blank viewport');
+    assert.match(home, /useEffect\(\(\) => \{ router\.prefetch\('\/build'\); \}, \[router\]\);/,
+        'removing the hydration gate must keep the useful builder prefetch');
+});
+
+test('builder entry, summary edits and checkout keep clear escape and return paths', () => {
+    assert.match(builder, /function HeaderBanner\(\{ onBack \}\)/);
+    assert.match(builder, /<button[\s\S]*?onClick=\{onBack\}[\s\S]*?aria-label="חזרה לתפריט"[\s\S]*?<span>לתפריט<\/span>/,
+        'the preset landing needs a visible, native way back to the menu');
+    assert.match(home, /markBuilderNavigationFromHome\(\);[\s\S]*?router\.replace\(target\)/,
+        'the menu must mark a size-picker navigation before replacing its modal entry');
+    assert.match(buildPage, /const \[enteredFromHome\] = useState\(readBuilderNavigationFromHome\)/);
+    assert.match(buildPage, /if \(enteredFromHome\) persistBuilderNavigationFromHome\(\)/,
+        'the destination history entry must retain its origin across reload and Forward');
+    assert.match(builderNavigation, /Read without consuming:[\s\S]*?React Strict Mode/,
+        'origin detection must not destructively consume storage in a replayed initializer');
+    assert.match(builder, /const exitPresetToMenu = useCallback\(\(\) => \{[\s\S]*?if \(enteredFromHome\) router\.back\(\);[\s\S]*?else router\.replace\("\/home2"\)/,
+        'menu arrivals should go Back once, while direct links need an in-app replacement');
+    assert.match(builder, /<HeaderBanner onBack=\{exitPresetToMenu\} \/>/);
+    assert.match(builder, /paddingTop: "env\(safe-area-inset-top\)"/,
+        'the preset header must clear the status bar when the app runs edge-to-edge');
+
+    assert.match(builder, /const \[editingFromSummary, setEditingFromSummary\] = useState\(false\)/);
+    assert.match(builder, /const \[checkoutDraft, setCheckoutDraft\] = useState\(emptyCheckoutDraft\)/,
+        'checkout choices must outlive SummaryView while one ingredient section is edited');
+    assert.match(builder, /const returnToSummary = useCallback\(\(\) => \{[\s\S]*?setEditingFromSummary\(false\);[\s\S]*?setSummary\(true\)/,
+        'editing one section must have a direct save-and-return action');
+    assert.match(builder, /const next = useCallback\(\(\) => \{[\s\S]*?if \(editingFromSummary\) \{[\s\S]*?returnToSummary\(\)/,
+        'the primary step action must return directly to checkout while editing');
+    assert.match(builder, /else if \(editingFromSummary\) returnToSummary\(\)/,
+        'the header back action must also return directly to checkout while editing');
+    assert.match(builder, /onEdit=\{editFromSummary\}/);
+    assert.match(builder, /checkoutDraft=\{checkoutDraft\} setCheckoutDraft=\{setCheckoutDraft\}/,
+        'the remounted summary must receive the same pickup and promo draft');
+    assert.match(summary, /const pickupTime = checkoutDraft\.pickupTime/);
+    assert.match(summary, /const promoInput = checkoutDraft\.promoInput/);
+    assert.match(summary, /const appliedDiscount = checkoutDraft\.appliedDiscount/);
+});
+
+test('checkout describes the server-confirmed payment handoff before submission', () => {
+    assert.match(shopRoute, /import \{ publicPaymentState \} from '@\/lib\/payment'/);
+    assert.match(paymentConfig, /paymentMode: 'pickup'[\s\S]*?paymentMode: 'hosted'/,
+        'the public shop response must distinguish pay-at-pickup from hosted checkout');
+    assert.match(shopRoute, /\.\.\.publicPaymentState\(\)/);
+    assert.match(shopHook, /paymentMode: 'unknown' \| 'hosted' \| 'pickup' \| 'unavailable'/);
+    assert.match(shopHook, /data\.paymentMode === 'hosted'[\s\S]*?data\.paymentMode === 'pickup'/,
+        'the client must validate the public server capability instead of trusting arbitrary JSON');
+
+    assert.match(summary, /shop\.paymentMode === 'hosted'/);
+    assert.match(summary, /shop\.paymentMode === 'pickup'/);
+    assert.match(summary, /המשך לתשלום מאובטח/);
+    assert.match(summary, /תשלום באיסוף/);
+    assert.match(summary, /עמוד התשלום המאובטח של \{hostedProviderName\}/);
+    assert.match(summary, /סטטוס התשלום יוצג כשתחזרו לאפליקציה/);
+    assert.match(summary, /אם האישור עדיין בבדיקה, נמשיך לאמת אותו/);
+    assert.doesNotMatch(summary, /האישור הסופי יוצג/,
+        'the return route may still be verifying, so checkout must not promise a final result');
+    assert.match(summary, /paymentConfigurationBlocked = !DEMO_MODE[\s\S]*?shop\.paymentMode === 'unavailable'/);
+    assert.match(summary, /disabled=\{submitting \|\| paymentConfigurationBlocked/,
+        'invalid payment configuration must fail closed before order submission');
+    assert.match(summary, /התשלום אינו זמין כרגע/);
+    assert.doesNotMatch(summary, /בלחיצה על ״שלח הזמנה״/,
+        'consent copy must not quote a label that changes with the payment mode');
 });
 
 test('customer-facing menu copy stays inside the facts the builder can verify', () => {

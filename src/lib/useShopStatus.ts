@@ -37,6 +37,9 @@ export interface LiveShopStatus extends ShopStatus {
     refreshedAt: number;
     /** Last server-confirmed staff override, retained across transient failures. */
     override: ShopOverride;
+    /** Public checkout capability; credentials always remain server-only. */
+    paymentMode: 'unknown' | 'hosted' | 'pickup' | 'unavailable';
+    paymentProvider: 'hyp' | 'yaadpay' | 'tranzila' | null;
 }
 
 export function useShopStatus(): LiveShopStatus {
@@ -48,6 +51,8 @@ export function useShopStatus(): LiveShopStatus {
         live: false,
         refreshedAt: 0,
         override: null,
+        paymentMode: 'unknown',
+        paymentProvider: null,
     }));
     const lastKnownOverrideRef = useRef<{ override: ShopOverride; note: string | null } | null>(null);
 
@@ -58,13 +63,15 @@ export function useShopStatus(): LiveShopStatus {
         const publishFallback = () => {
             if (cancelled) return;
             const known = lastKnownOverrideRef.current;
-            setState({
+            setState(current => ({
                 ...shopStatus(new Date(), known?.override ?? null, known?.note ?? null),
                 loading: false,
                 live: false,
                 refreshedAt: Date.now(),
                 override: known?.override ?? null,
-            });
+                paymentMode: current.paymentMode,
+                paymentProvider: current.paymentProvider,
+            }));
         };
 
         fetch('/api/shop', { cache: 'no-store', signal: controller.signal })
@@ -96,6 +103,8 @@ export function useShopStatus(): LiveShopStatus {
                         loading: false,
                         live: true,
                         refreshedAt: Date.now(),
+                        paymentMode: 'unavailable',
+                        paymentProvider: null,
                     });
                     return;
                 }
@@ -103,14 +112,26 @@ export function useShopStatus(): LiveShopStatus {
                     ? result.data as (ShopStatus & {
                         override?: ShopOverride;
                         storeAvailable?: boolean;
+                        paymentMode?: 'hosted' | 'pickup' | 'unavailable';
+                        paymentProvider?: 'hyp' | 'yaadpay' | 'tranzila' | null;
                     }) | null
                     : null;
                 if (data && typeof data.open === 'boolean') {
                     const override = data.override === 'open' || data.override === 'closed'
                         ? data.override
                         : null;
+                    const paymentMode = data.paymentMode === 'hosted'
+                        || data.paymentMode === 'pickup'
+                        || data.paymentMode === 'unavailable'
+                        ? data.paymentMode
+                        : 'unknown';
+                    const paymentProvider = data.paymentProvider === 'hyp'
+                        || data.paymentProvider === 'yaadpay'
+                        || data.paymentProvider === 'tranzila'
+                        ? data.paymentProvider
+                        : null;
                     lastKnownOverrideRef.current = { override, note: data.note ?? null };
-                    setState({ ...data, override, loading: false, live: true, refreshedAt: Date.now() });
+                    setState({ ...data, override, paymentMode, paymentProvider, loading: false, live: true, refreshedAt: Date.now() });
                 } else {
                     publishFallback();
                 }

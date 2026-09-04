@@ -9,6 +9,10 @@ import GoldField from '@/components/ui/GoldField';
 import { BariBadge, BariPanel } from '@/components/ui/bari';
 import { BUILDER_VEIL_Z, DropSettle, DropCover, SWEEP } from '@/components/transition/BowlDrop';
 import { isOrderableProduct, type OrderProduct } from '@/lib/orderRules';
+import {
+    persistBuilderNavigationFromHome,
+    readBuilderNavigationFromHome,
+} from '@/lib/builderNavigation';
 
 function BuildLoadingFallback() {
     return (
@@ -124,6 +128,7 @@ function BuilderExperience({ size, type }: { size: string | null; type: OrderPro
     const [arrived] = useState(() => {
         try { return sessionStorage.getItem('bb-drop') === '1'; } catch { return false; }
     });
+    const [enteredFromHome] = useState(readBuilderNavigationFromHome);
     const [visible, setVisible] = useState(false);
     // Panel covers from frame one when arriving, and holds until the page paints.
     const [settling, setSettling] = useState(arrived);
@@ -131,6 +136,10 @@ function BuilderExperience({ size, type }: { size: string | null; type: OrderPro
     // The field mounts immediately on an arrival so it can restore the picker's
     // motes and carry their sweep; on a direct visit it can wait.
     const [ambient, setAmbient] = useState(arrived);
+
+    useEffect(() => {
+        if (enteredFromHome) persistBuilderNavigationFromHome();
+    }, [enteredFromHome]);
 
     useEffect(() => {
         if (arrived) { try { sessionStorage.removeItem('bb-drop'); } catch { /* ignore */ } }
@@ -177,7 +186,7 @@ function BuilderExperience({ size, type }: { size: string | null; type: OrderPro
                 from the dive it restores that field mote-for-mote (persistKey) and
                 carries its rush to a stop, so the motion never actually breaks. */}
             {ambient && <GoldField zIndex={1} entrySweep={arrived ? SWEEP : 0} entryHold={arrived && !revealing} persistKey="bb-field" />}
-            <BariBaliBuilder sizeParam={size} type={type} entrance={revealing} skipIntro={arrived} />
+            <BariBaliBuilder sizeParam={size} type={type} entrance={revealing} skipIntro={arrived} enteredFromHome={enteredFromHome} />
             {settling && <DropSettle exiting={revealing} />}
         </div>
     );

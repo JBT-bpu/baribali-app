@@ -31,7 +31,7 @@
 | `/login` | Dedicated sign-in | Google sign-in with an explicit guest path. |
 | `/kitchen` | Staff board | Password-to-httpOnly-session gate, queue tabs, one active work surface, checks, urgency, payment handoff and undo. `?sim=1` exposes rehearsal controls. |
 | `/admin` | Local manager tools | Prices, discounts and customers. Password-gated and intentionally inert in production. |
-| `/privacy`, `/terms`, `/cancellations`, `/allergens`, `/accessibility`, `/contact` | Legal and information | Some business-detail placeholders still require owner input before launch. |
+| `/privacy`, `/terms`, `/cancellations`, `/allergens`, `/accessibility`, `/contact` | Legal and information | Customer-facing working drafts; owner/legal approval and missing registered-business details remain launch tasks, but internal notes are not rendered to customers. |
 
 The old `/favorites`, `/fresh`, `/top` and `/recommended` stubs are gone.
 

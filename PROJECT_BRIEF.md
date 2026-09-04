@@ -22,7 +22,7 @@ BariBali is a mobile-first, Hebrew (RTL) salad and tortilla builder for a **real
 - **PWA**: manifest (`src/app/manifest.ts`) implemented — installable/"Add to Home Screen"
 - **Lint**: ESLint 9 flat config (`eslint.config.mjs`), script is `eslint .`
 
-There are 173 focused Node/`tsx` regression tests covering Hyp, settlement and migration invariants, pricing/order authority and idempotency, product availability/reorder safety, atomic pickup capacity, Israel-day kitchen filtering, environment/configuration guardrails, hard-reload checkout recovery, generic-webhook rejection and concurrency, kitchen controls/simulation and critical customer-flow/source-trust invariants. GitHub Actions runs locked install, typecheck, lint, the focused suite and a production build for pull requests and `main` pushes.
+There are 187 focused Node/`tsx` regression tests covering Hyp, settlement and migration invariants, pricing/order authority and idempotency, product availability/reorder safety, atomic pickup capacity, Israel-day kitchen filtering, environment/configuration guardrails, hard-reload checkout recovery, generic-webhook rejection and concurrency, kitchen controls/simulation, public legal-copy guardrails and critical customer-flow/source-trust invariants. GitHub Actions runs locked install, typecheck, lint, the focused suite and a production build for pull requests and `main` pushes.
 
 ## 3. Directory structure (current)
 
@@ -205,7 +205,7 @@ brief's reassurance is what stopped anyone looking again.**
 - **PR #1 fixes ported**: an independent parallel PR had branched off the same commit; cherry-picked its genuinely good, non-conflicting fixes and left out its home2/auth/tortilla changes (which would have regressed the guest-first work). Real bug fixed: an unlayered `* { padding: 0 }` reset in `globals.css` was silently zeroing every Tailwind padding utility app-wide (beat every utility per CSS cascade-layers spec) — wrapped in `@layer base`. Also a builder CTA-crop fix, `BariButton` depth polish, and a floating glassmorphic `BariBottomNav`.
 - **Real `/kitchen` authentication**: staff password (server-only `KITCHEN_PASSWORD`) → httpOnly HMAC-signed session cookie; server-component page guard + cookie-verifying API routes. Replaced the `NEXT_PUBLIC_` header "secret."
 - **"Order again"**: reorder / reorder-with-changes from `/profile` history (`src/lib/reorder.ts` + builder reconstruction). Detects product by base price, not item ids — see the TORTILLA_STEPS note below.
-- **Security hardening**: in-memory rate limiter (`src/lib/rateLimit.ts`) on orders/payment-create/slots/kitchen-login; Hebrew `/privacy` + `/terms` pages (with business-detail placeholders still to fill).
+- **Security hardening**: in-memory rate limiter (`src/lib/rateLimit.ts`) on orders/payment-create/slots/kitchen-login; Hebrew legal/info pages that keep owner/legal follow-ups out of customer-visible copy.
 
 **2026-08-08 to 09-03**:
 - RLS lockdown, server-enforced opening hours, Israel-time fixes, live shop override, customer closed-state and the five-day Sunday–Thursday week shipped to `main`.
@@ -229,10 +229,10 @@ Git history is authoritative for exact detail — commit messages are descriptiv
 - `user_id` on orders is server-verified from a Bearer token, never client-claimed
 - **`/kitchen` has real access control**: a server-only shared staff password (`KITCHEN_PASSWORD`) exchanged for an httpOnly, HMAC-signed session cookie. The server component gates the page before any board markup ships; the order API routes verify the same cookie. Replaces the old `NEXT_PUBLIC_` header "secret" that shipped in the browser bundle. Unset = board runs open (local/demo); **set on Vercel in production** — verified live: `/kitchen` serves the login screen and `/api/kitchen/orders` returns 401 to anonymous requests.
 - **Rate limiting** (`src/lib/rateLimit.ts`) on orders (12/min), payment-create (12/min), slots (40/min), kitchen-login (8/min) — 429 + Retry-After. In-memory/per-process (approximate on serverless); webhook intentionally unthrottled so gateway callbacks aren't dropped.
-- **Privacy/terms pages exist** (`/privacy`, `/terms`) — drafted, but contain `[bracketed]` business-detail placeholders that must be filled before launch.
+- **Privacy/terms pages exist** (`/privacy`, `/terms`) as customer-facing working drafts. Internal editor placeholders were removed from every public legal/info page; owner/legal approval and the missing registered-business facts remain launch tasks.
 
 **Still open — biggest gaps:**
-- Legal pages have unfilled placeholders (business/legal name, ח.פ., address, contact, VAT-inclusive?, cancellation/refund policy, allergen statement, jurisdiction, effective date, retention, min age).
+- Legal pages still require owner/legal verification of the registered entity name/number, address/contact facts, VAT treatment, cancellation/refund policy, allergen statement, jurisdiction, effective date, retention, minimum age and accessibility contact/audit details. These are tracked here rather than exposed as customer-visible placeholders.
 - Rate limiting is per-process, not distributed — a determined attacker across instances/cold-starts isn't hard-capped. Fine as a deterrent for one small shop; a hard limit needs a shared store (Vercel KV / Upstash).
 - Kitchen auth is a single shared password, not per-user staff accounts (adequate for one small shop).
 - The generic Tranzila/YaadPay webhook remains unverified. Hyp payloads are rejected there; Hyp server notifications remain disabled pending the test-terminal payload contract and a dedicated ledger-backed handler. Legacy settlement and page creation use guarded compare-and-set updates: success dominates a racing failure, paid states remain absorbing, and stale create requests cannot overwrite payment or kitchen progress.
@@ -250,7 +250,7 @@ Git history is authoritative for exact detail — commit messages are descriptiv
 
 `main` is pushed, in sync and live at `d44fe06` as of 2026-09-03. The current `codex/payment-foundation` branch is local and unpushed. Production auto-deploys from `main` but is **still in demo mode** because the real Supabase/Hyp variables are not set on Vercel. Remaining:
 
-1. **Fill the `[bracketed]` placeholders in the legal pages** before launch (business/legal name, ח.פ., address, contact email/phone, VAT-inclusive?, payment provider name, cancellation/refund policy, allergen statement, jurisdiction city, effective date, min age and retention period).
+1. **Complete owner/legal review of every legal/info page** before launch: supply the registered business name and number, verify address/contact/VAT facts, cancellation/refund and allergen wording, jurisdiction, effective date, minimum age, retention period and accessibility contact/audit details. Do not reintroduce editorial placeholders into rendered customer copy.
 2. Apply the five locally missing migration versions to the connected pre-launch/test Supabase project with a filename-preserving CLI dry run first. The project currently contains 77 test orders and no customer tags; the full chain has passed a rollback-only rehearsal without changing them. Do not use MCP `apply_migration` for these existing timestamped files and never use `db reset --linked`.
 3. Add real Supabase/Hyp Pay env vars to **Vercel** before deploying this branch. Current `main` falls into demo mode without them; the branch intentionally fails closed instead. A public demo deploy now requires the exact opt-in `NEXT_PUBLIC_BARIBALI_DEMO_MODE=true`, which must not coexist with credentials.
 4. Production domain — not yet decided.
@@ -268,7 +268,7 @@ Supabase and undeployed. Git history is authoritative for the exact commit list.
 
 ## 10. Improvement backlog (not started, no priority commitment)
 
-- **Testing/CI**: 173 focused regression tests plus GitHub Actions on pull requests and `main` pushes. The largest gaps are component/browser automation, end-to-end provider flows and a true multi-connection database concurrency test. A real 77-row Supabase transaction rehearsal already proved migration compatibility, five-slot allocation, replay, sixth-order rejection and complete rollback.
+- **Testing/CI**: 187 focused regression tests plus GitHub Actions on pull requests and `main` pushes. The largest gaps are component/browser automation, end-to-end provider flows and a true multi-connection database concurrency test. A real 77-row Supabase transaction rehearsal already proved migration compatibility, five-slot allocation, replay, sixth-order rejection and complete rollback.
 - **Observability**: no error tracking, no structured logging on payment/webhook routes.
 - **Ops**: a local password-gated admin exists for prices/discounts/customers, but there is no production reporting dashboard. Schema/policy SQL and migrations are tracked; execution, advisor runs and backup/PITR verification remain manual.
 - **Code quality**: `zustand` installed but unused — a `BariBaliBuilder.jsx` state-lifting refactor is on the table whenever there's appetite.

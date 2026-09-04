@@ -168,7 +168,7 @@ function freshPaymentKey() {
     return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-export default function SummaryView({ sels, total, all, comboBadges, notes, setNotes, onBack, onEdit, onNewOrder, base = BASE, productType = 'salad', sizeLabel = null }) {
+export default function SummaryView({ sels, total, all, comboBadges, notes, setNotes, onBack, onEdit, onNewOrder, checkoutDraft, setCheckoutDraft, base = BASE, productType = 'salad', sizeLabel = null }) {
     // Schedule + the live staff override. The server checks this again at POST
     // /api/orders and is the authority; this is so the screen stops pretending.
     const shop = useShopStatus();
@@ -183,11 +183,17 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     });
     const [notesFocused, setNotesFocused] = useState(false);
     const [highlightedStep, setHighlightedStep] = useState(null);
-    const [pickupTime, setPickupTime] = useState(null);
+    const pickupTime = checkoutDraft.pickupTime;
+    const setPickupTime = useCallback((value) => {
+        setCheckoutDraft(current => ({ ...current, pickupTime: value }));
+    }, [setCheckoutDraft]);
     const [pickupSelectionNotice, setPickupSelectionNotice] = useState("");
     const pickupSectionRef = useRef(null);
     const effectivePickupTime = resolvePickupSelection(pickupTime, pickupAvailability.slots, shop.open);
-    const [paymentChoice, setPaymentChoice] = useState("pickup"); // 'now' | 'pickup' — demo mode only
+    const paymentChoice = checkoutDraft.paymentChoice; // 'now' | 'pickup' — demo mode only
+    const setPaymentChoice = useCallback((value) => {
+        setCheckoutDraft(current => ({ ...current, paymentChoice: value }));
+    }, [setCheckoutDraft]);
     /**
      * The accepted order — null until the server says it recorded one.
      *
@@ -205,8 +211,14 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     const [acceptedOrder, setAcceptedOrder] = useState(null);
     const [paymentFailed, setPaymentFailed] = useState(false);
     const [failedOrderNum, setFailedOrderNum] = useState(null);
-    const [promoInput, setPromoInput] = useState("");
-    const [appliedDiscount, setAppliedDiscount] = useState(null);
+    const promoInput = checkoutDraft.promoInput;
+    const setPromoInput = useCallback((value) => {
+        setCheckoutDraft(current => ({ ...current, promoInput: value }));
+    }, [setCheckoutDraft]);
+    const appliedDiscount = checkoutDraft.appliedDiscount;
+    const setAppliedDiscount = useCallback((value) => {
+        setCheckoutDraft(current => ({ ...current, appliedDiscount: value }));
+    }, [setCheckoutDraft]);
     const [promoError, setPromoError] = useState("");
     const [submitting, setSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState("");
@@ -276,7 +288,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
         if (reconciled.value === pickupTime && reconciled.notice === pickupSelectionNotice) return;
         setPickupTime(reconciled.value);
         setPickupSelectionNotice(reconciled.notice);
-    }, [pickupAvailability.slots, pickupSelectionNotice, pickupTime, shop.open]);
+    }, [pickupAvailability.slots, pickupSelectionNotice, pickupTime, setPickupTime, shop.open]);
     /* eslint-enable react-hooks/set-state-in-effect */
 
     const selectPickupTime = (nextTime) => {
@@ -351,6 +363,19 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     const recoveryPending = hasPendingPayment || hasPendingSubmission;
     const requestLocked = submitting || recoveryPending;
     const checkoutLocked = requestLocked || Boolean(priceReconfirmation);
+    const paymentConfigurationBlocked = !DEMO_MODE
+        && shop.paymentMode === 'unavailable'
+        && checkoutTotal > 0;
+    const hostedPaymentExpected = !DEMO_MODE && shop.paymentMode === 'hosted' && checkoutTotal > 0;
+    const pickupPaymentExpected = !DEMO_MODE && shop.paymentMode === 'pickup' && checkoutTotal > 0;
+    const hostedProviderName = shop.paymentProvider === 'hyp' ? 'Hyp' : 'ספק הסליקה';
+    const defaultSubmitLabel = hostedPaymentExpected
+        ? "המשך לתשלום מאובטח"
+        : pickupPaymentExpected
+            ? "שלחו הזמנה · תשלום באיסוף"
+            : checkoutTotal === 0
+                ? "אישור הזמנה"
+                : "שלח הזמנה";
     const pickupBlockLabel = pickupAvailability.slots === null || pickupCheckingMoreSlots
         ? "בודקים שעות איסוף"
         : pickupHasAvailableSlot
@@ -1067,6 +1092,25 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                         </div>
                     )}
 
+                    {hostedPaymentExpected && (
+                        <div style={S.paymentHandoffNote}>
+                            <span aria-hidden="true">🔒</span>
+                            <span>לאחר שליחת ההזמנה תועברו לעמוד התשלום המאובטח של {hostedProviderName}. סטטוס התשלום יוצג כשתחזרו לאפליקציה; אם האישור עדיין בבדיקה, נמשיך לאמת אותו.</span>
+                        </div>
+                    )}
+                    {pickupPaymentExpected && (
+                        <div style={S.paymentHandoffNote}>
+                            <span aria-hidden="true">🏪</span>
+                            <span>התשלום יתבצע בדלפק בעת האיסוף.</span>
+                        </div>
+                    )}
+                    {paymentConfigurationBlocked && (
+                        <div role="alert" style={{ ...S.paymentHandoffNote, borderColor: "rgba(255,117,117,0.38)", color: "#ffb0ad" }}>
+                            <span aria-hidden="true">⚠️</span>
+                            <span>התשלום אינו זמין כרגע, ולכן לא ניתן לשלוח את ההזמנה. נסו שוב בעוד כמה דקות.</span>
+                        </div>
+                    )}
+
                     <div style={S.trustCopy}>
                         <span style={{ opacity: 0.75 }}>🌿</span>
                         <span>מרכיבים כל הזמנה לפי הבחירות שלכם</span>
@@ -1117,16 +1161,16 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                         variant="primary"
                         fullWidth
                         aria-busy={submitting}
-                        disabled={submitting || (!recoveryPending && (shopBlocked || pickupBlocked))}
-                        style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif", opacity: (submitting || (!recoveryPending && (shopBlocked || pickupBlocked))) ? 0.6 : 1 }}
+                        disabled={submitting || paymentConfigurationBlocked || (!recoveryPending && (shopBlocked || pickupBlocked))}
+                        style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif", opacity: (submitting || paymentConfigurationBlocked || (!recoveryPending && (shopBlocked || pickupBlocked))) ? 0.6 : 1 }}
                         onClick={() => submitOrder()}
                     >
-                        <span>{submitting ? "שולח…" : hasPendingPayment ? "פתח תשלום" : hasPendingSubmission ? "בדקו הזמנה קודמת" : shopBlocked ? "סגור כרגע" : pickupBlocked ? pickupBlockLabel : priceReconfirmation ? "אישור המחיר המעודכן" : submitError ? "נסו שוב" : "שלח הזמנה"}</span>
+                        <span>{submitting ? "שולח…" : hasPendingPayment ? "פתחו שוב את התשלום" : hasPendingSubmission ? "בדקו הזמנה קודמת" : paymentConfigurationBlocked ? "התשלום אינו זמין כרגע" : shopBlocked ? "סגור כרגע" : pickupBlocked ? pickupBlockLabel : priceReconfirmation ? "אישור המחיר המעודכן" : submitError ? "נסו שוב" : defaultSubmitLabel}</span>
                         {!recoveryPending && <span style={S.orderBtnPrice}>₪{checkoutTotal}</span>}
                     </BariButton>
                     {/* Consent disclosure — links open the legal docs before ordering */}
                     <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.45)", textAlign: "center", lineHeight: 1.6, marginTop: "8px", fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }}>
-                        בלחיצה על ״שלח הזמנה״ אני מאשר/ת את{" "}
+                        בלחיצה על הכפתור אני מאשר/ת את{" "}
                         <a href="/terms" target="_blank" rel="noopener noreferrer" aria-label="תנאי השימוש (נפתח בלשונית חדשה)" style={{ color: "rgba(240,208,96,0.8)" }}>תנאי השימוש</a>,{" "}
                         <a href="/privacy" target="_blank" rel="noopener noreferrer" aria-label="מדיניות הפרטיות (נפתחת בלשונית חדשה)" style={{ color: "rgba(240,208,96,0.8)" }}>מדיניות הפרטיות</a>{" "}
                         ו<a href="/cancellations" target="_blank" rel="noopener noreferrer" aria-label="מדיניות הביטולים (נפתחת בלשונית חדשה)" style={{ color: "rgba(240,208,96,0.8)" }}>מדיניות הביטולים</a>.
@@ -1326,6 +1370,13 @@ const S = {
     orderBtnPrice: {
         fontSize: "15px", fontWeight: 900,
         background: "rgba(0,0,0,0.18)", padding: "3px 10px", borderRadius: "8px",
+    },
+    paymentHandoffNote: {
+        display: "flex", alignItems: "flex-start", gap: "8px",
+        marginTop: "12px", padding: "10px 12px", borderRadius: "12px",
+        background: "rgba(200,168,78,0.09)", border: "1px solid rgba(200,168,78,0.24)",
+        color: "rgba(255,255,255,0.66)", fontSize: "11px", fontWeight: 600,
+        lineHeight: 1.55,
     },
     trustCopy: { display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", marginTop: "16px", fontSize: "11px", fontWeight: 500, color: "rgba(255,255,255,0.45)", letterSpacing: "0.03em", animation: "pFadeIn 0.5s ease 0.8s both" },
 };

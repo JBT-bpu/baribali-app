@@ -237,6 +237,15 @@ const SIZE_ML_BY_PARAM = { S: 750, M: 1000, L: 1500 };
 const SIZE_PARAM_BY_ML = { 750: "S", 1000: "M", 1500: "L" };
 const BUILDER_SIZE_PICKER_HISTORY_STATE = "builder-size-picker";
 
+function emptyCheckoutDraft() {
+  return {
+    pickupTime: null,
+    paymentChoice: "pickup",
+    promoInput: "",
+    appliedDiscount: null,
+  };
+}
+
 function parseSizeParam(raw) {
   try {
     if (!raw) return null;
@@ -246,10 +255,29 @@ function parseSizeParam(raw) {
 }
 
 // ─── BUILDER PARTICLES ──────────────────────────────────────
-function HeaderBanner() {
+function HeaderBanner({ onBack }) {
   return (
     <>
-      <div style={{ position: "relative", width: "100%", flexShrink: 0 }}>
+      <div style={{ position: "relative", width: "100%", flexShrink: 0, paddingTop: "env(safe-area-inset-top)", background: "#020a02" }}>
+        <div style={{ height: "52px", padding: "4px 12px", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "flex-start", direction: "rtl" }}>
+          <button
+            type="button"
+            onClick={onBack}
+            aria-label="חזרה לתפריט"
+            style={{
+              minWidth: "88px", height: "44px", padding: "0 12px", borderRadius: "12px",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: "7px",
+              border: "1px solid rgba(255,255,255,0.24)", cursor: "pointer",
+              background: "rgba(255,255,255,0.055)", color: "#fff",
+              boxShadow: "0 3px 14px rgba(0,0,0,0.32)",
+              fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
+              fontSize: "12px", fontWeight: 800,
+            }}
+          >
+            <span aria-hidden="true">→</span>
+            <span>לתפריט</span>
+          </button>
+        </div>
         <img
           src={headerImage}
           alt=""
@@ -303,8 +331,8 @@ function ClearConfirmModal({ open, onConfirm, onCancel }) {
 
 // ─── MAIN ───────────────────────────────────────────────────
 
-/** @param {{ sizeParam?: string | null, type?: string, entrance?: boolean, skipIntro?: boolean }} props */
-export default function BariBaliBuilder({ sizeParam = null, type = "salad", entrance = false, skipIntro = false }) {
+/** @param {{ sizeParam?: string | null, type?: string, entrance?: boolean, skipIntro?: boolean, enteredFromHome?: boolean }} props */
+export default function BariBaliBuilder({ sizeParam = null, type = "salad", entrance = false, skipIntro = false, enteredFromHome = false }) {
   const router = useRouter();
   const isTortilla = type === "tortilla";
   const reducedMotion = usePrefersReducedMotion();
@@ -325,9 +353,20 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
   const [changingSize, setChangingSize] = useState(false);
   const changeSizeButtonRef = useRef(null);
   const startEmptyButtonRef = useRef(null);
+  const sizeCommitCleanupRef = useRef(null);
+  // React Strict Mode intentionally replays mount effects in development.
+  // Restoring is destructive (`takeReorder` clears sessionStorage), so without
+  // this per-product guard the replay could consume the reorder on pass one and
+  // then replace it with an older local draft on pass two.
+  const restoredProductRef = useRef(null);
   const [sels, setSels] = useState({});
   const [lastAdd, setLastAdd] = useState(null);
   const [summary, setSummary] = useState(false);
+  const [editingFromSummary, setEditingFromSummary] = useState(false);
+  // Checkout choices belong to the order draft, not to SummaryView's mount.
+  // Keep them here so editing one ingredient section cannot silently erase a
+  // selected pickup slot or a promo code when the summary remounts.
+  const [checkoutDraft, setCheckoutDraft] = useState(emptyCheckoutDraft);
   // "enter" fades the whole screen in on mount. Skipped when arriving from the
   // page transition — that slab fade is exactly what made the builder look like
   // it appeared in one piece; the staggered `rise()` below does the arrival instead.
@@ -447,6 +486,9 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
 
   // ─── Load a reorder, else the saved draft, on mount ───
   useEffect(() => {
+    if (restoredProductRef.current === type) return;
+    restoredProductRef.current = type;
+
     // "Order again" takes precedence over any saved draft — reconstruct the
     // selection from the past order's item ids against the CURRENT catalog
     // (so prices are current and off-menu items simply drop out).
@@ -631,6 +673,8 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
     localStorage.removeItem("baribali-draft");
     setSels({});
     setNotes("");
+    setEditingFromSummary(false);
+    setCheckoutDraft(emptyCheckoutDraft());
     setStep(isTortilla ? 0 : -1);
     haptic("remove");
     closeClearConfirm();
@@ -651,19 +695,44 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
     }, 200);
   }, [step]);
 
-  const next = useCallback(() => step < steps.length - 1 ? goTo(step + 1) : setSummary(true), [step, steps, goTo]);
+  const returnToSummary = useCallback(() => {
+    setEditingFromSummary(false);
+    setSummary(true);
+    haptic("step");
+    playSound("step");
+  }, []);
+  const next = useCallback(() => {
+    if (editingFromSummary) {
+      returnToSummary();
+      return;
+    }
+    if (step < steps.length - 1) goTo(step + 1);
+    else setSummary(true);
+  }, [editingFromSummary, goTo, returnToSummary, step, steps.length]);
   const back = useCallback(() => {
     if (summary) setSummary(false);
+    else if (editingFromSummary) returnToSummary();
     else if (step > 0) goTo(step - 1);
     else if (step === 0 && !isTortilla) goTo(-1);
     else window.location.href = "/";
-  }, [summary, step, goTo, isTortilla]);
+  }, [editingFromSummary, goTo, isTortilla, returnToSummary, step, summary]);
+  const editFromSummary = useCallback((stepIndex) => {
+    setEditingFromSummary(true);
+    setSummary(false);
+    setStep(stepIndex);
+  }, []);
+  const exitPresetToMenu = useCallback(() => {
+    if (enteredFromHome) router.back();
+    else router.replace("/home2");
+  }, [enteredFromHome, router]);
   const resetAll = () => {
     setSels({});
     setNotes("");
     setComboBadges([]);
     setShownBadges(new Set());
     setSummary(false);
+    setEditingFromSummary(false);
+    setCheckoutDraft(emptyCheckoutDraft());
     // Keep the currently committed size. It already lives in the URL; resetting
     // the bowl must not resurrect the size that happened to mount this instance.
     setStep(isTortilla ? 0 : -1);
@@ -745,6 +814,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
   const commitSize = (rawSize) => {
     const nextSize = parseSizeParam(rawSize);
     if (!nextSize) return;
+    if (sizeCommitCleanupRef.current) return;
     if (changingSize && nextSize === selectedSize) {
       cancelSizeChange();
       return;
@@ -753,22 +823,40 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
     const url = new URL(window.location.href);
     url.searchParams.set("size", SIZE_PARAM_BY_ML[nextSize]);
 
-    // Remove only our modal marker and preserve Next's private history fields.
+    const finishCommit = () => {
+      setSelectedSize(nextSize);
+      setChangingSize(false);
+      haptic("step");
+      router.replace(`${url.pathname}${url.search}${url.hash}`, { scroll: false });
+      requestAnimationFrame(() => startEmptyButtonRef.current?.focus({ preventScroll: true }));
+    };
+
+    // The picker owns a temporary same-page history entry. Consume it before
+    // replacing the builder URL; otherwise every size change leaves another
+    // builder entry between this screen and the menu, so "לתפריט" needs two
+    // or more Back presses. The popstate callback commits on the original
+    // builder entry after both the browser and Next have processed Back.
     const currentState = typeof window.history.state === "object" && window.history.state !== null
       ? window.history.state
       : {};
     if (currentState.bbOverlay === BUILDER_SIZE_PICKER_HISTORY_STATE) {
-      const nextState = { ...currentState };
-      delete nextState.bbOverlay;
-      window.history.replaceState(nextState, "", window.location.href);
+      const finishAfterOverlay = () => {
+        sizeCommitCleanupRef.current?.();
+        sizeCommitCleanupRef.current = null;
+        finishCommit();
+      };
+      window.addEventListener("popstate", finishAfterOverlay, { once: true });
+      sizeCommitCleanupRef.current = () => window.removeEventListener("popstate", finishAfterOverlay);
+      window.history.back();
+      return;
     }
 
-    setSelectedSize(nextSize);
-    setChangingSize(false);
-    haptic("step");
-    router.replace(`${url.pathname}${url.search}${url.hash}`, { scroll: false });
-    requestAnimationFrame(() => startEmptyButtonRef.current?.focus({ preventScroll: true }));
+    finishCommit();
   };
+
+  useEffect(() => () => {
+    sizeCommitCleanupRef.current?.();
+  }, []);
 
   // A true missing/invalid-size deep link must choose before rendering the
   // builder. Change mode uses the same picker without destroying the committed
@@ -796,7 +884,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
           opacity: anim === "enter" ? 0 : 1, transform: anim === "enter" ? "translateY(12px)" : "none", transition: "all 0.5s"
         }}>
           {/* Brand header banner */}
-          <div style={rise(2) ?? undefined}><HeaderBanner /></div>
+          <div style={rise(2) ?? undefined}><HeaderBanner onBack={exitPresetToMenu} /></div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "16px", flex: 1, padding: "16px 16px 24px", overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
 
@@ -1054,7 +1142,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
     );
   }
 
-  if (summary) return <SummaryView sels={sels} total={total} all={all} comboBadges={comboBadges} notes={notes} setNotes={setNotes} onBack={back} onEdit={(stepIndex) => { setSummary(false); setStep(stepIndex); }} onNewOrder={resetAll} base={activeBase} productType={isTortilla ? 'tortilla' : 'salad'} sizeLabel={selectedSize ? SIZE_CONFIG[selectedSize].label : null} />;
+  if (summary) return <SummaryView sels={sels} total={total} all={all} comboBadges={comboBadges} notes={notes} setNotes={setNotes} onBack={back} onEdit={editFromSummary} onNewOrder={resetAll} checkoutDraft={checkoutDraft} setCheckoutDraft={setCheckoutDraft} base={activeBase} productType={isTortilla ? 'tortilla' : 'salad'} sizeLabel={selectedSize ? SIZE_CONFIG[selectedSize].label : null} />;
 
   const slideX = anim === "out" ? (slideDir > 0 ? "-60px" : "60px") : anim === "in" ? "0" : undefined;
 
@@ -1121,7 +1209,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", minWidth: 0, padding: "4px 0 2px" }}>
             {/* Back + utility cluster — inline start */}
             <div style={{ display: "flex", gap: "5px", flexShrink: 0 }}>
-              <button type="button" onClick={back} aria-label="חזור" style={S.navBtn}>→</button>
+              <button type="button" onClick={back} aria-label={editingFromSummary ? "חזרה לסיכום" : "חזור"} style={S.navBtn}>→</button>
               <button
                 type="button"
                 onClick={requestClearDraft}
@@ -1144,7 +1232,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
               )}
             </div>
             {/* Next — inline end */}
-            <button type="button" onClick={next} aria-label="המשך" style={{ ...S.navBtnNext, flexShrink: 0 }}>←</button>
+            <button type="button" onClick={next} aria-label={editingFromSummary ? "שמירת השינויים וחזרה לסיכום" : "המשך"} style={{ ...S.navBtnNext, flexShrink: 0 }}>←</button>
           </div>
 
           {/* A normal-flow heading gets the full width and can wrap at 200%
@@ -1373,7 +1461,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
               ...(cur.id === "upgrade" && curSel.length === 0 ? { opacity: 0.5 } : {}),
             }}
             onClick={next}
-            aria-label={step === steps.length - 1 ? (curSel.length > 0 ? "עבור לסיכום" : "דלג ועבור לסיכום") : `עבור לשלב הבא - ${steps[step + 1]?.title || ""}`}
+            aria-label={editingFromSummary ? "שמירת השינויים וחזרה לסיכום" : step === steps.length - 1 ? (curSel.length > 0 ? "עבור לסיכום" : "דלג ועבור לסיכום") : `עבור לשלב הבא - ${steps[step + 1]?.title || ""}`}
             tabIndex={0}
           >
             {/* Left: counts */}
@@ -1395,7 +1483,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
               whiteSpace: "nowrap",
             }}>
               <span style={{ fontSize: "14px" }}>
-                {step === steps.length - 1 ? (curSel.length > 0 ? "לסיכום" : "דלגו") : "המשך"}
+                {editingFromSummary ? "שמירה וסיכום" : step === steps.length - 1 ? (curSel.length > 0 ? "לסיכום" : "דלגו") : "המשך"}
               </span>
               <span style={{ fontSize: "16px" }}>←</span>
             </div>
