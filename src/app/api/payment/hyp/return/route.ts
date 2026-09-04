@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyHypPayment } from '@/lib/hypPay';
 import { settleHypCallback } from '@/lib/hypSettlement';
 import { applyPaymentVerification, recordPaymentCallback } from '@/lib/paymentAttempts';
-import { enforceRateLimit } from '@/lib/rateLimit';
+import { clientIp, rateLimit } from '@/lib/rateLimit';
 
 function appOrigin(req: NextRequest): string {
     const configured = process.env.NEXT_PUBLIC_APP_URL;
@@ -26,8 +26,15 @@ function redirect(req: NextRequest, orderId: string | null, payment: 'success' |
 }
 
 export async function GET(req: NextRequest) {
-    const limited = enforceRateLimit(req, 'hyp-browser-return', 30, 60_000);
-    if (limited) return limited;
+    // This limiter never rejects the return. It only asks the database not to
+    // retain excess unknown-reference evidence from one public IP. The RPC
+    // ignores the flag for a real payment attempt, so a valid callback and its
+    // refund-critical Id are always recorded first.
+    const recordUnknownReference = rateLimit(
+        `hyp-browser-unknown:${clientIp(req)}`,
+        30,
+        60_000,
+    ).ok;
 
     try {
         const settled = await settleHypCallback(
@@ -35,8 +42,24 @@ export async function GET(req: NextRequest) {
             'browser_return',
             {
                 verify: verifyHypPayment,
-                record: recordPaymentCallback,
+                record: input => recordPaymentCallback({
+                    ...input,
+                    recordUnknownReference,
+                }),
                 apply: applyPaymentVerification,
+                // The callback must be recorded before any limiter can defer
+                // work: its Id is required for refunds and cannot be recovered
+                // from Pay after the redirect is lost. This budget protects
+                // outbound VERIFY calls; a deferred durable event can be
+                // replayed later and lands on the explicit verifying state.
+                // Scope VERIFY abuse to one unguessable payment reference;
+                // unrelated customers behind the same carrier IP cannot defer
+                // each other's first-party settlement.
+                claimVerificationBudget: ({ merchantReference }) => rateLimit(
+                    `hyp-browser-verify:${merchantReference}`,
+                    12,
+                    60_000,
+                ).ok,
             },
         );
         return redirect(req, settled.orderId, settled.paid ? 'success' : 'verifying');

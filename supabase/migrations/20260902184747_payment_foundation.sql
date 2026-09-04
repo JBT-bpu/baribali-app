@@ -813,7 +813,8 @@ create or replace function public.record_payment_callback(
   p_event_key text,
   p_event_source text,
   p_provider_transaction_id text,
-  p_payload_safe jsonb default '{}'::jsonb
+  p_payload_safe jsonb default '{}'::jsonb,
+  p_record_unknown_reference boolean default true
 )
 returns table (
   event_id bigint,
@@ -873,6 +874,21 @@ begin
     and a.merchant_reference = v_reference;
 
   if not found then
+    -- Public browser returns must never lose a known attempt's transaction Id.
+    -- Unknown references are only forensic noise, though, so callers may shed
+    -- them after an ingress budget is exhausted without creating a write-DoS.
+    if p_record_unknown_reference is not true then
+      return query select
+        null::bigint,
+        null::uuid,
+        null::uuid,
+        null::bigint,
+        null::text,
+        'unknown_reference'::text,
+        false;
+      return;
+    end if;
+
     insert into public.payment_events (
       attempt_id,
       provider,
@@ -1434,7 +1450,7 @@ revoke execute on function public.claim_payment_attempt(uuid, text, uuid, uuid)
   from public, anon, authenticated;
 revoke execute on function public.finish_payment_initialization(uuid, uuid, text, text)
   from public, anon, authenticated;
-revoke execute on function public.record_payment_callback(text, text, text, text, text, jsonb)
+revoke execute on function public.record_payment_callback(text, text, text, text, text, jsonb, boolean)
   from public, anon, authenticated;
 revoke execute on function public.apply_payment_verification(bigint, text, text, bigint, text, text, text, jsonb)
   from public, anon, authenticated;
@@ -1443,7 +1459,7 @@ grant execute on function public.claim_payment_attempt(uuid, text, uuid, uuid)
   to service_role;
 grant execute on function public.finish_payment_initialization(uuid, uuid, text, text)
   to service_role;
-grant execute on function public.record_payment_callback(text, text, text, text, text, jsonb)
+grant execute on function public.record_payment_callback(text, text, text, text, text, jsonb, boolean)
   to service_role;
 grant execute on function public.apply_payment_verification(bigint, text, text, bigint, text, text, text, jsonb)
   to service_role;

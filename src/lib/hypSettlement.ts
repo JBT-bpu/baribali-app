@@ -25,6 +25,16 @@ export interface HypSettlementDependencies {
         verificationMethod: string;
         safePayload: Record<string, string>;
     }) => Promise<PaymentVerificationResult>;
+    /**
+     * Optional budget for the outbound VERIFY request. It is deliberately
+     * claimed only after the callback (including its refund-critical Id) is
+     * durable. Returning false leaves the event replayable and the attempt in
+     * verification_pending instead of dropping the browser return.
+     */
+    claimVerificationBudget?: (input: {
+        merchantReference: string;
+        callback: PaymentCallbackRecord;
+    }) => boolean;
 }
 
 export interface HypSettlementResult {
@@ -88,7 +98,7 @@ export async function settleHypCallback(
         safePayload: safeCallbackPayload(params),
     });
 
-    if (!callback.attemptId || !callback.orderId) {
+    if (!callback.attemptId || !callback.orderId || callback.eventId === null) {
         return { orderId: null, result: 'unknown_reference', paid: false };
     }
     if (
@@ -96,6 +106,15 @@ export async function settleHypCallback(
         && (callback.attemptStatus === 'paid' || callback.attemptStatus === 'duplicate_paid')
     ) {
         return { orderId: callback.orderId, result: 'duplicate_success', paid: true };
+    }
+
+    if (dependencies.claimVerificationBudget?.({ merchantReference, callback }) === false) {
+        return {
+            orderId: callback.orderId,
+            result: 'verification_deferred',
+            paid: callback.attemptStatus === 'paid'
+                || callback.attemptStatus === 'duplicate_paid',
+        };
     }
 
     let verification;

@@ -255,6 +255,32 @@ test('pending payment identity survives reload and tracking clears only its orde
     assert.equal(restoreOrderSubmission(cartIntent, { storage, now: () => 17_002 }), null);
 });
 
+test('pending payment identity outlives the pre-order retry window in the same tab', () => {
+    const storage = new MemoryStorage();
+    const body = makeBody();
+    const cartIntent = orderSubmissionCartIntent(body);
+    const claimed = claimOrderSubmission(orderSubmissionIntent(body), null, {
+        storage,
+        now: () => 18_000,
+        randomUUID: () => UUID_A,
+        requestBody: body,
+        cartIntent,
+    });
+    markOrderSubmissionPaymentPending(claimed, {
+        orderId: ORDER_ID,
+        orderNum: 'BB-1234',
+        idempotencyKey: UUID_B,
+    }, { storage });
+
+    const restored = restoreOrderSubmission(cartIntent, {
+        storage,
+        now: () => 18_000 + ORDER_SUBMISSION_TTL_MS + 1,
+    });
+
+    assert.equal(restored?.submissionKey, UUID_A);
+    assert.equal(restored?.pendingPayment?.orderId, ORDER_ID);
+});
+
 test('changed intents get distinct keys without discarding an ambiguous earlier intent', () => {
     const storage = new MemoryStorage();
     const keys = [UUID_A, UUID_B];

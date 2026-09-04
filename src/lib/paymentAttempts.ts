@@ -29,7 +29,7 @@ export interface ClaimedPaymentAttempt {
 }
 
 export interface PaymentCallbackRecord {
-    eventId: number;
+    eventId: number | null;
     attemptId: string | null;
     orderId: string | null;
     amountAgorot: number | null;
@@ -122,6 +122,9 @@ export async function recordPaymentCallback(input: {
     eventSource: 'browser_return' | 'server_notification' | 'reconciliation';
     providerTransactionId: string | null;
     safePayload: Record<string, string>;
+    /** Known attempts are always recorded. This flag only permits storing an
+     * unknown-reference event after the public ingress budget is consumed. */
+    recordUnknownReference?: boolean;
 }): Promise<PaymentCallbackRecord> {
     const { data, error } = await getSupabaseAdmin().rpc('record_payment_callback', {
         p_provider: 'hyp',
@@ -130,12 +133,13 @@ export async function recordPaymentCallback(input: {
         p_event_source: input.eventSource,
         p_provider_transaction_id: input.providerTransactionId,
         p_payload_safe: input.safePayload,
+        p_record_unknown_reference: input.recordUnknownReference ?? true,
     });
     if (error) dbError('record_payment_callback', error);
 
     const row = firstRow<Record<string, unknown>>(data, 'record_payment_callback');
     return {
-        eventId: Number(row.event_id),
+        eventId: row.event_id == null ? null : Number(row.event_id),
         attemptId: typeof row.attempt_id === 'string' ? row.attempt_id : null,
         orderId: typeof row.attempt_order_id === 'string' ? row.attempt_order_id : null,
         amountAgorot: row.amount_agorot == null ? null : Number(row.amount_agorot),

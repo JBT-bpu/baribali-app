@@ -250,7 +250,12 @@ function parseRecord(value: unknown): OrderSubmissionRecord | null {
     };
 }
 
-function isFresh(record: OrderSubmissionRecord, now: number, ttlMs: number): boolean {
+function isRecoverable(record: OrderSubmissionRecord, now: number, ttlMs: number): boolean {
+    // Once the order exists, its hosted page may remain chargeable indefinitely
+    // under the current provider contract. Keep that exact order/payment
+    // identity for the rest of this tab session; tracking clears it after the
+    // terminal hand-off. The short TTL applies only to pre-order ambiguity.
+    if (record.pendingPayment) return true;
     const age = now - record.createdAt;
     return age >= 0 && age <= ttlMs;
 }
@@ -331,19 +336,19 @@ export function claimOrderSubmission(
     const ttlMs = options.ttlMs ?? ORDER_SUBMISSION_TTL_MS;
 
     const allStored = readStored(storage);
-    const freshStored = allStored.filter(record => isFresh(record, now, ttlMs));
+    const recoverableStored = allStored.filter(record => isRecoverable(record, now, ttlMs));
 
-    if (current?.intent === intent && isFresh(current, now, ttlMs)) {
+    if (current?.intent === intent && isRecoverable(current, now, ttlMs)) {
         const enriched = withClaimDetails(current, options);
-        const withoutCurrent = freshStored.filter(record => record.intent !== intent);
+        const withoutCurrent = recoverableStored.filter(record => record.intent !== intent);
         writeStored(storage, [...withoutCurrent, enriched]);
         return enriched;
     }
 
-    const stored = freshStored.find(record => record.intent === intent);
+    const stored = recoverableStored.find(record => record.intent === intent);
     if (stored) {
         const enriched = withClaimDetails(stored, options);
-        const withoutStored = freshStored.filter(record => record.intent !== intent);
+        const withoutStored = recoverableStored.filter(record => record.intent !== intent);
         writeStored(storage, [...withoutStored, enriched]);
         return enriched;
     }
@@ -352,7 +357,7 @@ export function claimOrderSubmission(
     if (!UUID_PATTERN.test(submissionKey)) throw new TypeError('randomUUID returned an invalid UUID');
 
     const record = withClaimDetails({ intent, submissionKey, createdAt: now }, options);
-    writeStored(storage, [...freshStored, record]);
+    writeStored(storage, [...recoverableStored, record]);
     return record;
 }
 
@@ -366,12 +371,12 @@ export function restoreOrderSubmission(
     const now = (options.now ?? Date.now)();
     const ttlMs = options.ttlMs ?? ORDER_SUBMISSION_TTL_MS;
     const allStored = readStored(storage);
-    const freshStored = allStored.filter(record => isFresh(record, now, ttlMs));
-    if (freshStored.length !== allStored.length) {
-        if (freshStored.length === 0) removeStored(storage);
-        else writeStored(storage, freshStored);
+    const recoverableStored = allStored.filter(record => isRecoverable(record, now, ttlMs));
+    if (recoverableStored.length !== allStored.length) {
+        if (recoverableStored.length === 0) removeStored(storage);
+        else writeStored(storage, recoverableStored);
     }
-    return freshStored
+    return recoverableStored
         .filter(record => record.cartIntent === cartIntent && record.requestBody)
         .sort((a, b) => b.createdAt - a.createdAt)[0] ?? null;
 }

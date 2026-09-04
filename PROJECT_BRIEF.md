@@ -22,7 +22,7 @@ BariBali is a mobile-first, Hebrew (RTL) salad and tortilla builder for a **real
 - **PWA**: manifest (`src/app/manifest.ts`) implemented — installable/"Add to Home Screen"
 - **Lint**: ESLint 9 flat config (`eslint.config.mjs`), script is `eslint .`
 
-There are 169 focused Node/`tsx` regression tests covering Hyp, settlement and migration invariants, pricing/order authority and idempotency, product availability/reorder safety, atomic pickup capacity, Israel-day kitchen filtering, environment/configuration guardrails, hard-reload checkout recovery, generic-webhook rejection and concurrency, kitchen controls/simulation and critical customer-flow/source-trust invariants. GitHub Actions runs locked install, typecheck, lint, the focused suite and a production build for pull requests and `main` pushes.
+There are 173 focused Node/`tsx` regression tests covering Hyp, settlement and migration invariants, pricing/order authority and idempotency, product availability/reorder safety, atomic pickup capacity, Israel-day kitchen filtering, environment/configuration guardrails, hard-reload checkout recovery, generic-webhook rejection and concurrency, kitchen controls/simulation and critical customer-flow/source-trust invariants. GitHub Actions runs locked install, typecheck, lint, the focused suite and a production build for pull requests and `main` pushes.
 
 ## 3. Directory structure (current)
 
@@ -105,17 +105,18 @@ create table orders (
 
 `supabase/migrations/20260903120000_order_submission_idempotency.sql` adds a
 server-only `order_creation_requests` ledger and `create_order_idempotent` RPC.
-The browser reuses one high-entropy key for the same semantic order intent for
-30 minutes. The RPC claims that key and creates the order in one transaction;
+Before an order exists, the browser reuses one high-entropy key for the same
+semantic order intent for 30 minutes. The RPC claims that key and creates the order in one transaction;
 equal retries return the original order and a changed intent with the same key
 returns 409. The ledger is separate from `orders` so kitchen/customer
 `select('*')` reads never expose the key or fingerprint. The route fails closed
 with 503 if the migration/RPC is unavailable; there is no unsafe direct-insert
 fallback. Before the first request, the browser also keeps the exact body in
 tab-scoped `sessionStorage`; after order creation it replaces that ambiguity
-with the durable order ID and payment idempotency key. A hard reload therefore
-offers an explicit retry of the same request or payment and locks mutable
-checkout choices until that earlier attempt is resolved.
+with the durable order ID and payment idempotency key for the rest of the tab
+session, because an existing hosted page may remain chargeable. A hard reload
+therefore offers an explicit retry of the same request or payment and locks
+mutable checkout choices until that earlier attempt is resolved.
 
 `supabase/migrations/20260903200310_order_capacity_and_numbering.sql`
 makes order numbering database-owned and adds the server-only
@@ -267,7 +268,7 @@ Supabase and undeployed. Git history is authoritative for the exact commit list.
 
 ## 10. Improvement backlog (not started, no priority commitment)
 
-- **Testing/CI**: 169 focused regression tests plus GitHub Actions on pull requests and `main` pushes. The largest gaps are component/browser automation, end-to-end provider flows and a true multi-connection database concurrency test. A real 77-row Supabase transaction rehearsal already proved migration compatibility, five-slot allocation, replay, sixth-order rejection and complete rollback.
+- **Testing/CI**: 173 focused regression tests plus GitHub Actions on pull requests and `main` pushes. The largest gaps are component/browser automation, end-to-end provider flows and a true multi-connection database concurrency test. A real 77-row Supabase transaction rehearsal already proved migration compatibility, five-slot allocation, replay, sixth-order rejection and complete rollback.
 - **Observability**: no error tracking, no structured logging on payment/webhook routes.
 - **Ops**: a local password-gated admin exists for prices/discounts/customers, but there is no production reporting dashboard. Schema/policy SQL and migrations are tracked; execution, advisor runs and backup/PITR verification remain manual.
 - **Code quality**: `zustand` installed but unused — a `BariBaliBuilder.jsx` state-lifting refactor is on the table whenever there's appetite.

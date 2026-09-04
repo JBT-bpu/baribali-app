@@ -44,6 +44,29 @@ test('receiving or retrying a callback cannot downgrade needs_review', () => {
     );
 });
 
+test('an ingress budget may shed unknown callbacks but never a known attempt', () => {
+    const unknownLookup = recordCallback.indexOf('if not found then');
+    const budgetGuard = recordCallback.indexOf(
+        'if p_record_unknown_reference is not true then',
+        unknownLookup,
+    );
+    const unknownInsert = recordCallback.indexOf(
+        'insert into public.payment_events',
+        budgetGuard,
+    );
+    const knownOrderLock = recordCallback.indexOf(
+        'perform 1 from public.orders',
+        unknownInsert,
+    );
+
+    assert.ok(unknownLookup >= 0 && budgetGuard > unknownLookup);
+    assert.ok(unknownInsert > budgetGuard && knownOrderLock > unknownInsert);
+    assert.match(
+        normalized,
+        /record_payment_callback\(text, text, text, text, text, jsonb, boolean\)/,
+    );
+});
+
 test('legacy paid_unverified orders fail closed without transaction provenance', () => {
     assert.match(
         applyVerification,

@@ -28,6 +28,13 @@ project.
   redirects to `/home2?payment=verifying`, where the customer is warned not to
   pay again and to contact the register if the order is missing. Neither case
   is treated as a decline.
+- The Hyp browser return records the callback and its transaction `Id` before
+  consuming the per-reference budget for an outbound VERIFY request. If that
+  budget is exhausted, the customer is redirected to the explicit verifying
+  state and the unprocessed event remains replayable; a rate limit can defer
+  verification but cannot discard the refund-critical redirect data. A
+  separate per-IP ingress budget may shed excess unknown-reference evidence,
+  but the database ignores it for every callback tied to a real attempt.
 - `needs_review` is sticky across callback replays and transient VERIFY
   failures. A later approved VERIFY may still settle it after all consistency
   checks pass.
@@ -66,11 +73,13 @@ project.
   offered. A missing pickup time is reserved for an explicit staff-open
   override when the schedule has no slots, where pickup is coordinated at the
   counter. `SIM-…` kitchen rehearsal orders never consume customer capacity.
-- The browser stores the exact unresolved order request in tab-scoped
+- The browser stores the exact unresolved pre-order request in tab-scoped
   `sessionStorage` for 30 minutes. Once the order exists, that record carries
-  its order ID and payment idempotency key instead. A hard reload never sends
-  automatically: the customer explicitly resumes the same request/payment,
-  and mutable checkout controls stay locked until it is resolved.
+  its order ID and payment idempotency key for the rest of the tab session,
+  because the hosted URL may still be chargeable; tracking clears it after the
+  terminal hand-off. A hard reload never sends automatically: the customer
+  explicitly resumes the same request/payment, and mutable checkout controls
+  stay locked until it is resolved.
 - A fully-discounted order is stored as `no_payment_required`: it remains a
   normal kitchen order, but it is neither called paid nor marked for collection
   at pickup. It creates no payment attempt and never opens a hosted checkout.
@@ -164,22 +173,41 @@ order by table_name, grantee, privilege_type;
   and which identifier their refund operation requires.
 
 After an approved test, verify that the captured Hyp transaction `Id` is
-durable. Once Hyp confirms the identifier required for refunds, verify that
-the corresponding field is stored here:
+durable. Before VERIFY completes it can exist only on the callback event; after
+successful settlement it is also promoted to the attempt. Once Hyp confirms
+the identifier required for refunds, inspect both sources here:
 
 ```sql
 select
   o.order_num,
   a.merchant_reference,
-  a.provider_transaction_id,
+  a.provider_transaction_id as settled_transaction_id,
+  e.id as callback_event_id,
+  e.provider_transaction_id as callback_transaction_id,
+  e.outcome as callback_outcome,
+  e.processed_at as callback_processed_at,
   a.amount_agorot,
   a.currency_code,
   a.status,
   a.settled_at
 from public.payment_attempts a
 join public.orders o on o.id = a.order_id
-order by a.created_at desc
-limit 20;
+left join public.payment_events e
+  on e.attempt_id = a.id
+ and e.provider_transaction_id is not null
+order by a.created_at desc, e.received_at desc
+limit 100;
+
+-- Separately inspect retained callbacks whose merchant reference was unknown.
+select
+  received_at,
+  merchant_reference,
+  provider_transaction_id,
+  outcome
+from public.payment_events
+where attempt_id is null
+order by received_at desc
+limit 100;
 ```
 
 ## Local verification
@@ -191,11 +219,12 @@ npm test
 npm run build
 ```
 
-The 169-test focused suite covers SIGN/VERIFY parsing, credential-safe failures,
+The 173-test focused suite covers SIGN/VERIFY parsing, credential-safe failures,
 immediate transaction-ID capture, URL persistence, concurrent initialization,
 order/request replay across hard reloads, duplicate callbacks, unknown
 references, verification-pending behavior, server pickup validation and the
-five-position capacity rule, plus generic-provider settlement/create races. The complete forward chain was also rehearsed on
+five-position capacity rule, generic-provider settlement/create races, durable
+pre-VERIFY rate limiting and long-open payment recovery. The complete forward chain was also rehearsed on
 the connected 77-row database inside one transaction: five same-slot orders,
 replay and sixth-order rejection all passed, then `ROLLBACK` restored all 77
 rows and removed every temporary object. This does not replace a true

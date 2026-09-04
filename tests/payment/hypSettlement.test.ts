@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { HypGatewayError } from '../../src/lib/hypPay';
@@ -14,6 +15,11 @@ const callback = new URLSearchParams({
     Coin: '1',
     CCode: '0',
 });
+
+const hypReturnRoute = readFileSync(new URL(
+    '../../src/app/api/payment/hyp/return/route.ts',
+    import.meta.url,
+), 'utf8');
 
 function dependencies(overrides: Partial<HypSettlementDependencies> = {}): HypSettlementDependencies {
     return {
@@ -79,6 +85,106 @@ test('approved VERIFY sends the provider transaction id to atomic settlement', a
     assert.equal(result.paid, true);
 });
 
+test('the browser return records its transaction Id before a VERIFY budget can defer work', async () => {
+    const calls: string[] = [];
+    const result = await settleHypCallback(callback, 'browser_return', dependencies({
+        record: async input => {
+            calls.push(`record:${input.providerTransactionId}`);
+            return {
+                eventId: 17,
+                attemptId: '11111111-1111-4111-8111-111111111111',
+                orderId: '22222222-2222-4222-8222-222222222222',
+                amountAgorot: 7200,
+                currencyCode: 'ILS',
+                attemptStatus: 'verification_pending',
+                duplicateEvent: false,
+            };
+        },
+        claimVerificationBudget: () => {
+            calls.push('budget');
+            return false;
+        },
+        verify: async () => {
+            calls.push('verify');
+            throw new Error('VERIFY must be deferred');
+        },
+        apply: async () => {
+            calls.push('apply');
+            throw new Error('an unverified event must remain replayable');
+        },
+    }));
+
+    assert.deepEqual(calls, ['record:tx-123', 'budget']);
+    assert.deepEqual(result, {
+        orderId: '22222222-2222-4222-8222-222222222222',
+        result: 'verification_deferred',
+        paid: false,
+    });
+    assert.doesNotMatch(hypReturnRoute, /if \(limited\) return limited/);
+    assert.match(
+        hypReturnRoute,
+        /recordUnknownReference = rateLimit[\s\S]*?record: input => recordPaymentCallback\([\s\S]*?recordUnknownReference/,
+    );
+    assert.match(
+        hypReturnRoute,
+        /claimVerificationBudget: \(\{ merchantReference \}\)[\s\S]*?hyp-browser-verify:\$\{merchantReference\}/,
+    );
+});
+
+test('the same durable event can complete VERIFY after the budget window reopens', async () => {
+    let recorded = false;
+    let verificationAllowed = false;
+    let verifyCalls = 0;
+    let applyCalls = 0;
+    const shared = dependencies({
+        record: async () => {
+            const duplicateEvent = recorded;
+            recorded = true;
+            return {
+                eventId: 17,
+                attemptId: '11111111-1111-4111-8111-111111111111',
+                orderId: '22222222-2222-4222-8222-222222222222',
+                amountAgorot: 7200,
+                currencyCode: 'ILS',
+                attemptStatus: 'verification_pending',
+                duplicateEvent,
+            };
+        },
+        claimVerificationBudget: () => verificationAllowed,
+        verify: async () => {
+            verifyCalls += 1;
+            return {
+                verified: true,
+                ccode: '0',
+                transactionId: 'tx-123',
+                orderReference: 'BBP-attempt',
+                amountAgorot: 7200,
+                currencyCode: 'ILS',
+                safeMetadata: { CCode: '0', Id: 'tx-123' },
+            };
+        },
+        apply: async () => {
+            applyCalls += 1;
+            return {
+                result: 'settled',
+                orderId: '22222222-2222-4222-8222-222222222222',
+                attemptId: '11111111-1111-4111-8111-111111111111',
+                orderPaymentStatus: 'paid',
+            };
+        },
+    });
+
+    const deferred = await settleHypCallback(callback, 'browser_return', shared);
+    verificationAllowed = true;
+    const replayed = await settleHypCallback(callback, 'browser_return', shared);
+
+    assert.equal(deferred.result, 'verification_deferred');
+    assert.equal(replayed.result, 'settled');
+    assert.equal(replayed.paid, true);
+    assert.equal(verifyCalls, 1);
+    assert.equal(applyCalls, 1);
+});
+
 test('a VERIFY transport error stays verification_pending instead of becoming failed', async () => {
     const appliedInputs: Parameters<HypSettlementDependencies['apply']>[0][] = [];
     const result = await settleHypCallback(callback, 'browser_return', dependencies({
@@ -133,6 +239,9 @@ test('a duplicate callback for an already paid attempt does not call VERIFY agai
         verify: async () => {
             verified = true;
             throw new Error('must not run');
+        },
+        claimVerificationBudget: () => {
+            throw new Error('a paid duplicate must not consume verification budget');
         },
     }));
 
