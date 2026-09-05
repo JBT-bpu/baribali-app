@@ -1,12 +1,13 @@
 # BariBali payment foundation
 
 This branch adds durable, idempotent order creation, atomic pickup capacity,
-database-owned order numbers and Hyp payment attempts. The four forward
-migrations have not been applied to Supabase. The linked pre-launch test
-project already records the two
-2026-08-08 historical migrations; its older application tables previously had
-no replayable baseline in Git. Apply the forward chain first in a test/staging
-project.
+database-owned order numbers and Hyp payment attempts. On 2026-09-04 the four
+forward migrations were applied to the linked pre-launch test project with
+their original filename versions. The project now records the two 2026-08-08
+historical migrations plus the four forward migrations; its older application
+tables previously had no replayable baseline in Git. The branch remains
+unpushed and undeployed, and a real Hyp test-terminal round trip is still
+required.
 
 ## What changes
 
@@ -101,26 +102,23 @@ the missing `orders.user_id` index. The final capacity migration backfills every
 historical timed real order, refusing to continue if any old slot is already
 overbooked or off the five-minute grid.
 
-## Before applying the migration
+## Completed Supabase rollout (2026-09-04)
 
-1. Confirm the complete `public.orders` shape, including the nullable discount
-   fields. The forward migrations contain guards and abort when required types differ.
-2. Take a database backup or confirm the project's recovery option.
-3. The connected project is the pre-launch test project. It currently contains
-   77 test orders and no customer tags; do not delete or reset them implicitly.
-4. Run Supabase database and security advisors after applying.
-5. Test the `anon` and `authenticated` roles: neither may read or write the
-   payment tables or order-creation ledger, nor execute their RPCs. Only
-   `service_role` is granted.
-6. The baseline version predates the linked project's recorded migrations. Use
-   pinned Supabase CLI `2.116.0` and preview with
-   `supabase db push --linked --include-all --dry-run`. It must list exactly the
-   missing baseline plus the four `202609…` forward migrations before the real
-   push. Never run `supabase db reset --linked`.
-7. Do not apply these timestamped files with MCP `apply_migration`: that API
-   creates different server versions and would split local/remote migration
-   history. Authenticate and link the CLI interactively; never put the access
-   token or database password in a command or repository file.
+1. The linked project was confirmed as the pre-launch/test project, then
+   explicitly cleared for a clean integration baseline: 77 test orders, the
+   test Auth identity and sessions, customer tags and the shop override were
+   removed or reset. Public application tables and Storage are now empty.
+2. The four forward migrations were applied with their original timestamped
+   filenames. Do not reapply them through a tool that would invent different
+   server migration versions.
+3. Post-migration checks passed: RLS is enabled on the protected tables;
+   `anon` and `authenticated` have no table or RPC access; `service_role` has
+   the intended grants; the required RPCs and indexes exist.
+4. Supabase security and performance advisors were run. Only expected
+   informational findings remain.
+5. Future schema changes should continue as new timestamped migrations. Never
+   reset a linked non-test project, and never put an access token or database
+   password in a command or repository file.
 
 Useful post-migration checks:
 
@@ -219,13 +217,15 @@ npm test
 npm run build
 ```
 
-The 187-test focused suite covers SIGN/VERIFY parsing, credential-safe failures,
+The 192-test focused suite covers SIGN/VERIFY parsing, credential-safe failures,
 immediate transaction-ID capture, URL persistence, concurrent initialization,
 order/request replay across hard reloads, duplicate callbacks, unknown
 references, verification-pending behavior, server pickup validation and the
 five-position capacity rule, generic-provider settlement/create races, durable
-pre-VERIFY rate limiting and long-open payment recovery. The complete forward chain was also rehearsed on
-the connected 77-row database inside one transaction: five same-slot orders,
-replay and sixth-order rejection all passed, then `ROLLBACK` restored all 77
-rows and removed every temporary object. This does not replace a true
+pre-VERIFY rate limiting and long-open payment recovery. Before rollout, the
+complete forward chain was rehearsed on the connected 77-row database inside
+one transaction: five same-slot orders, replay and sixth-order rejection all
+passed, then `ROLLBACK` restored all rows and removed every temporary object.
+The forward chain has since been applied to the explicitly reset test project
+and its post-migration checks passed. This does not replace a true
 multi-connection concurrency run or a real Hyp test-terminal round trip.

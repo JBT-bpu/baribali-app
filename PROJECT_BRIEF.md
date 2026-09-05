@@ -1,6 +1,6 @@
 # BariBali — Project Brief
 
-> **Purpose of this file**: a self-contained snapshot for a collaborator with no repo or conversation history. Updated 2026-09-03. `MENU_FLOW_BRIEF.md` is the current screen/flow map; `MENU_RESTRUCTURE_REPLY.md` preserves the decision record behind the navigation work.
+> **Purpose of this file**: a self-contained snapshot for a collaborator with no repo or conversation history. Updated 2026-09-05. `MENU_FLOW_BRIEF.md` is the current screen/flow map; `MENU_RESTRUCTURE_REPLY.md` preserves the decision record behind the navigation work.
 
 ---
 
@@ -16,13 +16,13 @@ BariBali is a mobile-first, Hebrew (RTL) salad and tortilla builder for a **real
 - **Styling**: Tailwind CSS v4 (CSS-first `@theme` tokens in `globals.css`) for new/migrated components; older components still use inline `S = {...}` style objects — both patterns coexist
 - **Backend**: Supabase (Postgres + Auth). Database reads/writes go through server API routes using the service-role client. The browser anon/publishable client is used for Auth only; public database roles have no order policies.
 - **Auth**: Supabase Auth, Google OAuth provider — guest-first (see §4), no password/email signup flow
-- **Payments**: Hyp is the intended primary provider. Hosted-page SIGN and server-to-server APISign VERIFY are implemented with server-held credentials. The durable attempt/event ledger is still an unapplied, unmerged migration; a real test-terminal round trip remains required. Tranzila/YaadPay code remains as legacy alternatives.
+- **Payments**: Hyp is the intended primary provider. Hosted-page SIGN and server-to-server APISign VERIFY are implemented with server-held credentials. The durable attempt/event schema is applied and verified in the pre-launch/test Supabase project, but the code is still unmerged/unpushed and a real test-terminal round trip remains required. Tranzila/YaadPay code remains as legacy alternatives.
 - **Motion/UI libs**: `motion` (route transitions), `react-parallax-tilt` (card tilt/glare), `vaul` (bottom sheets), `canvas-confetti`, `lucide-react` icons, `zustand` (installed, still unused)
 - **Fonts**: Heebo (UI) + Secular One (display/headings), self-hosted via `next/font/google`
 - **PWA**: manifest (`src/app/manifest.ts`) implemented — installable/"Add to Home Screen"
 - **Lint**: ESLint 9 flat config (`eslint.config.mjs`), script is `eslint .`
 
-There are 187 focused Node/`tsx` regression tests covering Hyp, settlement and migration invariants, pricing/order authority and idempotency, product availability/reorder safety, atomic pickup capacity, Israel-day kitchen filtering, environment/configuration guardrails, hard-reload checkout recovery, generic-webhook rejection and concurrency, kitchen controls/simulation, public legal-copy guardrails and critical customer-flow/source-trust invariants. GitHub Actions runs locked install, typecheck, lint, the focused suite and a production build for pull requests and `main` pushes.
+There are 192 focused Node/`tsx` regression tests covering Hyp, settlement and migration invariants, pricing/order authority and idempotency, product availability/reorder safety, atomic pickup capacity, Israel-day kitchen filtering, environment/configuration guardrails, hard-reload checkout recovery, generic-webhook rejection and concurrency, kitchen controls/simulation, public legal-copy guardrails and critical customer-flow/source-trust invariants. GitHub Actions runs locked install, typecheck, lint, the focused suite and a production build for pull requests and `main` pushes.
 
 ## 3. Directory structure (current)
 
@@ -207,10 +207,10 @@ brief's reassurance is what stopped anyone looking again.**
 - **"Order again"**: reorder / reorder-with-changes from `/profile` history (`src/lib/reorder.ts` + builder reconstruction). Detects product by base price, not item ids — see the TORTILLA_STEPS note below.
 - **Security hardening**: in-memory rate limiter (`src/lib/rateLimit.ts`) on orders/payment-create/slots/kitchen-login; Hebrew legal/info pages that keep owner/legal follow-ups out of customer-visible copy.
 
-**2026-08-08 to 09-03**:
+**2026-08-08 to 09-05**:
 - RLS lockdown, server-enforced opening hours, Israel-time fixes, live shop override, customer closed-state and the five-day Sunday–Thursday week shipped to `main`.
 - The kitchen board became a queue-tab/active-ticket work surface with real login, audio readiness, rehearsal mode, explicit payment handoff, undo and network/race hardening.
-- `codex/payment-foundation` adds durable order-submission, pickup-allocation and Hyp attempt/event ledgers, database-owned order numbers, idempotent order and checkout-page creation, immediate transaction-`Id` capture, strict settlement/replay checks and focused tests. It remains unpushed and its four forward migrations are unapplied.
+- `codex/payment-foundation` adds durable order-submission, pickup-allocation and Hyp attempt/event ledgers, database-owned order numbers, idempotent order and checkout-page creation, immediate transaction-`Id` capture, strict settlement/replay checks and focused tests. It remains unpushed and undeployed; its four forward migrations were applied and verified in the connected pre-launch/test Supabase project on 2026-09-04.
 - Local demo shop overrides now use process-global state, matching the demo order store, so the customer/kitchen `/api/shop` bundle and `/api/orders` enforce the same manual open/closed decision. It remains intentionally non-durable outside a single development process.
 
 **Non-obvious code fact (worth knowing before menu-restructure work):** tortilla is currently fail-closed at the home card, `/build` boundary, server pricing and order API. Its dormant builder uses `STEPS` minus "finish" and `TORTILLA_STEPS` remains unused. Historic orders still lack immutable product identity; reorder infers a recognized current product from the stored base price and disables unknown/stale values. Add `product_type` (preferably `size_ml` too) before enabling tortilla so later price changes or collisions cannot misclassify history.
@@ -251,10 +251,10 @@ Git history is authoritative for exact detail — commit messages are descriptiv
 `main` is pushed, in sync and live at `d44fe06` as of 2026-09-03. The current `codex/payment-foundation` branch is local and unpushed. Production auto-deploys from `main` but is **still in demo mode** because the real Supabase/Hyp variables are not set on Vercel. Remaining:
 
 1. **Complete owner/legal review of every legal/info page** before launch: supply the registered business name and number, verify address/contact/VAT facts, cancellation/refund and allergen wording, jurisdiction, effective date, minimum age, retention period and accessibility contact/audit details. Do not reintroduce editorial placeholders into rendered customer copy.
-2. Apply the five locally missing migration versions to the connected pre-launch/test Supabase project with a filename-preserving CLI dry run first. The project currently contains 77 test orders and no customer tags; the full chain has passed a rollback-only rehearsal without changing them. Do not use MCP `apply_migration` for these existing timestamped files and never use `db reset --linked`.
+2. **Supabase test schema is ready:** the project was explicitly cleared of its 77 test orders/Auth test identity and the four forward migrations were applied with their original versions on 2026-09-04. RLS, role privileges, RPCs, indexes and advisors were checked. Preserve that migration history; make any further database change as a new timestamped migration.
 3. Add real Supabase/Hyp Pay env vars to **Vercel** before deploying this branch. Current `main` falls into demo mode without them; the branch intentionally fails closed instead. A public demo deploy now requires the exact opt-in `NEXT_PUBLIC_BARIBALI_DEMO_MODE=true`, which must not coexist with credentials.
 4. Production domain — not yet decided.
-5. Verify whether the emailed Hyp terminal credentials are test or production and map their exact fields before updating credential status.
+5. **Finish configuring the confirmed Hyp/YaadPay test terminal:** change the initial portal password and default PassP, enable "מערכת זרה", map the hosted return URL, and obtain the undocumented server-notification payload contract before enabling notifications. Then run approved, declined, abandoned and replayed test flows and confirm that the transaction `Id` is durable for refunds.
 6. Menu/navigation follow-up — see `MENU_FLOW_BRIEF.md` / `MENU_RESTRUCTURE_REPLY.md`. The three-item nav, `/orders` split, reorder and dead-route cleanup are done; softening the repeated external-entry gate and unifying the builder remain open product decisions.
 7. **Enable leaked-password protection** in Supabase Auth (checks against HaveIBeenPwned). Flagged by the security advisor; one toggle in the dashboard. Low urgency while sign-in is Google-first.
 8. **Do not switch to digital-only** until the payment migration is applied and approved, declined, abandoned and replayed test-terminal flows pass. Approved Hyp VERIFY returns become `paid`; `paid_unverified` remains legacy-only. Pay-at-pickup stays working until that checkpoint is explicitly approved.
@@ -263,12 +263,13 @@ Git history is authoritative for exact detail — commit messages are descriptiv
 **Current unmerged work:** `codex/payment-foundation` contains the durable
 order-submission, payment and pickup-capacity foundations plus database-owned
 order numbering and the order-validation, settlement, kitchen and
-production-configuration hardening passes. It is unpushed, unapplied to
-Supabase and undeployed. Git history is authoritative for the exact commit list.
+production-configuration hardening passes. It is unpushed and undeployed; its
+schema is applied only to the pre-launch/test Supabase project. Git history is
+authoritative for the exact commit list.
 
 ## 10. Improvement backlog (not started, no priority commitment)
 
-- **Testing/CI**: 187 focused regression tests plus GitHub Actions on pull requests and `main` pushes. The largest gaps are component/browser automation, end-to-end provider flows and a true multi-connection database concurrency test. A real 77-row Supabase transaction rehearsal already proved migration compatibility, five-slot allocation, replay, sixth-order rejection and complete rollback.
+- **Testing/CI**: 192 focused regression tests plus GitHub Actions on pull requests and `main` pushes. The largest gaps are component/browser automation, end-to-end provider flows and a true multi-connection database concurrency test. A 77-row Supabase transaction rehearsal proved migration compatibility, five-slot allocation, replay, sixth-order rejection and complete rollback before the test project was explicitly reset and the forward chain applied.
 - **Observability**: no error tracking, no structured logging on payment/webhook routes.
 - **Ops**: a local password-gated admin exists for prices/discounts/customers, but there is no production reporting dashboard. Schema/policy SQL and migrations are tracked; execution, advisor runs and backup/PITR verification remain manual.
 - **Code quality**: `zustand` installed but unused — a `BariBaliBuilder.jsx` state-lifting refactor is on the table whenever there's appetite.

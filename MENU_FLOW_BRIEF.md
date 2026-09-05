@@ -1,8 +1,9 @@
 # BariBali — Current Screen and Order Flow
 
-> Current map for design, UX and engineering work. Updated 2026-09-03 against
+> Current map for design, UX and engineering work. Updated 2026-09-05 against
 > `codex/payment-foundation`. Production still runs `main` at `d44fe06`; branch-only
-> payment-ledger changes are not deployed and have not been applied to Supabase.
+> payment-ledger changes are not deployed, but their four forward migrations are
+> applied and verified in the connected pre-launch/test Supabase project.
 
 ## Product principles
 
