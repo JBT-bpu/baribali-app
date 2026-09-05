@@ -194,6 +194,14 @@ export function createHypClient(credentials: HypCredentials, fetchImpl: FetchLik
             Amount: formatAgorot(params.amountAgorot),
             Coin: '1',
             Order: reference,
+            // Template 5 is the shortest hosted form that still shows both
+            // the merchant name and the amount. Keep this checkout focused on
+            // the only method BariBali currently supports: one card payment.
+            tmp: '5',
+            PageLang: 'HEB',
+            Tash: '1',
+            FixTash: 'True',
+            hideBtns: 'True',
             ...(params.info ? { Info: params.info } : {}),
         });
 

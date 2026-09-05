@@ -34,6 +34,11 @@ test('SIGN uses the durable merchant reference and never returns credentials in 
     assert.equal(requests[0]?.searchParams.get('What'), 'SIGN');
     assert.equal(requests[0]?.searchParams.get('Amount'), '72.50');
     assert.equal(requests[0]?.searchParams.get('Order'), 'BBP-attempt');
+    assert.equal(requests[0]?.searchParams.get('tmp'), '5');
+    assert.equal(requests[0]?.searchParams.get('PageLang'), 'HEB');
+    assert.equal(requests[0]?.searchParams.get('Tash'), '1');
+    assert.equal(requests[0]?.searchParams.get('FixTash'), 'True');
+    assert.equal(requests[0]?.searchParams.get('hideBtns'), 'True');
     assert.equal(paymentUrl.includes('test-key'), false);
     assert.equal(paymentUrl.includes('test-pass'), false);
 });
