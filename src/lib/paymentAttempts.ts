@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { getSupabaseAdmin } from '@/lib/serverSupabase';
+import { encryptHypCallback } from '@/lib/hypCallbackEnvelope';
 
 export type PaymentAttemptStatus =
     | 'initializing'
@@ -122,22 +123,23 @@ export async function recordPaymentCallback(input: {
     eventSource: 'browser_return' | 'server_notification' | 'reconciliation';
     providerTransactionId: string | null;
     safePayload: Record<string, string>;
+    callbackQuery: string;
     /** Known attempts are always recorded. This flag only permits storing an
      * unknown-reference event after the public ingress budget is consumed. */
     recordUnknownReference?: boolean;
 }): Promise<PaymentCallbackRecord> {
-    const { data, error } = await getSupabaseAdmin().rpc('record_payment_callback', {
-        p_provider: 'hyp',
+    const { data, error } = await getSupabaseAdmin().rpc('record_hyp_callback', {
         p_merchant_reference: input.merchantReference,
         p_event_key: input.eventKey,
         p_event_source: input.eventSource,
         p_provider_transaction_id: input.providerTransactionId,
         p_payload_safe: input.safePayload,
+        p_encrypted_query: encryptHypCallback(input.callbackQuery, input.merchantReference),
         p_record_unknown_reference: input.recordUnknownReference ?? true,
     });
-    if (error) dbError('record_payment_callback', error);
+    if (error) dbError('record_hyp_callback', error);
 
-    const row = firstRow<Record<string, unknown>>(data, 'record_payment_callback');
+    const row = firstRow<Record<string, unknown>>(data, 'record_hyp_callback');
     return {
         eventId: row.event_id == null ? null : Number(row.event_id),
         attemptId: typeof row.attempt_id === 'string' ? row.attempt_id : null,
@@ -146,6 +148,33 @@ export async function recordPaymentCallback(input: {
         currencyCode: typeof row.currency_code === 'string' ? row.currency_code : null,
         attemptStatus: String(row.attempt_status) as PaymentCallbackRecord['attemptStatus'],
         duplicateEvent: row.duplicate_event === true,
+    };
+}
+
+/** A database cooldown applies across all server instances, not just one process. */
+export async function claimHypCallbackReplay(orderId: string): Promise<{
+    paramsEnvelope: string;
+    merchantReference: string;
+    callback: PaymentCallbackRecord;
+} | null> {
+    const { data, error } = await getSupabaseAdmin().rpc('claim_hyp_callback_replay', {
+        p_order_id: orderId,
+    });
+    if (error) dbError('claim_hyp_callback_replay', error);
+    if (Array.isArray(data) && data.length === 0) return null;
+    const row = firstRow<Record<string, unknown>>(data, 'claim_hyp_callback_replay');
+    return {
+        paramsEnvelope: String(row.encrypted_query),
+        merchantReference: String(row.merchant_reference),
+        callback: {
+            eventId: Number(row.event_id),
+            attemptId: String(row.attempt_id),
+            orderId: String(row.attempt_order_id),
+            amountAgorot: Number(row.amount_agorot),
+            currencyCode: String(row.currency_code),
+            attemptStatus: String(row.attempt_status) as PaymentAttemptStatus,
+            duplicateEvent: true,
+        },
     };
 }
 

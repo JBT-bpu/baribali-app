@@ -7,13 +7,18 @@ their original filename versions. The project now records the two 2026-08-08
 historical migrations plus the four forward migrations; its older application
 tables previously had no replayable baseline in Git. The branch remains
 unpushed and undeployed, and a real Hyp test-terminal round trip is still
-required.
+required. On 2026-10-03 the paused test project was restored without a reset,
+and two additive callback-recovery migrations were applied (versions listed
+below). No production deployment or real payment was performed.
 
 ## What changes
 
 - `payment_attempts` owns the merchant reference, amount in agorot, one hosted
   checkout URL, the Hyp transaction `Id`, and the reconciliation status.
 - `payment_events` records the browser return before any external VERIFY call.
+  `hyp_callback_evidence` atomically retains its complete ordered VERIFY query,
+  including `Sign` and optional fields, encrypted with AES-256-GCM. Neither
+  signatures nor personal fields are copied into readable safe metadata.
 - A partial unique index permits only one active payment attempt per order.
 - `claim_payment_attempt` and `finish_payment_initialization` make payment-page
   creation idempotent. A persisted checkout page is reused and never expires
@@ -77,8 +82,10 @@ required.
 - The browser stores the exact unresolved pre-order request in tab-scoped
   `sessionStorage` for 30 minutes. Once the order exists, that record carries
   its order ID and payment idempotency key for the rest of the tab session,
-  because the hosted URL may still be chargeable; tracking clears it after the
-  terminal hand-off. A hard reload never sends automatically: the customer
+  because the hosted URL may still be chargeable; tracking clears it only after
+  an authoritative final payment state, not merely on arrival. Tracking can
+  resume the existing checkout, or recheck stored VERIFY evidence without
+  creating a checkout. A hard reload never sends automatically: the customer
   explicitly resumes the same request/payment, and mutable checkout controls
   stay locked until it is resolved.
 - A fully-discounted order is stored as `no_payment_required`: it remains a
@@ -94,6 +101,8 @@ The migrations are:
 - `supabase/migrations/20260903120000_order_submission_idempotency.sql`
 - `supabase/migrations/20260903130000_server_only_table_privileges.sql`
 - `supabase/migrations/20260903200310_order_capacity_and_numbering.sql`
+- `supabase/migrations/20261003083146_hyp_callback_recovery.sql`
+- `supabase/migrations/20261003083524_hyp_callback_record_conflict.sql`
 
 The baseline matches the live schema inspected on 2026-09-03 and aborts on an
 incompatible existing table instead of rewriting data. The final hardening
@@ -152,7 +161,10 @@ order by table_name, grantee, privilege_type;
   copy them into Git. Change the initial portal password and default PassP
   before broader testing.
 - Set `PAYMENT_PROVIDER=hyp`, `HYP_MASOF`, `HYP_KEY`, `HYP_PASSP`, the real
-  server-side Supabase variables, and `NEXT_PUBLIC_APP_URL`.
+  server-side Supabase variables, `PAYMENT_CALLBACK_ENCRYPTION_KEY` (a separate
+  32-byte random key encoded as 64 hexadecimal characters), and
+  `NEXT_PUBLIC_APP_URL`. Keep the encryption key stable and backed up while
+  unresolved callbacks exist; rotating HYP credentials does not rotate it.
 - Configure the hosted-page return URL as
   `https://<host>/api/payment/hyp/return`.
 - Do **not** configure Hyp notifications to `/api/payment/webhook`; that route
@@ -163,7 +175,13 @@ order by table_name, grantee, privilege_type;
   match the later verified result.
 - Obtain one approved and one declined test payload plus the server-notification
   specification before implementing decline mapping or a notification route.
-- Only `CCode=0` is treated as approved. `CCode=700` remains unresolved because
+- Both the signed transaction's `CCode` and the VERIFY response must be exactly
+  `0` for approval. VERIFY alone authenticates the envelope, not a declined
+  transaction. An absent/empty `Sign` never contacts VERIFY. The documented
+  success envelope may omit `Coin`; only an approved, matching amount/Id on an
+  immutable ILS attempt may inherit its signed-request currency. Explicit
+  malformed or conflicting currency never uses that fallback.
+  `CCode=700` remains unresolved because
   the application has no authorization/capture state. Confirm the test
   terminal's one-phase/J5 configuration and its authorization/capture fields
   with Hyp before changing this mapping.
@@ -217,7 +235,7 @@ npm test
 npm run build
 ```
 
-The 192-test focused suite covers SIGN/VERIFY parsing, credential-safe failures,
+The 209-test focused suite covers SIGN/VERIFY parsing, credential-safe failures,
 immediate transaction-ID capture, URL persistence, concurrent initialization,
 order/request replay across hard reloads, duplicate callbacks, unknown
 references, verification-pending behavior, server pickup validation and the
@@ -229,3 +247,28 @@ passed, then `ROLLBACK` restored all rows and removed every temporary object.
 The forward chain has since been applied to the explicitly reset test project
 and its post-migration checks passed. This does not replace a true
 multi-connection concurrency run or a real Hyp test-terminal round trip.
+
+## Callback recovery verification (2026-10-03)
+
+- The two new migration filename versions match the Management API's recorded
+  live versions. The second migration is a forward repair for a PL/pgSQL
+  `event_id` conflict target found by the first integration rehearsal; do not
+  edit applied history or deploy only the first new migration.
+- `supabase/tests/hyp_callback_recovery.sql` passes against the restored test
+  project and ends with `ROLLBACK`: existing-checkout reuse, durable Id/evidence,
+  duplicate capture, private grants, cooldown, 12-retry cap, expired-evidence
+  refusal, timeout replay, matching settlement and paid-state absorption.
+- `POST /api/payment/hyp/reconcile` accepts only the unguessable order ID used
+  by tracking, not client financial outcomes or callback data. It claims a
+  stored event with a database-wide 60-second cooldown and a seven-day replay
+  window, then runs VERIFY on the server. It never creates a chargeable page.
+- Browser checks passed at 390px and 320px using mocked payment responses:
+  resume, rapid-click deduplication, verifying without repayment (even after
+  the URL hint is removed), final-state cleanup, and no runtime page errors.
+  A separate read of the existing test order through the actual local app
+  returned 200 and no private attempt/evidence fields.
+- Replay expiry is NOT automatic data deletion. Before launch, approve and
+  implement purging of processed/expired encrypted envelopes as part of the
+  privacy retention policy. Refund Ids remain in the minimal event/attempt
+  ledger. No complete evidence exists for browser returns captured before
+  these migrations; do not imply those older events can now be reconstructed.

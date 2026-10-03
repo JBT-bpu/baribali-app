@@ -55,7 +55,7 @@ test('VERIFY returns the provider transaction id, reference, amount and currency
         Id: 'tx-123',
         Amount: '72.50',
         Coin: '1',
-        Signature: 'signed',
+        Sign: 'signed',
     });
 
     const result = await client.verifyPayment(callback);
@@ -77,7 +77,9 @@ test('legacy Hyp success is exactly CCode=0 and Amount is parsed as shekels', as
     const callback = new URLSearchParams({
         Order: 'BBP-attempt',
         Id: 'tx-10',
+        CCode: '0',
         Coin: '1',
+        Sign: 'signed',
     });
 
     const approved = await client.verifyPayment(callback);
@@ -89,6 +91,53 @@ test('legacy Hyp success is exactly CCode=0 and Amount is parsed as shekels', as
     assert.equal(yaadPayCode.verified, false);
     assert.equal(yaadPayAmountField.verified, true);
     assert.equal(yaadPayAmountField.amountAgorot, null);
+});
+
+test('documented VERIFY forwards the complete ordered signed envelope and returns no invented currency', async () => {
+    const callback = new URLSearchParams('Id=tx-123&CCode=0&Amount=72.50&ACode=ok&Order=BBP-attempt&Fild1=Jane+Doe&Fild2=example%40test.invalid&Fild3=&Sign=signature');
+    const client = createHypClient(credentials, async input => {
+        const fields = [...new URL(String(input)).searchParams.entries()];
+        assert.deepEqual(fields.slice(5), [...callback.entries()]);
+        return new Response('CCode=0');
+    });
+    const result = await client.verifyPayment(callback);
+    assert.equal(result.verified, true);
+    assert.equal(result.amountAgorot, 7250);
+    assert.equal(result.transactionId, 'tx-123');
+    assert.equal(result.currencyCode, null);
+    assert.equal(result.currencyReported, false);
+});
+
+test('authenticated decline or missing transaction code never becomes approval', async () => {
+    const client = createHypClient(credentials, async () => new Response('CCode=0'));
+    for (const code of ['4', '000', '']) {
+        const result = await client.verifyPayment(new URLSearchParams({
+            Id: 'tx', Order: 'BBP-attempt', Amount: '72', CCode: code, Sign: 'signed',
+        }));
+        assert.equal(result.verified, false);
+    }
+});
+
+test('explicit invalid or contradictory Coin cannot be mistaken for an omitted field', async () => {
+    for (const coin of ['', '2', 'invalid']) {
+        const client = createHypClient(credentials, async () => new Response('CCode=0'));
+        await assert.rejects(client.verifyPayment(new URLSearchParams({
+            Order: 'BBP-attempt', Id: 'tx', Amount: '72', CCode: '0', Coin: coin, Sign: 'signed',
+        })), (error: unknown) => error instanceof HypGatewayError && error.code === 'HYP_VERIFY_CURRENCY_INVALID');
+    }
+    const client = createHypClient(credentials, async () => new Response('CCode=0&Coin=USD'));
+    await assert.rejects(client.verifyPayment(new URLSearchParams({
+        Order: 'BBP-attempt', Id: 'tx', Amount: '72', CCode: '0', Coin: '1', Sign: 'signed',
+    })), (error: unknown) => error instanceof HypGatewayError && error.code === 'HYP_VERIFY_CURRENCY_MISMATCH');
+});
+
+test('unsigned redirects never contact VERIFY or become approved', async () => {
+    let calls = 0;
+    const client = createHypClient(credentials, async () => { calls += 1; return new Response('CCode=0'); });
+    await assert.rejects(client.verifyPayment(new URLSearchParams({
+        Order: 'BBP-attempt', Id: 'tx', Amount: '72', CCode: '0',
+    })), /HYP_CALLBACK_SIGNATURE_MISSING/);
+    assert.equal(calls, 0);
 });
 
 test('VERIFY rejects injected reserved fields before contacting Hyp', async () => {

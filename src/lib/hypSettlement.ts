@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-import { HypGatewayError, verifyHypPayment } from '@/lib/hypPay';
+import { HypGatewayError, validateHypCallbackParams, verifyHypPayment } from '@/lib/hypPay';
 import type {
     PaymentCallbackRecord,
     PaymentVerificationResult,
@@ -14,6 +14,8 @@ export interface HypSettlementDependencies {
         eventSource: 'browser_return' | 'server_notification' | 'reconciliation';
         providerTransactionId: string | null;
         safePayload: Record<string, string>;
+        /** Ordered, complete VERIFY evidence; persistence encrypts it server-side. */
+        callbackQuery: string;
     }) => Promise<PaymentCallbackRecord>;
     apply: (input: {
         eventId: number;
@@ -60,12 +62,10 @@ function safeCallbackPayload(params: URLSearchParams): Record<string, string> {
 }
 
 function callbackEventKey(source: string, params: URLSearchParams): string {
-    const canonical = [...params.entries()]
-        .sort(([leftKey, leftValue], [rightKey, rightValue]) => (
-            leftKey.localeCompare(rightKey) || leftValue.localeCompare(rightValue)
-        ));
+    // HYP requires the original parameter order for VERIFY. Different ordered
+    // envelopes must not collide and overwrite each other's replay evidence.
     const fingerprint = createHash('sha256')
-        .update(new URLSearchParams(canonical).toString(), 'utf8')
+        .update(params.toString(), 'utf8')
         .digest('hex');
     return `${source}:${fingerprint}`;
 }
@@ -89,6 +89,7 @@ export async function settleHypCallback(
     if (callbackTransactionId && callbackTransactionId.length > 256) {
         return { orderId: null, result: 'invalid_transaction_id', paid: false };
     }
+    validateHypCallbackParams(params);
 
     const callback = await dependencies.record({
         merchantReference,
@@ -96,7 +97,22 @@ export async function settleHypCallback(
         eventSource: source,
         providerTransactionId: callbackTransactionId,
         safePayload: safeCallbackPayload(params),
+        callbackQuery: params.toString(),
     });
+
+    return settleRecordedHypCallback(params, callback, dependencies);
+}
+
+/** Replay a durable event, without inserting a new callback or creating a checkout. */
+export async function settleRecordedHypCallback(
+    params: URLSearchParams,
+    callback: PaymentCallbackRecord,
+    dependencies: Pick<HypSettlementDependencies, 'verify' | 'apply' | 'claimVerificationBudget'>,
+): Promise<HypSettlementResult> {
+    validateHypCallbackParams(params);
+    const merchantReference = uniqueCallbackValue(params, 'Order');
+    const callbackTransactionId = uniqueCallbackValue(params, 'Id');
+    if (!merchantReference) return { orderId: null, result: 'invalid_reference', paid: false };
 
     if (!callback.attemptId || !callback.orderId || callback.eventId === null) {
         return { orderId: null, result: 'unknown_reference', paid: false };
@@ -144,15 +160,34 @@ export async function settleHypCallback(
     const outcome = verification.verified && referenceMatches
         ? 'approved'
         : 'verification_pending';
+    // Pay's documented success redirect can omit Coin, and VERIFY can return
+    // only CCode=0. In that exact case the signed request's immutable ILS ledger
+    // is authoritative. Never infer currency from an unverified response, an
+    // explicit invalid/mismatched Coin, or a ledger in another currency.
+    const verifiedCurrency = verification.currencyCode ?? (
+        outcome === 'approved'
+        && verification.currencyReported === false
+        && callback.currencyCode === 'ILS'
+        && verification.amountAgorot === callback.amountAgorot
+        && verification.transactionId === callbackTransactionId
+        && !!callbackTransactionId
+            ? 'ILS'
+            : null
+    );
     const applied = await dependencies.apply({
         eventId: callback.eventId,
         outcome,
         providerTransactionId: verification.transactionId,
         reportedAmountAgorot: verification.amountAgorot,
-        currencyCode: verification.currencyCode,
+        currencyCode: verifiedCurrency,
         providerCode: verification.ccode,
         verificationMethod: 'legacy_apisign_verify',
-        safePayload: verification.safeMetadata,
+        safePayload: {
+            ...verification.safeMetadata,
+            ...(verifiedCurrency && !verification.currencyCode
+                ? { CurrencySource: 'signed_request_ledger' }
+                : {}),
+        },
     });
 
     return {

@@ -714,8 +714,8 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
     else if (editingFromSummary) returnToSummary();
     else if (step > 0) goTo(step - 1);
     else if (step === 0 && !isTortilla) goTo(-1);
-    else window.location.href = "/";
-  }, [editingFromSummary, goTo, isTortilla, returnToSummary, step, summary]);
+    else router.replace("/");
+  }, [editingFromSummary, goTo, isTortilla, returnToSummary, router, step, summary]);
   const editFromSummary = useCallback((stepIndex) => {
     setEditingFromSummary(true);
     setSummary(false);

@@ -1,5 +1,7 @@
 'use client';
 import { useCallback, useMemo, useState, useEffect, useRef } from "react";
+import { requestHostedPayment } from '@/lib/hostedPaymentRequest';
+import { useRouter } from 'next/navigation';
 import { fireGoldConfetti } from "../../lib/confetti";
 
 function Icon({ src, size = "1.2em", style = {} }) {
@@ -170,6 +172,7 @@ function freshPaymentKey() {
 }
 
 export default function SummaryView({ sels, total, all, comboBadges, notes, setNotes, onBack, onEdit, onNewOrder, checkoutDraft, setCheckoutDraft, base = BASE, productType = 'salad', sizeLabel = null, sizeMl = 1000 }) {
+    const router = useRouter();
     // Schedule + the live staff override. The server checks this again at POST
     // /api/orders and is the authority; this is so the screen stops pretending.
     const shop = useShopStatus();
@@ -443,52 +446,23 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
         navigator.vibrate?.([30, 40, 30]);
     }, []);
 
-    const requestPaymentPage = async (pendingPayment) => {
-        const ctl = new AbortController();
-        const timeoutId = setTimeout(() => ctl.abort(), 20000);
-        try {
-            for (let attempt = 0; attempt < 2; attempt += 1) {
-                const response = await fetch('/api/payment/create', {
-                    method: 'POST',
-                    signal: ctl.signal,
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        orderId: pendingPayment.orderId,
-                        idempotencyKey: pendingPayment.idempotencyKey,
-                    }),
-                });
-                const payload = await response.json().catch(() => null);
-                if (response.status === 202 && attempt === 0) {
-                    await new Promise(resolve => setTimeout(resolve, 500));
-                    continue;
-                }
-                return { response, payload, networkError: null };
-            }
-        } catch (error) {
-            return { response: null, payload: null, networkError: error };
-        } finally {
-            clearTimeout(timeoutId);
-        }
-        return { response: null, payload: null, networkError: null };
-    };
-
     const launchPendingPayment = async (pendingPayment) => {
-        const { response, payload, networkError } = await requestPaymentPage(pendingPayment);
+        const { response, payload, networkError } = await requestHostedPayment(pendingPayment);
 
         if (payload?.paymentUrl) {
             window.location.href = payload.paymentUrl;
             return;
         }
         if (payload?.code === 'PAYMENT_ALREADY_SETTLED') {
-            window.location.href = `/order/${encodeURIComponent(pendingPayment.orderId)}?payment=success`;
+            router.replace(`/order/${encodeURIComponent(pendingPayment.orderId)}?payment=success`);
             return;
         }
         if (payload?.code === 'PAYMENT_NOT_REQUIRED') {
-            window.location.href = `/order/${encodeURIComponent(pendingPayment.orderId)}`;
+            router.replace(`/order/${encodeURIComponent(pendingPayment.orderId)}`);
             return;
         }
         if (payload?.code === 'PAYMENT_VERIFICATION_PENDING') {
-            window.location.href = `/order/${encodeURIComponent(pendingPayment.orderId)}?payment=verifying`;
+            router.replace(`/order/${encodeURIComponent(pendingPayment.orderId)}?payment=verifying`);
             return;
         }
         if (payload?.retryWithNewKey) {

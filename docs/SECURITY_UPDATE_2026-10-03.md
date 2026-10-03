@@ -18,5 +18,8 @@ development: https://github.com/vercel/next.js/security/advisories/GHSA-p293-qw3
 The app does not currently use `next/og` / `ImageResponse`; do not claim that
 every published Next.js exploit applies to this application.
 
-Verification: typecheck, lint (the existing nine warnings), all 192 focused
-regression tests and a production build. Not pushed, merged or deployed.
+Verification: typecheck, all 192 focused regression tests and a production build
+passed. The upgraded lint configuration also detected four pre-existing relative
+`window.location.href` assignments, in addition to the nine existing React
+warnings. Those navigation warnings are resolved in the following recovery
+phase. Not pushed, merged or deployed.

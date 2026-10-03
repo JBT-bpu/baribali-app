@@ -21,6 +21,27 @@ export function requiresHostedPayment(status: string | null | undefined): boolea
     return status === 'pending';
 }
 
+export type PaymentRecoveryMode = 'checkout' | 'verifying' | 'none';
+
+/** Derived on the server; unknown ledger states never invite repayment. */
+export function paymentRecoveryMode(
+    total: number,
+    paymentStatus: string | null | undefined,
+    attemptStatus: string | null,
+): PaymentRecoveryMode {
+    if (paymentStatus !== 'pending' || !Number.isFinite(total) || total <= 0) return 'none';
+    if (attemptStatus === 'verification_pending' || attemptStatus === 'needs_review') return 'verifying';
+    return attemptStatus === null || attemptStatus === 'initializing'
+        || attemptStatus === 'checkout_ready' || attemptStatus === 'init_failed'
+        ? 'checkout'
+        : 'none';
+}
+
+/** Merely visiting tracking is not a payment decision. Keep unresolved keys. */
+export function paymentRecoveryComplete(status: string | null | undefined): boolean {
+    return status === 'paid' || status === 'no_payment_required' || status === 'pay_at_pickup';
+}
+
 /**
  * Customer-facing payment truth shared by the immediate confirmation and the
  * tracking page. `paid_unverified` means the money must not be requested again,

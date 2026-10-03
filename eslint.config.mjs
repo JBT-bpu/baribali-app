@@ -10,6 +10,7 @@ const config = [
             'lottie/**',
             'Local TECH/**',
             'plans/**',
+            '.playwright-cli/**',
         ],
     },
     ...nextCoreWebVitals,

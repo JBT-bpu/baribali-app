@@ -5,7 +5,8 @@ import Link from 'next/link';
 import GoldField from '@/components/ui/GoldField';
 import BariGlowBackground from '@/components/ui/bari/BariGlowBackground';
 import { fireGoldConfetti } from '@/lib/confetti';
-import { customerPaymentPresentation } from '@/lib/customerPayment';
+import { customerPaymentPresentation, paymentRecoveryComplete, type PaymentRecoveryMode } from '@/lib/customerPayment';
+import PaymentRecoveryActions from '@/components/payment/PaymentRecoveryActions';
 import { orderSizeLabel } from '@/lib/reorder';
 import { resolvePickupMoment } from '@/lib/shopHours';
 import { clearOrderSubmissionForOrder } from '@/lib/orderSubmission';
@@ -23,6 +24,7 @@ interface Order {
     notes: string | null;
     status: OrderStatus;
     payment_status?: string;
+    payment_recovery?: PaymentRecoveryMode;
     created_at: string;
 }
 
@@ -154,13 +156,11 @@ export default function OrderStatusView({ id, paymentHint = null }: { id: string
     const [ringScale, setRingScale] = useState(false);
     const [labelSlide, setLabelSlide] = useState(false);
 
-    // Reaching the durable tracking route completes checkout recovery. Until
-    // this point the originating tab keeps the order/payment keys so a hard
-    // reload or Back can resume the same hosted payment instead of creating a
-    // second order. Clear only the record tied to this order.
+    // Tracking can still represent an unpaid or ambiguous checkout. Keep its
+    // recovery identity until the server reports a definitive payment state.
     useEffect(() => {
-        clearOrderSubmissionForOrder(id);
-    }, [id]);
+        if (paymentRecoveryComplete(order?.payment_status)) clearOrderSubmissionForOrder(id);
+    }, [id, order?.payment_status]);
     // The celebratory cat Lottie is gone from this page: the "ready" state now
     // shows its own medallion, so all four of the step artworks get used and the
     // set stays coherent. That also drops lottie-react and a JSON fetch from a
@@ -354,13 +354,15 @@ export default function OrderStatusView({ id, paymentHint = null }: { id: string
     // The return URL is only a conservative UX hint while the durable payment
     // attempt is being reconciled. It may suppress a second payment, but can
     // never claim success; the order API remains authoritative for `paid`.
-    const effectivePayment = paymentHint === 'verifying' && order.payment_status === 'pending'
+    const effectivePayment = (paymentHint === 'verifying' || order.payment_recovery === 'verifying') && order.payment_status === 'pending'
         ? 'verification_pending'
         : order.payment_status;
     const pay = customerPaymentPresentation(effectivePayment);
+    const recoveryMode = effectivePayment === 'verification_pending'
+        ? 'verifying' : order.payment_recovery ?? 'none';
 
     return (
-        <div style={P.root}>
+        <div style={{ ...P.root, flexDirection: 'column' }}>
             <div
                 ref={statusAnnouncementRef}
                 role="status"
@@ -371,7 +373,7 @@ export default function OrderStatusView({ id, paymentHint = null }: { id: string
             <BariGlowBackground />
             <GoldField zIndex={0} />
 
-            <div style={P.board}>
+            <div style={{ ...P.board, ...(recoveryMode !== 'none' ? { margin: 'auto auto 0' } : {}) }}>
                 <div style={P.boardArt} aria-hidden="true" />
 
                 {/* Order number — what the customer says at the counter. */}
@@ -502,6 +504,8 @@ export default function OrderStatusView({ id, paymentHint = null }: { id: string
                     ← חזרה לתפריט
                 </Link>
             </div>
+
+            <PaymentRecoveryActions key={id} orderId={id} mode={recoveryMode} />
 
             <style>{`
                 @keyframes statusSlideIn { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }

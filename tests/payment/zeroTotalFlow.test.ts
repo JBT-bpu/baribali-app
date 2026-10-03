@@ -66,7 +66,7 @@ test('zero-charge demo and stale-recovery paths always reach a truthful confirma
 
     assert.match(
         summary,
-        /payload\?\.code === 'PAYMENT_NOT_REQUIRED'[\s\S]*?window\.location\.href = `\/order\/\$\{encodeURIComponent\(pendingPayment\.orderId\)\}`/,
+        /payload\?\.code === 'PAYMENT_NOT_REQUIRED'[\s\S]*?router\.replace\(`\/order\/\$\{encodeURIComponent\(pendingPayment\.orderId\)\}`\)/,
     );
     assert.match(
         summary,

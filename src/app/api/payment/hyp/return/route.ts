@@ -22,7 +22,10 @@ function redirect(req: NextRequest, orderId: string | null, payment: 'success' |
     const path = orderId ? `/order/${encodeURIComponent(orderId)}` : '/home2';
     const target = new URL(path, appOrigin(req));
     target.searchParams.set('payment', payment);
-    return NextResponse.redirect(target, 303);
+    const response = NextResponse.redirect(target, 303);
+    response.headers.set('Cache-Control', 'no-store');
+    response.headers.set('Referrer-Policy', 'no-referrer');
+    return response;
 }
 
 export async function GET(req: NextRequest) {

@@ -22,7 +22,7 @@ BariBali is a mobile-first, Hebrew (RTL) salad and tortilla builder for a **real
 - **PWA**: manifest (`src/app/manifest.ts`) implemented — installable/"Add to Home Screen"
 - **Lint**: ESLint 9 flat config (`eslint.config.mjs`), script is `eslint .`
 
-There are 192 focused Node/`tsx` regression tests covering Hyp, settlement and migration invariants, pricing/order authority and idempotency, product availability/reorder safety, atomic pickup capacity, Israel-day kitchen filtering, environment/configuration guardrails, hard-reload checkout recovery, generic-webhook rejection and concurrency, kitchen controls/simulation, public legal-copy guardrails and critical customer-flow/source-trust invariants. GitHub Actions runs locked install, typecheck, lint, the focused suite and a production build for pull requests and `main` pushes.
+There are 209 focused Node/`tsx` regression tests covering Hyp, encrypted callback replay, safe tracking recovery, settlement and migration invariants, pricing/order authority and idempotency, product availability/reorder safety, atomic pickup capacity, Israel-day kitchen filtering, environment/configuration guardrails, hard-reload checkout recovery, generic-webhook rejection and concurrency, kitchen controls/simulation, public legal-copy guardrails and critical customer-flow/source-trust invariants. GitHub Actions runs locked install, typecheck, lint, the focused suite and a production build for pull requests and `main` pushes.
 
 ## 3. Directory structure (current)
 
@@ -251,10 +251,10 @@ Git history is authoritative for exact detail — commit messages are descriptiv
 `main` is pushed, in sync and live at `d44fe06` as of 2026-09-03. The current `codex/payment-foundation` branch is local and unpushed. Production auto-deploys from `main` but is **still in demo mode** because the real Supabase/Hyp variables are not set on Vercel. Remaining:
 
 1. **Complete owner/legal review of every legal/info page** before launch: supply the registered business name and number, verify address/contact/VAT facts, cancellation/refund and allergen wording, jurisdiction, effective date, minimum age, retention period and accessibility contact/audit details. Do not reintroduce editorial placeholders into rendered customer copy.
-2. **Supabase test schema is ready:** the project was explicitly cleared of its 77 test orders/Auth test identity and the four forward migrations were applied with their original versions on 2026-09-04. RLS, role privileges, RPCs, indexes and advisors were checked. Preserve that migration history; make any further database change as a new timestamped migration.
-3. Add real Supabase/Hyp Pay env vars to **Vercel** before deploying this branch. Current `main` falls into demo mode without them; the branch intentionally fails closed instead. A public demo deploy now requires the exact opt-in `NEXT_PUBLIC_BARIBALI_DEMO_MODE=true`, which must not coexist with credentials.
+2. **Supabase test schema is ready:** after the authorized September reset, the paused project was restored on 2026-10-03 without resetting its newer data. Two additive encrypted-callback recovery migrations were applied, role/RLS/advisor checks passed, and rollback-only integration left the existing test order and attempt/events unchanged. Preserve migration history; use new timestamped migrations for further schema changes.
+3. Verify/configure the real Supabase/Hyp Pay env vars on **Vercel** before deploying this branch, including the new server-only `PAYMENT_CALLBACK_ENCRYPTION_KEY`. The connector could not inspect deployment variables on 2026-10-03 because its authorization must be renewed; the older demo-mode observation is not proof of today's settings. This branch intentionally fails closed rather than silently falling into demo mode. A public demo deploy requires the exact opt-in `NEXT_PUBLIC_BARIBALI_DEMO_MODE=true`, which must not coexist with credentials.
 4. Production domain — not yet decided.
-5. **Finish configuring the confirmed Hyp/YaadPay test terminal:** change the initial portal password and default PassP, enable "מערכת זרה", map the hosted return URL, and obtain the undocumented server-notification payload contract before enabling notifications. Then run approved, declined, abandoned and replayed test flows and confirm that the transaction `Id` is durable for refunds.
+5. **Confirm the supplied HYP terminal is a no-charge test terminal:** hosted SIGN works, but a genuine approved payment round trip has not passed. Verify the portal credentials/return URL and run approved, declined, abandoned and replayed test flows, checking durable refund `Id` capture. Bit and notifications are deferred by the owner; obtain their contracts only before implementing those later features. Pay APISign and Enterprise/CreditGuard are separate APIs, not interchangeable configuration panels.
 6. Menu/navigation follow-up — see `MENU_FLOW_BRIEF.md` / `MENU_RESTRUCTURE_REPLY.md`. The three-item nav, `/orders` split, reorder and dead-route cleanup are done; softening the repeated external-entry gate and unifying the builder remain open product decisions.
 7. **Enable leaked-password protection** in Supabase Auth (checks against HaveIBeenPwned). Flagged by the security advisor; one toggle in the dashboard. Low urgency while sign-in is Google-first.
 8. **Do not switch to digital-only** until the payment migration is applied and approved, declined, abandoned and replayed test-terminal flows pass. Approved Hyp VERIFY returns become `paid`; `paid_unverified` remains legacy-only. Pay-at-pickup stays working until that checkpoint is explicitly approved.
@@ -267,9 +267,17 @@ production-configuration hardening passes. It is unpushed and undeployed; its
 schema is applied only to the pre-launch/test Supabase project. Git history is
 authoritative for the exact commit list.
 
+**2026-10-03 update:** runtime security dependencies are patched; encrypted
+callback evidence, database-bounded VERIFY replay, missing-currency handling
+for the documented Pay envelope and safe tracking resume/recheck are verified.
+Both signed transaction approval and VERIFY approval are required. Evidence
+expiry does not delete stored ciphertext; approve/implement purging before
+launch. See `docs/PROJECT_STATUS_2026-10-03.md` and `PAYMENT_FOUNDATION.md` for
+the verification evidence and remaining HYP/Vercel gates.
+
 ## 10. Improvement backlog (not started, no priority commitment)
 
-- **Testing/CI**: 192 focused regression tests plus GitHub Actions on pull requests and `main` pushes. The largest gaps are component/browser automation, end-to-end provider flows and a true multi-connection database concurrency test. A 77-row Supabase transaction rehearsal proved migration compatibility, five-slot allocation, replay, sixth-order rejection and complete rollback before the test project was explicitly reset and the forward chain applied.
+- **Testing/CI**: 209 focused regression tests plus GitHub Actions on pull requests and `main` pushes. Manual browser automation checks now cover payment recovery at 390px/320px with mocked gateway responses, but app-wide component/browser CI, end-to-end provider flows and true multi-connection database concurrency remain gaps. Rollback-only Supabase rehearsals cover migration/capacity and callback-recovery invariants without leaving test decisions persisted.
 - **Observability**: no error tracking, no structured logging on payment/webhook routes.
 - **Ops**: a local password-gated admin exists for prices/discounts/customers, but there is no production reporting dashboard. Schema/policy SQL and migrations are tracked; execution, advisor runs and backup/PITR verification remain manual.
 - **Code quality**: `zustand` installed but unused — a `BariBaliBuilder.jsx` state-lifting refactor is on the table whenever there's appetite.
@@ -278,4 +286,4 @@ authoritative for the exact commit list.
 
 ## 11. Environment variables
 
-Canonical list in `.env.example` at repo root. Categories: Supabase (URL, publishable/anon key, secret/service-role key and explicit demo opt-in), kitchen-board and local-admin passwords, payment-provider selection plus Tranzila/YaadPay/Hyp credentials, Google Places API (reviews strip), and app base URL (payment redirects). Production rejects incomplete/mixed Supabase configuration, and `next.config.js` stops the build if it recognizes a private key in a `NEXT_PUBLIC_` slot or a public key in a server-only slot.
+Canonical list in `.env.example` at repo root. Categories: Supabase (URL, publishable/anon key, secret/service-role key and explicit demo opt-in), kitchen-board and local-admin passwords, payment-provider selection plus Tranzila/YaadPay/Hyp credentials, server-only callback encryption key, Google Places API (reviews strip), and app base URL (payment redirects). Production rejects incomplete/mixed Supabase configuration, and `next.config.js` stops the build if it recognizes a private key in a `NEXT_PUBLIC_` slot or a public key in a server-only slot.

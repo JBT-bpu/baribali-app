@@ -401,7 +401,16 @@ export function markOrderSubmissionPaymentPending(
     return updated;
 }
 
-/** Tracking is the terminal hand-off: this order no longer needs checkout recovery. */
+/** Recover an existing order's checkout identity without using its basket again. */
+export function storedPaymentForOrder(
+    orderId: string,
+    options: ClearOptions = {},
+): OrderSubmissionRecord['pendingPayment'] | null {
+    return readStored(resolveStorage(options.storage))
+        .find(record => record.pendingPayment?.orderId === orderId)?.pendingPayment ?? null;
+}
+
+/** Call only after an authoritative final payment state, not on tracking mount. */
 export function clearOrderSubmissionForOrder(
     orderId: string,
     options: ClearOptions = {},

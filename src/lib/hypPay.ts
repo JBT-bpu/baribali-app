@@ -1,11 +1,12 @@
 /**
  * Legacy Hyp Pay APISign client (pay.hyp.co.il/p).
  *
- * The current public Hyp documentation mostly describes the newer XML /
- * CreditGuard API. This client deliberately keeps the existing APISign
- * protocol until the test terminal's legacy payload contract is confirmed.
+ * Hyp Pay documents APISign separately from the Enterprise/CreditGuard API.
+ * Keep this product's protocol; Enterprise configuration is not interchangeable.
  * Credentials and provider response bodies never appear in thrown messages.
  */
+
+import { assertHypCallbackEncryptionConfigured } from '@/lib/hypCallbackEnvelope';
 
 const HYP_BASE = 'https://pay.hyp.co.il/p/';
 const HYP_TIMEOUT_MS = 10_000;
@@ -27,6 +28,8 @@ export interface HypVerifyResult {
     orderReference: string | null;
     amountAgorot: number | null;
     currencyCode: string | null;
+    /** Absent currency is different from an explicitly invalid provider value. */
+    currencyReported?: boolean;
     safeMetadata: Record<string, string>;
 }
 
@@ -76,7 +79,7 @@ function hasQueryKey(params: URLSearchParams, name: string): boolean {
     return [...params.keys()].some(key => key.toLowerCase() === name.toLowerCase());
 }
 
-function validateCallbackParams(params: URLSearchParams): void {
+export function validateHypCallbackParams(params: URLSearchParams): void {
     if (params.toString().length > MAX_CALLBACK_QUERY) {
         throw new HypGatewayError('HYP_CALLBACK_TOO_LARGE', false);
     }
@@ -97,6 +100,7 @@ function validateCallbackParams(params: URLSearchParams): void {
     boundedQueryValue(params, 'Amount', 64);
     boundedQueryValue(params, 'Coin', 16);
     boundedQueryValue(params, 'CCode', 120);
+    boundedQueryValue(params, 'Sign', 256);
 }
 
 async function providerGet(
@@ -222,7 +226,10 @@ export function createHypClient(credentials: HypCredentials, fetchImpl: FetchLik
     };
 
     const verifyPayment = async (redirectParams: URLSearchParams): Promise<HypVerifyResult> => {
-        validateCallbackParams(redirectParams);
+        validateHypCallbackParams(redirectParams);
+        if (!boundedQueryValue(redirectParams, 'Sign', 256)) {
+            throw new HypGatewayError('HYP_CALLBACK_SIGNATURE_MISSING', false);
+        }
 
         const verifyParams = new URLSearchParams({
             action: 'APISign',
@@ -260,20 +267,28 @@ export function createHypClient(credentials: HypCredentials, fetchImpl: FetchLik
             throw new HypGatewayError('HYP_VERIFY_AMOUNT_MISMATCH', false);
         }
 
-        const callbackCoin = currencyCode(boundedQueryValue(redirectParams, 'Coin', 16));
-        const verifiedCoin = currencyCode(boundedQueryValue(verifiedParams, 'Coin', 16));
+        const rawCallbackCoin = boundedQueryValue(redirectParams, 'Coin', 16);
+        const rawVerifiedCoin = boundedQueryValue(verifiedParams, 'Coin', 16);
+        const callbackCoin = currencyCode(rawCallbackCoin);
+        const verifiedCoin = currencyCode(rawVerifiedCoin);
+        if ((rawCallbackCoin !== null && !callbackCoin) || (rawVerifiedCoin !== null && !verifiedCoin)) {
+            throw new HypGatewayError('HYP_VERIFY_CURRENCY_INVALID', false);
+        }
         if (callbackCoin && verifiedCoin && callbackCoin !== verifiedCoin) {
             throw new HypGatewayError('HYP_VERIFY_CURRENCY_MISMATCH', false);
         }
 
         const ccode = boundedQueryValue(verifiedParams, 'CCode', 120);
         return {
-            verified: ccode === '0',
+            // VERIFY CCode=0 authenticates the envelope. The signed transaction
+            // code must also be approved; a valid decline is not a paid order.
+            verified: ccode === '0' && boundedQueryValue(redirectParams, 'CCode', 120) === '0',
             ccode,
             transactionId: verifiedId ?? callbackId,
             orderReference: verifiedReference ?? callbackReference,
             amountAgorot: verifiedAmount ?? callbackAmount,
             currencyCode: verifiedCoin ?? callbackCoin,
+            currencyReported: rawCallbackCoin !== null || rawVerifiedCoin !== null,
             safeMetadata: safeVerificationMetadata(verifiedParams),
         };
     };
@@ -286,6 +301,7 @@ export async function createHypPaymentUrl(params: {
     merchantReference: string;
     info?: string;
 }): Promise<string> {
+    assertHypCallbackEncryptionConfigured();
     return createHypClient(hypCredentials()).createPaymentUrl(params);
 }
 

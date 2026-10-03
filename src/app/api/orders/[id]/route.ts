@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseConfigurationState } from '@/lib/supabaseServerConfig';
 import { getDemoOrder } from '@/lib/demoStore';
 import { loadSupabaseAdmin, supabaseConfigurationErrorResponse } from '@/lib/supabaseRoute';
+import { paymentRecoveryMode } from '@/lib/customerPayment';
+import { publicPaymentState } from '@/lib/payment';
 
 // Customer order-status lookup. The order's UUID id acts as the sole
 // capability token (unguessable) — no extra secret needed, consistent with
@@ -14,7 +16,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     if (configuration === 'demo') {
         const order = getDemoOrder(id);
         if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 });
-        return NextResponse.json(order);
+        return NextResponse.json({ ...order, payment_recovery: 'none' }, { headers: { 'Cache-Control': 'no-store' } });
     }
 
     let admin;
@@ -31,13 +33,27 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         // still owed — with no gateway configured every order is pay-at-pickup,
         // and nothing on the status page said so. `size` (the base price paid)
         // is what tells them which bowl this ticket is for.
-        .select('id, order_num, items, total, size, pickup_time, notes, status, payment_status, created_at')
+        .select('id, order_num, items, total, size, pickup_time, notes, status, payment_status, created_at, current_payment_attempt_id')
         .eq('id', id)
-        .single();
+        .maybeSingle();
 
-    if (error || !data) {
+    if (error) return supabaseConfigurationErrorResponse();
+    if (!data) {
         return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }
 
-    return NextResponse.json(data);
+    const { current_payment_attempt_id: attemptId, ...publicOrder } = data;
+    let attemptStatus: string | null = null;
+    if (attemptId) {
+        const attempt = await admin.from('payment_attempts')
+            .select('status').eq('id', attemptId).eq('order_id', id).single();
+        if (attempt.error || !attempt.data) return supabaseConfigurationErrorResponse();
+        attemptStatus = attempt.data.status;
+    }
+    return NextResponse.json({
+        ...publicOrder,
+        payment_recovery: publicPaymentState().paymentProvider === 'hyp'
+            ? paymentRecoveryMode(data.total, data.payment_status, attemptStatus)
+            : 'none',
+    }, { headers: { 'Cache-Control': 'no-store' } });
 }

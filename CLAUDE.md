@@ -6,7 +6,7 @@
 
 BariBali is a **mobile-first, Hebrew (RTL)** salad + tortilla builder for a **real, pre-launch restaurant** (not a demo/portfolio). Customers build a bowl/wrap ingredient by ingredient, choose a pickup time, and pay online (Hyp Pay) or at pickup. A staff **kitchen board** shows live orders. Ordering is **guest-first** — an account (Google sign-in) is always optional, never required.
 
-Deployed on Vercel, auto-deploys from `main` (GitHub `JBT-bpu/baribali-app`, private). **The current `main` deployment runs in demo mode** because the real Supabase/Hyp env vars are not set on Vercel. The unmerged payment-foundation branch changes production to fail closed, so configure those variables before deploying it.
+Deployed on Vercel, auto-deploys from `main` (GitHub `JBT-bpu/baribali-app`, private). The older deployment was observed in demo mode with missing Supabase/Hyp variables. Vercel authorization prevented rechecking the variables on 2026-10-03; verify today's settings before deploying. The unmerged payment-foundation branch changes production to fail closed, so configure real variables (or explicitly opt into public demo) before deploying it.
 
 ## 2. Tech stack
 
@@ -31,7 +31,7 @@ npm run fresh      # rimraf .next && next dev — use if the dev cache corrupts
 
 - **Supabase configuration has three explicit states:** configured, demo and misconfigured. Empty local/test environments use the process-global demo stores (`src/lib/demoStore.ts`, `src/lib/shopState.ts`); production fails closed unless an intentionally public demo deploy sets exactly `NEXT_PUBLIC_BARIBALI_DEMO_MODE=true`. Server routes separately require a secret/service-role key and never fall back to the browser key. This demo state is single-process development data, not durable serverless persistence.
 - **Lint baseline: 0 errors / 9 warnings.** Hold that line — don't add warnings; the 9 are pre-existing `react-hooks/set-state-in-effect` findings.
-- **Focused tests use Node's built-in test runner through pinned `tsx`.** The current 192-test suite covers payment, pricing/order validation and idempotency, product availability/reorder safety, atomic pickup capacity, Israel-day kitchen filtering, configuration guardrails, kitchen controls, public legal-copy guardrails and critical customer-flow/source-trust invariants; it is not app-wide, so manual smoke-testing remains required for affected UI flows.
+- **Focused tests use Node's built-in test runner through pinned `tsx`.** The current 209-test suite covers payment (including encrypted callback replay and checkout recovery), pricing/order validation and idempotency, product availability/reorder safety, atomic pickup capacity, Israel-day kitchen filtering, configuration guardrails, kitchen controls, public legal-copy guardrails and critical customer-flow/source-trust invariants; it is not app-wide, so manual smoke-testing remains required for affected UI flows.
 
 ## 4. Where things live
 
@@ -81,7 +81,7 @@ src/
 - **Tortilla is not orderable yet.** One shared availability switch locks its home card, blocks `/build?type=tortilla`, and makes pricing/API requests fail closed; dormant builder/pricing code is retained for launch. `TORTILLA_STEPS` is still unused, and historic product type is inferred from the base price because `orders` has no `product_type`. Unknown/stale prices now disable reorder, but persist immutable `product_type` (and preferably `size_ml`) before enabling tortilla so a future price collision cannot misclassify history.
 - **`/kitchen` auth is live in production** — `KITCHEN_PASSWORD` is set on Vercel (verified: the deployed `/kitchen` renders the login screen and `/api/kitchen/orders` returns 401 anonymously). Unset locally = board runs open, which is the intended dev behaviour.
 - **Hyp uses its dedicated APISign VERIFY return route.** The generic Tranzila/YaadPay webhook still has no signature verification and can only produce `paid_unverified`; it explicitly refuses Hyp payloads. Its legacy updates use guarded compare-and-set operations: failure may claim only `pending`, success may also repair `failed`, and paid states stay absorbing. A late payment-page request cannot reset payment or kitchen progress. Do not enable Hyp server notifications until the test-terminal payload contract is obtained and implemented.
-- **The durable order-creation, payment and pickup-allocation schema is live only in the pre-launch/test Supabase project.** The four forward migrations were applied there with their original versions on 2026-09-04 after an explicit test-data reset, and the RLS/privilege/RPC/index checks passed. The `codex/payment-foundation` branch is still unpushed and undeployed, Vercel still lacks the real variables, and no real Hyp test-terminal round trip has passed yet.
+- **The durable order-creation, payment and pickup-allocation schema is live only in the pre-launch/test Supabase project.** The four forward migrations were applied there with their original versions on 2026-09-04 after an explicit test-data reset; two callback-recovery migrations followed on 2026-10-03 without a reset. The RLS/privilege/RPC checks passed. The `codex/payment-foundation` branch is still unpushed and undeployed, current Vercel variables remain unverified, and no real Hyp test-terminal round trip has passed yet.
 - **The legal/info pages are customer-facing working drafts** and no longer expose internal `[fill/verify]` notes to customers. Before launch, the owner/legal reviewer must still supply and approve the registered entity name/number, VAT treatment, retention period, cancellation wording, accessibility contact/audit details and all business contact facts; keep that work in the launch checklist, never in rendered placeholder copy.
 - **Rate limiting** (`src/lib/rateLimit.ts`) is in-memory/per-process — a deterrent, approximate on serverless (no shared store).
 - **CI is defined in `.github/workflows/ci.yml`.** Pull requests and pushes to `main` run locked install, typecheck, lint, the focused suite and a production build on Node 22 with read-only repository permissions and no application secrets. The build alone retries up to three times while `next/font/google` remains a network dependency.
@@ -91,3 +91,13 @@ src/
 `PROJECT_BRIEF.md` (repo root) has the full changelog, data model / `orders` schema, security posture, environment variables, and the current pending-actions list. `MENU_FLOW_BRIEF.md` is the tracked current screen/flow map; `MENU_RESTRUCTURE_REPLY.md` preserves the decision record behind the navigation changes.
 
 `PAYMENT_FOUNDATION.md` is the migration and Hyp test-terminal runbook. Read it before applying the payment migration or configuring callbacks.
+
+`docs/PROJECT_STATUS_2026-10-03.md` records the latest security/recovery work.
+Supabase was restored on that date without resetting data. Two additive
+callback-recovery migrations are applied to the prelaunch test project. The
+complete ordered callback is encrypted with the separate server-only
+`PAYMENT_CALLBACK_ENCRYPTION_KEY`; configure and back up this key before a
+deployment. Tracking now preserves unresolved payment identities and exposes
+safe resume/recheck actions; it clears those identities only after a definitive
+server-reported payment state. HYP approvals and declines, public-deployment
+configuration and callback-evidence retention still need launch verification.
