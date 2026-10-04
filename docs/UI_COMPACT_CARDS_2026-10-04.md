@@ -30,3 +30,16 @@ The two obsolete animation-setter calls were removed. Selection filtering, price
 - Final browser run: zero errors, no framework overlay, no attempted API writes. Only GET/HEAD API requests were allowed; no order or payment was submitted.
 
 Local screenshots and the draft-only verification harness live in `.playwright-cli/compact-20261004/` (ignored). Remote build status and the exact published commit are recorded by Git and Vercel. Real-device/iOS review remains with the owner.
+
+## Second spacing pass — after phone feedback
+
+The owner preferred the compact version and requested a smaller box by trimming empty space around the artwork and name. This pass changes spacing only; no new artwork, ornamentation or builder restructuring.
+
+- Card minimum height is 120px instead of 134px (about 10% shorter again). Artwork remains 56px, names 13px, and information targets 44×44px.
+- Bottom padding is 6px instead of 8px. Name minimum height is 20px instead of 34px, removing the reserved empty second line while allowing longer names to wrap naturally.
+- At 390px and 430px, all measured cards are 120px tall. At 320px, rows with longer two-line names can grow to 129.78px; no label is clipped or forced into a fixed height.
+- All thirteen stage/viewport geometry checks passed again, with no control/artwork/price/name collisions or horizontal overflow. Screenshots of vegetables, upgrades and finishing were visually reviewed.
+- Information remains independent of selection; keyboard selection, summary editing, card removal and bowl removal passed. Browser errors: zero. Attempted API writes: zero. No order or payment was submitted.
+- Regression suite: 216 passed. Typecheck and the isolated optimized build passed. Lint has zero errors and the same nine pre-existing warnings.
+
+Local screenshots and the read-only verification harness for this follow-up are in `.playwright-cli/snug-20261004/` (ignored). Publication stays on the feature branch's protected Preview; production and payment/database configuration remain untouched.

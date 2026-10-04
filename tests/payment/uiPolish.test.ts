@@ -31,8 +31,9 @@ test('separating pictured ingredients never alters the order or nutrition inputs
 test('compact ingredient cards keep readable artwork and separate corner controls', () => {
     assert.match(builder, /<Icon src=\{item.icon\} size="56px"/);
     assert.match(builder, /chipName: \{ fontSize: "13px"/);
-    assert.match(builder, /padding: "28px 6px 8px"/);
-    assert.match(builder, /minHeight: "134px"/);
+    assert.match(builder, /padding: "28px 6px 6px"/);
+    assert.match(builder, /minHeight: "120px"/);
+    assert.match(builder, /chipName: \{[^\n]*minHeight: "20px"/);
     assert.match(builder, /gridTemplateColumns: "repeat\(3, minmax\(0, 1fr\)\)"/);
     assert.match(builder, /chipInfoHit: \{[\s\S]*?top: 0, insetInlineEnd: 0[\s\S]*?width: "44px", height: "44px"/);
     assert.match(builder, /chipCost: \{[\s\S]*?top: "8px", insetInlineStart: "4px"/);
