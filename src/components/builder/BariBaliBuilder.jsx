@@ -6,6 +6,8 @@ import { ArrowLeft } from "lucide-react";
 const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
 
 const headerImage = "/builder-assets/header-brand.png";
+// A quiet, component-specific surface; the wordmark stays on the starter screen.
+const builderHeaderImage = "/builder-assets/builder-header-panel-v1.webp";
 const footerImage = "/builder-assets/footer-brand.png";
 
 // Renders either a PNG icon path or an emoji string
@@ -176,20 +178,20 @@ function chipVisual(stepId, isOn) {
   const isPremiumStep = stepId === "upgrade" || stepId === "t_upgrade";
   if (isPremiumStep) {
     return isOn ? {
-      backgroundImage: "linear-gradient(155deg, rgba(76,57,20,0.96), rgba(45,34,12,0.94))",
+      backgroundImage: "radial-gradient(ellipse at 50% 32%, rgba(218,181,82,0.16), transparent 70%), linear-gradient(160deg, #493b1b, #282611)",
       border: "1px solid rgba(240,208,96,0.95)",
-      boxShadow: "inset 0 0 0 1px rgba(240,208,96,0.5), 0 3px 10px rgba(0,0,0,0.3)",
+      boxShadow: "inset 0 0 0 1px rgba(240,208,96,0.5), inset 0 1px 0 rgba(255,236,167,0.16), 0 3px 10px rgba(0,0,0,0.3)",
     } : {
-      backgroundImage: "linear-gradient(155deg, rgba(58,44,16,0.92), rgba(32,24,8,0.88))",
+      backgroundImage: "radial-gradient(ellipse at 50% 32%, rgba(186,142,45,0.1), transparent 70%), linear-gradient(160deg, #352a15, #1b1b0b)",
       border: "1px solid rgba(200,168,78,0.3)",
     };
   }
   return isOn ? {
     // backgroundImage (not the `background` shorthand) so it can't conflict
     // with S.chip's own `background` key when the two style objects merge.
-    backgroundImage: "linear-gradient(155deg, rgba(36,86,38,0.97), rgba(24,61,27,0.95))",
+    backgroundImage: "radial-gradient(ellipse at 50% 32%, rgba(108,164,94,0.16), transparent 70%), linear-gradient(160deg, #254c2b, #15361d)",
     border: "1px solid rgba(240,208,96,0.95)",
-    boxShadow: "inset 0 0 0 1px rgba(240,208,96,0.5), 0 3px 10px rgba(0,0,0,0.3)",
+    boxShadow: "inset 0 0 0 1px rgba(240,208,96,0.5), inset 0 1px 0 rgba(255,236,167,0.16), 0 3px 10px rgba(0,0,0,0.3)",
   } : {};
 }
 
@@ -1179,18 +1181,6 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
 
         {/* ── HEADER ── */}
         <div style={{ ...S.header, ...rise(3) }} role="banner">
-          {/* Contrast plate behind text */}
-          <div style={{
-            position: "absolute",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            width: "calc(100% + 40px)",
-            height: "calc(100% + 40px)",
-            background: "radial-gradient(circle, rgba(20,60,20,0.15) 0%, transparent 70%)",
-            zIndex: 0,
-            pointerEvents: "none"
-          }} />
           {/* Controls occupy their own row. The title used to be absolutely
               centred behind 3×44px controls, which guaranteed overlap at 320px
               and under text zoom. */}
@@ -1213,7 +1203,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                   onClick={toggleSound}
                   aria-label={soundOn ? "כבה צלילים" : "הפעל צלילים"}
                   aria-pressed={soundOn}
-                  style={{ ...S.resetBtn, opacity: soundOn ? 1 : 0.45 }}
+                  style={{ ...S.navBtn, opacity: soundOn ? 1 : 0.45 }}
                 >
                   {soundOn ? "🔊" : "🔇"}
                 </button>
@@ -1553,10 +1543,12 @@ const S = {
   // CTA was inset twice as far as the chip grid directly above it.
   // paddingTop carries the status bar / notch now that viewport-fit=cover is
   // on; the header's own background fills that strip.
-  header: { padding: "8px 16px 6px", paddingTop: "calc(8px + env(safe-area-inset-top))", background: `linear-gradient(to bottom, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.28) 100%), url(${headerImage}) center / cover no-repeat`, borderBottom: "2px solid rgba(200,168,78,0.4)", boxShadow: "0 4px 20px rgba(0,0,0,0.5), 0 0 30px rgba(200,168,78,0.08)", position: "relative" },
+  // Extend the artwork's quiet lower margin so its gold rail sits below the
+  // visible step markers, not through them. The controls keep their own sizes.
+  header: { padding: "8px 16px 6px", paddingTop: "calc(8px + env(safe-area-inset-top))", backgroundColor: "#0b2312", backgroundImage: `linear-gradient(rgba(5,18,9,0.08), rgba(5,18,9,0.08)), url(${builderHeaderImage})`, backgroundSize: "100% calc(100% + 16px)", backgroundRepeat: "no-repeat", borderBottom: "1px solid rgba(200,168,78,0.4)", boxShadow: "0 4px 16px rgba(0,0,0,0.35)", position: "relative", isolation: "isolate" },
   headerTop: { display: "flex", alignItems: "center" },
   backBtn: { width: "44px", height: "44px", borderRadius: "10px", cursor: "pointer", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", color: "#ffffff", fontSize: "16px", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-heebo), 'Heebo', sans-serif" },
-  navBtn: { width: "44px", height: "44px", borderRadius: "10px", cursor: "pointer", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", color: "#ffffff", fontSize: "16px", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-heebo), 'Heebo', sans-serif" },
+  navBtn: { width: "44px", height: "44px", borderRadius: "10px", cursor: "pointer", background: "linear-gradient(145deg, rgba(34,68,39,0.88), rgba(8,27,14,0.9))", border: "1px solid rgba(200,168,78,0.26)", boxShadow: "inset 0 1px 0 rgba(255,236,167,0.08)", color: "#ffffff", fontSize: "16px", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-heebo), 'Heebo', sans-serif" },
   navBtnNext: { width: "44px", height: "44px", borderRadius: "10px", cursor: "pointer", background: "linear-gradient(135deg, rgba(200,168,78,0.35), rgba(240,208,96,0.25))", border: "1.5px solid rgba(200,168,78,0.55)", color: "#f0d060", fontSize: "16px", fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", boxShadow: "0 0 10px rgba(200,168,78,0.25)" },
   resetBtn: { width: "44px", height: "44px", borderRadius: "10px", cursor: "pointer", background: "rgba(239,83,80,0.18)", border: "1.5px solid rgba(239,83,80,0.5)", color: "#ff7575", fontSize: "17px", fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", boxShadow: "0 0 8px rgba(239,83,80,0.2)" },
   pricePill: { display: "flex", alignItems: "baseline", gap: "2px", background: "linear-gradient(135deg, rgba(200,168,78,0.15), rgba(180,140,40,0.08))", border: "1px solid rgba(200,168,78,0.4)", padding: "4px 12px", borderRadius: "12px", transition: "all 0.2s cubic-bezier(0.34,1.56,0.64,1)" },
@@ -1622,7 +1614,7 @@ const S = {
   // `animation` shorthand so it can coexist with the per-chip `animationDelay`
   // set at the call site — mixing shorthand + animationDelay longhand on the
   // same element trips React's "conflicting property" dev warning.
-  chip: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", padding: "28px 6px 6px", borderRadius: "14px", cursor: "pointer", position: "relative", minHeight: "120px", backgroundImage: "linear-gradient(155deg, rgba(27,65,29,0.96), rgba(14,38,18,0.94))", border: "1px solid rgba(200,168,78,0.22)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", boxShadow: "0 2px 5px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.05)", color: "#ffffff", transition: "border-color 0.2s, box-shadow 0.2s, transform 0.2s", animationName: "chipIn", animationDuration: "0.25s", animationTimingFunction: "ease", animationFillMode: "both", outline: "none" },
+  chip: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", padding: "28px 6px 6px", borderRadius: "14px", cursor: "pointer", position: "relative", minHeight: "120px", backgroundImage: "radial-gradient(ellipse at 50% 32%, rgba(75,122,65,0.18), transparent 70%), linear-gradient(160deg, #17391f, #0b2112)", border: "1px solid rgba(200,168,78,0.28)", boxShadow: "inset 0 1px 0 rgba(244,225,150,0.12), inset 0 -1px 0 rgba(0,0,0,0.22), 0 2px 6px rgba(0,0,0,0.24)", color: "#ffffff", transition: "border-color 0.2s, box-shadow 0.2s, transform 0.2s", animationName: "chipIn", animationDuration: "0.25s", animationTimingFunction: "ease", animationFillMode: "both", outline: "none" },
   chipOff: { opacity: 0.2, cursor: "not-allowed", filter: "grayscale(0.5)" },
   check: { position: "absolute", top: "56px", insetInlineStart: "6px", width: "18px", height: "18px", borderRadius: "50%", background: "linear-gradient(135deg, #ffe066, #d4b84a)", color: "#0d2e0d", fontSize: "10px", fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 3px rgba(0,0,0,0.3)" },
   premiumMark: { position: "absolute", top: "56px", insetInlineStart: "6px", fontSize: "12px", lineHeight: 1.5, filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.6))" },

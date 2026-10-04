@@ -7,6 +7,28 @@ import { estimateNutritionRange } from '../../src/lib/nutritionSimulator';
 const builder = readFileSync(new URL('../../src/components/builder/BariBaliBuilder.jsx', import.meta.url), 'utf8');
 const summary = readFileSync(new URL('../../src/components/builder/SummaryView.jsx', import.meta.url), 'utf8');
 
+test('the builder header uses lightweight dedicated artwork instead of the wordmark backdrop', () => {
+    assert.match(builder, /const builderHeaderImage = "\/builder-assets\/builder-header-panel-v1\.webp"/);
+    const headerStyle = builder.slice(builder.indexOf('header: {'), builder.indexOf('\n', builder.indexOf('header: {')));
+    assert.ok(headerStyle.includes('url(${builderHeaderImage})'));
+    assert.ok(!headerStyle.includes('url(${headerImage})'));
+    assert.match(headerStyle, /backgroundSize: "100% calc\(100% \+ 16px\)"/);
+    assert.match(headerStyle, /backgroundColor: "#0b2312"/);
+    assert.match(builder, /src=\{headerImage\}/, 'starter branding stays intact');
+    const art = readFileSync(new URL('../../public/builder-assets/builder-header-panel-v1.webp', import.meta.url));
+    assert.equal(art.toString('ascii', 0, 4), 'RIFF');
+    assert.equal(art.toString('ascii', 8, 12), 'WEBP');
+    assert.ok(art.length < 64 * 1024, 'decorative header must remain a lightweight asset');
+});
+
+test('matching card surfaces use restrained shading without adding repeated decorative images', () => {
+    const chipStyle = builder.slice(builder.indexOf('chip: {'), builder.indexOf('\n', builder.indexOf('chip: {')));
+    assert.match(chipStyle, /radial-gradient\(ellipse/);
+    assert.match(chipStyle, /inset 0 1px 0/);
+    assert.doesNotMatch(chipStyle, /url\(|backdropFilter/);
+    assert.match(builder, /style=\{\{ \.\.\.S\.navBtn, opacity: soundOn/, 'sound is a neutral utility, not a destructive control');
+});
+
 test('preparation presentation preserves food and unknown selections', () => {
     for (const id of ['mix_no_sauce', 'no_mix', 'none_side']) assert.equal(isPreparationChoice({ id }), true);
     for (const id of ['bread', 'croutons_s', 'bread_p', 'egg', 'future_finish']) assert.equal(isPreparationChoice({ id }), false);
