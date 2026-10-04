@@ -11,6 +11,7 @@ const config = [
             'Local TECH/**',
             'plans/**',
             '.playwright-cli/**',
+            '.next-ui-preview/**',
         ],
     },
     ...nextCoreWebVitals,

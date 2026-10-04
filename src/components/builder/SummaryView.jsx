@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState, useEffect, useRef } from "react";
 import { requestHostedPayment } from '@/lib/hostedPaymentRequest';
 import { useRouter } from 'next/navigation';
 import { fireGoldConfetti } from "../../lib/confetti";
+import { isPreparationChoice, preparationLabel } from "../../lib/summaryPresentation";
 
 function Icon({ src, size = "1.2em", style = {} }) {
     if (src && src.startsWith("/")) {
@@ -419,11 +420,11 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
         [all, productType, sizeMl],
     );
 
-    // Ingredients bucketed into the bowl's three rows, keeping the order they
-    // were chosen in within each row.
+    const preparationChoices = all.filter(isPreparationChoice);
+    // Instructions remain in the order, but are not pictured as edible food.
     const bowlRows = useMemo(() => {
         const rows = BOWL_ROWS.map(() => []);
-        all.forEach(it => rows[tierOf(it)].push(it));
+        all.filter(it => !isPreparationChoice(it)).forEach(it => rows[tierOf(it)].push(it));
         return rows;
     }, [all]);
 
@@ -760,7 +761,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
 
             <div style={S.main}>
                 <div style={S.header}>
-                    <img src={headerImage} alt="" aria-hidden="true" style={{ width: "100%", display: "block", height: "72px", objectFit: "cover", objectPosition: "center top", flexShrink: 0 }} />
+                    <img className="summary-brand" src={headerImage} alt="" aria-hidden="true" style={{ width: "100%", display: "block", height: "72px", objectFit: "cover", objectPosition: "center top", flexShrink: 0 }} />
                     <div style={S.headerTop}>
                         <button
                             type="button"
@@ -833,6 +834,17 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                         <div style={S.sumBowlMeta}>
                             <span>{all.length} בחירות</span>
                         </div>
+                        {preparationChoices.length > 0 && (
+                            <div style={S.preparationNote}>
+                                <span style={{ color: "#f0d060", fontWeight: 800 }}>הנחיות הכנה</span>
+                                <span>{preparationChoices.map(preparationLabel).join(" · ")}</span>
+                            </div>
+                        )}
+                        {nutritionEstimate && (
+                            <p style={S.nutritionDisclaimer}>
+                                הערכה לפי מנות טיפוסיות · הכמויות וההכנה בפועל משתנות
+                            </p>
+                        )}
                         {nutritionEstimate && (
                             <details style={S.nutritionDetails}>
                                 <summary style={S.nutritionSummary}>איך BariMeter מחשב את הטווח?</summary>
@@ -1106,13 +1118,12 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                         <span style={{ opacity: 0.75 }}>🌿</span>
                         <span>מרכיבים כל הזמנה לפי הבחירות שלכם</span>
                     </div>
-                    <div style={{ height: "110px" }} />
                 </div>
 
-                <div style={S.bar}>
+                <div className="summary-action-zone" style={S.bar}>
                     {/* Order meta pills */}
                     <div style={S.barMeta}>
-                        <div style={S.metaPill}>
+                        <div className="summary-pick-count" style={S.metaPill}>
                             <span style={S.metaPillIcon}>🥗</span>
                             <span style={S.metaPillText}>{all.length} בחירות</span>
                         </div>
@@ -1160,7 +1171,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                         {!recoveryPending && <span style={S.orderBtnPrice}>₪{checkoutTotal}</span>}
                     </BariButton>
                     {/* Consent disclosure — links open the legal docs before ordering */}
-                    <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.45)", textAlign: "center", lineHeight: 1.6, marginTop: "8px", fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }}>
+                    <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.68)", textAlign: "center", lineHeight: 1.6, fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }}>
                         בלחיצה על הכפתור אני מאשר/ת את{" "}
                         <a href="/terms" target="_blank" rel="noopener noreferrer" aria-label="תנאי השימוש (נפתח בלשונית חדשה)" style={{ color: "rgba(240,208,96,0.8)" }}>תנאי השימוש</a>,{" "}
                         <a href="/privacy" target="_blank" rel="noopener noreferrer" aria-label="מדיניות הפרטיות (נפתחת בלשונית חדשה)" style={{ color: "rgba(240,208,96,0.8)" }}>מדיניות הפרטיות</a>{" "}
@@ -1178,6 +1189,7 @@ function CompositionStats({ all, estimate }) {
     if (!estimate) {
         return (
             <div
+                role="group"
                 aria-label={`${all.length} בחירות בהזמנה`}
                 style={{ width: "100%", display: "flex", flexDirection: "column", justifyContent: "center", textAlign: "center" }}
             >
@@ -1194,42 +1206,38 @@ function CompositionStats({ all, estimate }) {
 
     const stats = [
         { key: 'protein', label: 'חלבון', color: '#e9c85f', bg: 'rgba(233,200,95,0.12)' },
-        { key: 'carbs', label: 'פחמ׳', color: '#55c6c4', bg: 'rgba(85,198,196,0.11)' },
+        { key: 'carbs', label: 'פחמימות', color: '#55c6c4', bg: 'rgba(85,198,196,0.11)' },
         { key: 'fat', label: 'שומן', color: '#7ed37d', bg: 'rgba(126,211,125,0.11)' },
         { key: 'fiber', label: 'סיבים', color: '#b69af2', bg: 'rgba(182,154,242,0.11)' },
     ];
 
     return (
         <div
+            role="group"
             aria-label={`סימולציה תזונתית: ${estimate.calories.low} עד ${estimate.calories.high} קילוקלוריות`}
             style={{ width: "100%", display: "flex", flexDirection: "column", justifyContent: "center", textAlign: "center" }}
         >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
-                <span style={{ fontSize: "10px", fontWeight: 950, color: "#f0d060", letterSpacing: "0.08em" }}>BariMeter</span>
-                <span style={{ padding: "2px 6px", borderRadius: "999px", background: "rgba(85,198,196,0.12)", border: "1px solid rgba(85,198,196,0.26)", color: "#83d8d6", fontSize: "7.5px", fontWeight: 900 }}>סימולציה</span>
+                <span style={{ fontSize: "13px", fontWeight: 950, color: "#f0d060", letterSpacing: "0.04em" }}>BariMeter</span>
+                <span style={{ padding: "2px 6px", borderRadius: "999px", background: "rgba(85,198,196,0.12)", border: "1px solid rgba(85,198,196,0.26)", color: "#a5efeb", fontSize: "11px", fontWeight: 800 }}>סימולציה</span>
             </div>
             <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: "4px", marginTop: "3px" }}>
-                <span dir="ltr" style={{ display: "inline-block", fontSize: "23px", fontWeight: 950, color: "#ffffff", lineHeight: 1, letterSpacing: "-0.04em", textShadow: "0 0 18px rgba(200,168,78,0.38)" }}>
+                <span dir="ltr" style={{ display: "inline-block", fontSize: "32px", fontWeight: 950, color: "#ffffff", lineHeight: 1.1, letterSpacing: "-0.04em", textShadow: "0 0 18px rgba(200,168,78,0.38)" }}>
                     {estimate.calories.low}–{estimate.calories.high}
                 </span>
-                <span style={{ fontSize: "9px", fontWeight: 800, color: "rgba(255,255,255,0.46)" }}>קק״ל</span>
+                <span style={{ fontSize: "12px", fontWeight: 800, color: "rgba(255,255,255,0.8)" }}>קק״ל</span>
             </div>
-            <div aria-hidden="true" style={S.nutritionMeter}>
-                <div style={S.nutritionMeterFill} />
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "4px", marginTop: "7px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "4px", marginTop: "9px" }}>
                 {stats.map(stat => {
                     const value = estimate.macros[stat.key];
                     return (
-                        <div key={stat.key} style={{ background: stat.bg, borderRadius: "8px", padding: "5px 1px 4px", minWidth: 0 }}>
-                            <div style={{ fontSize: "12px", lineHeight: 1, fontWeight: 950, color: stat.color, direction: "ltr" }}>{value.low}–{value.high}<small style={{ fontSize: "7px", marginLeft: "1px" }}>g</small></div>
-                            <div style={{ marginTop: "3px", fontSize: "8px", lineHeight: 1, fontWeight: 800, color: "rgba(255,255,255,0.48)" }}>{stat.label}</div>
+                        <div key={stat.key} role="group" aria-label={`${stat.label}: ${value.low} עד ${value.high} גרם`} style={{ background: stat.bg, border: `1px solid ${stat.color}33`, borderRadius: "8px", padding: "6px 1px", minWidth: 0 }}>
+                            <div dir="ltr" style={{ fontSize: "clamp(11px, 3.4vw, 14px)", lineHeight: 1.1, fontWeight: 950, color: stat.color, whiteSpace: "nowrap" }}>{value.low}–{value.high}</div>
+                            <div style={{ marginTop: "4px", fontSize: "11px", lineHeight: 1.2, fontWeight: 700, color: "rgba(255,255,255,0.88)" }}>{stat.label}</div>
+                            <div style={{ marginTop: "2px", fontSize: "10px", lineHeight: 1.1, color: "rgba(255,255,255,0.74)" }}>גרם</div>
                         </div>
                     );
                 })}
-            </div>
-            <div style={{ marginTop: "6px", fontSize: "7.8px", lineHeight: 1.3, fontWeight: 650, color: "rgba(255,255,255,0.36)" }}>
-                הערכה לפי מנות טיפוסיות · הכמויות וההכנה בפועל משתנות
             </div>
         </div>
     );
@@ -1310,7 +1318,7 @@ const S = {
     pricePill: { display: "flex", alignItems: "baseline", gap: "1px", background: "linear-gradient(135deg, rgba(200,168,78,0.22), rgba(184,134,11,0.1))", border: "1px solid rgba(200,168,78,0.4)", padding: "4px 11px", borderRadius: "12px" },
     priceS: { fontSize: "10px", color: "#d4b84a", fontWeight: 600 },
     priceV: { fontSize: "20px", color: "#ffffff", fontWeight: 900, textShadow: "0 2px 8px rgba(200,168,78,0.5)" },
-    content: { flex: 1, overflowY: "auto", overflowX: "hidden", padding: "12px 16px max(24px, env(safe-area-inset-bottom))", scrollbarWidth: "none" },
+    content: { flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", padding: "12px 16px max(24px, env(safe-area-inset-bottom))", scrollbarWidth: "none" },
     sumBowlWrap: { position: "relative", margin: "8px auto 18px", width: "100%", maxWidth: "360px", display: "flex", flexDirection: "column", alignItems: "center" },
     sumBowlGlow: { position: "absolute", bottom: "20px", left: "50%", transform: "translateX(-50%)", width: "200px", height: "60px", borderRadius: "50%", background: "radial-gradient(ellipse, rgba(200,168,78,0.18) 0%, transparent 70%)", pointerEvents: "none", filter: "blur(8px)" },
     /*
@@ -1345,14 +1353,14 @@ const S = {
     // The plaque's interior measures x 8.2-91.4%, y 16-56%; inset a little from
     // that so the content never touches the engraved border.
     panelNut: {
-        position: "absolute", left: "11%", right: "11%", top: "21%", height: "33%",
+        position: "absolute", left: "11%", right: "11%", top: "18%", height: "36%",
         display: "flex", flexDirection: "column", justifyContent: "center",
     },
     sumBowlMeta: { marginTop: "10px", display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", fontWeight: 600, color: "rgba(255,255,255,0.5)", letterSpacing: "0.03em" },
-    nutritionMeter: { position: "relative", width: "74%", height: "3px", margin: "6px auto 0", borderRadius: "999px", overflow: "hidden", background: "rgba(255,255,255,0.08)", boxShadow: "inset 0 1px 2px rgba(0,0,0,0.45)" },
-    nutritionMeterFill: { position: "absolute", inset: 0, borderRadius: "inherit", background: "linear-gradient(90deg, #55c6c4 0%, #7ed37d 38%, #e9c85f 72%, #f0d060 100%)", transformOrigin: "right center", animation: "bariMeterFill 0.9s cubic-bezier(.2,.8,.2,1) 0.45s both, bariMeterGlow 2.8s ease-in-out 1.4s infinite" },
-    nutritionDetails: { width: "100%", marginTop: "8px", padding: "0 12px", borderRadius: "11px", background: "rgba(9,31,14,0.66)", border: "1px solid rgba(200,168,78,0.16)", color: "rgba(255,255,255,0.56)", fontSize: "10.5px", lineHeight: 1.55 },
-    nutritionSummary: { minHeight: "40px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "rgba(240,208,96,0.72)", fontWeight: 800, listStylePosition: "inside" },
+    preparationNote: { width: "100%", display: "flex", flexDirection: "column", gap: "3px", marginTop: "8px", padding: "10px 12px", borderRadius: "12px", background: "rgba(200,168,78,0.08)", border: "1px solid rgba(200,168,78,0.2)", fontSize: "12px", lineHeight: 1.5, color: "rgba(255,255,255,0.85)" },
+    nutritionDisclaimer: { margin: "10px 4px 0", fontSize: "12px", lineHeight: 1.55, color: "rgba(255,255,255,0.75)", textAlign: "center" },
+    nutritionDetails: { width: "100%", marginTop: "8px", padding: "0 12px", borderRadius: "11px", background: "rgba(9,31,14,0.66)", border: "1px solid rgba(200,168,78,0.24)", color: "rgba(255,255,255,0.8)", fontSize: "12px", lineHeight: 1.55 },
+    nutritionSummary: { minHeight: "44px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#f0d060", fontWeight: 800, listStylePosition: "inside" },
     nutritionExplanation: { padding: "0 4px 10px", textAlign: "right" },
     // 16px inner gutter + a smaller badge glyph (below): four bordered pills in
     // a bordered box used to fill the row edge-to-edge with nothing to spare,
@@ -1610,10 +1618,13 @@ const PT = {
 const KF = `
 @keyframes popBounce { 0%{transform:scale(0.3);opacity:0} 60%{transform:scale(1.15)} 100%{transform:scale(1);opacity:1} }
 @keyframes pFadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
-@keyframes bariMeterFill { from{transform:scaleX(0);opacity:0.25} to{transform:scaleX(1);opacity:1} }
-@keyframes bariMeterGlow { 0%,100%{filter:brightness(0.9);box-shadow:0 0 4px rgba(240,208,96,0.15)} 50%{filter:brightness(1.25);box-shadow:0 0 10px rgba(240,208,96,0.5)} }
+@media (max-height: 700px) {
+  .summary-brand { height:48px !important; }
+  .summary-action-zone { gap:6px !important; padding:8px 16px max(8px, env(safe-area-inset-bottom)) !important; }
+  .summary-pick-count { display:none !important; }
+}
 @media (prefers-reduced-motion: reduce) {
-  [style*="bariMeterFill"], [style*="bariMeterGlow"] { animation: none !important; }
+  [style*="popBounce"], [style*="pFadeIn"] { animation: none !important; }
 }
 ::-webkit-scrollbar{display:none}
 `;

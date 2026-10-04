@@ -1355,9 +1355,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
         <div style={{ ...S.content, opacity: anim === "out" ? 0 : 1, transform: anim === "out" ? `translateX(${slideX})` : "translateX(0)", filter: anim === "out" ? "blur(3px)" : "blur(0px)", transition: "opacity 0.22s ease, transform 0.28s cubic-bezier(0.25,0.46,0.45,0.94), filter 0.22s ease", ...rise(1) }} ref={scrollRef} role="main" aria-label={`${cur.title} - בחרו מרכיבים`}>
 
           {/* Ingredient-info discovery hint — shown until it has been read once.
-              Tappable: it sits at the top of the list taking 78px, so someone
-              who has already read it needs a way to clear it now rather than
-              waiting out the timer. */}
+              Compact and dismissible so larger ingredient cards stay visible. */}
           {showInfoHint && (
             <div
               style={S.longPressHint}
@@ -1367,11 +1365,9 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
               aria-label="הבנתי, סגירת ההסבר"
               onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); dismissHint(); } }}
             >
-              <span style={{ fontSize: "32px", lineHeight: 1 }}>👆</span>
-              <div>
-                <div style={{ fontSize: "13px", fontWeight: 900, color: "#f0d060", marginBottom: "2px" }}>למידע נוסף על רכיב</div>
-                <div style={{ fontSize: "11px", fontWeight: 600, color: "rgba(255,255,255,0.65)" }}>לחצו על ⓘ בכרטיס שלו</div>
-              </div>
+              <span aria-hidden="true" style={{ fontSize: "22px", lineHeight: 1 }}>ⓘ</span>
+              <span style={{ fontSize: "12px", fontWeight: 700, color: "#f0d060" }}>למידע על רכיב, לחצו על ⓘ בכרטיס</span>
+              <span aria-hidden="true" style={{ marginInlineStart: "auto", color: "rgba(255,255,255,0.7)" }}>×</span>
             </div>
           )}
 
@@ -1418,9 +1414,9 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                           {on && <div style={S.check} aria-hidden="true">✓</div>}
                           {isPremiumStep && <div style={{ position: "absolute", top: "-2px", left: "-2px", fontSize: "12px", filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.6))" }} aria-hidden="true">👑</div>}
                           {item.pop && <div style={S.popTag} aria-hidden="true">פופולרי</div>}
-                          <Icon src={item.icon} size="38px" style={{ ...S.chipEmoji, transform: lastAdd === item.id ? "scale(1.4) rotate(-10deg)" : "scale(1)", transition: "transform 0.25s cubic-bezier(0.34,1.56,0.64,1)" }} />
+                          <Icon src={item.icon} size="64px" style={{ ...S.chipEmoji, transform: !reducedMotion && lastAdd === item.id ? "scale(1.12) rotate(-6deg)" : "scale(1)", transition: reducedMotion ? "none" : "transform 0.25s cubic-bezier(0.34,1.56,0.64,1)" }} />
                           <span style={S.chipName}>{item.he}</span>
-                          {itemPrice > 0 && <span style={S.chipCost}>+₪{itemPrice}</span>}
+                          {itemPrice > 0 && <span style={S.chipCost}><bdi dir="ltr">+₪{itemPrice}</bdi></span>}
                         </button>
                         {/* Ingredient info. This explicit control replaces the old
                             hidden long-press shortcut, which could also trigger the
@@ -1542,9 +1538,11 @@ button:focus-visible {
   outline-offset: 2px;
   box-shadow: 0 0 0 3px rgba(200,168,78,0.2), 0 4px 18px rgba(200,168,78,0.35) !important;
 }
-button:hover:not(:disabled) {
+@media (hover: hover) and (pointer: fine) {
+button:hover:not(:disabled):not([aria-disabled="true"]) {
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(200,168,78,0.3), inset 0 2px 4px rgba(0,0,0,0.3) !important;
+}
 }
 button:active:not(:disabled) {
   transform: translateY(0);
@@ -1593,7 +1591,7 @@ const S = {
 
   content: { flex: 1, overflowY: "auto", overflowX: "hidden", padding: "4px 16px", scrollbarWidth: "none" },
 
-  longPressHint: { display: "flex", alignItems: "center", gap: "12px", padding: "14px 16px", margin: "4px 0 10px", borderRadius: "16px", background: "linear-gradient(135deg, rgba(200,168,78,0.22), rgba(180,140,40,0.12))", border: "2px solid rgba(200,168,78,0.55)", boxShadow: "0 0 20px rgba(200,168,78,0.25), 0 4px 16px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08)", animation: "hintPop 15s ease both, hintGlow 1s ease-in-out infinite alternate", cursor: "pointer", WebkitTapHighlightColor: "transparent" },
+  longPressHint: { display: "flex", alignItems: "center", gap: "8px", minHeight: "44px", padding: "8px 10px", margin: "4px 0 8px", borderRadius: "12px", background: "linear-gradient(135deg, rgba(200,168,78,0.18), rgba(180,140,40,0.08))", border: "1px solid rgba(200,168,78,0.4)", cursor: "pointer", WebkitTapHighlightColor: "transparent" },
   introCard: { display: "flex", alignItems: "center", gap: "8px", padding: "10px 12px", margin: "4px 0 8px", borderRadius: "12px", background: "linear-gradient(145deg, rgba(13,46,13,0.95), rgba(8,28,8,0.9))", border: "1px solid rgba(200,168,78,0.2)", boxShadow: "0 2px 10px rgba(0,0,0,0.4)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" },
   draftNotice: {
     display: "flex", alignItems: "center", gap: "8px",
@@ -1607,42 +1605,41 @@ const S = {
     color: "rgba(255,255,255,0.75)", fontSize: "11px", fontWeight: 800,
     fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
   },
-  // A full thumb-sized target overlays the card corner while the visible glyph
-  // stays compact. The target never crosses the card boundary, so neighbouring
-  // ingredients remain unambiguous even in the three-column phone grid.
+  // A dedicated 44px footer keeps the information target clear of the name.
+  // Logical insets place price and information at opposite ends of the RTL card.
   chipInfoHit: {
-    position: "absolute", bottom: 0, right: 0,
-    width: "44px", height: "44px", borderRadius: "0 0 16px 0",
-    display: "flex", alignItems: "flex-end", justifyContent: "flex-end",
+    position: "absolute", bottom: 0, insetInlineEnd: "2px",
+    width: "44px", height: "44px", borderRadius: "12px",
+    display: "flex", alignItems: "center", justifyContent: "center",
     background: "transparent", border: 0,
-    cursor: "pointer", padding: "0 3px 3px 0",
+    cursor: "pointer", padding: 0,
     fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
   },
   chipInfoGlyph: {
-    width: "24px", height: "24px", borderRadius: "50%",
+    width: "26px", height: "26px", borderRadius: "50%",
     display: "flex", alignItems: "center", justifyContent: "center",
     background: "rgba(0,0,0,0.42)", border: "1px solid rgba(255,255,255,0.28)",
-    color: "rgba(255,255,255,0.8)", fontSize: "11px", fontWeight: 900,
+    color: "rgba(255,255,255,0.88)", fontSize: "14px", fontWeight: 900,
     lineHeight: 1, pointerEvents: "none",
   },
   capNotice: { display: "flex", alignItems: "center", gap: "8px", padding: "10px 12px", margin: "4px 0 8px", borderRadius: "12px", background: "rgba(255,183,77,0.12)", border: "1px solid rgba(255,183,77,0.42)", fontSize: "12px", fontWeight: 700, color: "#ffcc80", lineHeight: 1.5 },
   introText: { fontSize: "12px", color: "rgba(255,255,255,0.65)", fontWeight: 500, textShadow: "0 1px 2px rgba(0,0,0,0.5)" },
 
   sgLabel: { fontSize: "11px", fontWeight: 800, color: "rgba(200,168,78,0.85)", padding: "10px 4px 6px", textShadow: "0 1px 3px rgba(0,0,0,0.7), 0 0 8px rgba(0,0,0,0.3)" },
-  grid: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "7px" },
+  grid: { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "8px" },
   chipWrap: { position: "relative", minWidth: 0 },
 
   // animationName/Duration/TimingFunction/FillMode used instead of the
   // `animation` shorthand so it can coexist with the per-chip `animationDelay`
   // set at the call site — mixing shorthand + animationDelay longhand on the
   // same element trips React's "conflicting property" dev warning.
-  chip: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "10px 3px 7px", borderRadius: "16px", cursor: "pointer", position: "relative", minHeight: "74px", backgroundImage: "linear-gradient(155deg, rgba(50,115,50,0.9), rgba(30,75,30,0.85))", border: "2px solid rgba(200,168,78,0.55)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", boxShadow: "0 3px 12px rgba(0,0,0,0.5), 0 0 8px rgba(200,168,78,0.08), inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.25)", color: "#ffffff", transition: "all 0.2s cubic-bezier(0.34,1.56,0.64,1)", animationName: "chipIn", animationDuration: "0.25s", animationTimingFunction: "ease", animationFillMode: "both", outline: "none" },
+  chip: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", padding: "14px 6px 44px", borderRadius: "16px", cursor: "pointer", position: "relative", minHeight: "158px", backgroundImage: "linear-gradient(155deg, rgba(50,115,50,0.9), rgba(30,75,30,0.85))", border: "2px solid rgba(200,168,78,0.55)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", boxShadow: "0 3px 12px rgba(0,0,0,0.5), 0 0 8px rgba(200,168,78,0.08), inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.25)", color: "#ffffff", transition: "all 0.2s cubic-bezier(0.34,1.56,0.64,1)", animationName: "chipIn", animationDuration: "0.25s", animationTimingFunction: "ease", animationFillMode: "both", outline: "none" },
   chipOff: { opacity: 0.2, cursor: "not-allowed", filter: "grayscale(0.5)" },
   check: { position: "absolute", top: "3px", left: "3px", width: "18px", height: "18px", borderRadius: "50%", background: "linear-gradient(135deg, #ffe066, #d4b84a)", color: "#0d2e0d", fontSize: "10px", fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 6px rgba(200,168,78,0.5)" },
   popTag: { position: "absolute", top: "-1px", right: "-1px", background: "linear-gradient(135deg, #d4b84a, #f0d060)", color: "#0d2e0d", fontSize: "10px", fontWeight: 900, padding: "3px 8px", borderRadius: "16px 0 8px 0", boxShadow: "0 2px 4px rgba(0,0,0,0.35)" },
-  chipEmoji: { marginBottom: "2px", filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.4))" },
-  chipName: { fontSize: "10.5px", fontWeight: 700, textAlign: "center", lineHeight: 1.15, color: "#ffffff", textShadow: "0 1px 3px rgba(0,0,0,0.6)" },
-  chipCost: { fontSize: "10px", fontWeight: 800, color: "#f0d060", background: "linear-gradient(135deg, rgba(200,168,78,0.2), rgba(200,168,78,0.08))", border: "1px solid rgba(200,168,78,0.35)", padding: "2px 7px", borderRadius: "6px", marginTop: "2px", boxShadow: "0 1px 2px rgba(0,0,0,0.3)" },
+  chipEmoji: { marginBottom: "6px", flexShrink: 0, filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.4))" },
+  chipName: { fontSize: "13px", fontWeight: 800, textAlign: "center", lineHeight: 1.3, minHeight: "34px", width: "100%", overflowWrap: "anywhere", color: "#ffffff", textShadow: "0 1px 3px rgba(0,0,0,0.6)" },
+  chipCost: { position: "absolute", bottom: "10px", insetInlineStart: "6px", maxWidth: "calc(100% - 50px)", fontSize: "11px", fontWeight: 800, whiteSpace: "nowrap", color: "#f0d060", background: "linear-gradient(135deg, rgba(200,168,78,0.2), rgba(200,168,78,0.08))", border: "1px solid rgba(200,168,78,0.35)", padding: "2px 2px", borderRadius: "6px", boxShadow: "0 1px 2px rgba(0,0,0,0.3)" },
 
   bar: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 16px max(14px, env(safe-area-inset-bottom))", background: `linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.25) 100%), url(${footerImage}) center top / cover no-repeat`, borderTop: "2px solid rgba(200,168,78,0.4)", boxShadow: "0 -4px 20px rgba(0,0,0,0.5), 0 0 30px rgba(200,168,78,0.08)" },
   heroBtn: {
