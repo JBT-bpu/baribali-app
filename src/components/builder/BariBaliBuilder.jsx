@@ -170,36 +170,26 @@ function getStepColor(stepId) {
   return STEP_COLORS[stepId] || STEP_COLORS.veggies;
 }
 
-// ─── Ingredient chip visual — step-tinted glow when selected, plus a
-// distinct richer "premium" look for the upgrade step (real premium items,
-// not just a bigger price tag) ──
+// ─── Ingredient chip visual — quiet surfaces, with a consistent gold
+// selection outline. Premium ingredients keep their warmer surface. ──
 function chipVisual(stepId, isOn) {
   const isPremiumStep = stepId === "upgrade" || stepId === "t_upgrade";
   if (isPremiumStep) {
     return isOn ? {
-      backgroundImage: "linear-gradient(120deg, rgba(96,70,16,0.95) 0%, rgba(220,180,90,0.45) 45%, rgba(96,70,16,0.95) 100%)",
-      backgroundSize: "200% 100%",
-      animationName: "shimmer",
-      animationDuration: "2.5s",
-      animationTimingFunction: "ease-in-out",
-      animationIterationCount: "infinite",
-      border: "2.5px solid rgba(255,224,102,0.95)",
-      boxShadow: "0 0 0 1px rgba(255,224,102,0.3), 0 6px 22px rgba(200,168,78,0.55), 0 0 30px rgba(255,224,102,0.4), inset 0 1px 0 rgba(255,255,255,0.25)",
-      transform: "translateY(-3px)",
+      backgroundImage: "linear-gradient(155deg, rgba(76,57,20,0.96), rgba(45,34,12,0.94))",
+      border: "1px solid rgba(240,208,96,0.95)",
+      boxShadow: "inset 0 0 0 1px rgba(240,208,96,0.5), 0 3px 10px rgba(0,0,0,0.3)",
     } : {
       backgroundImage: "linear-gradient(155deg, rgba(58,44,16,0.92), rgba(32,24,8,0.88))",
-      border: "2px solid rgba(200,168,78,0.65)",
-      boxShadow: "0 3px 14px rgba(0,0,0,0.5), 0 0 12px rgba(200,168,78,0.2), inset 0 1px 0 rgba(255,255,255,0.12)",
+      border: "1px solid rgba(200,168,78,0.3)",
     };
   }
-  const sc = getStepColor(stepId);
   return isOn ? {
     // backgroundImage (not the `background` shorthand) so it can't conflict
     // with S.chip's own `background` key when the two style objects merge.
-    backgroundImage: "linear-gradient(155deg, rgba(60,140,60,0.95), rgba(40,100,40,0.9))",
-    border: `2.5px solid ${sc.onBorder}`,
-    boxShadow: `0 0 0 1px ${sc.onGlow}, 0 6px 22px ${sc.onGlow}, 0 0 28px ${sc.onGlow}, inset 0 1px 0 rgba(255,255,255,0.25)`,
-    transform: "translateY(-3px)",
+    backgroundImage: "linear-gradient(155deg, rgba(36,86,38,0.97), rgba(24,61,27,0.95))",
+    border: "1px solid rgba(240,208,96,0.95)",
+    boxShadow: "inset 0 0 0 1px rgba(240,208,96,0.5), 0 3px 10px rgba(0,0,0,0.3)",
   } : {};
 }
 
@@ -606,7 +596,6 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
       const exists = cur.find(i => i.id === item.id);
       if (exists) {
         haptic("remove"); playSound("remove");
-        setLastRemove(item.id); setTimeout(() => setLastRemove(null), 300);
         return { ...prev, [sid]: cur.filter(i => i.id !== item.id) };
       }
 
@@ -645,7 +634,6 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
   // ─── Remove from bowl strip ───
   const removeFromBowl = useCallback((itemId) => {
     haptic("remove"); playSound("remove");
-    setLastRemove(itemId); setTimeout(() => setLastRemove(null), 300);
     setSels(prev => {
       const next = {};
       Object.entries(prev).forEach(([k, v]) => { next[k] = v.filter(i => i.id !== itemId); });
@@ -1404,7 +1392,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                         <button
                           type="button"
                           onClick={() => { if (!full) toggle(cur.id, item, cur.maxPicks); }}
-                          aria-label={`${item.he}${itemPrice > 0 ? `, תוספת ${itemPrice} שקלים` : ""}${on ? ", נבחר" : ""}${item.desc ? `, ${item.desc}` : ""}`}
+                          aria-label={`${item.he}${itemPrice > 0 ? `, תוספת ${itemPrice} שקלים` : ""}${on ? ", נבחר" : ""}${item.pop ? ", פופולרי" : ""}${item.desc ? `, ${item.desc}` : ""}`}
                           aria-checked={on}
                           aria-disabled={full}
                           role="checkbox"
@@ -1412,9 +1400,9 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                           style={{ ...S.chip, width: "100%", height: "100%", ...chipVisual(cur.id, on), ...(full ? S.chipOff : {}), animationDelay: `${(si * 5 + idx) * 20}ms` }}
                         >
                           {on && <div style={S.check} aria-hidden="true">✓</div>}
-                          {isPremiumStep && <div style={{ position: "absolute", top: "-2px", left: "-2px", fontSize: "12px", filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.6))" }} aria-hidden="true">👑</div>}
-                          {item.pop && <div style={S.popTag} aria-hidden="true">פופולרי</div>}
-                          <Icon src={item.icon} size="64px" style={{ ...S.chipEmoji, transform: !reducedMotion && lastAdd === item.id ? "scale(1.12) rotate(-6deg)" : "scale(1)", transition: reducedMotion ? "none" : "transform 0.25s cubic-bezier(0.34,1.56,0.64,1)" }} />
+                          {!on && isPremiumStep && <div style={S.premiumMark} aria-hidden="true">👑</div>}
+                          {!on && !isPremiumStep && item.pop && <div style={S.popTag} title="פופולרי" aria-hidden="true">✦</div>}
+                          <Icon src={item.icon} size="56px" style={{ ...S.chipEmoji, transform: !reducedMotion && lastAdd === item.id ? "scale(1.12) rotate(-6deg)" : "scale(1)", transition: reducedMotion ? "none" : "transform 0.25s cubic-bezier(0.34,1.56,0.64,1)" }} />
                           <span style={S.chipName}>{item.he}</span>
                           {itemPrice > 0 && <span style={S.chipCost}><bdi dir="ltr">+₪{itemPrice}</bdi></span>}
                         </button>
@@ -1605,21 +1593,22 @@ const S = {
     color: "rgba(255,255,255,0.75)", fontSize: "11px", fontWeight: 800,
     fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
   },
-  // A dedicated 44px footer keeps the information target clear of the name.
-  // Logical insets place price and information at opposite ends of the RTL card.
+  // Information and price share the top corners rather than a tall footer.
+  // The visible info glyph clears the artwork; its touch target remains 44px.
+  // Logical insets keep the information target and price separate in RTL.
   chipInfoHit: {
-    position: "absolute", bottom: 0, insetInlineEnd: "2px",
+    position: "absolute", top: 0, insetInlineEnd: 0,
     width: "44px", height: "44px", borderRadius: "12px",
-    display: "flex", alignItems: "center", justifyContent: "center",
+    display: "flex", alignItems: "flex-start", justifyContent: "center",
     background: "transparent", border: 0,
-    cursor: "pointer", padding: 0,
+    cursor: "pointer", padding: "6px 0 0",
     fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
   },
   chipInfoGlyph: {
-    width: "26px", height: "26px", borderRadius: "50%",
+    width: "20px", height: "20px", borderRadius: "50%",
     display: "flex", alignItems: "center", justifyContent: "center",
-    background: "rgba(0,0,0,0.42)", border: "1px solid rgba(255,255,255,0.28)",
-    color: "rgba(255,255,255,0.88)", fontSize: "14px", fontWeight: 900,
+    background: "rgba(0,0,0,0.22)", border: "1px solid rgba(255,255,255,0.2)",
+    color: "rgba(255,255,255,0.88)", fontSize: "12px", fontWeight: 900,
     lineHeight: 1, pointerEvents: "none",
   },
   capNotice: { display: "flex", alignItems: "center", gap: "8px", padding: "10px 12px", margin: "4px 0 8px", borderRadius: "12px", background: "rgba(255,183,77,0.12)", border: "1px solid rgba(255,183,77,0.42)", fontSize: "12px", fontWeight: 700, color: "#ffcc80", lineHeight: 1.5 },
@@ -1633,13 +1622,14 @@ const S = {
   // `animation` shorthand so it can coexist with the per-chip `animationDelay`
   // set at the call site — mixing shorthand + animationDelay longhand on the
   // same element trips React's "conflicting property" dev warning.
-  chip: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", padding: "14px 6px 44px", borderRadius: "16px", cursor: "pointer", position: "relative", minHeight: "158px", backgroundImage: "linear-gradient(155deg, rgba(50,115,50,0.9), rgba(30,75,30,0.85))", border: "2px solid rgba(200,168,78,0.55)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", boxShadow: "0 3px 12px rgba(0,0,0,0.5), 0 0 8px rgba(200,168,78,0.08), inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.25)", color: "#ffffff", transition: "all 0.2s cubic-bezier(0.34,1.56,0.64,1)", animationName: "chipIn", animationDuration: "0.25s", animationTimingFunction: "ease", animationFillMode: "both", outline: "none" },
+  chip: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", padding: "28px 6px 8px", borderRadius: "14px", cursor: "pointer", position: "relative", minHeight: "134px", backgroundImage: "linear-gradient(155deg, rgba(27,65,29,0.96), rgba(14,38,18,0.94))", border: "1px solid rgba(200,168,78,0.22)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", boxShadow: "0 2px 5px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.05)", color: "#ffffff", transition: "border-color 0.2s, box-shadow 0.2s, transform 0.2s", animationName: "chipIn", animationDuration: "0.25s", animationTimingFunction: "ease", animationFillMode: "both", outline: "none" },
   chipOff: { opacity: 0.2, cursor: "not-allowed", filter: "grayscale(0.5)" },
-  check: { position: "absolute", top: "3px", left: "3px", width: "18px", height: "18px", borderRadius: "50%", background: "linear-gradient(135deg, #ffe066, #d4b84a)", color: "#0d2e0d", fontSize: "10px", fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 6px rgba(200,168,78,0.5)" },
-  popTag: { position: "absolute", top: "-1px", right: "-1px", background: "linear-gradient(135deg, #d4b84a, #f0d060)", color: "#0d2e0d", fontSize: "10px", fontWeight: 900, padding: "3px 8px", borderRadius: "16px 0 8px 0", boxShadow: "0 2px 4px rgba(0,0,0,0.35)" },
-  chipEmoji: { marginBottom: "6px", flexShrink: 0, filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.4))" },
+  check: { position: "absolute", top: "56px", insetInlineStart: "6px", width: "18px", height: "18px", borderRadius: "50%", background: "linear-gradient(135deg, #ffe066, #d4b84a)", color: "#0d2e0d", fontSize: "10px", fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 3px rgba(0,0,0,0.3)" },
+  premiumMark: { position: "absolute", top: "56px", insetInlineStart: "6px", fontSize: "12px", lineHeight: 1.5, filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.6))" },
+  popTag: { position: "absolute", top: "56px", insetInlineStart: "6px", width: "18px", height: "18px", display: "grid", placeItems: "center", borderRadius: "50%", color: "#f0d060", background: "rgba(0,0,0,0.25)", fontSize: "12px", lineHeight: 1 },
+  chipEmoji: { marginBottom: "4px", flexShrink: 0, filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.3))" },
   chipName: { fontSize: "13px", fontWeight: 800, textAlign: "center", lineHeight: 1.3, minHeight: "34px", width: "100%", overflowWrap: "anywhere", color: "#ffffff", textShadow: "0 1px 3px rgba(0,0,0,0.6)" },
-  chipCost: { position: "absolute", bottom: "10px", insetInlineStart: "6px", maxWidth: "calc(100% - 50px)", fontSize: "11px", fontWeight: 800, whiteSpace: "nowrap", color: "#f0d060", background: "linear-gradient(135deg, rgba(200,168,78,0.2), rgba(200,168,78,0.08))", border: "1px solid rgba(200,168,78,0.35)", padding: "2px 2px", borderRadius: "6px", boxShadow: "0 1px 2px rgba(0,0,0,0.3)" },
+  chipCost: { position: "absolute", top: "8px", insetInlineStart: "4px", maxWidth: "calc(100% - 48px)", fontSize: "11px", fontWeight: 800, lineHeight: 1.25, whiteSpace: "nowrap", color: "#f0d060", background: "rgba(200,168,78,0.08)", border: "1px solid rgba(200,168,78,0.2)", padding: "2px 2px", borderRadius: "6px" },
 
   bar: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 16px max(14px, env(safe-area-inset-bottom))", background: `linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.25) 100%), url(${footerImage}) center top / cover no-repeat`, borderTop: "2px solid rgba(200,168,78,0.4)", boxShadow: "0 -4px 20px rgba(0,0,0,0.5), 0 0 30px rgba(200,168,78,0.08)" },
   heroBtn: {

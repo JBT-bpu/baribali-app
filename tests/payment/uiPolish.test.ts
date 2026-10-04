@@ -28,16 +28,34 @@ test('separating pictured ingredients never alters the order or nutrition inputs
     assert.match(summary, /estimateNutritionRange\(all, sizeMl\)/);
 });
 
-test('large ingredient cards reserve room for sibling information and price controls', () => {
-    assert.match(builder, /<Icon src=\{item.icon\} size="64px"/);
+test('compact ingredient cards keep readable artwork and separate corner controls', () => {
+    assert.match(builder, /<Icon src=\{item.icon\} size="56px"/);
     assert.match(builder, /chipName: \{ fontSize: "13px"/);
-    assert.match(builder, /padding: "14px 6px 44px"/);
-    assert.match(builder, /chipInfoHit: \{[\s\S]*?insetInlineEnd: "2px"[\s\S]*?width: "44px", height: "44px"/);
-    assert.match(builder, /chipCost: \{[\s\S]*?insetInlineStart: "6px"/);
+    assert.match(builder, /padding: "28px 6px 8px"/);
+    assert.match(builder, /minHeight: "134px"/);
+    assert.match(builder, /gridTemplateColumns: "repeat\(3, minmax\(0, 1fr\)\)"/);
+    assert.match(builder, /chipInfoHit: \{[\s\S]*?top: 0, insetInlineEnd: 0[\s\S]*?width: "44px", height: "44px"/);
+    assert.match(builder, /chipCost: \{[\s\S]*?top: "8px", insetInlineStart: "4px"/);
     assert.match(builder, /<span style=\{S.chipCost\}><bdi dir="ltr">/);
     const costStyle = builder.slice(builder.indexOf('chipCost: {'), builder.indexOf('\n', builder.indexOf('chipCost: {')));
     assert.doesNotMatch(costStyle, /direction: "ltr"/, 'numeric direction must not reverse the logical price inset');
     assert.match(builder, /!reducedMotion && lastAdd === item.id/);
+});
+
+test('selection accents do not grow or animate the ingredient-card borders', () => {
+    const visual = builder.slice(builder.indexOf('function chipVisual('), builder.indexOf('\n}', builder.indexOf('function chipVisual(')));
+    assert.doesNotMatch(visual, /2\.5px|translateY|animationIterationCount|animationName: "shimmer"/);
+    assert.match(visual, /border: "1px solid rgba\(240,208,96,0\.95\)"/);
+    assert.match(builder, /aria-checked=\{on\}/);
+    assert.match(builder, /\{on && <div style=\{S.check\}/);
+    assert.match(builder, /title="פופולרי"/);
+    assert.match(builder, /item.pop \? ", פופולרי"/);
+});
+
+test('card and bowl removal have no dangling animation setter', () => {
+    assert.doesNotMatch(builder, /setLastRemove\(/);
+    assert.match(builder, /\[sid\]: cur.filter\(i => i.id !== item.id\)/);
+    assert.match(builder, /next\[k\] = v.filter\(i => i.id !== itemId\)/);
 });
 
 test('nutrition simulation keeps explicit units and does not invent a health score', () => {
