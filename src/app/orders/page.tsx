@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { ClipboardList, TriangleAlert } from 'lucide-react';
+import BariJournalArt from '@/components/ui/bari/BariJournalArt';
 import GoldField from '@/components/ui/GoldField';
 import GoogleSignInButton from '@/components/ui/GoogleSignInButton';
 import { BariPanel, BariBadge, BariBottomNav, BariButton } from '@/components/ui/bari';
@@ -88,13 +90,14 @@ export default function OrdersPage() {
             <div style={{ ...bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '18px', padding: '20px', paddingBottom: 'calc(106px + env(safe-area-inset-bottom))' }}>
                 <GoldField zIndex={0} />
                 <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', maxWidth: '320px', width: '100%' }}>
-                    <div style={{ fontSize: '48px' }}>📋</div>
+                    <BariJournalArt />
                     <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 900, color: '#fff' }}>ההזמנות שלי</h1>
                     <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.74)', textAlign: 'center', lineHeight: 1.7 }}>
                         התחברו כדי לראות את היסטוריית ההזמנות ולהזמין שוב בלחיצה.
                         <br />להזמין אפשר תמיד גם בלי חשבון.
                     </div>
                     <GoogleSignInButton fullWidth />
+                    <BariButton fullWidth onClick={() => router.push('/home2')}>להמשיך לתפריט כאורח ←</BariButton>
                 </div>
                 <BariBottomNav />
             </div>
@@ -107,7 +110,7 @@ export default function OrdersPage() {
             <div style={{ position: 'relative', zIndex: 1, maxWidth: '430px', margin: '0 auto', padding: '24px 16px', paddingTop: 'max(24px, env(safe-area-inset-top))', display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
                 <h1 style={{ margin: 0, fontSize: '22px', fontWeight: 900, color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    📋 ההזמנות שלי
+                    <ClipboardList size={24} color="#e6d18b" aria-hidden /> ההזמנות שלי
                 </h1>
 
                 {orders === null && (
@@ -117,7 +120,7 @@ export default function OrdersPage() {
                     returning customer their history had vanished. */}
                 {loadError && orders?.length === 0 && (
                     <BariPanel className="p-5" style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: '32px', marginBottom: '8px' }}>⚠️</div>
+                        <TriangleAlert size={32} color="#ead482" aria-hidden style={{ margin: '0 auto 8px' }} />
                         <div style={{ fontSize: '14px', fontWeight: 700, color: 'rgba(255,255,255,0.7)' }}>לא הצלחנו לטעון את ההזמנות</div>
                         <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginTop: '4px' }}>ההיסטוריה שלכם שמורה — נסו שוב</div>
                         <BariButton variant="secondary" size="sm" style={{ marginTop: '14px' }} onClick={() => { setLoadError(false); setOrders(null); setReloadKey(k => k + 1); }}>
@@ -126,11 +129,11 @@ export default function OrdersPage() {
                     </BariPanel>
                 )}
                 {!loadError && orders?.length === 0 && (
-                    <BariPanel className="p-5" style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: '32px', marginBottom: '8px' }}>🥗</div>
+                    <BariPanel ornate className="p-5" style={{ textAlign: 'center' }}>
+                        <BariJournalArt compact />
                         <div style={{ fontSize: '14px', fontWeight: 700, color: 'rgba(255,255,255,0.6)' }}>עדיין אין הזמנות</div>
                         <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.35)', marginTop: '4px' }}>ההזמנה הבאה שלכם תופיע כאן</div>
-                        <Link href="/home2" style={{ display: 'inline-block', marginTop: '14px', fontSize: '14px', fontWeight: 800, color: 'var(--color-gold-light)', textDecoration: 'none' }}>
+                        <Link href="/home2" style={{ display: 'inline-flex', alignItems: 'center', minHeight: '44px', marginTop: '8px', fontSize: '14px', fontWeight: 800, color: 'var(--color-gold-light)', textDecoration: 'none' }}>
                             להזמנה חדשה ←
                         </Link>
                     </BariPanel>
@@ -138,7 +141,7 @@ export default function OrdersPage() {
                 {orders?.map(o => {
                     const reorderable = isOrderReorderable(o);
                     return (
-                        <BariPanel key={o.id} className="p-3.5" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <BariPanel ornate key={o.id} className="p-3.5" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         {/* The order body is a real link so touch, keyboard and
                             assistive-technology users reach the same live status. */}
                         <Link

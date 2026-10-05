@@ -2,11 +2,13 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
+import { Check } from 'lucide-react';
 import { BariButton } from '@/components/ui/bari';
 import GoldField from '@/components/ui/GoldField';
 import { DropPour, POUR_END, SWEEP } from '@/components/transition/BowlDrop';
 import { usePrefersReducedMotion } from '@/lib/motionHooks';
 import { effectiveSizePrice } from '@/lib/menuConfig';
+import { matchingSizeArtwork } from '@/lib/catalogArtwork';
 
 /**
  * Salad size picker — the single place the app asks "which size?".
@@ -40,6 +42,7 @@ const NS = SIZE_CARDS.length;
 
 export default function SizePicker({ onSelect, onBack, dive = false, initialSize = 'M' }: { onSelect: (s: string) => void; onBack: () => void; dive?: boolean; initialSize?: string }) {
     const reducedMotion = usePrefersReducedMotion();
+    const [failedArt, setFailedArt] = useState<Record<string, boolean>>({});
     const [activeIdx, setActiveIdx] = useState(() => {
         const initialIndex = SIZE_CARDS.findIndex(card => card.id === initialSize.toUpperCase());
         return initialIndex >= 0 ? initialIndex : 1;
@@ -265,6 +268,7 @@ export default function SizePicker({ onSelect, onBack, dive = false, initialSize
 
             {/* Stage — discrete smooth coverflow (matches the hero menu) */}
             <div
+                className="sizePickerStage"
                 style={{ position: 'relative', width: '100%', height: 'clamp(210px, 40vh, 310px)', perspective: '900px', cursor: 'grab', touchAction: 'pan-y pinch-zoom', overflow: 'visible' }}
                 onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={() => { startX.current = null; }}
             >
@@ -278,6 +282,7 @@ export default function SizePicker({ onSelect, onBack, dive = false, initialSize
                         ? 'translateX(0) translateZ(34px) rotateY(0deg) scale(1)'
                         : `translateX(${side * 140}px) translateZ(-104px) rotateY(${-side * 22}deg) scale(0.66)`;
                     const hidden = reducedMotion && !isActive;
+                    const artwork = !failedArt[card.id] ? matchingSizeArtwork(card) : null;
 
                     return (
                         <button
@@ -285,6 +290,8 @@ export default function SizePicker({ onSelect, onBack, dive = false, initialSize
                             ref={element => { cardRefs.current[i] = element; }}
                             type="button"
                             className="sizePickerCard"
+                            data-size-tier={card.id}
+                            data-size-art={artwork ? 'botanical' : 'native'}
                             aria-label={`גודל ${card.name} (${card.id}), ${card.ml} מיליליטר, ${card.tag}, ${card.price} שקלים${isActive ? ', נבחר' : ''}`}
                             aria-pressed={isActive}
                             aria-hidden={hidden || undefined}
@@ -308,37 +315,46 @@ export default function SizePicker({ onSelect, onBack, dive = false, initialSize
                         >
                             <div style={{
                                 width: '100%', height: '100%', borderRadius: '16px', overflow: 'hidden', position: 'relative',
-                                border: isActive ? '1.5px solid rgba(240,200,50,0.65)' : '1px solid rgba(255,255,255,0.22)',
+                                border: artwork ? 0 : isActive ? '1.5px solid rgba(240,200,50,0.65)' : '1px solid rgba(255,255,255,0.22)',
                                 boxShadow: isActive ? 'var(--shadow-card-glow), var(--shadow-gold-glow-lg)' : '0 6px 20px rgba(0,0,0,0.5)',
                                 background: '#0b2113',
                             }}>
-                                <Image
-                                    src={card.img} alt="" aria-hidden width={S_W} height={S_H} sizes="210px"
-                                    style={{ width: '100%', height: '58%', objectFit: 'contain', pointerEvents: 'none', display: 'block' }}
-                                />
+                                {artwork && (
+                                    <Image className="sizePickerPoster" src={artwork.src} alt="" aria-hidden fill
+                                        sizes="210px" priority={isActive}
+                                        onError={() => setFailedArt(previous => ({ ...previous, [card.id]: true }))}
+                                        style={{ objectFit: 'contain', pointerEvents: 'none' }} />
+                                )}
+                                {isActive && <span className="sizePickerSelected" aria-hidden><Check size={11} />נבחר</span>}
+                                <div className={artwork ? 'sizePickerFallback' : undefined} style={{ width: '100%', height: '100%' }}>
+                                    <Image
+                                        src={card.img} alt="" aria-hidden width={S_W} height={S_H} sizes="210px"
+                                        style={{ width: '100%', height: '58%', objectFit: 'contain', pointerEvents: 'none', display: 'block' }}
+                                    />
 
-                                {/* Food-only artwork. Every size, price and volume
-                                    is native text from the effective-price layer. */}
-                                <div style={{
-                                    position: 'absolute', zIndex: 3, left: 0, right: 0, bottom: 0, height: '42%',
-                                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                                    padding: '7px 10px 10px', textAlign: 'center',
-                                    background: '#081b10',
-                                    borderTop: '1px solid rgba(225,200,117,0.2)',
-                                }}>
-                                    <div
-                                        key={isActive ? `live-price-${activeIdx}` : `live-price-${card.id}`}
-                                        style={{
-                                            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                                            animation: isActive && !reducedMotion ? 'priceBadge 0.32s cubic-bezier(0.34,1.4,0.64,1) both' : 'none',
-                                        }}
-                                    >
-                                        <div style={{ fontSize: '16px', fontWeight: 800, color: '#fff3ce' }}>{card.name} · {card.id}</div>
-                                        <div style={{ fontSize: '30px', lineHeight: 1.05, fontWeight: 950, color: '#fff', textShadow: '0 2px 10px rgba(0,0,0,0.7)' }}>
-                                            ₪{card.price}
-                                        </div>
-                                        <div style={{ fontSize: '12px', fontWeight: 500, color: '#c9d7c5', marginTop: '4px' }}>
-                                            {card.ml} מ״ל · {card.tag}
+                                    {/* Native facts remain available when an illustrated offer
+                                        is stale, unavailable, failed or unsuitable for the viewport. */}
+                                    <div style={{
+                                        position: 'absolute', zIndex: 3, left: 0, right: 0, bottom: 0, height: '42%',
+                                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                                        padding: '7px 10px 10px', textAlign: 'center',
+                                        background: '#081b10',
+                                        borderTop: '1px solid rgba(225,200,117,0.2)',
+                                    }}>
+                                        <div
+                                            key={isActive ? `live-price-${activeIdx}` : `live-price-${card.id}`}
+                                            style={{
+                                                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                                                animation: isActive && !reducedMotion ? 'priceBadge 0.32s cubic-bezier(0.34,1.4,0.64,1) both' : 'none',
+                                            }}
+                                        >
+                                            <div style={{ fontSize: '16px', fontWeight: 800, color: '#fff3ce' }}>{card.name} · {card.id}</div>
+                                            <div style={{ fontSize: '30px', lineHeight: 1.05, fontWeight: 950, color: '#fff', textShadow: '0 2px 10px rgba(0,0,0,0.7)' }}>
+                                                ₪{card.price}
+                                            </div>
+                                            <div style={{ fontSize: '12px', fontWeight: 500, color: '#c9d7c5', marginTop: '4px' }}>
+                                                {card.ml} מ״ל · {card.tag}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -394,6 +410,17 @@ export default function SizePicker({ onSelect, onBack, dive = false, initialSize
 }
 
 const KF = `
+.sizePickerFallback { display: none; }
+.sizePickerSelected { position: absolute; top: 9px; inset-inline-start: 9px; z-index: 6; display: inline-flex; align-items: center; gap: 3px; padding: 3px 7px; border-radius: 20px; background: #f0d060; color: #173018; font-size: 10px; font-weight: 800; }
+@media (forced-colors: active), (max-height: 600px) {
+  .sizePickerPoster { display: none; }
+  .sizePickerFallback { display: block; }
+}
+@media (max-height: 600px) {
+  /* The absolute 272px card must not spill out of its stage onto the CTA.
+     Safe-centering and modal scrolling handle the extra height. */
+  .sizePickerStage { min-height: 272px; flex-shrink: 0; }
+}
 @keyframes sizePickerIn  { from{opacity:0;transform:scale(0.93) translateY(24px)} to{opacity:1;transform:none} }
 @keyframes sizePickerOut { to{opacity:0;transform:scale(0.96) translateY(-10px)} }
 @keyframes priceBadge    { from{opacity:0;transform:translateY(8px) scale(0.75)} to{opacity:1;transform:none} }

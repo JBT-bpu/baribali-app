@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import GoldField from '@/components/ui/GoldField';
 import GoogleSignInButton from '@/components/ui/GoogleSignInButton';
 import LegalLinks from '@/components/legal/LegalLinks';
@@ -28,18 +29,18 @@ export default function LoginPage() {
         }}>
             <GoldField zIndex={0} />
             <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '18px', maxWidth: '320px', width: '100%' }}>
-                <div style={{ fontSize: '28px', fontWeight: 800, color: 'var(--color-gold-light)' }}>🥗 BariBali</div>
+                <Image src="/homepage-assets/logo.webp" alt="BariBali" width={220} height={140} sizes="150px" style={{ width: '150px', height: 'auto' }} />
                 <div style={{ fontSize: '22px', fontWeight: 900, color: '#fff', textAlign: 'center' }}>התחברות</div>
-                <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.55)', textAlign: 'center', lineHeight: 1.7 }}>
+                <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.82)', textAlign: 'center', lineHeight: 1.7 }}>
                     חשבון שומר את היסטוריית ההזמנות שלכם.
                     <br />
-                    <strong style={{ color: 'rgba(255,255,255,0.75)' }}>לא צריך חשבון כדי להזמין</strong> — אפשר תמיד כאורח.
+                    <strong style={{ color: '#fff8dc' }}>לא צריך חשבון כדי להזמין</strong> — אפשר תמיד כאורח.
                 </div>
                 <GoogleSignInButton fullWidth />
                 <Link href="/home2" style={{
-                    fontSize: '14px', fontWeight: 700, color: 'rgba(255,255,255,0.5)',
-                    textDecoration: 'none', padding: '10px 24px',
-                    border: '1px solid rgba(255,255,255,0.15)', borderRadius: '50px',
+                    fontSize: '15px', fontWeight: 800, color: '#ffe7a0',
+                    textDecoration: 'none', padding: '14px 24px', minHeight: '52px', width: '100%', textAlign: 'center',
+                    background: '#17351b', border: '1px solid #bfa54f', borderRadius: '50px',
                 }}>
                     המשך כאורח ←
                 </Link>

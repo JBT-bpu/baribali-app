@@ -2,7 +2,8 @@
 
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ClipboardList, ChevronLeft } from 'lucide-react';
+import { ClipboardList, ChevronLeft, UserRound } from 'lucide-react';
+import BariJournalArt from '@/components/ui/bari/BariJournalArt';
 import GoldField from '@/components/ui/GoldField';
 import GoogleSignInButton from '@/components/ui/GoogleSignInButton';
 import { BariPanel, BariBottomNav, BariButton } from '@/components/ui/bari';
@@ -31,13 +32,14 @@ export default function ProfilePage() {
             <div style={{ ...bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '18px', padding: '20px', paddingBottom: 'calc(106px + env(safe-area-inset-bottom))' }}>
                 <GoldField zIndex={0} />
                 <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', maxWidth: '320px', width: '100%' }}>
-                    <div style={{ fontSize: '48px' }}>👤</div>
+                    <BariJournalArt />
                     <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 900, color: '#fff' }}>האזור שלי</h1>
                     <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.74)', textAlign: 'center', lineHeight: 1.7 }}>
                         התחברו כדי לשמור את היסטוריית ההזמנות ולהזמין שוב בקלות.
                         <br />להזמין אפשר תמיד גם בלי חשבון.
                     </div>
                     <GoogleSignInButton fullWidth />
+                    <BariButton fullWidth onClick={() => router.push('/home2')}>להמשיך לתפריט כאורח ←</BariButton>
                 </div>
                 <BariBottomNav />
             </div>
@@ -54,10 +56,10 @@ export default function ProfilePage() {
                 <h1 style={{ margin: 0, fontSize: '22px', fontWeight: 900, color: '#fff' }}>האזור שלי</h1>
 
                 {/* Identity card */}
-                <BariPanel className="p-4" style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <BariPanel ornate className="p-4" style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                     {avatar
                         ? <img src={avatar} alt="" referrerPolicy="no-referrer" style={{ width: '52px', height: '52px', borderRadius: '50%', border: '2px solid rgba(200,168,78,0.5)' }} />
-                        : <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: 'rgba(200,168,78,0.2)', border: '2px solid rgba(200,168,78,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px' }}>👤</div>}
+                        : <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: 'rgba(200,168,78,0.2)', border: '2px solid rgba(200,168,78,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><UserRound size={24} color="#ead482" aria-hidden /></div>}
                     <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: '17px', fontWeight: 900, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName(user)}</div>
                         {user.email && <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email}</div>}
@@ -66,7 +68,7 @@ export default function ProfilePage() {
 
                 {/* My Orders — the history lives on its own screen now */}
                 <Link href="/orders" style={{ textDecoration: 'none' }}>
-                    <BariPanel className="p-4" style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+                    <BariPanel ornate className="p-4" style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
                         <ClipboardList size={22} color="var(--color-gold-light)" strokeWidth={2.2} />
                         <span style={{ flex: 1, fontSize: '15px', fontWeight: 800, color: '#fff' }}>ההזמנות שלי</span>
                         <ChevronLeft size={20} color="rgba(255,255,255,0.4)" strokeWidth={2.4} />

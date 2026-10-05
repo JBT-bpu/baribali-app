@@ -7,6 +7,7 @@ import { BariButton } from '@/components/ui/bari';
 import { usePrefersReducedMotion } from '@/lib/motionHooks';
 import { effectiveSizePrice } from '@/lib/menuConfig';
 import { matchingSaladHeroArtwork } from '@/lib/saladHeroArtwork';
+import { matchingComingSoonArtwork } from '@/lib/catalogArtwork';
 import {
     isOrderableProduct,
     isOrderProduct,
@@ -16,7 +17,7 @@ import {
 /**
  * Product "hero select" — a game-style character-select roster for the menu.
  * Availability comes from the same product switch enforced by the route and
- * pricing layers. The veiled third hero remains a local coming-soon concept.
+ * pricing layers. Pasta remains an explicitly locked coming-soon concept.
  *
  * Motion model is DISCRETE (this is what makes it feel smooth): each card sits
  * in a fixed slot — active center, or a rotated/receded side — derived purely
@@ -32,7 +33,7 @@ import {
  */
 
 interface Hero {
-    id: OrderProduct | 'mystery';
+    id: OrderProduct | 'pasta';
     img: string | null;
     title: string;
     copy: string;      // card subtitle
@@ -54,18 +55,18 @@ const HEROES: Hero[] = [
     },
     {
         id: 'tortilla', img: '/homepage-assets/card-tortilla.png',
-        title: 'טורטייה',
-        copy: isOrderableProduct('tortilla') ? 'הרכבה חופשית' : 'הגיבור הבא של התפריט',
+        title: 'כריכים וטורטיות',
+        copy: isOrderableProduct('tortilla') ? 'הרכבה חופשית' : 'בקרוב בתפריט',
         status: isOrderableProduct('tortilla') ? 'זמין עכשיו' : 'בקרוב',
         detail: isOrderableProduct('tortilla')
             ? 'הרכיבו אותה בדיוק כמו שאתם אוהבים.'
-            : 'עוד רגע מצטרפת לתפריט. שווה לחכות.',
+            : 'כריכים וטורטיות בדרך. נעדכן כשאפשר להזמין.',
         locked: !isOrderableProduct('tortilla'),
     },
     {
-        id: 'mystery', img: null,
-        title: 'מנת הפתעה', copy: 'סוד קטן מהמטבח',
-        status: 'בקרוב', detail: 'מקום שמור למנה הבאה. נגלה בקרוב.',
+        id: 'pasta', img: '/icons/pasta_fusilli.webp',
+        title: 'פסטה', copy: 'משהו חדש מתבשל',
+        status: 'בקרוב', detail: 'פסטה בדרך לתפריט. עדיין לא זמינה להזמנה.',
         locked: true,
     },
 ];
@@ -86,6 +87,7 @@ export default function HeroSelector({
     const reducedMotion = usePrefersReducedMotion();
     const [activeIdx, setActiveIdx] = useState(0);
     const [posterFailed, setPosterFailed] = useState(false);
+    const [failedComingArt, setFailedComingArt] = useState<Record<string, boolean>>({});
     const startingPrice = Math.min(...[750, 1000, 1500].map(effectiveSizePrice));
     const startX = useRef<number | null>(null);
     const moved = useRef(false);
@@ -198,7 +200,7 @@ export default function HeroSelector({
                     const hidden = reducedMotion && !isActive;
                     const cardArtwork = hero.id === 'salad' && !hero.locked && !posterFailed
                         ? matchingSaladHeroArtwork(startingPrice, hero.title, hero.copy)
-                        : null;
+                        : !failedComingArt[hero.id] ? matchingComingSoonArtwork(hero.id, hero.title, hero.copy, hero.locked) : null;
 
                     return (
                         <button
@@ -221,7 +223,7 @@ export default function HeroSelector({
                                 transformOrigin: '50% 80%',
                                 transform: reducedMotion ? (isActive ? 'none' : 'scale(0.9)') : transform,
                                 opacity: hidden ? 0 : (isActive ? 1 : 0.52),
-                                filter: isActive ? 'none' : 'brightness(0.82)',
+                                filter: isActive ? 'none' : 'brightness(0.9)',
                                 zIndex: isActive ? 4 : 2,
                                 pointerEvents: hidden ? 'none' : 'auto',
                                 cursor: 'pointer',
@@ -248,8 +250,11 @@ export default function HeroSelector({
                                         className="hero-selector__poster"
                                         src={cardArtwork.src} alt="" aria-hidden fill
                                         sizes="(max-height: 640px) 162px, 210px"
-                                        priority
-                                        onError={() => setPosterFailed(true)}
+                                        priority={isActive}
+                                        onError={() => {
+                                            if (hero.id === 'salad') setPosterFailed(true);
+                                            else setFailedComingArt(previous => ({ ...previous, [hero.id]: true }));
+                                        }}
                                         style={{ objectFit: 'contain', pointerEvents: 'none' }}
                                     />
                                 )}
@@ -263,7 +268,7 @@ export default function HeroSelector({
                                             src={hero.img} alt="" aria-hidden width={C_W} height={C_H}
                                             sizes="210px"
                                             priority={hero.id === 'salad' && !cardArtwork}
-                                            style={{ width: '100%', height: hero.id === 'salad' ? '64%' : '100%', marginTop: hero.id === 'salad' ? '8px' : 0, objectFit: hero.id === 'salad' ? 'contain' : 'cover', pointerEvents: 'none', display: 'block', filter: hero.locked ? 'saturate(0.45) brightness(0.66)' : 'none' }}
+                                            style={{ width: '100%', height: hero.id === 'salad' || hero.id === 'pasta' ? '64%' : '100%', marginTop: hero.id === 'salad' || hero.id === 'pasta' ? '8px' : 0, objectFit: hero.id === 'salad' || hero.id === 'pasta' ? 'contain' : 'cover', pointerEvents: 'none', display: 'block', filter: hero.locked ? 'saturate(0.65) brightness(0.82)' : 'none' }}
                                         />
                                     ) : (
                                         <div style={S.veilArt} aria-hidden>

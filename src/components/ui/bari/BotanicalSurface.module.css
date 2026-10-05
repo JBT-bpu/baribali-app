@@ -1,0 +1,38 @@
+/* Nine-slice the real artwork: corners retain their proportions at any panel size. */
+.surface {
+    position: relative;
+    isolation: isolate;
+}
+
+.surface::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    border: 1px solid transparent;
+    border-image: url('/builder-assets/botanical-panel-v1.webp') 96 fill / 18px / 0 stretch;
+    opacity: 0.88;
+}
+
+.journal {
+    width: 180px;
+    height: auto;
+    max-height: 20dvh;
+    object-fit: contain;
+    display: block;
+}
+
+.journalCompact {
+    width: 112px;
+    height: 84px;
+    object-fit: contain;
+    display: block;
+    margin-inline: auto;
+    margin-bottom: 8px;
+}
+
+@media (forced-colors: active) {
+    .surface::before { display: none; }
+    .journal, .journalCompact { display: none; }
+}

@@ -30,7 +30,7 @@ test('poster eligibility uses effective size prices and preserves native interac
     assert.match(hero, /Math\.min\(\.\.\.\[750, 1000, 1500\]\.map\(effectiveSizePrice\)\)/);
     assert.match(hero, /hero\.id === 'salad' && !hero\.locked && !posterFailed/);
     assert.match(hero, /matchingSaladHeroArtwork\(startingPrice, hero\.title, hero\.copy\)/);
-    assert.match(hero, /onError=\{\(\) => setPosterFailed\(true\)\}/);
+    assert.match(hero, /if \(hero.id === 'salad'\) setPosterFailed\(true\)/);
     assert.match(hero, /החל מ־\$\{startingPrice\} ₪ לפני תוספות/);
     assert.match(hero, /@media \(forced-colors: active\), \(max-height: 560px\)/);
     assert.match(hero, /hero-selector__poster \{ display: none; \}/);

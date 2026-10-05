@@ -998,7 +998,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                     />
 
                     {/* Price breakdown */}
-                    <BariPanel style={{ marginTop: "14px", padding: "14px 16px" }}>
+                    <BariPanel ornate style={{ marginTop: "14px", padding: "14px 16px" }}>
                         <div style={S.sumPriceLine}>
                             <span>מחיר בסיס{sizeLabel ? <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)", fontWeight: 500 }}> · {sizeLabel}</span> : null}</span>
                             <span style={{ fontWeight: 700 }}>₪{base}</span>

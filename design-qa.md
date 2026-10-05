@@ -1,4 +1,152 @@
-# Design QA — botanical salad card and luminous backdrop, 2026-10-05
+# Design QA — botanical customer UI extension, 2026-10-05
+
+## Current phase acceptance
+
+final result: passed
+
+The short-screen P2 below was repaired and passed post-fix capture/comparison.
+No actionable scoped P0/P1/P2 remains. This extends the owner's approved botanical
+salad card art direction
+through v1.0, without a new layout or dependency. The current phase is local:
+publication is awaiting explicit owner approval. Earlier Preview authorization
+and URLs below refer only to the prior phase, not these new changes.
+
+## Visual truth and actual combined comparisons
+
+Primary style truth: `public/homepage-assets/card-salad-botanical-54-v1.webp`.
+Seven new built-in ImageGen outputs were opened and inspected in original and
+optimized form. Exact variants, original PNG paths and generation briefs:
+`docs/BOTANICAL_UI_SYSTEM_2026-10-05.md`.
+
+Actual same-turn before and after captures use a 393×852 CSS viewport and pixels,
+deviceScaleFactor 1, guest, closed-shop fixture, reduced motion. No device frame
+or browser chrome is included. Sources are 630×816 (size cards), 630×858 (home
+future cards), 960×320 (panel texture), 512×384 (alpha journal).
+
+- Combined five-card comparison:
+  `.playwright-cli/art-system-2026-10-05/source-and-render-board.png`.
+  Source top, rendered implementation below; S/M/L and pasta/wraps left-to-right.
+  Normalize sources to 210×272 and 210×286 respectively, not a stretched mockup.
+- Focused comparisons:
+  `.playwright-cli/art-system-2026-10-05/compare-S.png`, `compare-M.png`,
+  `compare-L.png`, `compare-pasta.png`, `compare-wraps.png`.
+  Source left, actual browser right, matching scale. Full-view crops use
+  (92,319,210,272) for sizes and (92,258,210,286) for home; identical half-pixel
+  screenshot rounding conventions. Native selected/coming-soon badges are
+  intentional overlays, not missing or baked source elements.
+- Actual full-view before/after comparisons:
+  `.playwright-cli/art-system-2026-10-05/before-after-01-home.png`,
+  `before-after-02-size.png`, `before-after-03-entry.png`,
+  `before-after-04-orders.png`; each is 802×852, before left / after right.
+- Short-screen repair comparison: `compare-short-stage-fix.png`, 652×540.
+  Left is a clearly labelled browser-only reconstruction of original stage
+  sizing; right is the actual repaired implementation, both 320×540. It is not
+  represented as an archived pre-edit source screenshot. The initial screenshot
+  was inspected before discovering the issue; the final matrix recaptured it.
+- Additional implementation states: `recipe-expanded.png`, `builder-step-after.png`,
+  `builder-step-verified.png`, `summary-after.png`, `summary-price-panel.png`,
+  `summary-price-viewport.png`, `profile-after.png`, `login-after.png` in that folder.
+
+Both source and implementation were visually inspected from the combined
+boards, not inferred from filenames or separate thumbnail views.
+
+## Five required fidelity surfaces
+
+- Fonts/typography: unchanged self-hosted Heebo/Secular One for native UI;
+  generated ivory Hebrew lettering matches the approved poster style. Titles,
+  tier letters and prices are legible at the unchanged card dimensions. Volume
+  and descriptors are subordinate raster captions, not an accessibility claim.
+  Real native ARIA labels expose exact live size/price/volume. Native text appears
+  in forced colors, short/zoomed viewports, changed offers and image failures.
+- Spacing/layout rhythm: home stays 210×286, size stays 210×272 at 393×852;
+  entry 180.5px, live bowl 114px before/after selection. Twelve recipe buttons
+  retain the original two-column compact grid. Nine-sliced corners do not grow
+  padding/boxes; guest actions remain below copy and clear of the bottom dock.
+- Colors/tokens: preserved emerald/gold/ivory identity, luminous backdrop and
+  full field density. Source and browser card palettes align. Availability is
+  a real native badge; unlaunched food is intentionally visible rather than
+  obscured by a giant lock. Full-color art never means orderability.
+- Image quality/fidelity: 3× WebP posters retain real bowl/leaf relief details;
+  no handcrafted CSS/SVG substitute. S restrained, M richer relief, L pedestal
+  and double botanical perimeter. Slight differences in bowl visual scale are
+  artistic composition, not measured servings. Journal has genuine alpha and
+  blank pages; no invented account facts. Panel uses real nine-slicing.
+- Copy/content: exact S54/M59/L72 and 750/1000/1500 variants are runtime guarded
+  against effective menu prices and descriptions. Future cards have no prices
+  or dates. Pasta and sandwiches/tortillas explicitly remain coming soon.
+  Guest-first instructions/CTA are coherent. Nutrition, totals and legal facts
+  remain native, and existing checkout/recovery safeguards are unchanged.
+
+## Verified interactions and viewport resilience
+
+Isolated Chrome sessions; fixture APIs, external hosts and all non-GET/HEAD
+requests blocked. Final browser runs reported zero runtime errors and zero
+attempted writes. Signed-in sessions were not borrowed or fabricated.
+
+- Home: salad pointer/Enter opens the original picker; future cards pointer/
+  Enter stay on home without opening ordering. RTL arrows preserve roving focus.
+- Sizes: S/M/L illustrated at identical dimensions; native selection marker,
+  focus follows arrows, Tab remains inside, Escape restores the opener.
+  L confirmation reaches `/build?size=L` and reopening retains L.
+- Entry/recipes: real shared panel loaded; recipe expands/collapses; loading
+  signature recipe still quotes 67. Ingredient details, add and remove work;
+  bowl height is unchanged (114px empty and selected). Five-step flow reaches
+  summary with native total 67; no submit button pressed.
+- Guest orders/profile/login: art/logo loaded; full-width guest actions navigate
+  to home. Targets are 54px / 54px / 52.5px at the canonical viewport.
+- 320×540, 320×640, 393×852, 430×932, 768×1024: no horizontal overflow across
+  home, picker, entry, guest orders/profile/login. Picker confirmation remains
+  reachable and guest controls do not disappear below the dock.
+- At 320×540 home and picker use native offers; forced colors also reveals
+  native facts. Intentional M, pasta and wrap 404s preserve live native facts
+  and availability. M fallback confirmation still reaches the builder; future
+  fallbacks stay locked.
+- Field: 111 mobile sprites (92 sparks +19 bokeh), frozen reduced-motion frames,
+  advancing normal-motion frames; size picker retains 111. Existing finite
+  sheen and coordinated handoff remain, no new permanent animation loop.
+- 235 focused tests, TypeScript and production build passed; full ESLint:
+  zero errors and eight unchanged warnings. React review: no new fetch/effect,
+  timer/listener, provider boundary or pointer-blocking decoration.
+
+## QA history, follow-up and limits
+
+The canonical equal-scale card and full-view comparisons passed. Subsequent
+short-screen inspection found one P2: the absolute 272px size card extended
+outside its clamped stage and covered about 13px of the confirmation button at
+320×540. This violates touch-action visibility even though a bounding-box-only
+reachability assertion passes. The current result was set blocked during repair.
+
+Fix: only at height ≤600px, reserve a 272px minimum, non-shrinking stage;
+existing safe-centering/modal scrolling handles the extra height. Card size and
+canonical-screen layout are unchanged. Add a regression/source assertion and a
+browser assertion for at least 8px between card and CTA. The full resilience run
+then passed again. `compare-short-stage-fix.png` was opened and inspected; the
+post-fix gap is about 14.8px. Confirmation and Back remain reachable by scrolling.
+Login supporting copy was also brightened against the restored luminous image,
+with refreshed canonical/short captures. No background darkening was introduced.
+
+During verification, the harness needed the
+observed volume label and checkbox role. The initial fixed Date clock also kept
+Motion's outgoing route tree alive: normal-animation verification was rerun in
+a fresh advancing-clock browser and passed with a single builder tree. These
+are recorded harness corrections, not hidden application or visual fixes.
+
+P3: raster footers do not inherit all system text-size preferences, and the L
+food composition is not a scientific representation of volume. The native
+small-screen/high-contrast/failure fallbacks and miniature comparison cups
+remain. Full WCAG/OS-text-only zoom certification and real-device performance
+measurement are not claimed. Authenticated history/profile panels are covered
+by shared-component/source checks, not a real OAuth session; no payment, staff,
+production or database round trip was performed.
+
+Implementation checklist complete: seven versioned assets, offer/launch guards,
+native fallback, opt-in quiet surfaces, guest CTAs, RTL/modal/focus checks,
+responsive/motion/failure and ingredient-to-summary checks, combined comparisons,
+regression tests and build. Preview publication remains a separate pending action.
+
+---
+
+# Prior phase — botanical salad card and luminous backdrop, 2026-10-05
 
 ## Current acceptance
 

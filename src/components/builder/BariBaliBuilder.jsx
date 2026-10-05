@@ -1,6 +1,7 @@
 'use client';
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import Image from "next/image";
+import botanical from "../ui/bari/BotanicalSurface.module.css";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, ChefHat, ChevronDown } from "lucide-react";
 
@@ -851,6 +852,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                 type="button"
                 onClick={() => { setStep(0); haptic("step"); playSound("step"); }}
                 style={S.heroBtn}
+                className={botanical.surface}
                 aria-label={`${hasDraft ? "המשיכו לבנות" : "לחצו להתחיל לבנות"} סלט ${sc.label}`}
               >
               {/* Top row: bowl + text */}
@@ -932,6 +934,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                                 else presetButtonRefs.current.delete(p.id);
                               }}
                               type="button"
+                              className={botanical.surface}
                               onClick={() => isOpen ? closeExpandedPreset(p.id) : setExpandedPreset(p.id)}
                               disabled={!presetAvailable}
                               style={{

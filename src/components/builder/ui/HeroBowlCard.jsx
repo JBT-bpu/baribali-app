@@ -6,6 +6,7 @@ import { usePrefersReducedMotion } from '../../../lib/motionHooks';
 import { isPreparationChoice } from '../../../lib/summaryPresentation';
 import { PANEL } from './heroBowlGeometry';
 import styles from './HeroBowlCard.module.css';
+import botanical from '../../ui/bari/BotanicalSurface.module.css';
 
 /** All choices remain removable in one horizontal 44px rail.
  * Decorative artwork is not a quantity or nutrition representation. */
@@ -16,7 +17,7 @@ export default function HeroBowlCard({ all, ingredientCount = all.length, onRemo
     const circumference = 2 * Math.PI * 44;
 
     return (
-        <section className={styles.panel} aria-label="הקערה והבחירות שלכם" data-bowl-panel>
+        <section className={`${styles.panel} ${botanical.surface}`} aria-label="הקערה והבחירות שלכם" data-bowl-panel>
             <div className={styles.art} aria-hidden="true">
                 <svg viewBox="0 0 100 100" className={styles.ring}>
                     <circle cx="50" cy="50" r="44" fill="none" stroke="rgba(229,210,145,0.14)" strokeWidth="2" />
