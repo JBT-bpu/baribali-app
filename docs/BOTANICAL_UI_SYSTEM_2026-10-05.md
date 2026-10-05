@@ -1,5 +1,27 @@
 # Botanical UI extension — 2026-10-05
 
+## Owner refinement: brighter large size card
+
+After reviewing the published v1 family, the owner requested a brighter,
+more inviting L and curved lettering like M. Only the L manifest reference
+now selects `homepage-assets/size-l-botanical-72-v2.webp`, 630×816 / 151912 bytes.
+M/S, prices, native controls, component geometry and background remain unchanged.
+L v1 is retained as a recoverable sibling.
+
+Built-in ImageGen edit target: L v1; style reference: unchanged M v1. Condensed
+brief: keep L's premium embossed botanical emerald bowl/pedestal and frame,
+match M's luminous emerald, fresh illuminated food and dimensional arched ivory
+title; preserve exactly גדול, L, 72 ₪, 1500 מ״ל, הכי גדול שלנו, same aspect ratio
+and clear native selection-marker area; no extra labels or controls.
+Original PNG retained at
+`C:/Users/COMP13/.codex/generated_images/01a06340-dcbe-7fd0-b3cb-302686bed44f/exec-f8c42719-57f6-43f0-bf6d-43e5e20cc9b9.png`.
+Sharp only resized/compressed and composed a same-scale comparison.
+Source board: `.playwright-cli/l-bright-revision-2026-10-05/old-L-reference-M-new-L.png`.
+Code checks pass; rendered QA awaits isolated-browser permission. The owner has
+now authorized a new feature-branch Preview for personal review, including this
+L revision and the selected builder/button refinements. The previously published
+Preview below does not contain them. Production promotion remains out of scope.
+
 ## Brief and boundary
 
 Extend the owner's approved illustrated emerald/gold salad card through the
@@ -9,8 +31,12 @@ pasta and sandwiches/tortillas. Preserve the restored bright background,
 particles, guest-first journey, real prices and all backend/payment boundaries.
 
 No new dependency, provider change, environment edit, database write, real
-order/payment or production deployment belongs to this phase. Preview publication
-requires a fresh owner go-ahead; earlier Preview URLs do not contain these edits.
+order/payment or production deployment belongs to this phase. The owner approved
+branch-only Preview publication after local verification. Commit 6dc66a7 is READY
+at https://baribali-6g68g2g6a-jts-projects-c85ca52d.vercel.app/home2;
+deployment dpl_9piekvwgSzTtsS5ez3eG6qKZwnLn. Five customer routes and eight assets
+returned 200; asset hashes match the local reviewed files. Production remains
+d44fe06089fa3c113fbbc4a97c44191ec328dfc3. Earlier Preview URLs lack these edits.
 
 ## Scoped visual audit and changes
 

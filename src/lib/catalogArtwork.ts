@@ -2,7 +2,7 @@
 export const SIZE_ARTWORK = {
     S: { src: '/homepage-assets/size-s-botanical-54-v1.webp', name: 'קטן', ml: 750, price: 54, tag: 'קומפקטי', tier: 1 },
     M: { src: '/homepage-assets/size-m-botanical-59-v1.webp', name: 'בינוני', ml: 1000, price: 59, tag: 'הקלאסי', tier: 2 },
-    L: { src: '/homepage-assets/size-l-botanical-72-v1.webp', name: 'גדול', ml: 1500, price: 72, tag: 'הכי גדול שלנו', tier: 3 },
+    L: { src: '/homepage-assets/size-l-botanical-72-v2.webp', name: 'גדול', ml: 1500, price: 72, tag: 'הכי גדול שלנו', tier: 3 },
 } as const;
 
 interface SizeOffer { id: string; name: string; ml: number; price: number; tag: string }
