@@ -1,16 +1,26 @@
 'use client';
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
-import Image from "next/image";
 import botanical from "../ui/bari/BotanicalSurface.module.css";
+import visuals from "./ui/BuilderVisuals.module.css";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, ChefHat, ChevronDown } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChefHat, ChevronDown, Check, Crown, Leaf, Salad, Egg, Soup, Wheat, Sandwich, RotateCcw, Volume2, VolumeX } from "lucide-react";
 
 // Active ingredient picking keeps its quiet, space-efficient surface.
-const builderHeaderImage = "/builder-assets/builder-header-panel-v1.webp";
-const footerImage = "/builder-assets/footer-brand.png";
+const builderHeaderImage = "/builder-assets/builder-leaf-frame-v1.webp";
 
-// Presentation only: an actual ingredient from each resolved recipe, not its
-// catalog emoji. Prices, selections and recipe definitions stay untouched.
+const STEP_VISUALS = {
+  veggies: [Salad, "ירקות"], protein: [Egg, "תוספת"], sauces: [Soup, "רטבים"],
+  finish: [Wheat, "ערבוב"], upgrade: [Crown, "שדרוג"], wrap: [Sandwich, "טורטייה"],
+  t_fillings: [Salad, "מילויים"], t_protein: [Egg, "תוספת"],
+  t_sauces: [Soup, "רטבים"], t_upgrade: [Crown, "שדרוג"],
+};
+function StepIcon({ id, size = 20, completed = false }) {
+  const Glyph = completed ? Check : (STEP_VISUALS[id]?.[0] || Leaf);
+  return <Glyph size={size} strokeWidth={1.8} aria-hidden className={visuals.stepIcon} />;
+}
+
+// Actual-ingredient fallback if a recipe illustration is missing or outdated.
+// Prices, selections and recipe definitions stay untouched.
 const PRESET_ART = {
   signature: "baked_sweet_potato", mediterranean: "green_olives",
   asian_fusion: "tofu_olive", protein_beast: "egg", rainbow: "bell_pepper",
@@ -32,6 +42,8 @@ import DetailSheet from "./ui/DetailSheet.jsx";
 import SummaryView from "./SummaryView.jsx";
 import HeroBowlCard from "./ui/HeroBowlCard.jsx";
 import BuilderBrandHeader from "./ui/BuilderBrandHeader";
+import BuilderStartCard from "./ui/BuilderStartCard";
+import ChefRecipeArt from "./ui/ChefRecipeArt";
 import SizePicker from "../home/SizePicker";
 import BariModal from "../ui/bari/BariModal";
 import BariButton from "../ui/bari/BariButton";
@@ -39,6 +51,7 @@ import { useAnimatedNumber, usePrefersReducedMotion } from "../../lib/motionHook
 import { takeReorder } from "../../lib/reorder";
 import { effectiveItemPrice, effectiveBase, effectiveSizePrice } from "../../lib/menuConfig";
 import { resolveChefPreset } from "../../lib/chefPresets";
+import { matchingRecipeArtwork } from "../../lib/recipeArtwork";
 import { countsTowardIngredientPickLimit, INGREDIENT_PICK_LIMIT } from "../../lib/orderRules";
 import { isSoundOn, readSoundPref, setSoundPref } from "../../lib/soundPref";
 import { useHistoryBackedOverlay } from "../../hooks/useHistoryBackedOverlay";
@@ -843,51 +856,15 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
               </div>
             )}
 
-            {/* HERO - Start Empty Button (Glassy). Change Size is deliberately
+            {/* HERO. Change Size is deliberately
                 a sibling control, never an interactive element nested inside
                 this button. */}
             <div style={{ width: "100%", ...rise(1) }}>
-              <button
-                ref={startEmptyButtonRef}
-                type="button"
-                onClick={() => { setStep(0); haptic("step"); playSound("step"); }}
-                style={S.heroBtn}
-                className={botanical.surface}
-                aria-label={`${hasDraft ? "המשיכו לבנות" : "לחצו להתחיל לבנות"} סלט ${sc.label}`}
-              >
-              {/* Top row: bowl + text */}
-              <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "14px", padding: "10px 14px 10px" }}>
-
-                {/* Matching food artwork with no baked-in labels or prices. */}
-                <div className="hero-ring">
-                  <Image src="/homepage-assets/salad-bowl-m-v2.webp" alt="" width={112} height={112} sizes="112px" className="hero-bowl" />
-                </div>
-
-                {/* Text column */}
-                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "5px", textAlign: "right" }}>
-                  <div style={{ fontSize: "20px", fontWeight: 900, color: "#e8f5e9", textShadow: "0 2px 6px rgba(0,0,0,0.7)", letterSpacing: "0.02em", lineHeight: 1.2 }}>{hasDraft ? "המשיכו לבנות את הסלט" : "בנו את הסלט שלכם"}</div>
-                  <div style={{ fontSize: "12px", color: "#c9d7c5", fontWeight: 500, lineHeight: 1.6 }}>{hasDraft ? "הבחירות שלכם נשמרו · אפשר להמשיך לערוך" : "5 שלבים פשוטים · בחירה חופשית"}</div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "6px", padding: "5px 10px", borderRadius: "10px", background: "rgba(200,168,78,0.1)", border: "1px solid rgba(200,168,78,0.25)", width: "fit-content", alignSelf: "flex-end" }}>
-                    <span style={{ fontSize: "12px", fontWeight: 800, color: "#f0d060" }}>{sc.label}</span>
-                    <div style={{ width: "1px", height: "12px", background: "rgba(200,168,78,0.3)" }} />
-                    <span style={{ fontSize: "18px", fontWeight: 900, color: "#f0d060", lineHeight: 1 }}>₪{effectiveSizePrice(sc.ml)}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Gold CTA strip */}
-              <div style={{
-                width: "100%", padding: "10px 18px",
-                backgroundImage: "linear-gradient(135deg, #c8a832 0%, #f0d060 40%, #ffe599 52%, #c8a832 100%)",
-                backgroundSize: "200% 100%",
-                animation: reducedMotion ? "none" : "shimmer 1.2s ease-out both",
-                display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
-                borderTop: "1px solid rgba(255,220,80,0.3)",
-              }}>
-                <span style={{ fontSize: "14px", fontWeight: 900, color: "#0d2e0d", letterSpacing: "0.03em" }}>{hasDraft ? "המשיכו לבנות" : "לחצו להתחיל לבנות"}</span>
-                <span style={{ fontSize: "17px", fontWeight: 900, color: "#0d2e0d" }}>←</span>
-              </div>
-              </button>
+              <BuilderStartCard
+                buttonRef={startEmptyButtonRef}
+                onStart={() => { setStep(0); haptic("step"); playSound("step"); }}
+                hasDraft={hasDraft} sizeLabel={sc.label} price={effectiveSizePrice(sc.ml)}
+              />
               <button
                 ref={changeSizeButtonRef}
                 type="button"
@@ -895,7 +872,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                 style={S.changeSizeBtn}
                 aria-label={`שינוי גודל. הגודל הנוכחי: ${sc.label}`}
               >
-                <span aria-hidden="true">↺</span>
+                <RotateCcw size={16} strokeWidth={1.8} aria-hidden />
                 <span>שינוי גודל · {sc.label}</span>
               </button>
             </div>
@@ -934,14 +911,14 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                                 else presetButtonRefs.current.delete(p.id);
                               }}
                               type="button"
-                              className={botanical.surface}
+                              className={`${visuals.leafSurface} ${visuals.recipeButton}`}
                               onClick={() => isOpen ? closeExpandedPreset(p.id) : setExpandedPreset(p.id)}
                               disabled={!presetAvailable}
                               style={{
                                 ...S.presetCard,
                                 width: "100%",
                                 background: pc.bg,
-                                borderWidth: "1px", borderStyle: "solid", borderColor: isOpen ? pc.text : pc.border,
+                                border: 0,
                                 boxShadow: isOpen ? `${pc.glow}, inset 0 0 0 1px ${pc.border}` : pc.glow,
                                 opacity: expandedPreset && !isOpen ? 0.55 : 1,
                                 transform: isOpen && !reducedMotion ? "scale(1.01)" : "none",
@@ -959,7 +936,8 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                                   מומלץ ✦
                                 </div>
                               )}
-                              <Icon src={presetQuote?.items.find(item => item.id === PRESET_ART[p.id])?.icon || presetQuote?.items[0]?.icon || "/icons/lettuce_romaine.webp"} size="32px" style={{ flexShrink: 0 }} />
+                              <ChefRecipeArt src={presetAvailable ? matchingRecipeArtwork(p) : null}
+                                fallbackSrc={presetQuote?.items.find(item => item.id === PRESET_ART[p.id])?.icon || presetQuote?.items[0]?.icon || "/icons/lettuce_romaine.webp"} />
                               <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px", textAlign: "right" }}>
                                 <span style={{ fontSize: "12px", fontWeight: 800, color: "#fff0ba", lineHeight: 1.3 }}>{p.he}</span>
                                 <span style={{ fontSize: "11px", fontWeight: 600, color: presetAvailable ? "#d6c384" : "#c4d2bf", lineHeight: 1.3 }}>
@@ -1122,21 +1100,21 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
       <div style={S.main}>
 
         {/* ── HEADER ── */}
-        <div style={{ ...S.header, ...rise(3) }} role="banner">
+        <div className={visuals.leafSurface} style={{ ...S.header, "--builder-frame": `url(${builderHeaderImage})`, ...rise(3) }} role="banner">
           {/* Controls occupy their own row. The title used to be absolutely
               centred behind 3×44px controls, which guaranteed overlap at 320px
               and under text zoom. */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", minWidth: 0, padding: "4px 0 2px" }}>
             {/* Back + utility cluster — inline start */}
             <div style={{ display: "flex", gap: "5px", flexShrink: 0 }}>
-              <button type="button" onClick={back} aria-label={editingFromSummary ? "חזרה לסיכום" : "חזור"} style={S.navBtn}>→</button>
+              <button type="button" onClick={back} aria-label={editingFromSummary ? "חזרה לסיכום" : "חזור"} style={S.navBtn}><ArrowRight size={22} strokeWidth={1.8} aria-hidden /></button>
               <button
                 type="button"
                 onClick={requestClearDraft}
                 aria-label="נקה הכל"
                 disabled={all.length === 0}
-                style={{ ...S.resetBtn, opacity: all.length > 0 ? 1 : 0.35, cursor: all.length > 0 ? "pointer" : "not-allowed" }}
-              >↺</button>
+                style={{ ...S.navBtn, opacity: all.length > 0 ? 1 : 0.45, cursor: all.length > 0 ? "pointer" : "not-allowed" }}
+              ><RotateCcw size={20} strokeWidth={1.8} aria-hidden /></button>
               {/* Sound toggle — rendered post-mount so the stored preference can't
                   cause a hydration mismatch. */}
               {mounted && (
@@ -1147,12 +1125,12 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                   aria-pressed={soundOn}
                   style={{ ...S.navBtn, opacity: soundOn ? 1 : 0.45 }}
                 >
-                  {soundOn ? "🔊" : "🔇"}
+                  {soundOn ? <Volume2 size={21} strokeWidth={1.8} aria-hidden /> : <VolumeX size={21} strokeWidth={1.8} aria-hidden />}
                 </button>
               )}
             </div>
             {/* Next — inline end */}
-            <button type="button" onClick={next} aria-label={editingFromSummary ? "שמירת השינויים וחזרה לסיכום" : "המשך"} style={{ ...S.navBtnNext, flexShrink: 0 }}>←</button>
+            <button type="button" onClick={next} aria-label={editingFromSummary ? "שמירת השינויים וחזרה לסיכום" : "המשך"} style={{ ...S.navBtnNext, flexShrink: 0 }}><ArrowLeft size={22} strokeWidth={1.8} aria-hidden /></button>
           </div>
 
           {/* A normal-flow heading gets the full width and can wrap at 200%
@@ -1166,7 +1144,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
               gap: "4px 5px", textAlign: "center", lineHeight: 1.15, pointerEvents: "none",
             }}
           >
-            <span style={{ fontSize: "clamp(15px, 4.5vw, 22px)" }} aria-hidden="true">{cur.emoji}</span>
+            <StepIcon id={cur.id} size={21} />
             <span style={{ fontFamily: "var(--font-display), 'Secular One', sans-serif", fontSize: "clamp(16px, 4.8vw, 23px)", color: "#ffffff", textShadow: "0 2px 6px rgba(0,0,0,0.6)" }}>{cur.title}</span>
             {currentSubtitle && <>
               <span style={{ fontSize: "clamp(11px, 3vw, 14px)", color: "rgba(255,255,255,0.5)", fontWeight: 400 }} aria-hidden="true">·</span>
@@ -1206,16 +1184,14 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                   display: "flex", alignItems: "center", justifyContent: "center",
                   overflow: "hidden", gap: "3px",
                 }}>
-                  <span style={{ fontSize: "11px", lineHeight: 1 }}>
-                    {i < step ? "✓" : s.emoji}
-                  </span>
+                  <span style={{ lineHeight: 1, color: i === step ? "#3a2800" : "#e1d6a7" }}><StepIcon id={s.id} size={12} completed={i < step} /></span>
                   <span className="builder-progress-label" style={{
                     fontSize: "10px", fontWeight: i === step ? 800 : 700,
                     color: i === step ? "#3a2800" : i < step ? "#ffffff" : "rgba(255,255,255,0.55)",
                     letterSpacing: "0.01em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                     maxWidth: "calc(100% - 18px)",
                     transition: "color 0.3s ease",
-                  }}>{s.title}</span>
+                  }}>{STEP_VISUALS[s.id]?.[1] || s.title}</span>
                 </div>
               </button>
             ))}
@@ -1290,7 +1266,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
 
           {/* Empty state intro */}
           {curSel.length === 0 && currentIntro && (
-            <div style={S.introCard}><span style={{ fontSize: "13px" }}>{cur.emoji}</span><span style={S.introText}>{currentIntro}</span></div>
+            <div style={S.introCard}><StepIcon id={cur.id} size={18} /><span style={S.introText}>{currentIntro}</span></div>
           )}
 
           {/* Bowl at capacity — says why the chips below are unavailable */}
@@ -1360,18 +1336,18 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
         {/* ── BOTTOM ACTION ZONE ── */}
         <div style={{ ...S.bar, ...rise(0) }}>
           <button
+            type="button"
+            className={`${visuals.leafSurface} ${visuals.footerButton}`}
             style={{
               flex: 1,
               display: "flex", alignItems: "center", justifyContent: "space-between",
-              padding: "12px 20px",
+              padding: "10px 12px",
               borderRadius: "14px",
-              border: "1px solid rgba(200,168,78,0.35)",
-              background: "linear-gradient(145deg, rgba(8,22,8,0.97), rgba(13,40,13,0.95))",
+              border: 0,
+              background: "#0b2515",
               cursor: "pointer",
               fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
-              // Static gold glow — was a goldPulse box-shadow loop, but infinite
-              // box-shadow animation repaints every frame and the CTA pill's
-              // shimmer already provides motion here.
+              // Artwork is static; no permanent shimmer or repaint loop.
               boxShadow: "0 4px 18px rgba(0,0,0,0.4), 0 0 12px rgba(200,168,78,0.35), 0 0 0 1px rgba(200,168,78,0.08)",
               ...(cur.id === "upgrade" && curSel.length === 0 ? { opacity: 0.5 } : {}),
             }}
@@ -1382,25 +1358,16 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
             {/* Left: counts */}
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <span style={{ fontSize: "17px", fontWeight: 900, color: "#ffffff", textShadow: "0 2px 4px rgba(0,0,0,0.5)" }}>{all.length}</span>
-              <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)", fontWeight: 600 }}>בחירות</span>
+              <span style={{ fontSize: "11px", color: "#c4d2bf", fontWeight: 600 }}>בחירות</span>
               <div style={{ width: "1px", height: "14px", background: "rgba(200,168,78,0.25)" }} />
               <span style={{ fontSize: "17px", fontWeight: 900, color: "#f0d060", textShadow: "0 2px 6px rgba(200,168,78,0.4)" }}>₪{displayTotal}</span>
             </div>
             {/* Right: single combined CTA pill */}
-            <div style={{
-              display: "flex", alignItems: "center", gap: "6px",
-              padding: "7px 14px", borderRadius: "10px",
-              backgroundImage: "linear-gradient(135deg, #c8a832 0%, #f0d060 40%, #ffe599 52%, #c8a832 100%)",
-              backgroundSize: "200% 100%",
-              color: "#0d2e0d", fontWeight: 900,
-              boxShadow: "0 2px 10px rgba(200,168,78,0.5)",
-              animation: "shimmer 3s ease-in-out infinite",
-              whiteSpace: "nowrap",
-            }}>
+            <div className={visuals.actionSeal}>
               <span style={{ fontSize: "14px" }}>
                 {editingFromSummary ? "שמירה וסיכום" : step === steps.length - 1 ? (curSel.length > 0 ? "לסיכום" : "דלגו") : "המשך"}
               </span>
-              <span style={{ fontSize: "16px" }}>←</span>
+              <ArrowLeft size={20} strokeWidth={2.2} aria-hidden />
             </div>
           </button>
         </div>
@@ -1418,20 +1385,10 @@ const KF = `
 @keyframes expandIn { 0%{opacity:0;transform:translateY(-6px) scaleY(0.94);transform-origin:top} 100%{opacity:1;transform:none} }
 @keyframes popBounce { 0%{transform:scale(0.3);opacity:0} 60%{transform:scale(1.15)} 100%{transform:scale(1);opacity:1} }
 @keyframes popOut { 0%{transform:scale(1);opacity:1} 100%{transform:scale(0.3);opacity:0} }
-@keyframes shimmer { 0%{background-position:200% center} 100%{background-position:-200% center} }
 @keyframes rayPulse { 0%,100%{opacity:0.04} 50%{opacity:0.08} }
 @keyframes flashIn { 0%{transform:translateY(-20px) scale(0.8);opacity:0} 12%{transform:none;opacity:1} 85%{opacity:1} 100%{transform:translateY(-8px);opacity:0} }
 @keyframes hintPop { 0%{opacity:0;transform:translateY(-6px) scale(0.95)} 3%{opacity:1;transform:none} 88%{opacity:1} 100%{opacity:0;transform:translateY(4px)} }
 @keyframes hintGlow { from{box-shadow:0 0 14px rgba(200,168,78,0.2),0 4px 16px rgba(0,0,0,0.4)} to{box-shadow:0 0 28px rgba(200,168,78,0.45),0 4px 20px rgba(0,0,0,0.5)} }
-@keyframes heroPulse {
-  0%, 100% { box-shadow: 0 0 0 1px rgba(200,168,78,0.12), 0 12px 40px rgba(0,0,0,0.55), 0 0 50px rgba(200,168,78,0.08), inset 0 1px 0 rgba(255,255,255,0.07); }
-  50% { box-shadow: 0 0 0 1px rgba(200,168,78,0.22), 0 14px 50px rgba(0,0,0,0.55), 0 0 80px rgba(200,168,78,0.18), inset 0 1px 0 rgba(255,255,255,0.1); }
-}
-.hero-ring { position:relative; width:112px; height:112px; flex-shrink:0 }
-.hero-bowl { width:100%; height:100%; object-fit:contain; pointer-events:none }
-@media (max-width: 374px) {
-  .hero-ring { width:90px; height:90px }
-}
 @media (max-width: 349px) {
   .builder-progress-label { display:none !important; }
 }
@@ -1481,14 +1438,12 @@ const S = {
   // CTA was inset twice as far as the chip grid directly above it.
   // paddingTop carries the status bar / notch now that viewport-fit=cover is
   // on; the header's own background fills that strip.
-  // Extend the artwork's quiet lower margin so its gold rail sits below the
-  // visible step markers, not through them. The controls keep their own sizes.
-  header: { padding: "8px 16px 6px", paddingTop: "calc(8px + env(safe-area-inset-top))", backgroundColor: "#0b2312", backgroundImage: `linear-gradient(rgba(5,18,9,0.08), rgba(5,18,9,0.08)), url(${builderHeaderImage})`, backgroundSize: "100% calc(100% + 16px)", backgroundRepeat: "no-repeat", borderBottom: "1px solid rgba(200,168,78,0.4)", boxShadow: "0 4px 16px rgba(0,0,0,0.35)", position: "relative", isolation: "isolate" },
+  // The quiet nine-slice leaf frame stays outside the native controls.
+  header: { padding: "8px 16px 6px", paddingTop: "calc(8px + env(safe-area-inset-top))", backgroundColor: "#0b2312", boxShadow: "0 4px 16px rgba(0,0,0,0.35)", position: "relative", isolation: "isolate" },
   headerTop: { display: "flex", alignItems: "center" },
   backBtn: { width: "44px", height: "44px", borderRadius: "10px", cursor: "pointer", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", color: "#ffffff", fontSize: "16px", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-heebo), 'Heebo', sans-serif" },
   navBtn: { width: "44px", height: "44px", borderRadius: "10px", cursor: "pointer", background: "linear-gradient(145deg, rgba(34,68,39,0.88), rgba(8,27,14,0.9))", border: "1px solid rgba(200,168,78,0.26)", boxShadow: "inset 0 1px 0 rgba(255,236,167,0.08)", color: "#ffffff", fontSize: "16px", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-heebo), 'Heebo', sans-serif" },
   navBtnNext: { width: "44px", height: "44px", borderRadius: "10px", cursor: "pointer", background: "linear-gradient(135deg, rgba(200,168,78,0.35), rgba(240,208,96,0.25))", border: "1.5px solid rgba(200,168,78,0.55)", color: "#f0d060", fontSize: "16px", fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", boxShadow: "0 0 10px rgba(200,168,78,0.25)" },
-  resetBtn: { width: "44px", height: "44px", borderRadius: "10px", cursor: "pointer", background: "rgba(239,83,80,0.18)", border: "1.5px solid rgba(239,83,80,0.5)", color: "#ff7575", fontSize: "17px", fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", boxShadow: "0 0 8px rgba(239,83,80,0.2)" },
   pricePill: { display: "flex", alignItems: "baseline", gap: "2px", background: "linear-gradient(135deg, rgba(200,168,78,0.15), rgba(180,140,40,0.08))", border: "1px solid rgba(200,168,78,0.4)", padding: "4px 12px", borderRadius: "12px", transition: "all 0.2s cubic-bezier(0.34,1.56,0.64,1)" },
   priceS: { fontSize: "11px", color: "#d4b84a", fontWeight: 700 },
   priceV: { fontSize: "22px", color: "#ffffff", fontWeight: 900, textShadow: "0 2px 8px rgba(200,168,78,0.5)" },
@@ -1562,23 +1517,7 @@ const S = {
   chipName: { fontSize: "13px", fontWeight: 800, textAlign: "center", lineHeight: 1.3, minHeight: "20px", width: "100%", overflowWrap: "anywhere", color: "#ffffff", textShadow: "0 1px 3px rgba(0,0,0,0.6)" },
   chipCost: { position: "absolute", top: "8px", insetInlineStart: "4px", maxWidth: "calc(100% - 48px)", fontSize: "11px", fontWeight: 800, lineHeight: 1.25, whiteSpace: "nowrap", color: "#f0d060", background: "rgba(200,168,78,0.08)", border: "1px solid rgba(200,168,78,0.2)", padding: "2px 2px", borderRadius: "6px" },
 
-  bar: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 16px max(14px, env(safe-area-inset-bottom))", background: `linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.25) 100%), url(${footerImage}) center top / cover no-repeat`, borderTop: "2px solid rgba(200,168,78,0.4)", boxShadow: "0 -4px 20px rgba(0,0,0,0.5), 0 0 30px rgba(200,168,78,0.08)" },
-  heroBtn: {
-    display: "flex", flexDirection: "column", alignItems: "stretch", gap: 0,
-    padding: 0, borderRadius: "16px", cursor: "pointer",
-    background: "#0b2515",
-    border: "1px solid rgba(200,168,78,0.55)",
-    boxShadow: "0 0 0 1px rgba(200,168,78,0.12), 0 8px 30px rgba(0,0,0,0.5), 0 0 40px rgba(200,168,78,0.08)",
-    transition: "all 0.35s cubic-bezier(0.34,1.56,0.64,1)",
-    outline: "none", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", width: "100%",
-    overflow: "hidden",
-    // A flex item with overflow != visible gets an automatic min-height of 0
-    // (CSS flexbox spec), so this button — the tallest thing in a scrollable
-    // flex column — was the one the flex-shrink algorithm sacrificed first,
-    // silently clipping the gold "לחצו להתחיל לבנות" strip below its own
-    // fold before the column ever got a chance to just scroll instead.
-    flexShrink: 0,
-  },
+  bar: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 16px max(14px, env(safe-area-inset-bottom))", background: "#06160bd9", borderTop: "1px solid rgba(200,168,78,0.3)", boxShadow: "0 -4px 20px rgba(0,0,0,0.35)" },
   changeSizeBtn: {
     width: "fit-content", minHeight: "44px", marginTop: "8px", marginLeft: "auto",
     display: "flex", alignItems: "center", justifyContent: "center", gap: "7px",
@@ -1589,7 +1528,7 @@ const S = {
   },
   presetCard: {
     display: "flex", flexDirection: "row", alignItems: "center",
-    gap: "7px", padding: "10px 9px", minHeight: "66px", borderRadius: "12px", cursor: "pointer",
+    gap: "6px", padding: "6px 8px", minHeight: "66px", borderRadius: "12px", cursor: "pointer",
     background: "linear-gradient(135deg, rgba(13,40,13,0.95), rgba(8,24,8,0.9))",
     boxShadow: "0 0 0 1px rgba(200,168,78,0.07), 0 2px 10px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)",
     transition: "all 0.2s cubic-bezier(0.34,1.56,0.64,1)", outline: "none",

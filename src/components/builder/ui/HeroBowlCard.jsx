@@ -6,7 +6,7 @@ import { usePrefersReducedMotion } from '../../../lib/motionHooks';
 import { isPreparationChoice } from '../../../lib/summaryPresentation';
 import { PANEL } from './heroBowlGeometry';
 import styles from './HeroBowlCard.module.css';
-import botanical from '../../ui/bari/BotanicalSurface.module.css';
+import visuals from './BuilderVisuals.module.css';
 
 /** All choices remain removable in one horizontal 44px rail.
  * Decorative artwork is not a quantity or nutrition representation. */
@@ -17,14 +17,14 @@ export default function HeroBowlCard({ all, ingredientCount = all.length, onRemo
     const circumference = 2 * Math.PI * 44;
 
     return (
-        <section className={`${styles.panel} ${botanical.surface}`} aria-label="הקערה והבחירות שלכם" data-bowl-panel>
+        <section className={`${styles.panel} ${visuals.leafSurface}`} aria-label="הקערה והבחירות שלכם" data-bowl-panel>
             <div className={styles.art} aria-hidden="true">
-                <svg viewBox="0 0 100 100" className={styles.ring}>
+                {ingredientCount > 0 && <svg viewBox="0 0 100 100" className={styles.ring}>
                     <circle cx="50" cy="50" r="44" fill="none" stroke="rgba(229,210,145,0.14)" strokeWidth="2" />
                     <circle cx="50" cy="50" r="44" fill="none" stroke="#d7bd62" strokeWidth="2" strokeLinecap="round"
                         strokeDasharray={circumference} strokeDashoffset={circumference * (1 - progress)} />
-                </svg>
-                <Image src="/builder-assets/builder-bowl-empty-v2.webp" alt="" width={96} height={96} sizes="96px" className={styles.base} />
+                </svg>}
+                <Image src="/builder-assets/builder-bowl-empty-seal-v1.webp" alt="" width={96} height={96} sizes="96px" className={styles.base} />
                 {foodPreview.map((item, index) => (
                     <img key={item.id} src={item.icon} alt="" className={styles.food}
                         style={{ left: (24 + index * 15) + '%', top: (foodPreview.length === 1 ? 26 : 22 + (index % 2) * 7) + '%', animationName: !reducedMotion && lastAdd === item.id ? styles.arrive : 'none' }} />

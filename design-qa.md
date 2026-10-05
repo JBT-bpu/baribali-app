@@ -1,3 +1,119 @@
+# Design QA — less-rounded gold button refinement, 2026-10-05
+
+final result: blocked
+
+The owner subsequently requested Preview publication ("תעלה אני יבדוק") and
+will review the live mobile UI personally. Publishing this owner-review Preview
+does not mark visual QA passed. Only the existing feature branch is in scope;
+`main`, production, environment variables and deployment protection stay unchanged.
+
+Owner correction: change only the empty gold button's capsule shape to a
+rounded rectangle matching the existing framed cards. Built-in ImageGen edited
+the hero's bottom plaque and its standalone sibling, preserving the large bowl
+composition and native control dimensions. V1 assets remain recoverable.
+
+Visual truth: `public/builder-assets/start-hero-seal-v2.webp` (1080×538) and
+`public/builder-assets/button-leaf-seal-v2.webp` (512×128, genuine alpha).
+Opened and inspected source-only before/after comparison:
+`.playwright-cli/builder-seals-2026-10-05/gold-shape-v1-v2-source-comparison.png`,
+1096×439; old left / revised right; hero normalized to 540×269 each and button
+to 512×128 each. This is not a combined source/render comparison.
+
+Five fidelity surfaces: typography/copy are unchanged native UI; spacing retains
+the existing card/target dimensions and native fallback corners are now 8px;
+gold/emerald material remains consistent; source image compression and alpha
+were inspected; prices, drafts, recipe data, sound/reset and step behavior are
+untouched. Actual rendering, text alignment and fallback/zoom remain unverified.
+
+241/241 tests, typecheck, targeted lint and production build pass. No actionable
+rendering defect is asserted from source files alone. Blocker unchanged: in-app
+browser tools are unavailable and isolated-Chrome permission has not been
+granted. No browser capture, commit, push, deployment or external mutation.
+Detailed saved paths, provenance and exact prompt set:
+`docs/GOLD_BUTTON_RECTANGLE_2026-10-05.md`.
+
+## Previous builder implementation record (preserved)
+
+# Design QA — builder option 3 + large bowl from option 1, 2026-10-05
+
+final result: blocked
+
+Owner chose visual 3 and requested the larger salad from 1. A merged generated
+source was opened and inspected, then used for a scoped local implementation.
+Source: `C:/Users/COMP13/.codex/generated_images/01a06340-dcbe-7fd0-b3cb-302686bed44f/exec-eb58b8ed-54c6-48f5-b4e0-a3877baf7e00.png`.
+The optimized artwork was also opened and inspected as one source-only sheet:
+`.playwright-cli/builder-seals-2026-10-05/optimized-assets-source-board.png`.
+The latter proves export/crop quality, not browser implementation fidelity.
+
+Five required fidelity surfaces — status before browser verification:
+- Fonts/typography: existing Heebo/Secular One, native Hebrew labels, current
+  prices/size and full ARIA labels retained; rendered wrapping remains unverified.
+- Spacing/layout: existing v1.0 structure, two-column recipe grid and 66px minimum
+  recipe buttons retained; 52px bowls offset by reduced padding. Compact bowl
+  geometry constants unchanged. Hero is a 2:1 composition with 180px minimum,
+  not a text-clipping fixed height. Actual dimensions/zoom require capture.
+- Colors/tokens: scoped fresh emerald, ivory and warm gold artwork; no global
+  backdrop darkening or particle change. Actual contrast is not measured yet.
+- Image quality: genuine alpha bowls/seals, corrected recipe atlas and dedicated
+  large-food hero. No baked price, quantity or nutrition authority. The compressed
+  sources are visually clean; nine-slice fit/CTA alignment still need render QA.
+- Copy/content: prices and recipe selections remain canonical native values;
+  draft/failure fallbacks, native RTL arrows and semantic sound/reset controls
+  preserved. Generated mock arrow mistakes are intentionally not reproduced.
+
+Checks: 240/240 tests passed; typecheck and production build passed; lint has
+0 errors and eight pre-existing warnings. Native HEAD for the new local hero
+asset at port 3002 returned 200. No browser automation was performed.
+
+Blocker: in-app browser tools are unavailable and the requested approval for an
+isolated Chrome visual check remains unanswered. The required equal-scale
+combined source/render comparison cannot yet be made. Do not mark this phase
+done or publish it from static checks alone. Pending: 320/393/430 layouts,
+short screens, 200% text, forced colors, image failures, recipe expansion/loading,
+draft/sizing, sound/reset/steps, full removal rail and correct footer totals.
+
+No discovered rendering defect is asserted without capture; no visual pass is
+claimed. No commit, push, deployment, provider, environment or database mutation.
+Implementation/provenance: `docs/BUILDER_RECIPE_SEALS_2026-10-05.md`.
+
+## Earlier local L revision record (preserved)
+
+# Design QA — brighter L artwork revision, 2026-10-05
+
+final result: blocked
+
+The user's scoped feedback: L was darker/less inviting than M and its title
+was straight rather than curved. Built-in ImageGen edited only the L artwork,
+using the unchanged M as the lighting/typography reference. The new sibling is
+`public/homepage-assets/size-l-botanical-72-v2.webp` (630×816, 151912 bytes).
+The original L v1 is retained; only the L manifest reference changed.
+
+Source comparison opened and inspected:
+`.playwright-cli/l-bright-revision-2026-10-05/old-L-reference-M-new-L.png`.
+Left: old L; center: unchanged M reference; right: revised L, all normalized
+to 210×272, combined canvas 654×272. This is a source-only comparison, not
+a browser implementation capture. Brighter fresh emerald, illuminated food
+and dimensional arched ivory lettering address the reported art mismatch.
+
+Five fidelity surfaces (source review only):
+- Typography: arched dimensional גדול, correct L and legible price; native
+  typography/ARIA untouched. No claim of rendered font fidelity yet.
+- Layout: same 630×816 raster and 210×272 component; no CSS or geometry edit.
+- Colors: visibly brighter greenery/food/gold than L v1; no global palette edit.
+- Image quality: genuine generated artwork, mechanically compressed WebP,
+  no added CSS filter, handcrafted ornament or altered M/S image.
+- Copy: גדול / L / 72 ₪ / 1500 מ״ל / הכי גדול שלנו; native pricing guards unchanged.
+
+Code checks: focused regression suite, typecheck and production build passed;
+lint has 0 errors and the same 8 existing warnings. No browser or deployed
+revision claim: in-app browser tools are unavailable; permission for an isolated
+Chrome visual check was requested and remains pending. The required combined
+source/render comparison is therefore absent. Blocker: browser verification
+permission, not a discovered rendering defect. No push, deployment, production,
+provider, environment, payment or database mutation occurred for this revision.
+
+## Previous phase record (preserved)
+
 # Design QA — botanical customer UI extension, 2026-10-05
 
 ## Current phase acceptance
@@ -7,9 +123,13 @@ final result: passed
 The short-screen P2 below was repaired and passed post-fix capture/comparison.
 No actionable scoped P0/P1/P2 remains. This extends the owner's approved botanical
 salad card art direction
-through v1.0, without a new layout or dependency. The current phase is local:
-publication is awaiting explicit owner approval. Earlier Preview authorization
-and URLs below refer only to the prior phase, not these new changes.
+through v1.0, without a new layout or dependency. The owner subsequently
+authorized Preview publication. Commit 6dc66a7910255217120115fd3476eb298ab1fd06
+is READY at https://baribali-6g68g2g6a-jts-projects-c85ca52d.vercel.app/home2
+(deployment dpl_9piekvwgSzTtsS5ez3eG6qKZwnLn). All five customer route GETs and
+eight artwork GETs returned 200; remote artwork hashes match the reviewed files.
+Production still resolves to d44fe06089fa3c113fbbc4a97c44191ec328dfc3.
+Earlier Preview URLs below refer only to the prior phase.
 
 ## Visual truth and actual combined comparisons
 
@@ -142,7 +262,8 @@ production or database round trip was performed.
 Implementation checklist complete: seven versioned assets, offer/launch guards,
 native fallback, opt-in quiet surfaces, guest CTAs, RTL/modal/focus checks,
 responsive/motion/failure and ingredient-to-summary checks, combined comparisons,
-regression tests and build. Preview publication remains a separate pending action.
+regression tests and build. Branch-only Preview publication is verified; no
+production promotion, protection/environment change, order or payment occurred.
 
 ---
 

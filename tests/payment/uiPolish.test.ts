@@ -71,14 +71,16 @@ test('builder content never waits invisibly for a mount-animation timer', () => 
 });
 
 test('the builder header uses lightweight dedicated artwork instead of the wordmark backdrop', () => {
-    assert.match(builder, /const builderHeaderImage = "\/builder-assets\/builder-header-panel-v1\.webp"/);
+    assert.match(builder, /const builderHeaderImage = "\/builder-assets\/builder-leaf-frame-v1\.webp"/);
+    const frameCss = readFileSync(new URL('../../src/components/builder/ui/BuilderVisuals.module.css', import.meta.url), 'utf8');
     const headerStyle = builder.slice(builder.indexOf('header: {'), builder.indexOf('\n', builder.indexOf('header: {')));
-    assert.ok(headerStyle.includes('url(${builderHeaderImage})'));
-    assert.ok(!headerStyle.includes('url(${headerImage})'));
-    assert.match(headerStyle, /backgroundSize: "100% calc\(100% \+ 16px\)"/);
+    assert.ok(builder.includes('"--builder-frame": `url(${builderHeaderImage})`'));
+    assert.doesNotMatch(headerStyle, /backgroundImage|backgroundSize/, 'frame is nine-sliced, not stretched behind controls');
+    assert.match(frameCss, /border-image-slice: 145 190 fill/);
+    assert.match(frameCss, /pointer-events: none/);
     assert.match(headerStyle, /backgroundColor: "#0b2312"/);
     assert.match(builder, /<BuilderBrandHeader>/, 'starter branding uses the selected full-logo cartouche');
-    const art = readFileSync(new URL('../../public/builder-assets/builder-header-panel-v1.webp', import.meta.url));
+    const art = readFileSync(new URL('../../public/builder-assets/builder-leaf-frame-v1.webp', import.meta.url));
     assert.equal(art.toString('ascii', 0, 4), 'RIFF');
     assert.equal(art.toString('ascii', 8, 12), 'WEBP');
     assert.ok(art.length < 64 * 1024, 'decorative header must remain a lightweight asset');
