@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import Image from 'next/image';
+import { LockKeyhole, Sparkles } from 'lucide-react';
 import { BariButton } from '@/components/ui/bari';
 import { usePrefersReducedMotion } from '@/lib/motionHooks';
 import {
@@ -40,7 +41,7 @@ interface Hero {
 
 const HEROES: Hero[] = [
     {
-        id: 'salad', img: '/homepage-assets/card-salad.png',
+        id: 'salad', img: '/homepage-assets/salad-bowl-m-v2.webp',
         title: 'הסלט שלכם',
         copy: isOrderableProduct('salad') ? 'בחירת גודל · הרכבה חופשית' : 'חוזר לתפריט בקרוב',
         status: isOrderableProduct('salad') ? 'זמין עכשיו' : 'בקרוב',
@@ -222,8 +223,8 @@ export default function HeroSelector({
                             <div style={{
                                 width: '100%', height: '100%', borderRadius: '18px', overflow: 'hidden', position: 'relative',
                                 border: isActive ? '1.5px solid rgba(240,200,50,0.7)' : '1px solid rgba(255,255,255,0.16)',
-                                boxShadow: isActive ? '0 18px 42px rgba(0,0,0,0.55), 0 0 34px rgba(240,200,50,0.34)' : '0 8px 22px rgba(0,0,0,0.5)',
-                                background: 'linear-gradient(165deg, rgba(16,42,16,0.9), rgba(6,18,6,0.94))',
+                                boxShadow: isActive ? '0 18px 42px rgba(0,0,0,0.5), 0 0 20px rgba(240,200,50,0.16)' : '0 8px 22px rgba(0,0,0,0.4)',
+                                background: '#0b2113',
                             }}>
                                 {/* Status badge */}
                                 <div style={{ position: 'absolute', top: '10px', insetInlineStart: '10px', zIndex: 4 }}>
@@ -236,25 +237,27 @@ export default function HeroSelector({
                                 {hero.img ? (
                                     <Image
                                         src={hero.img} alt="" aria-hidden width={C_W} height={C_H}
-                                        style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none', display: 'block', filter: hero.locked ? 'saturate(0.45) brightness(0.66)' : 'none' }}
+                                        sizes="210px"
+                                        priority={hero.id === 'salad'}
+                                        style={{ width: '100%', height: hero.id === 'salad' ? '74%' : '100%', marginTop: hero.id === 'salad' ? '8px' : 0, objectFit: hero.id === 'salad' ? 'contain' : 'cover', pointerEvents: 'none', display: 'block', filter: hero.locked ? 'saturate(0.45) brightness(0.66)' : 'none' }}
                                     />
                                 ) : (
                                     <div style={S.veilArt} aria-hidden>
-                                        <span style={S.veilSparkle}>✨</span>
+                                        <Sparkles size={38} color="#ecd583" />
                                     </div>
                                 )}
 
                                 {/* Locked emblem */}
                                 {hero.locked && (
                                     <div style={S.lockWash} aria-hidden>
-                                        <span style={S.lockEmblem}>🔒</span>
+                                        <span style={S.lockEmblem}><LockKeyhole size={22} color="#ecd583" /></span>
                                     </div>
                                 )}
 
                                 {/* Bottom copy */}
-                                <div style={S.cardCopy}>
-                                    <div style={S.cardTitle}>{hero.title}</div>
-                                    <div style={S.cardSub}>{hero.copy}</div>
+                                <div className="hero-selector__copy" style={S.cardCopy}>
+                                    <div className="hero-selector__title" style={S.cardTitle}>{hero.title}</div>
+                                    <div className="hero-selector__subtitle" style={S.cardSub}>{hero.copy}</div>
                                 </div>
 
                                 {/* Landing feedback — a gold sheen sweep + rim flash, re-fired each
@@ -293,11 +296,10 @@ export default function HeroSelector({
 
             {/* Selection panel */}
             <div style={S.selection} aria-live="polite">
-                <div style={{ ...S.statusChip, color: active.locked ? 'rgba(255,255,255,0.5)' : 'var(--color-gold-light)' }}>
-                    <span>{active.locked ? '🔒' : '✨'}</span>
+                <div style={{ ...S.statusChip, color: active.locked ? '#c4d2bf' : 'var(--color-gold-light)' }}>
+                    {active.locked ? <LockKeyhole size={14} aria-hidden /> : <Sparkles size={14} aria-hidden />}
                     <span>{active.status}</span>
                 </div>
-                <div style={S.selTitle}>{active.title}</div>
                 <div style={S.selDetail}>{active.detail}</div>
                 {active.locked ? (
                     <div style={S.lockedCta}>בקרוב 🔒</div>
@@ -328,9 +330,9 @@ const S: Record<string, React.CSSProperties> = {
     veilSparkle: { fontSize: '40px', opacity: 0.7, filter: 'drop-shadow(0 0 16px rgba(240,200,50,0.5))' },
     lockWash: { position: 'absolute', inset: 0, zIndex: 3, display: 'grid', placeItems: 'center', background: 'rgba(3,8,3,0.28)', pointerEvents: 'none' },
     lockEmblem: { display: 'grid', placeItems: 'center', width: '52px', height: '52px', borderRadius: '50%', background: 'rgba(3,8,3,0.72)', border: '1px solid rgba(240,200,50,0.3)', fontSize: '21px', boxShadow: '0 0 24px rgba(0,0,0,0.5)' },
-    cardCopy: { position: 'absolute', insetInline: 0, bottom: 0, zIndex: 4, padding: '22px 14px 13px', textAlign: 'center', background: 'linear-gradient(180deg, transparent, rgba(3,10,3,0.6) 42%, rgba(3,10,3,0.92))' },
-    cardTitle: { fontFamily: "var(--font-display), 'Secular One', sans-serif", fontSize: '18px', color: '#fff', textShadow: '0 2px 8px rgba(0,0,0,0.9)' },
-    cardSub: { fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.62)', marginTop: '3px' },
+    cardCopy: { position: 'absolute', insetInline: 0, bottom: 0, zIndex: 4, padding: '13px 10px 15px', textAlign: 'center', background: '#081b10', borderTop: '1px solid rgba(225,200,117,0.2)' },
+    cardTitle: { fontFamily: "var(--font-display), 'Secular One', sans-serif", fontSize: '20px', color: '#fff8df' },
+    cardSub: { fontSize: '12px', fontWeight: 500, color: '#c9d7c5', marginTop: '3px' },
     // The visual dot stays compact while the button meets the mobile hit target.
     pips: { display: 'flex', gap: 0, marginTop: 0, marginBottom: 0 },
     pipHit: { width: '44px', height: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, border: 0, background: 'transparent', cursor: 'pointer' },
@@ -338,8 +340,7 @@ const S: Record<string, React.CSSProperties> = {
     pipOn: { width: '26px', background: 'linear-gradient(90deg, #c8a832, #f0d060)' },
     selection: { textAlign: 'center', width: '100%', maxWidth: '320px', padding: '0 12px 4px' },
     statusChip: { display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 800, letterSpacing: '0.02em' },
-    selTitle: { fontFamily: "var(--font-display), 'Secular One', sans-serif", fontSize: '22px', color: '#fff', margin: '3px 0 4px', textShadow: '0 0 22px rgba(200,168,78,0.3)' },
-    selDetail: { fontSize: '12.5px', color: 'rgba(255,255,255,0.55)', lineHeight: 1.6, minHeight: '34px', marginBottom: '10px', fontWeight: 500 },
+    selDetail: { fontSize: '13px', color: '#c9d7c5', lineHeight: 1.6, minHeight: '34px', marginTop: '6px', marginBottom: '10px', fontWeight: 500 },
     lockedCta: { width: '100%', padding: '13px 0', borderRadius: 'var(--radius-full)', background: 'rgba(255,255,255,0.05)', border: '1px dashed rgba(255,255,255,0.18)', color: 'rgba(255,255,255,0.45)', fontSize: '14px', fontWeight: 800, letterSpacing: '0.03em' },
 };
 
@@ -357,5 +358,8 @@ const KF = `
   .hero-selector__prompt-hint { display: none !important; }
   .hero-selector__stage { height: 144px !important; margin-top: 0 !important; }
   .hero-selector__card { width: 103px !important; height: 140px !important; margin-left: -51.5px !important; margin-top: -70px !important; }
+  .hero-selector__copy { padding: 6px !important; }
+  .hero-selector__title { font-size: 14px !important; }
+  .hero-selector__subtitle { display: none; }
 }
 `;

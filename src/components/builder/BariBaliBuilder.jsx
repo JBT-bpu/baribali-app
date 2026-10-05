@@ -1,14 +1,22 @@
 'use client';
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
-import dynamic from "next/dynamic";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
-const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
+import { ArrowLeft, ArrowRight, ChefHat, ChevronDown } from "lucide-react";
 
-const headerImage = "/builder-assets/header-brand.png";
-// A quiet, component-specific surface; the wordmark stays on the starter screen.
+// Active ingredient picking keeps its quiet, space-efficient surface.
 const builderHeaderImage = "/builder-assets/builder-header-panel-v1.webp";
 const footerImage = "/builder-assets/footer-brand.png";
+
+// Presentation only: an actual ingredient from each resolved recipe, not its
+// catalog emoji. Prices, selections and recipe definitions stay untouched.
+const PRESET_ART = {
+  signature: "baked_sweet_potato", mediterranean: "green_olives",
+  asian_fusion: "tofu_olive", protein_beast: "egg", rainbow: "bell_pepper",
+  fire_spice: "hot_pepper", warm_earth: "roasted_eggplant", garden_fresh: "cucumber",
+  pasta_garden: "fusilli_pasta", detox_bowl: "green_peas",
+  crunchy_master: "sunflower_seeds", eastern_night: "roasted_eggplant",
+};
 
 // Renders either a PNG icon path or an emoji string
 function Icon({ src, size = "1.4em", style = {} }) {
@@ -22,6 +30,7 @@ import { STEPS, BASE, COMBOS, BADGE_ART, LEGENDARY_AT, PRESETS, getSuggestions, 
 import DetailSheet from "./ui/DetailSheet.jsx";
 import SummaryView from "./SummaryView.jsx";
 import HeroBowlCard from "./ui/HeroBowlCard.jsx";
+import BuilderBrandHeader from "./ui/BuilderBrandHeader";
 import SizePicker from "../home/SizePicker";
 import BariModal from "../ui/bari/BariModal";
 import BariButton from "../ui/bari/BariButton";
@@ -249,63 +258,17 @@ function parseSizeParam(raw) {
 // ─── BUILDER PARTICLES ──────────────────────────────────────
 function HeaderBanner({ onBack }) {
   return (
-    <>
-      <div style={{ position: "relative", width: "100%", flexShrink: 0, paddingTop: "env(safe-area-inset-top)", background: "#020a02" }}>
-        <div style={{ height: "52px", padding: "4px 12px", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "flex-start", direction: "rtl" }}>
-          <button
-            type="button"
-            onClick={onBack}
-            aria-label="חזרה לתפריט"
-            style={{
-              minWidth: "88px", height: "44px", padding: "0 12px", borderRadius: "12px",
-              display: "flex", alignItems: "center", justifyContent: "center", gap: "7px",
-              border: "1px solid rgba(255,255,255,0.24)", cursor: "pointer",
-              background: "rgba(255,255,255,0.055)", color: "#fff",
-              boxShadow: "0 3px 14px rgba(0,0,0,0.32)",
-              fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
-              fontSize: "12px", fontWeight: 800,
-            }}
-          >
-            <span aria-hidden="true">→</span>
-            <span>לתפריט</span>
-          </button>
-        </div>
-        <img
-          src={headerImage}
-          alt=""
-          aria-hidden="true"
-          style={{ width: "100%", display: "block", height: "80px", objectFit: "cover", objectPosition: "center top" }}
-        />
-        {/* Fade dissolve — image melts into dark bg */}
-        <div style={{
-          position: "absolute", bottom: 0, left: 0, right: 0, height: "52px",
-          background: "linear-gradient(to bottom, transparent, #020a02)",
-          pointerEvents: "none",
-        }} />
-        {/* Gold glow line */}
-        <div style={{
-          position: "absolute", bottom: 0, left: 0, right: 0, height: "2px",
-          background: "linear-gradient(90deg, transparent 0%, rgba(200,168,78,0.7) 20%, rgba(240,208,96,1) 50%, rgba(200,168,78,0.7) 80%, transparent 100%)",
-          boxShadow: "0 0 10px rgba(200,168,78,0.55), 0 0 22px rgba(200,168,78,0.22)",
-          pointerEvents: "none",
-        }} />
-      </div>
-      {/* Scalloped wave separator */}
-      <div style={{ width: "100%", lineHeight: 0, flexShrink: 0, marginTop: "-1px" }}>
-        <svg
-          viewBox="0 0 430 16"
-          preserveAspectRatio="none"
-          style={{ width: "100%", height: "16px", display: "block", filter: "drop-shadow(0 0 5px rgba(200,168,78,0.4))" }}
-        >
-          <path
-            d="M0,0 Q26.875,12 53.75,0 Q80.625,12 107.5,0 Q134.375,12 161.25,0 Q188.125,12 215,0 Q241.875,12 268.75,0 Q295.625,12 322.5,0 Q349.375,12 376.25,0 Q403.125,12 430,0"
-            fill="none"
-            stroke="rgba(200,168,78,0.45)"
-            strokeWidth="1.5"
-          />
-        </svg>
-      </div>
-    </>
+    <BuilderBrandHeader>
+      <button
+        type="button"
+        onClick={onBack}
+        aria-label="חזרה לתפריט"
+      >
+        <ArrowRight size={18} aria-hidden="true" />
+        <span>לתפריט</span>
+      </button>
+      <h1>הסלט שלכם, בדרך שלכם</h1>
+    </BuilderBrandHeader>
   );
 }
 
@@ -324,7 +287,7 @@ function ClearConfirmModal({ open, onConfirm, onCancel }) {
 // ─── MAIN ───────────────────────────────────────────────────
 
 /** @param {{ sizeParam?: string | null, type?: string, entrance?: boolean, skipIntro?: boolean, enteredFromHome?: boolean }} props */
-export default function BariBaliBuilder({ sizeParam = null, type = "salad", entrance = false, skipIntro = false, enteredFromHome = false }) {
+export default function BariBaliBuilder({ sizeParam = null, type = "salad", entrance = false, enteredFromHome = false }) {
   const router = useRouter();
   const isTortilla = type === "tortilla";
   const reducedMotion = usePrefersReducedMotion();
@@ -359,10 +322,9 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
   // Keep them here so editing one ingredient section cannot silently erase a
   // selected pickup slot or a promo code when the summary remounts.
   const [checkoutDraft, setCheckoutDraft] = useState(emptyCheckoutDraft);
-  // "enter" fades the whole screen in on mount. Skipped when arriving from the
-  // page transition — that slab fade is exactly what made the builder look like
-  // it appeared in one piece; the staggered `rise()` below does the arrival instead.
-  const [anim, setAnim] = useState(skipIntro ? null : "enter");
+  // Keep the screen readable during hydration. Arrival choreography belongs
+  // to the transition layer; only deliberate step changes set "out" / "in".
+  const [anim, setAnim] = useState(null);
   const [slideDir, setSlideDir] = useState(1);
   const [comboBadges, setComboBadges] = useState([]);
   const [badgeFlash, setBadgeFlash] = useState(null);
@@ -401,7 +363,6 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
   const [expandedPreset, setExpandedPreset] = useState(null);
   const expandedPresetRef = useRef(null);
   const presetButtonRefs = useRef(new Map());
-  const [bowlAnim, setBowlAnim] = useState(null);
 
   const closeExpandedPreset = useCallback((presetId) => {
     setExpandedPreset(null);
@@ -456,15 +417,10 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
     };
   }, [changingSize]);
 
-  useEffect(() => {
-    const file = isTortilla ? "/mexican-burrito.json" : "/cat-salad-bowl.json";
-    fetch(file).then(r => r.json()).then(setBowlAnim).catch(() => {});
-  }, [isTortilla]);
   const scrollRef = useRef(null);
   const touchRef = useRef({ x: 0, y: 0, t: 0, ignored: false });
   const sgRefs = useRef([]);
 
-  useEffect(() => { setTimeout(() => setAnim(null), 500); }, []);
   // The one place the hint is raised. It used to fire on every return to step 0
   // AND on every mount, with nothing remembering it had been read — so someone
   // on their twentieth order still lost 78px at the top of the list to it. Now
@@ -871,7 +827,6 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
         <div style={S.bg} />
         <div style={{
           ...S.main, justifyContent: "space-between", padding: "0 0 20px",
-          opacity: anim === "enter" ? 0 : 1, transform: anim === "enter" ? "translateY(12px)" : "none", transition: "all 0.5s"
         }}>
           {/* Brand header banner */}
           <div style={rise(2) ?? undefined}><HeaderBanner onBack={exitPresetToMenu} /></div>
@@ -901,25 +856,15 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
               {/* Top row: bowl + text */}
               <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "14px", padding: "10px 14px 10px" }}>
 
-                {/* Bowl ring */}
+                {/* Matching food artwork with no baked-in labels or prices. */}
                 <div className="hero-ring">
-                  <svg viewBox="0 0 158 158" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", transform: "rotate(-90deg)" }}>
-                    <circle cx="79" cy="79" r="64" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="5" />
-                    <circle cx="79" cy="79" r="64" fill="none" stroke="rgba(200,168,78,0.3)" strokeWidth="5"
-                      strokeLinecap="round" strokeDasharray={2 * Math.PI * 64} strokeDashoffset={2 * Math.PI * 64} />
-                  </svg>
-                  <div className="hero-bowl" style={{ filter: "drop-shadow(0 4px 16px rgba(200,168,78,0.25))" }}>
-                    {bowlAnim
-                      ? <Lottie animationData={bowlAnim} loop={!reducedMotion} autoplay={!reducedMotion} style={{ width: "100%", height: "100%" }} />
-                      : <span style={{ fontSize: "52px", lineHeight: "108px", display: "block", textAlign: "center" }}>🥗</span>
-                    }
-                  </div>
+                  <Image src="/homepage-assets/salad-bowl-m-v2.webp" alt="" width={112} height={112} sizes="112px" className="hero-bowl" />
                 </div>
 
                 {/* Text column */}
                 <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "5px", textAlign: "right" }}>
                   <div style={{ fontSize: "20px", fontWeight: 900, color: "#e8f5e9", textShadow: "0 2px 6px rgba(0,0,0,0.7)", letterSpacing: "0.02em", lineHeight: 1.2 }}>{hasDraft ? "המשיכו לבנות את הסלט" : "בנו את הסלט שלכם"}</div>
-                  <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.45)", fontWeight: 500 }}>{hasDraft ? "הבחירות שלכם נשמרו · אפשר להמשיך לערוך" : "5 שלבים פשוטים · בחירה חופשית"}</div>
+                  <div style={{ fontSize: "12px", color: "#c9d7c5", fontWeight: 500, lineHeight: 1.6 }}>{hasDraft ? "הבחירות שלכם נשמרו · אפשר להמשיך לערוך" : "5 שלבים פשוטים · בחירה חופשית"}</div>
                   <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "6px", padding: "5px 10px", borderRadius: "10px", background: "rgba(200,168,78,0.1)", border: "1px solid rgba(200,168,78,0.25)", width: "fit-content", alignSelf: "flex-end" }}>
                     <span style={{ fontSize: "12px", fontWeight: 800, color: "#f0d060" }}>{sc.label}</span>
                     <div style={{ width: "1px", height: "12px", background: "rgba(200,168,78,0.3)" }} />
@@ -933,7 +878,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                 width: "100%", padding: "10px 18px",
                 backgroundImage: "linear-gradient(135deg, #c8a832 0%, #f0d060 40%, #ffe599 52%, #c8a832 100%)",
                 backgroundSize: "200% 100%",
-                animation: "shimmer 3s ease-in-out infinite",
+                animation: reducedMotion ? "none" : "shimmer 1.2s ease-out both",
                 display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
                 borderTop: "1px solid rgba(255,220,80,0.3)",
               }}>
@@ -956,15 +901,12 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
             {/* Presets - Secondary */}
             <div style={{ width: "100%", ...rise(0) }}>
               <div style={{ textAlign: "center", marginBottom: "14px" }}>
-                <div style={{ fontSize: "26px", marginBottom: "5px", filter: "drop-shadow(0 0 10px rgba(200,168,78,0.5))" }}>👨‍🍳</div>
+                <ChefHat size={26} color="#e6d18b" aria-hidden style={{ display: "block", margin: "0 auto 5px" }} />
                 <div style={{
                   fontSize: "15px", fontWeight: 900, letterSpacing: "0.06em",
-                  backgroundImage: "linear-gradient(135deg, #c8a832 0%, #f0d060 45%, #ffe599 55%, #c8a832 100%)",
-                  backgroundSize: "200% auto",
-                  WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-                  animation: "shimmer 4s ease-in-out infinite",
+                  color: "#e6d18b",
                 }}>מתכוני השף</div>
-                <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)", fontWeight: 500, marginTop: "3px" }}>
+                <div style={{ fontSize: "12px", color: "#c4d2bf", fontWeight: 500, marginTop: "3px" }}>
                   בחרו מתכון מוכן או התחילו מאפס
                 </div>
               </div>
@@ -977,16 +919,13 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                 return (
                   <>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "7px" }}>
-                      {PRESETS.map((p, i) => {
+                      {PRESETS.map((p) => {
                         const pc = PRESET_COLORS[p.id] || PRESET_COLORS.balanced;
                         const isOpen = expandedPreset === p.id;
                         const presetQuote = presetResolutions.get(p.id);
                         const presetAvailable = presetQuote?.valid === true;
                         return (
-                          // Outer wrapper carries the idle float (staggered per
-                          // card for an organic, not-all-in-sync feel) so it
-                          // doesn't fight the button's own press/open transform.
-                          <div key={p.id} style={{ width: "100%", animation: `cardFloat 3.6s ease-in-out ${(i % 4) * 0.25}s infinite` }}>
+                          <div key={p.id} style={{ width: "100%" }}>
                             <button
                               ref={(button) => {
                                 if (button) presetButtonRefs.current.set(p.id, button);
@@ -1002,7 +941,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                                 borderWidth: "1px", borderStyle: "solid", borderColor: isOpen ? pc.text : pc.border,
                                 boxShadow: isOpen ? `${pc.glow}, inset 0 0 0 1px ${pc.border}` : pc.glow,
                                 opacity: expandedPreset && !isOpen ? 0.55 : 1,
-                                transform: isOpen ? "scale(1.02)" : "scale(1)",
+                                transform: isOpen && !reducedMotion ? "scale(1.01)" : "none",
                                 transition: "all 0.2s cubic-bezier(0.34,1.56,0.64,1)",
                               }}
                               aria-expanded={isOpen}
@@ -1017,14 +956,14 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                                   מומלץ ✦
                                 </div>
                               )}
-                              <Icon src={p.icon} size="20px" style={{ flexShrink: 0, filter: `drop-shadow(0 1px 4px ${pc.dot})` }} />
+                              <Icon src={presetQuote?.items.find(item => item.id === PRESET_ART[p.id])?.icon || presetQuote?.items[0]?.icon || "/icons/lettuce_romaine.webp"} size="32px" style={{ flexShrink: 0 }} />
                               <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px", textAlign: "right" }}>
-                                <span style={{ fontSize: "11.5px", fontWeight: 800, color: pc.text, lineHeight: 1.2 }}>{p.he}</span>
-                                <span style={{ fontSize: "10px", fontWeight: 800, color: presetAvailable ? "#f0d060" : "rgba(255,255,255,0.38)", lineHeight: 1.2 }}>
+                                <span style={{ fontSize: "12px", fontWeight: 800, color: "#fff0ba", lineHeight: 1.3 }}>{p.he}</span>
+                                <span style={{ fontSize: "11px", fontWeight: 600, color: presetAvailable ? "#d6c384" : "#c4d2bf", lineHeight: 1.3 }}>
                                   {presetAvailable ? `₪${presetQuote.total} למתכון` : "לא זמין כרגע"}
                                 </span>
                               </span>
-                              <span style={{ fontSize: "9px", fontWeight: 700, color: isOpen ? pc.text : "rgba(255,255,255,0.28)", flexShrink: 0, transition: "transform 0.2s", transform: isOpen ? "rotate(180deg)" : "none" }}>▾</span>
+                              <ChevronDown size={14} color="#d6c384" aria-hidden style={{ flexShrink: 0, transition: reducedMotion ? "none" : "transform 0.2s", transform: isOpen ? "rotate(180deg)" : "none" }} />
                             </button>
                           </div>
                         );
@@ -1177,7 +1116,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
 
       <ClearConfirmModal open={showClearConfirm} onConfirm={confirmClearDraft} onCancel={closeClearConfirm} />
 
-      <div style={{ ...S.main, opacity: anim === "enter" ? 0 : 1, transition: "opacity 0.4s" }}>
+      <div style={S.main}>
 
         {/* ── HEADER ── */}
         <div style={{ ...S.header, ...rise(3) }} role="banner">
@@ -1292,9 +1231,6 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
             ingredientCount={ingredientPickCount}
             onRemove={removeFromBowl}
             lastAdd={lastAdd}
-            animFile={isTortilla ? "/mexican-burrito.json" : "/cat-salad-bowl.json"}
-            freePlay={isTortilla}
-            bowlTop={isTortilla ? "44%" : "24%"}
             max={isTortilla ? TORTILLA_MAX : BOWL_MAX}
           />
         </div>
@@ -1488,11 +1424,10 @@ const KF = `
   0%, 100% { box-shadow: 0 0 0 1px rgba(200,168,78,0.12), 0 12px 40px rgba(0,0,0,0.55), 0 0 50px rgba(200,168,78,0.08), inset 0 1px 0 rgba(255,255,255,0.07); }
   50% { box-shadow: 0 0 0 1px rgba(200,168,78,0.22), 0 14px 50px rgba(0,0,0,0.55), 0 0 80px rgba(200,168,78,0.18), inset 0 1px 0 rgba(255,255,255,0.1); }
 }
-.hero-ring { position:relative; width:158px; height:158px; flex-shrink:0 }
-.hero-bowl { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:108px; height:108px; pointer-events:none }
+.hero-ring { position:relative; width:112px; height:112px; flex-shrink:0 }
+.hero-bowl { width:100%; height:100%; object-fit:contain; pointer-events:none }
 @media (max-width: 374px) {
-  .hero-ring { width:110px; height:110px }
-  .hero-bowl { width:76px;  height:76px  }
+  .hero-ring { width:90px; height:90px }
 }
 @media (max-width: 349px) {
   .builder-progress-label { display:none !important; }
@@ -1628,12 +1563,12 @@ const S = {
   heroBtn: {
     display: "flex", flexDirection: "column", alignItems: "stretch", gap: 0,
     padding: 0, borderRadius: "16px", cursor: "pointer",
-    background: "linear-gradient(145deg, rgba(6,18,6,0.17), rgba(10,28,10,0.17)), url(/builder-assets/salad-card-bg.webp) center top / 102% auto no-repeat",
-    border: "2px solid rgba(200,168,78,0.55)",
+    background: "#0b2515",
+    border: "1px solid rgba(200,168,78,0.55)",
     boxShadow: "0 0 0 1px rgba(200,168,78,0.12), 0 8px 30px rgba(0,0,0,0.5), 0 0 40px rgba(200,168,78,0.08)",
     transition: "all 0.35s cubic-bezier(0.34,1.56,0.64,1)",
     outline: "none", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", width: "100%",
-    animation: "heroPulse 3s ease-in-out infinite", overflow: "hidden",
+    overflow: "hidden",
     // A flex item with overflow != visible gets an automatic min-height of 0
     // (CSS flexbox spec), so this button — the tallest thing in a scrollable
     // flex column — was the one the flex-shrink algorithm sacrificed first,
@@ -1651,9 +1586,8 @@ const S = {
   },
   presetCard: {
     display: "flex", flexDirection: "row", alignItems: "center",
-    gap: "7px", padding: "8px 10px", borderRadius: "10px", cursor: "pointer",
+    gap: "7px", padding: "10px 9px", minHeight: "66px", borderRadius: "12px", cursor: "pointer",
     background: "linear-gradient(135deg, rgba(13,40,13,0.95), rgba(8,24,8,0.9))",
-    backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
     boxShadow: "0 0 0 1px rgba(200,168,78,0.07), 0 2px 10px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)",
     transition: "all 0.2s cubic-bezier(0.34,1.56,0.64,1)", outline: "none",
     position: "relative", overflow: "hidden",

@@ -133,7 +133,7 @@ export default function GoldField({ impulseRef, dropRef, entrySweep = 0, entryHo
         }
 
         const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
-        let animate = !motionPreference.matches;
+        let animate = !motionPreference.matches && !document.hidden;
         let raf = 0, t = 0, drop = 0, live = 0;
         const draw = () => {
             t += 0.013; ctx.clearRect(0, 0, c.width, c.height);
@@ -193,8 +193,8 @@ export default function GoldField({ impulseRef, dropRef, entrySweep = 0, entryHo
             ctx.globalAlpha = 1;
             if (animate) raf = requestAnimationFrame(draw);
         };
-        const onMotionPreferenceChange = (event: MediaQueryListEvent) => {
-            const shouldAnimate = !event.matches;
+        const syncAnimation = () => {
+            const shouldAnimate = !motionPreference.matches && !document.hidden;
             if (animate === shouldAnimate) return;
             animate = shouldAnimate;
             if (animate) raf = requestAnimationFrame(draw);
@@ -202,15 +202,17 @@ export default function GoldField({ impulseRef, dropRef, entrySweep = 0, entryHo
         };
         const onResize = () => {
             resize();
-            if (!animate) draw();
+            if (!animate && !document.hidden) draw();
         };
-        motionPreference.addEventListener('change', onMotionPreferenceChange);
+        motionPreference.addEventListener('change', syncAnimation);
+        document.addEventListener('visibilitychange', syncAnimation);
         window.addEventListener('resize', onResize);
         // Reduced-motion users still get the branded field, frozen on one frame.
         draw();
         return () => {
             cancelAnimationFrame(raf);
-            motionPreference.removeEventListener('change', onMotionPreferenceChange);
+            motionPreference.removeEventListener('change', syncAnimation);
+            document.removeEventListener('visibilitychange', syncAnimation);
             window.removeEventListener('resize', onResize);
             // Unmounting mid-sweep: hand this exact field to the next page.
             // (Magnitude, not sign — the sweep is negative when travelling left.)

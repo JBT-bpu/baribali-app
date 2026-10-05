@@ -1,5 +1,6 @@
 import BariModal from "../../ui/bari/BariModal";
 import { effectiveItemPrice } from "../../../lib/menuConfig";
+import { usePrefersReducedMotion } from "../../../lib/motionHooks";
 
 const TAG_MAP = {
     protein:  { he: "חלבון",   icon: "💪", color: "#c8a832", bg: "rgba(200,168,78,0.15)"  },
@@ -12,6 +13,7 @@ const TAG_MAP = {
 };
 
 export default function DetailSheet({ item, isAdded, onToggle, onClose }) {
+    const reducedMotion = usePrefersReducedMotion();
     const tags = (item.tags || []).map(t => TAG_MAP[t]).filter(Boolean);
     const itemPrice = effectiveItemPrice(item.id, item.price || 0);
 
@@ -23,8 +25,8 @@ export default function DetailSheet({ item, isAdded, onToggle, onClose }) {
 
                     {/* Icon */}
                     <div style={S.iconWrap}>
-                        <div style={S.glowBg} />
-                        <div style={S.iconBox} aria-hidden="true">
+                        <div style={{ ...S.glowBg, animation: reducedMotion ? "none" : "glowPulse 1.2s ease both" }} />
+                        <div style={{ ...S.iconBox, animation: reducedMotion ? "none" : "iconPop 0.35s ease both" }} aria-hidden="true">
                             {item.icon && item.icon.startsWith("/")
                                 ? <img src={item.icon} alt="" style={{ width: "88px", height: "88px", objectFit: "contain", filter: "drop-shadow(0 8px 24px rgba(0,0,0,0.65)) drop-shadow(0 0 18px rgba(200,168,78,0.25))" }} />
                                 : <span style={{ fontSize: "88px", lineHeight: 1, filter: "drop-shadow(0 8px 24px rgba(0,0,0,0.65)) drop-shadow(0 0 18px rgba(200,168,78,0.25))" }}>{item.icon}</span>}
@@ -66,7 +68,7 @@ export default function DetailSheet({ item, isAdded, onToggle, onClose }) {
                 {/* CTAs */}
                 <div style={S.ctaWrap}>
                     {onToggle && (
-                        <button type="button" onClick={onToggle} style={isAdded ? S.ctaRemove : S.ctaAdd}>
+                        <button type="button" onClick={onToggle} style={{ ...(isAdded ? S.ctaRemove : S.ctaAdd), animation: reducedMotion ? "none" : "fadeUp 0.3s ease both" }}>
                             {isAdded ? "✕ הסר מהסלט" : "+ הוסף לסלט"}
                         </button>
                     )}
@@ -113,8 +115,8 @@ const S = {
         textShadow: "0 1px 6px rgba(0,0,0,0.5)", lineHeight: 1.2,
     },
     itemDesc: {
-        fontSize: "11px", color: "rgba(255,255,255,0.42)",
-        fontWeight: 500, lineHeight: 1.4,
+        fontSize: "13px", color: "#c9d7c5",
+        fontWeight: 500, lineHeight: 1.6,
     },
     pricePill: {
         fontSize: "11px", fontWeight: 800, color: "#edd87e",
@@ -141,12 +143,12 @@ const S = {
         border: "1px solid rgba(200,168,78,0.13)",
     },
     nutritionNoteTitle: {
-        fontSize: "10px", fontWeight: 800,
-        color: "rgba(200,168,78,0.6)",
+        fontSize: "12px", fontWeight: 800,
+        color: "#e6d18b",
         marginBottom: "4px", letterSpacing: "0.04em",
     },
     nutritionNoteText: {
-        fontSize: "12px", color: "rgba(255,255,255,0.68)",
+        fontSize: "13px", color: "#d7e3d2",
         lineHeight: 1.65, fontWeight: 500,
     },
 
@@ -175,11 +177,11 @@ const S = {
         animation: "fadeUp 0.3s ease 0.1s both",
     },
     closeBtn: {
-        width: "100%", padding: "11px",
+        width: "100%", minHeight: "44px", padding: "11px",
         borderRadius: "14px",
         border: "1px solid rgba(255,255,255,0.07)",
         background: "rgba(255,255,255,0.03)",
-        color: "rgba(255,255,255,0.35)",
+        color: "#c9d7c5",
         fontSize: "13px", fontWeight: 700,
         cursor: "pointer", fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
     },

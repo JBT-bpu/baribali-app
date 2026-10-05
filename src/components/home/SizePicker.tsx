@@ -29,14 +29,10 @@ import { effectiveSizePrice } from '@/lib/menuConfig';
  */
 
 const SIZE_CARDS = [
-    { id: 'S', name: 'קטן', ml: 750,  img: '/homepage-assets/size-s.png', tag: 'קומפקטי', price: effectiveSizePrice(750) },
-    { id: 'M', name: 'בינוני', ml: 1000, img: '/homepage-assets/size-m.png', tag: 'הקלאסי', price: effectiveSizePrice(1000) },
-    { id: 'L', name: 'גדול', ml: 1500, img: '/homepage-assets/size-l.png', tag: 'הכי גדול שלנו', price: effectiveSizePrice(1500) },
+    { id: 'S', name: 'קטן', ml: 750,  img: '/homepage-assets/salad-bowl-s-v2.webp', tag: 'קומפקטי', price: effectiveSizePrice(750) },
+    { id: 'M', name: 'בינוני', ml: 1000, img: '/homepage-assets/salad-bowl-m-v2.webp', tag: 'הקלאסי', price: effectiveSizePrice(1000) },
+    { id: 'L', name: 'גדול', ml: 1500, img: '/homepage-assets/salad-bowl-l-v2.webp', tag: 'הכי גדול שלנו', price: effectiveSizePrice(1500) },
 ];
-
-// Relative visual heights for the size-comparison cups — not to scale with real
-// ml, just enough of a size cue to read at a glance.
-const SIZE_SCALE_HEIGHTS = [26, 38, 52];
 
 const S_W = 210;
 const S_H = 272;
@@ -226,13 +222,13 @@ export default function SizePicker({ onSelect, onBack, dive = false, initialSize
                 different app — and it reacts to swipes the same way. Normally
                 behind the cards (above this overlay's scrim); during the dive it
                 lifts over everything and rushes outward. */}
-            <GoldField impulseRef={impulseRef} dropRef={dropRef} zIndex={diving ? 201 : -1} persistKey={dive ? 'bb-field' : undefined} />
+            <GoldField impulseRef={impulseRef} dropRef={dropRef} density={0.55} zIndex={diving ? 201 : -1} persistKey={dive ? 'bb-field' : undefined} />
 
             {/* Step breadcrumb */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '-4px' }}>
                 <span style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.06em' }}>בנה סלט</span>
                 <span style={{ fontSize: '10px', color: 'rgba(240,200,50,0.45)' }}>←</span>
-                <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-gold-deep)', letterSpacing: '0.06em', animation: 'stepGlow 2.2s ease-in-out infinite' }}>בחר גודל</span>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: '#e6d18b', letterSpacing: '0.04em' }}>בחר גודל</span>
             </div>
 
             {/* Thin gold divider */}
@@ -259,17 +255,8 @@ export default function SizePicker({ onSelect, onBack, dive = false, initialSize
                                 gap: '6px', cursor: 'pointer', color: 'inherit', background: 'transparent', position: 'relative',
                             }}
                         >
-                            <div style={{
-                                width: '30px', height: `${SIZE_SCALE_HEIGHTS[i]}px`,
-                                borderRadius: '45% 45% 14% 14%',
-                                background: isOn
-                                    ? 'linear-gradient(180deg, var(--color-gold-bright), var(--color-gold-deep))'
-                                    : 'rgba(255,255,255,0.12)',
-                                border: isOn ? '1px solid var(--color-gold-light)' : '1px solid rgba(255,255,255,0.2)',
-                                boxShadow: isOn ? '0 0 16px rgba(240,200,50,0.55)' : 'none',
-                                transition: 'all 0.35s cubic-bezier(0.34,1.4,0.64,1)',
-                            }} />
-                            <span style={{ fontSize: '11px', fontWeight: 800, color: isOn ? 'var(--color-gold-deep)' : 'rgba(255,255,255,0.4)', transition: 'color 0.3s ease' }}>{c.id}</span>
+                            <Image src={c.img} alt="" aria-hidden width={48} height={40} sizes="48px" style={{ width: '48px', height: '40px', objectFit: 'contain', opacity: isOn ? 1 : 0.65 }} />
+                            <span style={{ fontSize: '12px', fontWeight: 800, color: isOn ? '#fff0b0' : '#c9d7c5', transition: 'color 0.3s ease' }}>{c.id}</span>
                             {isOn && <span aria-hidden style={{ position: 'absolute', top: '2px', right: '2px', fontSize: '10px', fontWeight: 900, color: '#fff3a8' }}>✓</span>}
                         </button>
                     );
@@ -300,6 +287,7 @@ export default function SizePicker({ onSelect, onBack, dive = false, initialSize
                             className="sizePickerCard"
                             aria-label={`גודל ${card.name} (${card.id}), ${card.ml} מיליליטר, ${card.tag}, ${card.price} שקלים${isActive ? ', נבחר' : ''}`}
                             aria-pressed={isActive}
+                            aria-hidden={hidden || undefined}
                             tabIndex={isActive ? 0 : -1}
                             disabled={closing || out || diving}
                             onClick={(event) => handleCardTap(i, event)}
@@ -322,24 +310,21 @@ export default function SizePicker({ onSelect, onBack, dive = false, initialSize
                                 width: '100%', height: '100%', borderRadius: '16px', overflow: 'hidden', position: 'relative',
                                 border: isActive ? '1.5px solid rgba(240,200,50,0.65)' : '1px solid rgba(255,255,255,0.22)',
                                 boxShadow: isActive ? 'var(--shadow-card-glow), var(--shadow-gold-glow-lg)' : '0 6px 20px rgba(0,0,0,0.5)',
-                                background: 'linear-gradient(165deg, rgba(16,42,16,0.5), rgba(6,18,6,0.55))',
+                                background: '#0b2113',
                             }}>
                                 <Image
-                                    src={card.img} alt="" aria-hidden width={S_W} height={S_H}
-                                    style={{ width: '100%', height: '100%', objectFit: 'contain', pointerEvents: 'none', display: 'block' }}
+                                    src={card.img} alt="" aria-hidden width={S_W} height={S_H} sizes="210px"
+                                    style={{ width: '100%', height: '58%', objectFit: 'contain', pointerEvents: 'none', display: 'block' }}
                                 />
 
-                                {/* The source art contains launch-era prices. This
-                                    opaque panel fully replaces that region so an
-                                    admin price override can never contradict the
-                                    image. All customer-readable facts live in DOM. */}
+                                {/* Food-only artwork. Every size, price and volume
+                                    is native text from the effective-price layer. */}
                                 <div style={{
-                                    position: 'absolute', zIndex: 3, left: 0, right: 0, bottom: 0, height: '56%',
+                                    position: 'absolute', zIndex: 3, left: 0, right: 0, bottom: 0, height: '42%',
                                     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                                    padding: '10px 12px 12px', textAlign: 'center',
-                                    background: 'linear-gradient(180deg, #082008, #020a02)',
-                                    borderTop: '1px solid rgba(240,200,50,0.42)',
-                                    boxShadow: '0 -10px 24px rgba(2,10,2,0.72)',
+                                    padding: '7px 10px 10px', textAlign: 'center',
+                                    background: '#081b10',
+                                    borderTop: '1px solid rgba(225,200,117,0.2)',
                                 }}>
                                     <div
                                         key={isActive ? `live-price-${activeIdx}` : `live-price-${card.id}`}
@@ -348,17 +333,12 @@ export default function SizePicker({ onSelect, onBack, dive = false, initialSize
                                             animation: isActive && !reducedMotion ? 'priceBadge 0.32s cubic-bezier(0.34,1.4,0.64,1) both' : 'none',
                                         }}
                                     >
-                                        {isActive && (
-                                            <div style={{ fontSize: '9px', fontWeight: 900, color: '#fff3a8', letterSpacing: '0.04em', marginBottom: '2px' }}>
-                                                ✓ נבחר
-                                            </div>
-                                        )}
-                                        <div style={{ fontSize: '11px', fontWeight: 900, color: 'var(--color-gold-bright)' }}>{card.tag}</div>
+                                        <div style={{ fontSize: '16px', fontWeight: 800, color: '#fff3ce' }}>{card.name} · {card.id}</div>
                                         <div style={{ fontSize: '30px', lineHeight: 1.05, fontWeight: 950, color: '#fff', textShadow: '0 2px 10px rgba(0,0,0,0.7)' }}>
                                             ₪{card.price}
                                         </div>
-                                        <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-gold-deep)' }}>
-                                            {card.ml} מ״ל
+                                        <div style={{ fontSize: '12px', fontWeight: 500, color: '#c9d7c5', marginTop: '4px' }}>
+                                            {card.ml} מ״ל · {card.tag}
                                         </div>
                                     </div>
                                 </div>

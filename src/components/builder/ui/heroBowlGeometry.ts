@@ -11,39 +11,40 @@
  * 264px, worst case ~370px, against a scroll region of 353px. The better someone
  * did, the less room they had to keep going.
  *
- * Removing the badge pills is what fixed it. The chips alone never threaten the
- * height: the panel row is `max(ring, statsColumn)`, and even a full bowl of 14
- * needs only three chip rows, which fits inside the ring at every width. So the
- * chips are NOT capped — capping them would waste the ~113px of empty column
- * beside the ring for no benefit.
+ * The new compact panel keeps ALL choices in one horizontally scrollable row.
+ * That includes paid extras and preparation options, not only the 14 base picks.
+ * Every removal button is 44px rather than a tiny wrapping icon. The artwork
+ * shrinks to 96px, freeing vertical room for the actual ingredient cards.
  *
  * That makes the constant height a real invariant rather than a coincidence:
  * `statsColumnHeight(n) <= ringFor(vw)` for every n up to `maxItems`, asserted
- * in scripts/verify-plaque.ts. If the bowl cap is ever raised, or the chip or
+ * in scripts/verify-plaque.ts. If the layout constants or the chip or
  * ring sizes change, that assertion is what catches the panel growing again.
  */
 
 export const PANEL = {
-    chipIcon: 18,
-    chipW: 24,       // 2px padding x2 + 18px icon + 2px border
-    chipGap: 3,
+    chipIcon: 26,
+    chipW: 44,       // Full mobile touch targets.
+    chipGap: 6,
 
-    ring: 158,
-    ringSmall: 118,  // @media (max-width: 374px)
+    ring: 96,
+    ringSmall: 88,  // @media (max-width: 374px)
     smallAt: 374,
 
     marginX: 12,     // margin: "6px 12px"
-    marginY: 6,
-    padTop: 18,      // padding: "18px 14px 8px"
-    padX: 14,
+    marginY: 4,
+    padTop: 8,
+    padX: 10,
     padBottom: 8,
-    rowGap: 14,      // between the ring and the stats column
+    rowGap: 10,
 
-    counterH: 16,    // the 11px "n / 14 מרכיבים" line
-    colGap: 5,
+    counterH: 17,    // 12px text with a comfortable line height.
+    colGap: 6,
+    hintH: 15,
+    border: 1,
 
-    /** BOWL_MAX in BariBaliBuilder — the most chips that can ever appear. */
-    maxItems: 14,
+    /** Stress case including extras and preparation, NOT a business cap. */
+    maxItems: 32,
 } as const;
 
 /** The ring diameter at a given viewport width. */
@@ -52,25 +53,25 @@ export const ringFor = (viewportW: number): number =>
 
 /** Width available to the stats column beside the ring. */
 export const statsColumnWidth = (viewportW: number): number =>
-    viewportW - 2 * PANEL.marginX - 2 * PANEL.padX - ringFor(viewportW) - PANEL.rowGap;
+    viewportW - 2 * PANEL.marginX - 2 * PANEL.padX - 2 * PANEL.border - ringFor(viewportW) - PANEL.rowGap;
 
 /** How many chips fit on one row at this width. */
 export const chipsPerRow = (viewportW: number): number =>
     Math.floor((statsColumnWidth(viewportW) + PANEL.chipGap) / (PANEL.chipW + PANEL.chipGap));
 
-/** How many rows `count` chips wrap onto. */
-export const chipRows = (count: number, viewportW: number): number =>
-    count === 0 ? 0 : Math.ceil(count / chipsPerRow(viewportW));
+/** All choices stay in one scrollable row, without growing the panel. */
+export const chipRows = (count: number, _viewportW: number): number => count === 0 ? 0 : 1;
 
 /** Height of the stats column for a given ingredient count. */
 export const statsColumnHeight = (count: number, viewportW: number): number => {
     const rows = chipRows(count, viewportW);
     if (rows === 0) return PANEL.counterH;
-    return PANEL.counterH + PANEL.colGap + rows * PANEL.chipW + (rows - 1) * PANEL.chipGap;
+    return PANEL.counterH + 2 * PANEL.colGap + PANEL.chipW + PANEL.hintH;
 };
 
 /** Total panel height. Must not vary with `count` — that is the invariant. */
 export const panelHeight = (viewportW: number, count: number): number =>
     2 * PANEL.marginY
+    + 2 * PANEL.border
     + PANEL.padTop + PANEL.padBottom
     + Math.max(ringFor(viewportW), statsColumnHeight(count, viewportW));

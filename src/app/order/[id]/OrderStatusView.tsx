@@ -371,7 +371,7 @@ export default function OrderStatusView({ id, paymentHint = null }: { id: string
                 style={P.srOnly}
             />
             <BariGlowBackground />
-            <GoldField zIndex={0} />
+            <GoldField zIndex={0} density={0.55} />
 
             <div style={{ ...P.board, ...(recoveryMode !== 'none' ? { margin: 'auto auto 0' } : {}) }}>
                 <div style={P.boardArt} aria-hidden="true" />
@@ -608,7 +608,7 @@ const P: Record<string, React.CSSProperties> = {
     // slots is transparent — the site's own backdrop and particle field are
     // meant to show through it. Hence the full background here rather than the
     // flat one the confirmation overlay uses.
-    root: { position: 'relative', minHeight: '100dvh', display: 'flex', background: 'url(/homepage-assets/BG_8K.webp) center top / cover no-repeat, linear-gradient(155deg, #030a03 0%, #071a07 30%, #0a200a 60%, #071a07 100%)', fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: 'rtl', color: '#fff' },
+    root: { position: 'relative', minHeight: '100dvh', display: 'flex', background: 'linear-gradient(rgba(2,12,7,0.65), rgba(2,12,7,0.82)), url(/homepage-assets/BG_8K.webp) center top / cover no-repeat, #030a03', fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: 'rtl', color: '#fff' },
 
     // The artwork, locked to its own ratio. Everything below is absolutely
     // positioned into a slot the art already drew, so all the geometry lives in
@@ -689,7 +689,7 @@ const P: Record<string, React.CSSProperties> = {
 
     pickupRow: { display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'clamp(8px, 3.1vw, 12px)', color: 'rgba(255,255,255,0.82)', fontWeight: 600, lineHeight: 1.25, textShadow: '0 1px 3px rgba(0,0,0,0.75)' },
     pickupClock: { color: '#f0d060', fontWeight: 900 },
-    pickupSep: { color: 'rgba(255,255,255,0.25)' },
+    pickupSep: { color: '#a9b9a4' },
 
     countdownUrgent: { color: '#f0d060', fontWeight: 800, animation: 'countdownPulse 1s ease-in-out infinite' },
     countdownArrived: { color: '#7ed07e', fontWeight: 900, animation: 'countdownGlow 1.5s ease-in-out infinite' },
@@ -704,7 +704,7 @@ const P: Record<string, React.CSSProperties> = {
     // Clamped: the card is a fixed slot in the artwork, so a long ingredient
     // list must be cut off rather than pushing the composition apart.
     itemNames: {
-        fontSize: 'clamp(8px, 2.7vw, 10px)', color: 'rgba(255,255,255,0.72)', lineHeight: 1.35, textAlign: 'center' as const,
+        fontSize: 'clamp(8px, 2.7vw, 10px)', color: '#d7e3d2', lineHeight: 1.35, textAlign: 'center' as const,
         textShadow: '0 1px 3px rgba(0,0,0,0.75)',
         display: '-webkit-box', WebkitBoxOrient: 'vertical' as unknown as undefined, WebkitLineClamp: 2, overflow: 'hidden',
     },
@@ -718,7 +718,7 @@ const P: Record<string, React.CSSProperties> = {
     // not six.
     moneyRow: { display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '6px', flexWrap: 'nowrap', lineHeight: 1.1, textShadow: '0 1px 3px rgba(0,0,0,0.75)' },
     total: { fontSize: 'clamp(15px, 5.0vw, 20px)', fontWeight: 900, color: '#f0d060' },
-    bowlLabel: { fontSize: 'clamp(8px, 2.7vw, 10px)', color: 'rgba(240,208,96,0.75)', fontWeight: 700, whiteSpace: 'nowrap' },
+    bowlLabel: { fontSize: 'clamp(8px, 2.7vw, 10px)', color: '#ead482', fontWeight: 700, whiteSpace: 'nowrap' },
     payTag: { fontSize: 'clamp(8px, 2.9vw, 11px)', fontWeight: 800, whiteSpace: 'nowrap' },
     payOwed: { color: '#ffd08a' },
     payDone: { color: '#b6e6b6' },
@@ -730,7 +730,7 @@ const P: Record<string, React.CSSProperties> = {
     },
     railList: { position: 'absolute', inset: 0, margin: 0, padding: 0, listStyle: 'none', pointerEvents: 'none' },
 
-    footer: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: 'clamp(8px, 2.7vw, 11px)', color: 'rgba(255,255,255,0.62)', fontWeight: 600, textShadow: '0 1px 6px rgba(0,0,0,0.9)' },
+    footer: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: 'clamp(8px, 2.7vw, 11px)', color: '#c9d7c5', fontWeight: 600, textShadow: '0 1px 6px rgba(0,0,0,0.9)' },
 
     // Green and breathing while polling, amber when the connection is gone,
     // steady gold once collected.

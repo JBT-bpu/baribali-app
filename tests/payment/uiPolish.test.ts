@@ -3,9 +3,60 @@ import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { isPreparationChoice, preparationLabel } from '../../src/lib/summaryPresentation';
 import { estimateNutritionRange } from '../../src/lib/nutritionSimulator';
+import { PANEL, panelHeight, statsColumnHeight, ringFor } from '../../src/components/builder/ui/heroBowlGeometry';
 
 const builder = readFileSync(new URL('../../src/components/builder/BariBaliBuilder.jsx', import.meta.url), 'utf8');
 const summary = readFileSync(new URL('../../src/components/builder/SummaryView.jsx', import.meta.url), 'utf8');
+const brandHeader = readFileSync(new URL('../../src/components/builder/ui/BuilderBrandHeader.tsx', import.meta.url), 'utf8');
+const brandHeaderCss = readFileSync(new URL('../../src/components/builder/ui/BuilderBrandHeader.module.css', import.meta.url), 'utf8');
+const home = readFileSync(new URL('../../src/app/home2/page.tsx', import.meta.url), 'utf8');
+const bowl = readFileSync(new URL('../../src/components/builder/ui/HeroBowlCard.jsx', import.meta.url), 'utf8');
+const bowlCss = readFileSync(new URL('../../src/components/builder/ui/HeroBowlCard.module.css', import.meta.url), 'utf8');
+const field = readFileSync(new URL('../../src/components/ui/GoldField.tsx', import.meta.url), 'utf8');
+
+test('compact bowl geometry stays constant through base ingredients, extras and preparation', () => {
+    assert.equal(PANEL.chipW, 44);
+    for (const width of [320, 360, 374, 375, 393, 430]) {
+        for (let count = 0; count <= 64; count++) {
+            assert.equal(panelHeight(width, count), panelHeight(width, 0));
+            assert.ok(statsColumnHeight(count, width) <= ringFor(width));
+        }
+        assert.ok(panelHeight(width, 32) <= 122);
+    }
+    assert.match(bowl, /all\.map\(item =>/);
+    assert.match(bowlCss, /overflow-x:auto/);
+    assert.match(bowlCss, /flex:0 0 44px/);
+    assert.match(bowlCss, /:focus-visible/);
+    assert.match(bowl, /onFocus=\{event => event\.currentTarget\.scrollIntoView\(/);
+    assert.match(bowl, /!reducedMotion && lastAdd === item\.id/);
+    assert.doesNotMatch(bowl, /Lottie|Tilt|setTimeout|fetch\(/);
+});
+
+test('new bowls remain lightweight WebP artwork and the existing art is preserved', () => {
+    const paths = ['homepage-assets/salad-bowl-s-v2.webp', 'homepage-assets/salad-bowl-m-v2.webp', 'homepage-assets/salad-bowl-l-v2.webp', 'builder-assets/builder-bowl-empty-v2.webp'];
+    for (const path of paths) {
+        const art = readFileSync(new URL(`../../public/${path}`, import.meta.url));
+        assert.equal(art.toString('ascii', 0, 4), 'RIFF');
+        assert.equal(art.toString('ascii', 8, 12), 'WEBP');
+        assert.ok(art.length < 140 * 1024);
+    }
+    assert.ok(readFileSync(new URL('../../public/homepage-assets/card-salad.png', import.meta.url)).length > 0);
+    assert.doesNotMatch(builder, /fetch\(file\)|const Lottie/);
+    assert.doesNotMatch(home, /import\('lottie-react'\)|fetch\('\/cat-salad-bowl\.json'\)/);
+});
+
+test('decorative field pauses while hidden and resumes with reduced-motion still respected', () => {
+    assert.match(field, /!motionPreference\.matches && !document\.hidden/);
+    assert.match(field, /document\.addEventListener\('visibilitychange', syncAnimation\)/);
+    assert.match(field, /document\.removeEventListener\('visibilitychange', syncAnimation\)/);
+    assert.match(field, /else cancelAnimationFrame\(raf\)/);
+});
+
+test('builder content never waits invisibly for a mount-animation timer', () => {
+    assert.match(builder, /const \[anim, setAnim\] = useState\(null\)/);
+    assert.doesNotMatch(builder, /opacity: anim === "enter" \? 0/);
+    assert.doesNotMatch(builder, /setTimeout\(\(\) => setAnim\(null\), 500\)/);
+});
 
 test('the builder header uses lightweight dedicated artwork instead of the wordmark backdrop', () => {
     assert.match(builder, /const builderHeaderImage = "\/builder-assets\/builder-header-panel-v1\.webp"/);
@@ -14,7 +65,7 @@ test('the builder header uses lightweight dedicated artwork instead of the wordm
     assert.ok(!headerStyle.includes('url(${headerImage})'));
     assert.match(headerStyle, /backgroundSize: "100% calc\(100% \+ 16px\)"/);
     assert.match(headerStyle, /backgroundColor: "#0b2312"/);
-    assert.match(builder, /src=\{headerImage\}/, 'starter branding stays intact');
+    assert.match(builder, /<BuilderBrandHeader>/, 'starter branding uses the selected full-logo cartouche');
     const art = readFileSync(new URL('../../public/builder-assets/builder-header-panel-v1.webp', import.meta.url));
     assert.equal(art.toString('ascii', 0, 4), 'RIFF');
     assert.equal(art.toString('ascii', 8, 12), 'WEBP');
@@ -91,8 +142,42 @@ test('nutrition simulation keeps explicit units and does not invent a health sco
 
 test('short summary viewports retain pickup and legal consent while compacting decoration', () => {
     assert.match(summary, /@media \(max-height: 700px\)/);
-    assert.match(summary, /\.summary-brand \{ height:48px !important; \}/);
+    assert.match(brandHeaderCss, /@media \(max-height: 700px\)/);
+    assert.match(brandHeaderCss, /height: 82px/);
+    assert.match(brandHeaderCss, /object-fit: contain/);
     assert.match(summary, /aria-controls="pickup-time-picker"/);
     for (const href of ['/terms', '/privacy', '/cancellations']) assert.ok(summary.includes(`href="${href}"`));
     assert.doesNotMatch(summary, /height: "110px"/);
+});
+
+test('entry and summary share the selected cartouche without duplicate or cropped branding', () => {
+    for (const screen of [builder, summary]) {
+        assert.match(screen, /<BuilderBrandHeader>/);
+        assert.doesNotMatch(screen, /header-brand\.png/);
+    }
+    assert.match(brandHeader, /import Image from 'next\/image'/);
+    assert.match(brandHeader, /builder-brand-cartouche-v2\.webp/);
+    assert.match(brandHeader, /alt="BariBali"/);
+    assert.match(brandHeader, /sizes="\(max-width: 430px\) 100vw, 430px"/);
+    assert.match(brandHeaderCss, /aspect-ratio: 3 \/ 1/);
+    assert.match(brandHeaderCss, /padding-top: env\(safe-area-inset-top\)/);
+    assert.doesNotMatch(brandHeaderCss, /object-fit: cover|position: absolute|animation:/);
+    const art = readFileSync(new URL('../../public/builder-assets/builder-brand-cartouche-v2.webp', import.meta.url));
+    assert.equal(art.toString('ascii', 0, 4), 'RIFF');
+    assert.equal(art.toString('ascii', 8, 12), 'WEBP');
+    assert.ok(art.length < 120 * 1024, 'the branded header must remain lightweight on mobile');
+});
+
+test('cartouche toolbar keeps real accessible controls and request locking', () => {
+    assert.match(brandHeaderCss, /min-height: 44px/);
+    assert.match(brandHeaderCss, /button:focus-visible/);
+    assert.match(brandHeaderCss, /button:disabled/);
+    assert.match(summary, /aria-label="חזרה לעריכת ההזמנה"[\s\S]*?disabled=\{requestLocked\}[\s\S]*?onClick=\{leaveSummary\}/);
+    assert.match(summary, /aria-label=\{`סך ההזמנה \$\{checkoutTotal\} שקלים`\}/);
+    assert.match(summary, /<h1>ההזמנה שלכם<\/h1>/);
+});
+
+test('size selection warms the current cartouche instead of unused legacy branding', () => {
+    assert.match(home, /for \(const src of \['\/builder-assets\/builder-brand-cartouche-v2\.webp', '\/builder-assets\/footer-brand\.png'\]\)/);
+    assert.doesNotMatch(home, /header-brand\.png/);
 });

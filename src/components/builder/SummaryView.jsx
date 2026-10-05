@@ -2,6 +2,8 @@
 import { useCallback, useMemo, useState, useEffect, useRef } from "react";
 import { requestHostedPayment } from '@/lib/hostedPaymentRequest';
 import { useRouter } from 'next/navigation';
+import { ArrowRight } from 'lucide-react';
+import BuilderBrandHeader from './ui/BuilderBrandHeader';
 import { fireGoldConfetti } from "../../lib/confetti";
 import { isPreparationChoice, preparationLabel } from "../../lib/summaryPresentation";
 
@@ -129,7 +131,6 @@ function generatePickupSlots(now = new Date()) {
 import { STEPS, BASE } from "../../data/salad-data.js";
 import { effectiveItemPrice } from "../../lib/menuConfig";
 import { findDiscount, discountAmount } from "../../lib/discounts";
-const headerImage = "/builder-assets/header-brand.png";
 import OrderSealScreen from "./ui/OrderSealScreen.jsx";
 import BariPanel from "../ui/bari/BariPanel";
 import BariButton from "../ui/bari/BariButton";
@@ -760,26 +761,19 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
             )}
 
             <div style={S.main}>
-                <div style={S.header}>
-                    <img className="summary-brand" src={headerImage} alt="" aria-hidden="true" style={{ width: "100%", display: "block", height: "72px", objectFit: "cover", objectPosition: "center top", flexShrink: 0 }} />
-                    <div style={S.headerTop}>
+                <BuilderBrandHeader>
                         <button
                             type="button"
                             aria-label="חזרה לעריכת ההזמנה"
                             disabled={requestLocked}
-                            style={{ ...S.backBtn, ...(requestLocked ? { cursor: 'not-allowed', opacity: 0.45 } : {}) }}
                             onClick={leaveSummary}
-                        >→</button>
-                        <div style={{ flex: 1, display: "flex", alignItems: "center", gap: "5px" }}>
-                            <span style={{ fontSize: "17px" }}>📋</span>
-                            <h1 style={{ margin: 0, fontFamily: "var(--font-display), 'Secular One', sans-serif", fontSize: "17px", color: "#e8f5e9" }}>ההזמנה שלכם</h1>
-                        </div>
-                        <div style={S.pricePill}>
-                            <span style={S.priceS}>₪</span>
+                        ><ArrowRight size={22} aria-hidden="true" /></button>
+                        <h1>ההזמנה שלכם</h1>
+                        <div style={S.pricePill} aria-label={`סך ההזמנה ${checkoutTotal} שקלים`}>
                             <span style={S.priceV}>{checkoutTotal}</span>
+                            <span style={S.priceS}>₪</span>
                         </div>
-                    </div>
-                </div>
+                </BuilderBrandHeader>
 
                 <div style={S.content}>
                     {/* Layered bowl — hero */}
@@ -1307,17 +1301,9 @@ const S = {
     bg: { position: "fixed", inset: 0, zIndex: 0, background: "linear-gradient(155deg, #030a03 0%, #071a07 20%, #0a200a 45%, #071a07 70%, #030a03 100%)", filter: "blur(2px) brightness(0.65)" },
     bgRay: { position: "fixed", top: "-30%", left: "50%", transform: "translateX(-50%)", width: "110%", height: "70%", zIndex: 0, pointerEvents: "none", background: "radial-gradient(ellipse 70% 60% at 50% 20%, rgba(255,224,100,0.05) 0%, rgba(200,168,78,0.02) 50%, transparent 70%)" },
     main: { position: "relative", zIndex: 2, display: "flex", flexDirection: "column", height: "100dvh" },
-    // paddingTop keeps the brand art clear of the notch now that
-    // viewport-fit=cover is on; the header background fills the strip above it.
-    header: { paddingTop: "env(safe-area-inset-top)", background: `linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.5)), url(/builder-assets/header-brand.png) center / cover no-repeat`, borderBottom: "2px solid rgba(200,168,78,0.4)" },
-    // 16px side gutter, matching `content` and `bar` — the screen used to run
-    // 12/14/16/28px at different heights, which read as the header and footer
-    // being crowded against the edge.
-    headerTop: { display: "flex", alignItems: "center", gap: "8px", padding: "8px 16px 10px" },
-    backBtn: { width: "44px", height: "44px", borderRadius: "10px", cursor: "pointer", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)", color: "#a5d6a7", fontSize: "16px", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", flexShrink: 0 },
-    pricePill: { display: "flex", alignItems: "baseline", gap: "1px", background: "linear-gradient(135deg, rgba(200,168,78,0.22), rgba(184,134,11,0.1))", border: "1px solid rgba(200,168,78,0.4)", padding: "4px 11px", borderRadius: "12px" },
-    priceS: { fontSize: "10px", color: "#d4b84a", fontWeight: 600 },
-    priceV: { fontSize: "20px", color: "#ffffff", fontWeight: 900, textShadow: "0 2px 8px rgba(200,168,78,0.5)" },
+    pricePill: { display: "flex", alignItems: "baseline", justifyContent: "center", direction: "ltr", flexShrink: 0, gap: "3px", minWidth: "70px", minHeight: "44px", boxSizing: "border-box", background: "#28351a", border: "1px solid #bfa54f", padding: "4px 10px", borderRadius: "13px", boxShadow: "inset 0 1px 0 rgba(249,229,147,0.15)" },
+    priceS: { fontSize: "12px", color: "#e8cf74", fontWeight: 700 },
+    priceV: { fontSize: "24px", color: "#ffffff", fontWeight: 900, fontVariantNumeric: "tabular-nums" },
     content: { flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", padding: "12px 16px max(24px, env(safe-area-inset-bottom))", scrollbarWidth: "none" },
     sumBowlWrap: { position: "relative", margin: "8px auto 18px", width: "100%", maxWidth: "360px", display: "flex", flexDirection: "column", alignItems: "center" },
     sumBowlGlow: { position: "absolute", bottom: "20px", left: "50%", transform: "translateX(-50%)", width: "200px", height: "60px", borderRadius: "50%", background: "radial-gradient(ellipse, rgba(200,168,78,0.18) 0%, transparent 70%)", pointerEvents: "none", filter: "blur(8px)" },
@@ -1356,7 +1342,7 @@ const S = {
         position: "absolute", left: "11%", right: "11%", top: "18%", height: "36%",
         display: "flex", flexDirection: "column", justifyContent: "center",
     },
-    sumBowlMeta: { marginTop: "10px", display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", fontWeight: 600, color: "rgba(255,255,255,0.5)", letterSpacing: "0.03em" },
+    sumBowlMeta: { marginTop: "10px", display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", fontWeight: 600, color: "#c9d7c5", letterSpacing: "0.03em" },
     preparationNote: { width: "100%", display: "flex", flexDirection: "column", gap: "3px", marginTop: "8px", padding: "10px 12px", borderRadius: "12px", background: "rgba(200,168,78,0.08)", border: "1px solid rgba(200,168,78,0.2)", fontSize: "12px", lineHeight: 1.5, color: "rgba(255,255,255,0.85)" },
     nutritionDisclaimer: { margin: "10px 4px 0", fontSize: "12px", lineHeight: 1.55, color: "rgba(255,255,255,0.75)", textAlign: "center" },
     nutritionDetails: { width: "100%", marginTop: "8px", padding: "0 12px", borderRadius: "11px", background: "rgba(9,31,14,0.66)", border: "1px solid rgba(200,168,78,0.24)", color: "rgba(255,255,255,0.8)", fontSize: "12px", lineHeight: 1.55 },
@@ -1370,17 +1356,17 @@ const S = {
     // emblems are free-standing art with their own visual margin, so the
     // crowding it was fighting is gone.
     comboBanner: { marginBottom: "14px", padding: "12px 16px", borderRadius: "14px", background: "linear-gradient(135deg, rgba(200,168,78,0.14) 0%, rgba(180,140,40,0.08) 100%)", border: "1.5px solid rgba(200,168,78,0.4)", boxShadow: "0 0 24px rgba(200,168,78,0.12), inset 0 1px 0 rgba(255,255,255,0.06)", animation: "pFadeIn 0.5s ease both" },
-    comboBannerTitle: { fontSize: "10px", fontWeight: 800, color: "rgba(200,168,78,0.6)", letterSpacing: "0.06em", marginBottom: "8px" },
+    comboBannerTitle: { fontSize: "12px", fontWeight: 800, color: "#e6d18b", letterSpacing: "0.04em", marginBottom: "8px" },
     // A fixed 6-across trophy wall. At this size (~38px on a 320px screen,
     // ~56px on a large phone) the Hebrew baked into each emblem is NOT
     // readable — that is the intent: the wall is scanned for shape and colour,
     // the way a collection is. The title still reaches screen readers via alt.
     comboBannerRow: { display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: "6px", justifyItems: "center" },
     comboEmblem: { width: "100%", height: "auto", display: "block" },
-    notesToggle: { width: "100%", minHeight: "44px", margin: "12px 0", padding: "10px 12px", borderRadius: "12px", display: "flex", alignItems: "center", gap: "8px", background: "rgba(15,45,15,0.6)", backdropFilter: "blur(8px)", border: "1px solid rgba(200,168,78,0.15)", cursor: "pointer", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.55)", direction: "rtl", textAlign: "right" },
+    notesToggle: { width: "100%", minHeight: "44px", margin: "12px 0", padding: "10px 12px", borderRadius: "12px", display: "flex", alignItems: "center", gap: "8px", background: "#0d2815", border: "1px solid rgba(200,168,78,0.25)", cursor: "pointer", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", fontSize: "13px", fontWeight: 600, color: "#c9d7c5", direction: "rtl", textAlign: "right" },
     notesInput: { width: "100%", padding: "8px 10px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.04)", color: "#e8f5e9", fontSize: "12px", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", outline: "none", direction: "rtl", resize: "vertical", minHeight: "60px" },
     sumPriceCard: { marginTop: "14px", padding: "14px 16px", borderRadius: "14px", background: "linear-gradient(145deg, rgba(15,45,15,0.9), rgba(20,55,20,0.85))", border: "1px solid rgba(200,168,78,0.25)", boxShadow: "0 4px 16px rgba(0,0,0,0.3)" },
-    sumPriceLine: { display: "flex", justifyContent: "space-between", fontSize: "13px", color: "rgba(255,255,255,0.5)", padding: "3px 0" },
+    sumPriceLine: { display: "flex", justifyContent: "space-between", fontSize: "13px", color: "#c9d7c5", padding: "3px 0" },
     sumTotal: { display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: "36px", fontWeight: 900, color: "#f0d060", textShadow: "0 0 24px rgba(200,168,78,0.55), 0 2px 8px rgba(200,168,78,0.3)", padding: "12px 0 2px", marginTop: "10px", borderTop: "1px solid rgba(200,168,78,0.2)" },
     bar: {
         display: "flex", flexDirection: "column", gap: "10px",
@@ -1414,10 +1400,10 @@ const S = {
         display: "flex", alignItems: "flex-start", gap: "8px",
         marginTop: "12px", padding: "10px 12px", borderRadius: "12px",
         background: "rgba(200,168,78,0.09)", border: "1px solid rgba(200,168,78,0.24)",
-        color: "rgba(255,255,255,0.66)", fontSize: "11px", fontWeight: 600,
+        color: "#c9d7c5", fontSize: "12px", fontWeight: 600,
         lineHeight: 1.55,
     },
-    trustCopy: { display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", marginTop: "16px", fontSize: "11px", fontWeight: 500, color: "rgba(255,255,255,0.45)", letterSpacing: "0.03em", animation: "pFadeIn 0.5s ease 0.8s both" },
+    trustCopy: { display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", marginTop: "16px", fontSize: "12px", fontWeight: 500, color: "#c9d7c5", letterSpacing: "0.03em", animation: "pFadeIn 0.5s ease 0.8s both" },
 };
 
 // ─── Pickup time picker ────────────────────────────────────────
@@ -1619,7 +1605,6 @@ const KF = `
 @keyframes popBounce { 0%{transform:scale(0.3);opacity:0} 60%{transform:scale(1.15)} 100%{transform:scale(1);opacity:1} }
 @keyframes pFadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
 @media (max-height: 700px) {
-  .summary-brand { height:48px !important; }
   .summary-action-zone { gap:6px !important; padding:8px 16px max(8px, env(safe-area-inset-bottom)) !important; }
   .summary-pick-count { display:none !important; }
 }

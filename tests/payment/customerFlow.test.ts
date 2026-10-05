@@ -306,12 +306,13 @@ test('the shared size picker is a keyboard-complete modal', () => {
 
     assert.match(sizePicker, /price: effectiveSizePrice\(750\)/,
         'the customer-visible size price must come from the effective admin-driven layer');
-    assert.match(sizePicker, /admin price override can never contradict[\s\S]*?height: '56%'/,
-        'an opaque live-data panel must replace the launch-era price baked into the art');
-    assert.match(sizePicker, /height: '56%'[\s\S]*?key=\{isActive \? `live-price-/,
-        'the opaque price cover must stay static while only its live DOM content animates');
+    for (const size of ['s', 'm', 'l']) assert.ok(sizePicker.includes(`salad-bowl-${size}-v2.webp`),
+        'each size uses text-free food artwork rather than a launch-price poster');
+    assert.doesNotMatch(sizePicker, /\/homepage-assets\/size-[sml]\.png/);
+    assert.match(sizePicker, /height: '42%'[\s\S]*?key=\{isActive \? `live-price-/,
+        'the native price panel stays static while only its live DOM content animates');
     assert.match(sizePicker, /src=\{card\.img\} alt="" aria-hidden/,
-        'the stale text inside the source art must be hidden from assistive technology');
+        'decorative food art must be hidden from assistive technology');
     assert.match(sizePicker, /overflowY: 'auto', overflowX: 'hidden'/,
         'projected side cards must not turn a 320px modal into a horizontal scroller');
     assert.match(sizePicker, /touchAction: 'pan-y pinch-zoom'/,
@@ -589,8 +590,9 @@ test('builder entry, summary edits and checkout keep clear escape and return pat
     assert.match(builder, /const exitPresetToMenu = useCallback\(\(\) => \{[\s\S]*?if \(enteredFromHome\) router\.back\(\);[\s\S]*?else router\.replace\("\/home2"\)/,
         'menu arrivals should go Back once, while direct links need an in-app replacement');
     assert.match(builder, /<HeaderBanner onBack=\{exitPresetToMenu\} \/>/);
-    assert.match(builder, /paddingTop: "env\(safe-area-inset-top\)"/,
-        'the preset header must clear the status bar when the app runs edge-to-edge');
+    const headerCss = readFileSync(new URL('../../src/components/builder/ui/BuilderBrandHeader.module.css', import.meta.url), 'utf8');
+    assert.match(headerCss, /padding-top: env\(safe-area-inset-top\)/,
+        'the shared preset header must clear the status bar when the app runs edge-to-edge');
 
     assert.match(builder, /const \[editingFromSummary, setEditingFromSummary\] = useState\(false\)/);
     assert.match(builder, /const \[checkoutDraft, setCheckoutDraft\] = useState\(emptyCheckoutDraft\)/,

@@ -333,7 +333,7 @@ const S = {
     // that zone gets on a 320px-wide phone, and the overflow ran over the
     // engraved divider.
     title: { fontSize: "clamp(20px, 6.4vw, 26px)", fontWeight: 900, color: "#ffffff", textShadow: "0 2px 8px rgba(0,0,0,0.5)", lineHeight: 1.1 },
-    subtitle: { fontSize: "clamp(11px, 3.4vw, 13px)", fontWeight: 600, color: "rgba(255,255,255,0.55)", marginTop: "4px" },
+    subtitle: { fontSize: "clamp(11px, 3.4vw, 13px)", fontWeight: 600, color: "#c9d7c5", marginTop: "4px" },
 
     price: {
         fontSize: "44px", fontWeight: 900,
@@ -342,7 +342,7 @@ const S = {
         WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
         textShadow: "none", lineHeight: 1.1,
     },
-    meta: { fontSize: "12px", color: "rgba(255,255,255,0.38)", marginTop: "6px", fontWeight: 600 },
+    meta: { fontSize: "12px", color: "#c9d7c5", marginTop: "6px", fontWeight: 600 },
     payPill: {
         display: "inline-flex", alignItems: "center", gap: "7px",
         marginTop: "14px", padding: "8px 16px", borderRadius: "var(--radius-full)",
