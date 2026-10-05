@@ -5,6 +5,8 @@ import Image from 'next/image';
 import { LockKeyhole, Sparkles } from 'lucide-react';
 import { BariButton } from '@/components/ui/bari';
 import { usePrefersReducedMotion } from '@/lib/motionHooks';
+import { effectiveSizePrice } from '@/lib/menuConfig';
+import { matchingSaladHeroArtwork } from '@/lib/saladHeroArtwork';
 import {
     isOrderableProduct,
     isOrderProduct,
@@ -83,6 +85,8 @@ export default function HeroSelector({
 }) {
     const reducedMotion = usePrefersReducedMotion();
     const [activeIdx, setActiveIdx] = useState(0);
+    const [posterFailed, setPosterFailed] = useState(false);
+    const startingPrice = Math.min(...[750, 1000, 1500].map(effectiveSizePrice));
     const startX = useRef<number | null>(null);
     const moved = useRef(false);
 
@@ -192,6 +196,9 @@ export default function HeroSelector({
                         ? 'translateX(0) translateZ(40px) rotateY(0deg) scale(1)'
                         : `translateX(${side * 138}px) translateZ(-118px) rotateY(${-side * 22}deg) scale(0.64)`;
                     const hidden = reducedMotion && !isActive;
+                    const cardArtwork = hero.id === 'salad' && !hero.locked && !posterFailed
+                        ? matchingSaladHeroArtwork(startingPrice, hero.title, hero.copy)
+                        : null;
 
                     return (
                         <button
@@ -199,9 +206,10 @@ export default function HeroSelector({
                             key={hero.id}
                             ref={element => { cardRefs.current[i] = element; }}
                             type="button"
+                            data-card-art={cardArtwork ? 'botanical' : 'native'}
                             aria-pressed={isActive}
                             aria-hidden={hidden || undefined}
-                            aria-label={`${hero.title}, ${hero.locked ? 'בקרוב' : 'זמין עכשיו'}${isActive ? hero.locked ? ', נבחרה' : ', נבחרה — לחצו לבחירת גודל' : ''}`}
+                            aria-label={`${hero.title}, ${hero.locked ? 'בקרוב' : 'זמין עכשיו'}${hero.id === 'salad' && !hero.locked ? `, החל מ־${startingPrice} ₪ לפני תוספות` : ''}${isActive ? hero.locked ? ', נבחרה' : ', נבחרה — לחצו לבחירת גודל' : ''}`}
                             tabIndex={isActive ? 0 : -1}
                             onClick={event => handleCardTap(i, event)}
                             style={{
@@ -222,7 +230,7 @@ export default function HeroSelector({
                         >
                             <div style={{
                                 width: '100%', height: '100%', borderRadius: '18px', overflow: 'hidden', position: 'relative',
-                                border: isActive ? '1.5px solid rgba(240,200,50,0.7)' : '1px solid rgba(255,255,255,0.16)',
+                                border: cardArtwork ? 0 : isActive ? '1.5px solid rgba(240,200,50,0.7)' : '1px solid rgba(255,255,255,0.16)',
                                 boxShadow: isActive ? '0 18px 42px rgba(0,0,0,0.5), 0 0 20px rgba(240,200,50,0.16)' : '0 8px 22px rgba(0,0,0,0.4)',
                                 background: '#0b2113',
                             }}>
@@ -233,31 +241,51 @@ export default function HeroSelector({
                                     </span>
                                 </div>
 
-                                {/* Art */}
-                                {hero.img ? (
+                                {/* The approved poster owns its title, price and botanical finish.
+                                    The real button and availability remain application state. */}
+                                {cardArtwork && (
                                     <Image
-                                        src={hero.img} alt="" aria-hidden width={C_W} height={C_H}
-                                        sizes="210px"
-                                        priority={hero.id === 'salad'}
-                                        style={{ width: '100%', height: hero.id === 'salad' ? '74%' : '100%', marginTop: hero.id === 'salad' ? '8px' : 0, objectFit: hero.id === 'salad' ? 'contain' : 'cover', pointerEvents: 'none', display: 'block', filter: hero.locked ? 'saturate(0.45) brightness(0.66)' : 'none' }}
+                                        className="hero-selector__poster"
+                                        src={cardArtwork.src} alt="" aria-hidden fill
+                                        sizes="(max-height: 640px) 162px, 210px"
+                                        priority
+                                        onError={() => setPosterFailed(true)}
+                                        style={{ objectFit: 'contain', pointerEvents: 'none' }}
                                     />
-                                ) : (
-                                    <div style={S.veilArt} aria-hidden>
-                                        <Sparkles size={38} color="#ecd583" />
-                                    </div>
                                 )}
 
-                                {/* Locked emblem */}
-                                {hero.locked && (
-                                    <div style={S.lockWash} aria-hidden>
-                                        <span style={S.lockEmblem}><LockKeyhole size={22} color="#ecd583" /></span>
-                                    </div>
-                                )}
+                                {/* Native fallback for changed copy/pricing, a failed image,
+                                    forced colors and exceptionally short/zoomed viewports. */}
+                                <div className={cardArtwork ? 'hero-selector__native-fallback' : undefined} style={{ width: '100%', height: '100%' }}>
+                                    {/* Art */}
+                                    {hero.img ? (
+                                        <Image
+                                            src={hero.img} alt="" aria-hidden width={C_W} height={C_H}
+                                            sizes="210px"
+                                            priority={hero.id === 'salad' && !cardArtwork}
+                                            style={{ width: '100%', height: hero.id === 'salad' ? '64%' : '100%', marginTop: hero.id === 'salad' ? '8px' : 0, objectFit: hero.id === 'salad' ? 'contain' : 'cover', pointerEvents: 'none', display: 'block', filter: hero.locked ? 'saturate(0.45) brightness(0.66)' : 'none' }}
+                                        />
+                                    ) : (
+                                        <div style={S.veilArt} aria-hidden>
+                                            <Sparkles size={38} color="#ecd583" />
+                                        </div>
+                                    )}
 
-                                {/* Bottom copy */}
-                                <div className="hero-selector__copy" style={S.cardCopy}>
-                                    <div className="hero-selector__title" style={S.cardTitle}>{hero.title}</div>
-                                    <div className="hero-selector__subtitle" style={S.cardSub}>{hero.copy}</div>
+                                    {/* Locked emblem */}
+                                    {hero.locked && (
+                                        <div style={S.lockWash} aria-hidden>
+                                            <span style={S.lockEmblem}><LockKeyhole size={22} color="#ecd583" /></span>
+                                        </div>
+                                    )}
+
+                                    {/* Bottom copy */}
+                                    <div className="hero-selector__copy" style={S.cardCopy}>
+                                        <div className="hero-selector__title" style={S.cardTitle}>{hero.title}</div>
+                                        {hero.id === 'salad' && !hero.locked && (
+                                            <div className="hero-selector__price" style={S.cardPrice}>החל מ־{startingPrice} ₪</div>
+                                        )}
+                                        <div className="hero-selector__subtitle" style={S.cardSub}>{hero.copy}</div>
+                                    </div>
                                 </div>
 
                                 {/* Landing feedback — a gold sheen sweep + rim flash, re-fired each
@@ -332,6 +360,7 @@ const S: Record<string, React.CSSProperties> = {
     lockEmblem: { display: 'grid', placeItems: 'center', width: '52px', height: '52px', borderRadius: '50%', background: 'rgba(3,8,3,0.72)', border: '1px solid rgba(240,200,50,0.3)', fontSize: '21px', boxShadow: '0 0 24px rgba(0,0,0,0.5)' },
     cardCopy: { position: 'absolute', insetInline: 0, bottom: 0, zIndex: 4, padding: '13px 10px 15px', textAlign: 'center', background: '#081b10', borderTop: '1px solid rgba(225,200,117,0.2)' },
     cardTitle: { fontFamily: "var(--font-display), 'Secular One', sans-serif", fontSize: '20px', color: '#fff8df' },
+    cardPrice: { fontSize: '15px', fontWeight: 800, color: '#ecd583', marginTop: '3px', lineHeight: 1.2 },
     cardSub: { fontSize: '12px', fontWeight: 500, color: '#c9d7c5', marginTop: '3px' },
     // The visual dot stays compact while the button meets the mobile hit target.
     pips: { display: 'flex', gap: 0, marginTop: 0, marginBottom: 0 },
@@ -345,6 +374,11 @@ const S: Record<string, React.CSSProperties> = {
 };
 
 const KF = `
+.hero-selector__native-fallback { display: none; }
+@media (forced-colors: active), (max-height: 560px) {
+  .hero-selector__poster { display: none; }
+  .hero-selector__native-fallback { display: block; }
+}
 @keyframes heroIn { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:none} }
 @keyframes heroSheen { from{transform:translateX(-160%) skewX(-16deg)} to{transform:translateX(300%) skewX(-16deg)} }
 @keyframes heroRim { 0%{box-shadow:inset 0 0 0 1px rgba(240,200,50,0)} 45%{box-shadow:inset 0 0 20px 1px rgba(240,200,50,0.5)} 100%{box-shadow:inset 0 0 0 1px rgba(240,200,50,0)} }
@@ -360,6 +394,7 @@ const KF = `
   .hero-selector__card { width: 103px !important; height: 140px !important; margin-left: -51.5px !important; margin-top: -70px !important; }
   .hero-selector__copy { padding: 6px !important; }
   .hero-selector__title { font-size: 14px !important; }
+  .hero-selector__price { font-size: 12px !important; }
   .hero-selector__subtitle { display: none; }
 }
 `;

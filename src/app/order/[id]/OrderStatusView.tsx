@@ -371,7 +371,7 @@ export default function OrderStatusView({ id, paymentHint = null }: { id: string
                 style={P.srOnly}
             />
             <BariGlowBackground />
-            <GoldField zIndex={0} density={0.55} />
+            <GoldField zIndex={0} />
 
             <div style={{ ...P.board, ...(recoveryMode !== 'none' ? { margin: 'auto auto 0' } : {}) }}>
                 <div style={P.boardArt} aria-hidden="true" />
@@ -608,7 +608,7 @@ const P: Record<string, React.CSSProperties> = {
     // slots is transparent — the site's own backdrop and particle field are
     // meant to show through it. Hence the full background here rather than the
     // flat one the confirmation overlay uses.
-    root: { position: 'relative', minHeight: '100dvh', display: 'flex', background: 'linear-gradient(rgba(2,12,7,0.65), rgba(2,12,7,0.82)), url(/homepage-assets/BG_8K.webp) center top / cover no-repeat, #030a03', fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: 'rtl', color: '#fff' },
+    root: { position: 'relative', minHeight: '100dvh', display: 'flex', background: 'url(/homepage-assets/BG_8K.webp) center top / cover no-repeat, linear-gradient(155deg, #030a03 0%, #071a07 30%, #0a200a 60%, #071a07 100%)', fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: 'rtl', color: '#fff' },
 
     // The artwork, locked to its own ratio. Everything below is absolutely
     // positioned into a slot the art already drew, so all the geometry lives in

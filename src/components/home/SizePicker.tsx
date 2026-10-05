@@ -222,7 +222,7 @@ export default function SizePicker({ onSelect, onBack, dive = false, initialSize
                 different app — and it reacts to swipes the same way. Normally
                 behind the cards (above this overlay's scrim); during the dive it
                 lifts over everything and rushes outward. */}
-            <GoldField impulseRef={impulseRef} dropRef={dropRef} density={0.55} zIndex={diving ? 201 : -1} persistKey={dive ? 'bb-field' : undefined} />
+            <GoldField impulseRef={impulseRef} dropRef={dropRef} zIndex={diving ? 201 : -1} persistKey={dive ? 'bb-field' : undefined} />
 
             {/* Step breadcrumb */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '-4px' }}>

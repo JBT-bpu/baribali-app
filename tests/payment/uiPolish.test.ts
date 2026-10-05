@@ -52,6 +52,18 @@ test('decorative field pauses while hidden and resumes with reduced-motion still
     assert.match(field, /else cancelAnimationFrame\(raf\)/);
 });
 
+test('customer backdrops retain the original luminous photo and full particle density', () => {
+    const sizePicker = readFileSync(new URL('../../src/components/home/SizePicker.tsx', import.meta.url), 'utf8');
+    const tracking = readFileSync(new URL('../../src/app/order/[id]/OrderStatusView.tsx', import.meta.url), 'utf8');
+    assert.ok(home.includes('linear-gradient(to bottom, rgba(0,0,0,0.24) 0%, rgba(0,0,0,0.42) 50%, rgba(2,10,2,0.8) 100%)'));
+    assert.ok(tracking.includes('url(/homepage-assets/BG_8K.webp) center top / cover no-repeat, linear-gradient(155deg, #030a03 0%, #071a07 30%, #0a200a 60%, #071a07 100%)'));
+    for (const screen of [home, sizePicker, tracking]) {
+        assert.match(screen, /<GoldField/);
+        assert.doesNotMatch(screen, /<GoldField[^>]*density=/);
+    }
+    assert.match(field, /density = 1/);
+});
+
 test('builder content never waits invisibly for a mount-animation timer', () => {
     assert.match(builder, /const \[anim, setAnim\] = useState\(null\)/);
     assert.doesNotMatch(builder, /opacity: anim === "enter" \? 0/);

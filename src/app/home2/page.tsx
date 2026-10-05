@@ -314,9 +314,9 @@ export default function HomeV2() {
                 }} />
             </div>
             {/* Darkening gradient so foreground content stays legible over the photo */}
-            <div aria-hidden style={{ position: 'fixed', inset: 0, zIndex: 0, background: 'linear-gradient(to bottom, rgba(2,12,7,0.64) 0%, rgba(2,12,7,0.7) 50%, rgba(2,10,2,0.9) 100%)' }} />
+            <div aria-hidden style={{ position: 'fixed', inset: 0, zIndex: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.24) 0%, rgba(0,0,0,0.42) 50%, rgba(2,10,2,0.8) 100%)' }} />
 
-            <GoldField impulseRef={nudgeRef} density={0.55} />
+            <GoldField impulseRef={nudgeRef} />
 
             {/* Header: profile chip + centered logo (spacer balances the chip so the logo stays centered) */}
             <div style={{

@@ -1,4 +1,114 @@
-# Design QA — customer UI refresh, 2026-10-04
+# Design QA — botanical salad card and luminous backdrop, 2026-10-05
+
+## Current acceptance
+
+final result: passed
+
+The owner selected the single botanical card mockup, explicitly preserving v1.0
+screen structure. This phase implements the home salad card and, at the owner's
+subsequent request, restores the exact pre-refresh background/particle settings.
+The owner authorized publication to codex/payment-foundation Preview only.
+No production change, order, payment, provider configuration or DB write.
+
+## Visual truth, state and normalization
+
+- Approved source: C:/Users/COMP13/.codex/generated_images/01a06340-dcbe-7fd0-b3cb-302686bed44f/exec-acc77686-7285-410e-b02e-07d63ff49e62.png.
+- Source pixels: 851×1847; normalized to 393×852 with proportional cover scaling
+  and only the subpixel aspect-ratio rounding crop, not a reframed design.
+- Implementation: .playwright-cli/card-botanical-2026-10-05/home-393.png,
+  393×852, CSS viewport 393×852, deviceScaleFactor 1.
+- State: guest, salad selected, closed-shop fixture, reduced motion. APIs mocked,
+  external hosts and non-GET requests blocked. No real checkout submitted.
+- Full-view comparison, source left / implementation right:
+  .playwright-cli/card-botanical-2026-10-05/compare-full.png.
+- Focused comparison: .playwright-cli/card-botanical-2026-10-05/compare-card.png.
+  Both sides use identical 210×286 crops at (92,258) from the normalized full
+  screenshots. Element capture rounds the half-pixel bounds to 211×287, so it
+  was not silently compared against a 210×286 source crop.
+- Structural before/after comparison:
+  .playwright-cli/card-botanical-2026-10-05/before-after.png.
+- The brighter background is an intentional owner-requested difference from
+  the approved dark-background mockup. Home scrim, tracking backdrop and all
+  three reduced-density GoldField call sites match parent commit7bbacf4 again.
+  The builder's backdrop was not changed by8305de9 and is left intact.
+
+## Findings and the five fidelity surfaces
+
+No actionable P0/P1/P2 mismatch found in the final equal-scale comparisons.
+
+- Typography: baked ivory/gold title, engraved price and footer caption preserve
+  the approved hierarchy. Display lettering is part of the generated asset;
+  the surrounding Heebo/Secular One UI is untouched. No duplicate native title
+  appears over the poster. The button's accessible name includes title, current
+  minimum base price, the before-extras caveat and its size-selection action.
+- Layout: measured card bounds (91.5,258.359375,210,286); original 210×286
+  footprint, carousel, banner, primary CTA and bottom dock unchanged. Native
+  badge uses its original upper-right slot without colliding with the title.
+- Colors: emerald/gold art matches the approved palette; real status badge and
+  surrounding UI tokens retained. The original luminous background and particle
+  density are restored without reverting readability or layout improvements.
+  Forced colors exposes native text and hides
+  the poster rather than depending on raster text contrast.
+- Image quality: 630×858 WebP, 174,040 bytes, no stretched/cropped display.
+  The generated bowl and botanical border preserve the reference's subject,
+  arrangement and art direction. Existing bowl assets remain intact. Fine food
+  arrangement/lettering differences from generation are acceptable P3 variation,
+  not a layout change. No code-drawn replacement for the approved artwork.
+- Copy/content: artwork contains only title, starting price 54 and the existing
+  size/free-build caption. Runtime availability is not baked in. Price derives
+  from the minimum effective S/M/L prices; changed price or caption rejects the
+  old artwork and reveals native content, never an obsolete illustrated offer.
+
+## Interaction and responsive evidence
+
+- Pointer/Enter open the original size modal; Escape restores card focus.
+  Selecting and confirming M reaches /build?size=M.
+- Physical RTL ArrowLeft moves the active roving tab stop; locked tortilla
+  activation does not open ordering. Existing reduced-motion handling retained.
+- 320×640: card 162×220, poster visible, no horizontal overflow.
+- 430×932 and 768×1024: card 210×286, poster visible, no horizontal overflow.
+- 320×540: card 103×140, readable native title/price fallback, no horizontal
+  overflow. This intentional exception avoids shrinking baked lettering in
+  exceptionally short/zoomed viewports.
+- Forced colors: native title/price/caption visible; poster hidden.
+- Deliberate poster 404: native content and live price remain visible, and the
+  card still opens size selection. Expected fixture network errors excluded
+  from the unexpected-console check; zero JavaScript errors and zero attempted
+  writes. Normal flow: zero unexpected console errors, one existing Motion
+  reduced-motion warning.
+- Browser-instrumented mobile field:111 sprites per frame (92 sparks +19 bokeh)
+  on home and size picker. Normal-motion frames advance; reduced-motion frames
+  stay frozen. Existing visibility-pause safeguards remain regression-tested.
+  Normal-motion capture: .playwright-cli/card-botanical-2026-10-05/home-normal-motion.png.
+- 229 focused tests passed; TypeScript, full ESLint (0 errors,8 existing warnings)
+  and production build passed (37 pages). Scoped React review found no new
+  effect/listener/data-fetch dependency or interaction regression.
+
+## Comparison history and remaining limits
+
+First visual comparison passed; no visual P0/P1/P2 repair cycle was needed.
+The test harness initially used an ambiguous M selector, corrected to the
+observed size-card and confirmation controls. Focused captures were normalized
+for half-pixel screenshot rounding. Neither was an app or visual defect.
+
+The unchanged large CTA can require scrolling on compact phones; the active
+card remains a tested direct action above the dock. This scoped change does not
+claim to fix the entire pre-existing short-screen layout. No full WCAG audit,
+text-only zoom certification, device performance measurement or real payment
+round trip performed. Raster lettering does not automatically inherit every
+OS/browser font-size preference; native accessibility/fallback support is not
+a claim of universal image-of-text compliance.
+
+Implementation checklist complete: selected asset installed, price/copy guard,
+native fallback, interactions, responsive captures, equal-scale comparison,
+original backdrop and particle density, regressions and build verified.
+Publication is authorized through the existing non-production Git branch only;
+the verified READY Preview URL is returned in the delivery message. No direct
+folder upload, protection change, environment-variable change or main merge.
+
+---
+
+# Historical QA — customer UI refresh, 2026-10-04
 
 ## Current acceptance
 
