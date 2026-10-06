@@ -1,3 +1,583 @@
+# Design QA — separated material backdrop, 2026-10-06
+
+final result: passed
+
+Scope: fix the owner's complaint that background leaves looked like extra salad
+ingredients. Only a new versioned background, its CSS reference/comment and its
+matching test references change. No new dependency, foreground, layout, font,
+recipe, page-background, particle or ordering change. Local preview only.
+
+## Source truth and matched evidence
+
+Two explicit visual sources: the freshly captured v6 card for preserved
+structure, and the generated non-botanical background for new surface treatment.
+This is an intentional background replacement, not an exact foliage clone.
+
+- Structure source: `.playwright-cli/hero-atmosphere-2026-10-06/entry-before-393.png`
+  (393 × 852) and `hero-before-393.png` (361 × 240).
+- Background source: `.playwright-cli/hero-atmosphere-2026-10-06/masters/entry-atmosphere-background-v1.png`
+  (1536 × 1024); exported WebP 720 × 480, opaque, 69,718 bytes.
+- Implementation: `.playwright-cli/hero-atmosphere-2026-10-06/entry-final-393.png`
+  (393 × 852) and `hero-final-393.png` (361 × 240).
+- Same viewport/state: 393 × 852 CSS px, DPR 1 confirmed in Chrome, M, empty
+  draft, Hebrew RTL, reduced motion, isolated open-shop fixture. Card CSS box
+  361 × 239.5; element capture rounds to 361 × 240 pixels.
+- Full comparison actually opened: `entry-before-after-393.png` (798 × 852).
+- Focused comparison actually opened: `hero-before-after.png` (734 × 240);
+  before LEFT, after RIGHT. Both card captures have equal dimensions.
+- New source/export comparison actually opened: `background-source-export.png`
+  (1212 × 400), both backgrounds normalized to 600 × 400 with contain, no stretch.
+  This checks texture fidelity, not a full-UI state match or the native shade.
+- Opened additional evidence: `primary-phone-widths.png`, `narrow-text-stress.png`,
+  `entry-final-1440.png`, `forced-colors-393.png`, `hero-art-failure-393.png`.
+- Route: http://127.0.0.1:3004/build?size=M.
+- Provenance/prompt: `docs/BUILDER_HERO_ATMOSPHERE_2026-10-06.md`.
+
+## Findings, fixes and comparison history
+
+1. Earlier owner-identified [P2] imagery ambiguity: recognizable detailed garden
+   leaves behind the title and bowl could read as salad ingredients. Fresh v6
+   source captures confirm competing foreground-like foliage.
+2. Fix: generate one independent, non-botanical jade material background. Keep
+   the food, frame, native copy, price and gold CTA completely unchanged.
+3. Post-fix matched comparisons show a clean product silhouette and a continuous
+   emerald surface on both sides; no recognizable leaves/food remain in the new
+   background. The independent bowl stays sharp and bright. This is the intended
+   owner-directed art change, not accidental design drift.
+4. No additional actionable P0/P1/P2 finding in the final rendered comparisons.
+
+## Required fidelity surfaces
+
+- Fonts/typography: existing native Secular One title and Heebo UI retained;
+  fonts loaded. Standard title 20 px/400, description 11 px/400. Matched 393 px
+  wrapping/hierarchy unchanged; 360 px wraps naturally without clipping.
+- Spacing/layout: same two-column bowl/copy composition, intact full gold frame,
+  separate gold CTA, same padding/radii/hit area and above-the-fold geometry.
+  Card remains 361 × 239.5 at 393 px and capped 398 × 240 on wider screens.
+  At 320 px it uses the existing stacked layout, 288 × 298.09, not image cropping.
+- Colors/tokens: native emerald/ivory/gold preserved. Background is intentionally
+  less botanical. Existing 42% background-only inset shade remains unchanged.
+  No shaded food/text/frame, neon hotspot or flat CSS-art substitution.
+- Image quality: source and WebP viewed together; restrained fine texture survives
+  encoding. Bowl and frame alpha/scale remain unchanged. No visible new halo,
+  stretch, cut corner, added food or text baked into the backdrop.
+- Copy/content: native Hebrew title, description, draft copy, CTA, canonical
+  volume/price data retained; no rasterized customer-facing text.
+
+## Responsive, interaction and accessibility checks
+
+Nine CSS viewports: 320×568, 360×640, 390×844, 393×852, 412×915, 430×932,
+768×1024, 844×390 and 1440×900. No document overflow or card-child spill in recorded
+bounds. Primary-phone board and desktop/narrow evidence inspected.
+
+Keyboard focus/Enter starts the builder. Recipe panel close restores focus,
+canonical recipe loads eight selections, and draft continuation works.
+S/M/L native prices are ₪54/₪59/₪72.
+
+200% computed-font-size stress retains frame/content/CTA (361 × 440.98 card);
+this is not physical OS text scaling or browser-zoom coverage.
+Forced colors removes background/shade and retains native readable controls.
+Reduced motion respected; normal-motion fixture keeps one particle canvas.
+Missing background and combined missing bowl/background still allow native start.
+Shop loading/closed/unavailable entry fixtures inspected; not full checkout proof.
+
+Background-only conservative contrast: 28 complete title/description bounds,
+lowest 6.61:1; 393 px title 10.62:1 and body 8.16:1. Mapping uses actual padding-box
+cover coordinates inside the 1 px border and the unchanged native 42% shade.
+Not a complete WCAG, glyph-level or all-site contrast certification.
+
+Browser exceptions: 0. Attempted writes: 0. Three expected console resource errors
+during intentional asset aborts; fresh final normal render: no errors/warnings.
+All external requests and non-GET/HEAD writes blocked in our isolated Chrome;
+no orders/payments, user-profile actions or existing user tabs touched.
+
+## Checks, limits and follow-up
+
+247 regression tests, TypeScript and isolated production build passed.
+ESLint: 0 errors, 8 pre-existing warnings. No main merge, commit, push or deploy.
+
+No physical handset, Safari, high-DPR, GPU/performance or full-site audit claim.
+Subjective owner approval remains the next step; no further visual work is assumed.
+Implementation checklist complete: scoped asset → native reference → build/tests
+→ matched browser evidence → fidelity review → preserved QA history.
+
+## Earlier balanced-canopy record (preserved)
+
+# Design QA — balanced canopy refinement, 2026-10-06
+
+final result: passed
+
+Scope: owner's request to enrich the left, soften the right and unify the
+existing selected garden hero. Only the background asset, native background
+shade, forced-color shadow reset and matching regression references change.
+Food, full frame, gold action, native typography/copy, geometry, page background,
+particles and ordering behavior remain untouched. Local preview, not publishing.
+
+## Findings, fixes and iteration evidence
+
+- Owner-identified tonal imbalance: v3 had nearly empty very dark foliage on the
+  left and yellow-white glare behind the vivid bowl on the right. Fresh pre-change
+  captures `entry-before-393.png` / `hero-before-393.png` show this exact state.
+- V4/v5 attempts made left leaf detail visible and reduced right glare, but
+  unshaded background field checks found insufficient small-copy contrast.
+  They were prechecked only, not browser-rendered or selected as runtime art.
+- V6 supplies a coherent matte green garden with recognizable leaves/veins on
+  the left and no glaring yellow-white opening. A native inset shadow supports
+  copy contrast without altering child artwork or adding a panel.
+- [P2, repaired] First actual v6 + 38% shade run had a 4.42:1 conservative
+  description-field minimum at 360px after correcting the sampler to the CSS
+  padding-box origin. Evidence preserved under `shade38-history/`. Fix: 42%
+  inset shade, rebuilt and recaptured at the same sizes/states.
+- Post-fix field minimum is **4.80:1** over all 28 normal/size/draft/text-stress
+  title/description regions. At 393: title 6.45:1, description 5.40:1. Final
+  focused and full before/after boards were reopened after this last build.
+  No actionable scoped P0/P1/P2 remains in the inspected states.
+
+## Visual truth and matched comparisons
+
+Approved base direction: original displayed option 1, Fresh Morning Canopy,
+`C:/Users/COMP13/.codex/generated_images/01a06340-dcbe-7fd0-b3cb-302686bed44f/exec-da94f17d-ad10-4502-9ca0-215ae289c991.png`
+(1536×1024). The owner's new correction explicitly changes its tonal balance;
+sunlit glare is not a fidelity requirement anymore. Final generated background:
+`exec-3ca21470-ed0f-4c92-bfd0-2a9e5d3454f2.png`, 1536×1024. Exact input roles,
+three prompts, paths and iteration boundaries are saved in
+`docs/BUILDER_CANOPY_BALANCE_2026-10-06.md`.
+
+Implementation: `http://127.0.0.1:3004/build?size=M`, isolated production-mode
+Next preview, authorized Chrome session `bari-canopy-fit-1006`, DPR 1, Hebrew RTL,
+guest/open-shop fixture, empty draft and reduced motion. Main comparison at
+393×852 CSS/physical pixels. Hero remains 361×239.5 CSS px, screenshot 361×240.
+No browser/phone chrome or density mismatch is counted as design drift.
+
+Combined evidence under `.playwright-cli/canopy-balance-2026-10-06/`:
+
+- Full view `entry-before-after-393.png`, 798×852, fresh v3 baseline left and
+  actual final v6 + 42% shade right at matching viewport/content/auth/state.
+- Focused `hero-before-after.png`, 734×240, complete independent food/frame/CTA.
+- `selected-source-render.png`, 734×240, original concept normalized to
+  361×240 vs actual. Softer lighting is intentional; native fonts/offer remain
+  authoritative rather than cloning generated proposal lettering.
+- `background-source-export.png`, 1212×400, original/export normalized to
+  600×400. The code shade is not baked into this mechanical asset comparison.
+- `primary-phone-widths.png`, 2033×932, actual 360/390/393/412/430 widths.
+- `narrow-text-stress.png`, 693×568, actual 320 entry and 200% draft-copy hero.
+- Actual focus, forced-colors, background-failure, combined-art-failure and
+  desktop captures were inspected; the post-fix primary/stress/full boards
+  were explicitly reopened. Short viewports scroll rather than crop art.
+
+## Five fidelity surfaces
+
+Typography: native Heebo/Secular One, weights, sizes (20/11/18px), hierarchy,
+RTL content, wrapping and price order are unchanged. No new font, bitmap
+lettering or text-shadow effect. Enlarged copy reflows instead of clipping.
+
+Spacing/layout: unchanged padding/grid/radii and content-driven height.
+At 393, hero is 361×239.5; at 320, existing stacked 288×298.09375. At 200%
+computed-font stress, 361×440.984375. Complete rails, food silhouette and action
+fit; the native shade has no layout box or hit target.
+
+Colors/tokens: continuous emerald/jade botanical depth replaces the harsh
+dark/glare split. The left has visible matte shapes; right is calm enough for
+the unchanged vivid salad to lead. Warm gold frame/plaque and original page
+background/GoldField are retained. Native inset shade rgba(2,16,8,0.42) affects
+only garden/base painting, not child food, text, frame or price.
+
+Image quality: one individually generated opaque 720×480 WebP, 55400 bytes,
+no text/food/frame/button ghosts. Existing alpha edges remain complete and
+clean. Built-in ImageGen supplied the image; existing Sharp only encodes/resizes
+and composes diagnostic boards. No custom CSS/SVG art substitutes the garden;
+the native shadow is contrast support for the real raster, not a fake asset.
+
+Copy/content: native S/M/L ₪54/₪59/₪72, titles/descriptions, draft selections,
+start/continue action and canonical recipe behavior stay unchanged. No new
+claims, features, route, duplicate pricing or persistence behavior.
+
+## Verification and limits
+
+Final browser run: nine viewports 320×568, 360×640, 390×844, 393×852,
+412×915, 430×932, 768×1024, 844×390 and 1440×900. Zero horizontal document
+overflow or visible hero-child spill; inert frame retains pointer-events:none.
+Canonical size prices pass. Enter starts; signature expand/close restores focus,
+recipe action loads eight canonical base selections, and entry restores draft.
+
+Computed-font doubling is a stress test, not OS settings/native zoom.
+Forced colors remove both background image and shadow. Background and combined
+background/bowl failures still start the builder. Normal motion retains one
+particle canvas. Delayed/closed/unavailable-shop fixtures cover unchanged entry
+layout only, not provider availability or full checkout state semantics.
+
+External and non-GET/HEAD requests blocked; zero attempted writes and page
+exceptions. Whole-run console recorded three expected ERR_FAILED messages from
+deliberately aborted artwork requests; no unrelated message was recorded.
+Final clean-page console is rechecked separately. No submitted order/payment.
+
+Field contrast sampling uses actual measured text rectangles, padding-box
+background origin inside the existing 1px border, cover/left-center geometry
+and the verified 42% shadow's sRGB compositing. It is a conservative background
+field approximation, not glyph-level measurement or accessibility certification.
+
+Checks: 247 regression tests and isolated production-mode build pass after the
+last shade fix (build includes TypeScript). Standalone TypeScript and full lint
+also passed this pass before the final numeric-only shade correction; lint
+remains zero errors/eight pre-existing warnings. Whitespace check passes.
+
+Untested: physical phone, high-DPR, Safari, GPU/performance metrics, full
+accessibility certification and payment/provider connectivity. No TSX/JSX or
+dependency change, commit, push, deploy, main/provider/secret/database change.
+Unrelated working-tree edits and historical QA remain intact. Local port 3004
+is kept running for owner review.
+
+## Implementation checklist
+
+- Owner correction applied using a versioned independent background.
+- Background-only native shade supports clarity without dimming content.
+- Narrow-screen P2 repaired, rebuilt, recaptured and re-compared.
+- Scoped interactions/layout/failure/source checks passed.
+- Review locally; publishing remains subject to owner's approval.
+
+## Earlier selected-canopy record (preserved)
+
+# Design QA — selected canopy background, 2026-10-06
+
+final result: passed
+
+Scope: displayed option 1 (Fresh Morning Canopy) implemented as one independent
+opaque garden background on the existing layered builder-start hero. Native UI,
+complete frame, bowl, CTA, page structure/background and particles are preserved.
+This is local UI work only, not approval to deploy or roll out to all recipes.
+
+## Findings and comparison history
+
+- [P2, repaired] V1 bright leaves under narrow/draft/large copy reduced readability.
+  Location: start-card background, behind native title/description.
+  Evidence: first actual browser captures are preserved under
+  `.playwright-cli/canopy-background-2026-10-06/v1-render-history/`;
+  conservative field checks fell below 4.5:1 at 360px and in draft/text stress.
+  Fix: image-generated lighting correction, then a coherent v3 background with
+  natural shaded foliage on the left and sunlight on the right. No opaque text
+  box, new scrim, layout change or overall dimming was added.
+- V2 improved normal 393px readability, but prechecks against unchanged measured
+  v1 geometry still found bright patches at narrow/draft/200% states. V2 was not
+  rebuilt or captured; it is not counted as an actual rendered QA iteration.
+- Final post-fix evidence: v3 was rebuilt, recaptured across all nine viewports
+  and states, recomposed with the source, and reopened. Whole bounding-region
+  contrast approximation is at least 8.30:1 across all 28 sampled text regions.
+  Focused normal/draft/stress images visibly retain clear native copy.
+- No actionable scoped P0/P1/P2 remains. Native production typography, bowl
+  dimensions, price pill and CTA differ slightly from the generated concept:
+  intentional preservation of existing product UI, not an unreported pixel clone.
+
+## Source and implementation evidence
+
+Source visual truth:
+`C:/Users/COMP13/.codex/generated_images/01a06340-dcbe-7fd0-b3cb-302686bed44f/exec-da94f17d-ad10-4502-9ca0-215ae289c991.png`,
+1536×1024. Exact displayed-option mapping and all production prompts/originals
+are saved in `docs/BUILDER_CANOPY_BACKGROUND_2026-10-06.md`.
+
+Implementation: `http://127.0.0.1:3004/build?size=M`, isolated production-mode
+Next preview, authorized Chrome session `bari-canopy-fit-1006`. Baseline state:
+393×852 CSS px, DPR 1, guest/open-shop fixture, empty draft, reduced motion.
+Actual hero screenshot `hero-final-393.png` is 361×240 physical pixels for a
+361×239.5 CSS-pixel box. It is not a physical-phone/high-DPR capture.
+
+Opened combined source/render evidence under
+`.playwright-cli/canopy-background-2026-10-06/`:
+
+- Full view: `entry-before-after-393.png`, 798×852. Historical layered-pilot
+  baseline left, final v3 right, matching viewport/offer/state. Historical
+  baseline was not represented as a new pre-change capture this pass.
+- Focused reference/render: `selected-source-render.png`, 734×240. Concept
+  normalized via contain to 361×240 left, actual final hero right. No device
+  chrome or display-density mismatch is being treated as visual drift.
+- Focused old/new: `hero-before-after.png`, 734×240, complete frame/bowl/action.
+- Generated-original/export: `background-source-export.png`, 1212×400,
+  both normalized to 600×400. Final asset is 720×480 opaque WebP, 39902 bytes.
+- `primary-phone-widths.png`, 2033×932, and `narrow-text-stress.png`, 693×568,
+  verify real narrow/primary-phone layouts and enlarged draft-copy reflow.
+- Actual forced-colors, focus, failed-background, combined-art-failure,
+  delayed/closed/unavailable-shop entry, tablet, landscape and desktop captures
+  were also opened and inspected.
+
+## Five fidelity surfaces
+
+Fonts/typography: native Heebo/Secular One and existing 20px display / 11px
+description / 18px price remain; RTL ordering, draft copy and reflow remain native.
+All glyphs are UI, not generated bitmap lettering. The native fonts are retained
+deliberately rather than approximating the raster proposal's text rendering.
+
+Spacing/layout: no geometry edit this pass. Hero is still 361×239.5 at 393;
+320 stacks food above copy (288×298.09375). Insets, gold rails/corners, bowl scale,
+price pill and button fit without clipping. Short landscape viewports scroll;
+whole-page content is not promised above the fold.
+
+Colors/tokens: natural deep emerald shade behind copy and warm sunlit jade to
+the right reproduce the selected garden direction. Unchanged warm gold frame
+and button connect it to the page; global background brightness/particles are
+untouched. Final conservative background-only contrast minima: 8.30:1 across
+normal, size, draft and stress. This is not glyph-level certification.
+
+Image quality: complete independent alpha bowl/frame/plaque preserve clean edges
+and no crop/halo regression. The new background has no UI ghosts, food, border,
+logo or text and is intentionally opaque. Individual image generation, not CSS,
+SVG, emoji or a sprite-sheet crop, supplies the selected garden material. Existing
+Sharp only resizes/encodes and makes diagnostic comparison boards.
+
+Copy/content: canonical S/M/L ₪54/₪59/₪72, five-step description, native start/
+continue action, saved selections and signature recipe behavior are unchanged.
+No new marketing/health claim, feature or duplicate pricing engine was added.
+
+## Verification and boundaries
+
+Nine viewport dimensions: 320×568, 360×640, 390×844, 393×852, 412×915,
+430×932, 768×1024, 844×390, 1440×900. No document horizontal overflow or
+out-of-card visible hero child; decoration remains pointer-events:none.
+
+Enter starts the builder. Signature expand/close restores focus and recipe action
+loads eight canonical checked ingredients. Return to entry restores draft.
+Computed-font doubling (not browser/OS zoom) fits 361×440.984375. Forced colors
+remove the decorative background; failed background and failed background+bowl
+both preserve start behavior. Normal motion keeps one existing particle canvas.
+
+Non-GET/HEAD requests and external requests were blocked: zero attempted writes,
+zero page exceptions. Final-page console checked: zero errors/warnings. Deliberate
+asset aborts/API-unavailable fixtures are diagnostic, not production incidents.
+Delayed/closed/error shop fixtures verify unchanged entry layout/browsing only;
+shop-state semantics and checkout/payments were not re-certified.
+
+Final checks: 247 regression tests, TypeScript, isolated production-mode build
+and whitespace check passed. Lint: zero errors, eight existing warnings.
+No dependency or TSX change this pass.
+
+Residual gaps: physical phone, high-DPR, Safari, GPU/performance measurements,
+full accessibility audit and payment/provider connectivity are untested. Scope
+does not certify unrelated recipes/pages. Local port 3004 is left running.
+No commit, push, deployment, main/provider/secret/database change; unrelated
+working-tree edits are preserved.
+
+## Implementation checklist
+
+- Selected displayed source resolved; exact prompts/originals retained.
+- Individual background generated/exported and wired beneath native layers.
+- Readability finding repaired and actual post-fix captures compared.
+- Responsive/interaction/failure checks and source checks passed.
+- Local preview ready for owner review; publishing requires owner approval.
+
+## Earlier layered-entry record (preserved)
+
+# Design QA — layered builder-entry pilot, 2026-10-06
+
+final result: passed
+
+Scope: the owner approved trying independent artwork/code layers on the existing
+builder entry, where a customer starts from scratch or chooses a recipe. Only
+the start card and signature recipe (closed and expanded) receive the pilot.
+The v1.0 layout, other eleven recipe treatments, shared masthead, original
+background/GoldField, prices, drafts and ordering behavior are retained. This
+is a local implementation pass, not approval to publish or roll out everywhere.
+
+## Sources, implementation and combined comparisons
+
+Visual truth is the approved existing builder plus three individually generated
+true-alpha assets: `public/builder-assets/entry-frame-layer-v1.webp`,
+`entry-bowl-layer-v1.webp` and `recipe-frame-layer-v1.webp`. No sheet crops or
+semantic image repairs were performed with scripts. The prior flattened hero,
+button and artwork are preserved. Exact PNG paths, production sizes/bytes and
+all six generation prompts (including three rejected wide-bowl attempts) are
+saved in `docs/LAYERED_ENTRY_PILOT_2026-10-06.md`.
+
+Implementation: `src/components/builder/ui/BuilderStartCard.tsx` and its CSS,
+new `BuilderArtFrame.tsx` and its CSS, `BuilderVisuals.module.css`,
+`ChefRecipeArt.tsx`, and the signature branches in `BariBaliBuilder.jsx`.
+Nine-sliced transparent frame rails adapt to native content height; food,
+gold action plaque and native title/price/action are independent layers. No
+duplicate price engine, cloned text probe or ResizeObserver remains in the hero.
+
+Source assets, alpha proof and actual renderings were opened and inspected.
+Required combined images under `.playwright-cli/layered-entry-pilot-2026-10-06/`:
+
+- `before-after-393.png`, 802×852: fresh pre-change baseline on the left,
+  final production-mode pilot on the right, both 393×852 CSS px, DPR 1,
+  `/build?size=M`, guest/open-shop fixture, empty draft and reduced motion.
+- `source-layers-render.png`, 738×430: complete source frame normalized to
+  361×181 and independent bowl at 160px on the left; actual 361×240 hero on
+  the right. The changed height is deliberate, not a pixel-clone claim.
+- `hero-before-after.png` and `recipe-before-after.png`: old/new isolated
+  native controls, including complete rails and the signature badge.
+- `iteration-first-final-393.png`: first pilot versus final bowl/plaque fix.
+- `phone-widths.png`: unscaled actual 360/390/393/412/430 phone viewports.
+- `narrow-text-stress.png`: 320px stacked entry and computed-font 200% hero.
+- `forced-colors-393.png`: final native contrast fallback after the badge fix.
+  `recipe-expanded-final-393.png`, `hero-focus-393.png` and
+  `hero-image-failure-393.png` cover the expanded recipe, focus and fallback.
+
+The final full-page comparison and repaired forced-color capture were reopened
+after the last build. The complete frame is visible, the bowl does not clip,
+and the recommended label remains legible in forced colors.
+
+## Iteration findings and deliberate trade-offs
+
+- First action-layer attempt exposed a gold fallback rectangle behind the
+  transparent leaves. Confined that fallback to the plaque's center; the
+  surrounding leaf silhouette now reveals the original backing cleanly.
+- The first 140px bowl was small relative to the native copy. Raised its cap
+  to 160px. At 393 the hero is now 361×239.5 rather than 361×180.5. This is a
+  conscious taller-card trade-off for complete food art and content-driven
+  layout, to be reviewed by the owner before broader rollout.
+- Three wider-bowl image attempts retained outside green haze despite alpha
+  requests. Rejected them; none is copied into public or used by the pilot.
+- Forced-color QA initially rendered a blank-looking recommended badge.
+  Changed it to Canvas/CanvasText with a native border and reverified the
+  actual final screenshot. Decorative frames/plaque are hidden in that mode.
+- At 320, the hero stacks food above native text instead of shrinking or
+  cropping the art. Short screens scroll; an above-the-fold fit for every
+  recipe is not promised. Normal primary phone layouts remain side by side.
+
+Five fidelity surfaces: typography retains native RTL labels and existing
+fonts, with readable wrapping; spacing preserves the existing page/grid but
+allows the taller hero and sufficient frame insets; colors stay warm gold
+and emerald while revealing the unchanged background; image quality/alpha
+were inspected on white, green and black, with 190718 total source bytes;
+copy/content uses canonical prices, recipes, selections and drafts, not
+baked-in text or new independent data. Added unoptimized source-image payload
+is approximately 92 KiB over the replaced flattened hero, not measured transfer.
+
+## Verification and boundaries
+
+Authorized isolated Chrome session `bari-layer-audit-1006`, localhost:3004,
+DPR 1. The safe fixture kept the shop open and blocked external requests and
+non-GET/HEAD requests. Final run recorded zero page exceptions and zero writes.
+One expected console ERR_FAILED belongs to the deliberately aborted bowl image.
+
+Entry dimensions checked: 320×568, 360×640, 390×844, 393×852, 412×915,
+430×932, 768×1024, 844×390 and 1440×900. All checked hero content stayed
+inside its card, with no document horizontal overflow. The frame is inert
+and cannot intercept clicks. S/M/L show native prices 54/59/72. Signature
+expand/close passed at 360/393/430, including restored focus. Enter starts
+the native hero; recipe action loads eight canonical checked base ingredients;
+returning to entry preserves the draft. A real size-picker selection of L
+confirmed the 1500ml offer and ₪72 via the existing UI.
+
+A rerun initially found the size-picker overlay still open because the same
+URL retained its existing `history.state.bbOverlay`; confirmed L through
+the actual native dialog and repeated the verification successfully. This
+was test setup state, not a source regression or history-clearing workaround.
+
+Computed-font 200% stress reflows the hero to 440.984px tall without overflow;
+this is not native zoom or an OS font-setting claim. Visible focus, forced
+colors and actual failed-image fallback were inspected. The fallback still
+starts the builder. Normal-motion rendering keeps one existing particle
+canvas; small bowl interactions respect reduced motion.
+
+React review: native single-button semantics, inert decoration, canonical props,
+direct imports and per-image failure state only; no new effect, observer,
+timer, animation library or dependency. No asynchronous duplicate pricing or
+recipe state was introduced.
+
+Final source checks: 246/246 regression tests, standalone TypeScript,
+production-mode isolated build (37 route entries) and whitespace check pass.
+Full lint has zero errors and the same eight pre-existing warnings. No
+actionable scoped P0/P1/P2 remains in the inspected pilot.
+
+Limits: no physical-phone/GPU, high-DPR or Safari verification, full
+accessibility certification, submitted order/payment or production connectivity
+claim. This does not certify the untouched sibling recipes or every app flow.
+Local port 3004 remains available. No commit, push, deployment, provider,
+environment secret or database changes; existing unrelated edits are preserved.
+`main` and the previously published Preview remain untouched.
+
+## Earlier header refinement record (preserved)
+
+# Design QA — full-frame hero and integrated transparent masthead, 2026-10-05
+
+final result: passed
+
+Scope: the owner's request to preserve whole assets/frames, integrate the top
+banner's colors and expose the original background/particles. Existing v1.0
+layout is retained. Primary phone widths are 360–430 CSS px, with 393 as the
+comparison baseline. This is a design target, not a measured 80% traffic share.
+
+## Source and actual rendered comparisons
+
+Visual truth: the selected `start-hero-seal-v2.webp` remains unchanged; the
+existing cartouche was refined by built-in ImageGen into genuinely transparent
+`builder-brand-cartouche-v3.webp`. The original/generated/optimized assets were
+opened and inspected. V2 is preserved. Exact generation prompt and paths:
+`docs/HEADER_FRAME_REFINEMENT_2026-10-05.md`.
+
+Required combined source/render inputs were created, opened and inspected:
+- `.playwright-cli/header-fit-2026-10-05/hero-source-render-393.png`, 738×181:
+  complete selected source at 361×181 left, actual hero crop right. Native copy,
+  price and action are intentional overlays, not baked text to reproduce.
+- `.playwright-cli/header-fit-2026-10-05/header-source-render-393.png`, 802×123:
+  generated alpha source on a neutral dark backing left, actual masthead on the
+  real original particle/photo backdrop right, same 369×123 art size.
+- `before-after-393.png`, 802×852, and `before-after-320.png`, 656×568, in the
+  same folder: baseline left / final rendering right, same viewport, route,
+  M offer, empty draft, guest/open-shop fixture and reduced-motion state.
+  These were refreshed from the final production build and re-inspected.
+- `primary-phone-widths.png`, 1606×932: actual unscaled 360/375/393/430 viewports.
+  `builder-phone-widths.png` compares 360 and 393 active-builder states.
+
+## Findings repaired and verification
+
+- P2, pre-change: `cover` plus a 180px card minimum cropped the whole hero frame
+  at narrow widths. Repaired with contain-fit, intrinsic image dimensions and
+  removal of clipping/fixed minimum. Full source frame is visible at all seven
+  captured entry widths/heights, without stretching or separately shrinking food.
+- P2, first iteration: simply changing to contain/min-content left the action
+  below the plaque at 320/360. Repaired with scoped compact typography and
+  measured readable reflow. Final action ends inside the native card at every
+  captured viewport; whole-card hit targets remain much larger than 44px.
+- P2, pre-change synthetic 200% text: native hero facts/action were clipped.
+  Repaired by preserving the entire art/plaque and reflowing the same native
+  facts below it when measured copy cannot fit. Final 393px L draft card is
+  424.125px high; copy and action are within its bounds, document width 393px.
+  `whole-hero-text-200.png` was opened and inspected. This is a deliberate
+  computed-font doubling stress test, not an OS font setting or native zoom claim.
+- Requested visual integration: opaque green banner/backplate removed. True
+  alpha and warm gold/emerald ornament expose the existing background. All outer
+  bitmap edges are transparent; 149194 of 307200 pixels are fully transparent.
+  No global particle density/brightness change or duplicate canvas was added.
+
+Five fidelity surfaces: typography keeps Heebo/Secular One, native RTL labels,
+canonical prices and accessible names; spacing preserves the baseline card,
+toolbar controls and compact builder bowl, with safety margins around full art;
+colors blend the existing gold/emerald palette rather than replacing the brand;
+image quality remains clean at the inspected CSS scales with genuine alpha and
+bounded 108334-byte WebP; copy/content, drafts, recipes, quantities and nutrition
+semantics are unchanged. Native control failure/forced-color cases remain usable.
+
+Chrome permission was explicitly granted by the human for a separate session.
+All browser work used only `bari-header-fit-1005`, localhost:3003, fixture APIs
+and blocked non-GET/external requests. No orders or payments were submitted.
+Entry captures: 320×568, 360×640, 375×667, 393×852, 430×932, 844×390 and
+768×1024. No document horizontal overflow or page errors. Active builder was
+rechecked at 360/393/430; its bowl remains 106/114/114px, and framed controls are
+intact. Summary was inspected at 393 and 320 with a local three-ingredient draft;
+its background now matches the builder. The 320px summary scrolls normally:
+the whole nutrition panel is not promised to fit simultaneously into the short
+viewport. Its 44px coupon field is reachable after scroll. Normal motion retains
+one existing GoldField canvas. Hero image failure and forced-colors were captured
+and inspected. DPR is 1; no physical-device, high-DPR or Safari pass is claimed.
+
+React review: native single-button semantics and canonical props retained;
+measurement state depends on actual DOM geometry, not duplicate pricing state;
+primitive dependencies, observer cleanup, stable compact-width probe and batched
+DOM reads/writes avoid reflow-mode feedback and repeated layout work. No new
+package, network dependency or motion system.
+
+Final code checks: 242/242 regression tests, standalone typecheck, production
+build (37 route entries), changed-file lint and whitespace checks pass. Full lint
+has 0 errors and the same eight pre-existing warnings. No actionable scoped
+P0/P1/P2 remains. Pre-existing 320px recipe-label crowding is outside this focused
+hero/masthead change; the primary 360–430px range retains its existing recipe grid.
+
+Local preview remains available on port 3003. No commit, push, deployment,
+production, provider, environment or database change. Existing unrelated edits
+are preserved; `main` and the published Preview remain untouched.
+
+## Earlier gold-button phase record (preserved)
+
 # Design QA — less-rounded gold button refinement, 2026-10-05
 
 final result: blocked

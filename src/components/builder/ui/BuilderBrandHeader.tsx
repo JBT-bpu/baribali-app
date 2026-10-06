@@ -8,7 +8,7 @@ export default function BuilderBrandHeader({ children }: { children: ReactNode }
         <header className={styles.header} data-builder-brand-header>
             <div className={styles.masthead}>
                 <Image
-                    src="/builder-assets/builder-brand-cartouche-v2.webp"
+                    src="/builder-assets/builder-brand-cartouche-v3.webp"
                     alt="BariBali"
                     fill
                     sizes="(max-width: 430px) 100vw, 430px"

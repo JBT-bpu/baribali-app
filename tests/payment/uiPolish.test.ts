@@ -170,16 +170,25 @@ test('entry and summary share the selected cartouche without duplicate or croppe
         assert.doesNotMatch(screen, /header-brand\.png/);
     }
     assert.match(brandHeader, /import Image from 'next\/image'/);
-    assert.match(brandHeader, /builder-brand-cartouche-v2\.webp/);
+    assert.match(brandHeader, /builder-brand-cartouche-v3\.webp/);
     assert.match(brandHeader, /alt="BariBali"/);
     assert.match(brandHeader, /sizes="\(max-width: 430px\) 100vw, 430px"/);
     assert.match(brandHeaderCss, /aspect-ratio: 3 \/ 1/);
     assert.match(brandHeaderCss, /padding-top: env\(safe-area-inset-top\)/);
     assert.doesNotMatch(brandHeaderCss, /object-fit: cover|position: absolute|animation:/);
-    const art = readFileSync(new URL('../../public/builder-assets/builder-brand-cartouche-v2.webp', import.meta.url));
+    const art = readFileSync(new URL('../../public/builder-assets/builder-brand-cartouche-v3.webp', import.meta.url));
     assert.equal(art.toString('ascii', 0, 4), 'RIFF');
     assert.equal(art.toString('ascii', 8, 12), 'WEBP');
+    assert.equal(art.toString('ascii', 12, 16), 'VP8X');
+    assert.ok(art[20] & 0x10, 'the masthead must retain a real alpha channel');
     assert.ok(art.length < 120 * 1024, 'the branded header must remain lightweight on mobile');
+});
+
+test('shared masthead reveals the existing background instead of an opaque backplate', () => {
+    assert.match(brandHeaderCss, /background: transparent/);
+    assert.match(brandHeaderCss, /width: calc\(100% - 24px\)/);
+    assert.match(summary, /url\(\/homepage-assets\/BG_8K\.webp\)/);
+    assert.doesNotMatch(brandHeaderCss, /background: #071d0c/);
 });
 
 test('cartouche toolbar keeps real accessible controls and request locking', () => {
@@ -192,6 +201,6 @@ test('cartouche toolbar keeps real accessible controls and request locking', () 
 });
 
 test('size selection warms the current cartouche instead of unused legacy branding', () => {
-    assert.match(home, /for \(const src of \['\/builder-assets\/builder-brand-cartouche-v2\.webp', '\/builder-assets\/footer-brand\.png'\]\)/);
+    assert.match(home, /for \(const src of \['\/builder-assets\/builder-brand-cartouche-v3\.webp', '\/builder-assets\/footer-brand\.png'\]\)/);
     assert.doesNotMatch(home, /header-brand\.png/);
 });

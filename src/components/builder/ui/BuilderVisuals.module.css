@@ -18,8 +18,21 @@
 .footerButton { min-width: 0; gap: 8px; flex-wrap: wrap; min-height: 66px; }
 .footerButton:focus-visible, .recipeButton:focus-visible { outline: 2px solid #fff0b0; outline-offset: 2px; }
 .stepIcon { display: inline-block; flex-shrink: 0; vertical-align: middle; }
+.recipePilot { isolation: isolate; }
+.recipePilot > :not([data-art-frame]):not(.recipeBadge) { position: relative; z-index: 1; }
+.recipeBadge {
+    position: absolute; z-index: 1; top: -5px; inset-inline-start: 10px;
+    background: #e4c86e; color: #16341e; font-size: 9px; font-weight: 900;
+    padding: 1px 5px; border-radius: 3px; line-height: 1.4;
+}
+.recipePilotPanel { position: relative; isolation: isolate; }
+.recipePilotPanel > div { position: relative; z-index: 1; }
+.recipePilotPanel:focus-visible { outline: 2px solid #fff0b0; outline-offset: 2px; }
+.recipePilotPanel button:focus-visible { outline: 2px solid #fff0b0; outline-offset: 2px; }
 @media (forced-colors: active) {
     .leafSurface::before { display: none; }
     .actionSeal { background: ButtonFace; color: ButtonText; border: 1px solid ButtonText; border-radius: 8px; }
     .recipeButton, .footerButton { border: 1px solid ButtonText !important; }
+    .recipePilot, .recipePilotPanel { background: Canvas !important; color: CanvasText !important; border: 1px solid CanvasText !important; box-shadow: none !important; }
+    .recipeBadge { background: Canvas; color: CanvasText; border: 1px solid CanvasText; }
 }

@@ -3,7 +3,7 @@ import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import botanical from "../ui/bari/BotanicalSurface.module.css";
 import visuals from "./ui/BuilderVisuals.module.css";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, ChefHat, ChevronDown, Check, Crown, Leaf, Salad, Egg, Soup, Wheat, Sandwich, RotateCcw, Volume2, VolumeX } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChefHat, ChevronDown, Check, Crown, Leaf, Salad, Egg, Soup, Wheat, Sandwich, RotateCcw, Volume2, VolumeX, X } from "lucide-react";
 
 // Active ingredient picking keeps its quiet, space-efficient surface.
 const builderHeaderImage = "/builder-assets/builder-leaf-frame-v1.webp";
@@ -43,6 +43,8 @@ import SummaryView from "./SummaryView.jsx";
 import HeroBowlCard from "./ui/HeroBowlCard.jsx";
 import BuilderBrandHeader from "./ui/BuilderBrandHeader";
 import BuilderStartCard from "./ui/BuilderStartCard";
+import BuilderArtFrame from "./ui/BuilderArtFrame";
+import artLayers from "./ui/BuilderArtFrame.module.css";
 import ChefRecipeArt from "./ui/ChefRecipeArt";
 import SizePicker from "../home/SizePicker";
 import BariModal from "../ui/bari/BariModal";
@@ -911,15 +913,19 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                                 else presetButtonRefs.current.delete(p.id);
                               }}
                               type="button"
-                              className={`${visuals.leafSurface} ${visuals.recipeButton}`}
+                              className={`${p.id === "signature" ? visuals.recipePilot : visuals.leafSurface} ${visuals.recipeButton}`}
                               onClick={() => isOpen ? closeExpandedPreset(p.id) : setExpandedPreset(p.id)}
                               disabled={!presetAvailable}
                               style={{
                                 ...S.presetCard,
                                 width: "100%",
-                                background: pc.bg,
-                                border: 0,
-                                boxShadow: isOpen ? `${pc.glow}, inset 0 0 0 1px ${pc.border}` : pc.glow,
+                                background: p.id === "signature" ? "#0b2c1ded" : pc.bg,
+                                border: p.id === "signature" ? "1px solid #b69a4855" : 0,
+                                borderRadius: p.id === "signature" ? "8px" : S.presetCard.borderRadius,
+                                overflow: p.id === "signature" ? "visible" : S.presetCard.overflow,
+                                boxShadow: p.id === "signature"
+                                  ? (isOpen ? "0 0 0 2px #e4c86e88" : "0 3px 12px #0005")
+                                  : (isOpen ? `${pc.glow}, inset 0 0 0 1px ${pc.border}` : pc.glow),
                                 opacity: expandedPreset && !isOpen ? 0.55 : 1,
                                 transform: isOpen && !reducedMotion ? "scale(1.01)" : "none",
                                 transition: "all 0.2s cubic-bezier(0.34,1.56,0.64,1)",
@@ -931,11 +937,10 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                                 : `מתכון ${p.he}, אינו זמין כרגע`}
                               tabIndex={0}
                             >
-                              {p.id === "signature" && (
-                                <div style={{ position: "absolute", top: 0, right: 0, background: "linear-gradient(135deg, #c8a832, #f0d060)", color: "#0d2e0d", fontSize: "7px", fontWeight: 900, padding: "2px 7px", borderRadius: "0 10px 0 8px", letterSpacing: "0.04em" }}>
-                                  מומלץ ✦
-                                </div>
-                              )}
+                              {p.id === "signature" && <>
+                                <BuilderArtFrame variant="recipe" />
+                                <span className={visuals.recipeBadge}>מומלץ</span>
+                              </>}
                               <ChefRecipeArt src={presetAvailable ? matchingRecipeArtwork(p) : null}
                                 fallbackSrc={presetQuote?.items.find(item => item.id === PRESET_ART[p.id])?.icon || presetQuote?.items[0]?.icon || "/icons/lettuce_romaine.webp"} />
                               <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px", textAlign: "right" }}>
@@ -959,20 +964,24 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                         role="region"
                         tabIndex={-1}
                         aria-label={`פרטי מתכון ${ep.he}`}
+                        className={ep.id === "signature" ? visuals.recipePilotPanel : undefined}
                         style={{
                         // The id binds each recipe button's aria-expanded state
                         // to the details it reveals.
                         marginTop: "8px",
-                        borderRadius: "14px",
-                        background: epc.bg,
-                        border: `1.5px solid ${epc.border}`,
-                        boxShadow: epc.glow,
-                        overflow: "hidden",
-                        animation: "expandIn 0.28s cubic-bezier(0.22,1.2,0.36,1) both",
+                        borderRadius: ep.id === "signature" ? "8px" : "14px",
+                        background: ep.id === "signature" ? "#0b2c1ded" : epc.bg,
+                        border: ep.id === "signature" ? "1px solid #b69a4855" : `1.5px solid ${epc.border}`,
+                        boxShadow: ep.id === "signature" ? "0 5px 20px #0005" : epc.glow,
+                        overflow: ep.id === "signature" ? "visible" : "hidden",
+                        animation: reducedMotion ? "none" : "expandIn 0.28s cubic-bezier(0.22,1.2,0.36,1) both",
                         }} id={`chef-preset-${ep.id}`}>
+                        {ep.id === "signature" && <BuilderArtFrame variant="recipe" />}
                         {/* Header */}
                         <div style={{ padding: "10px 10px 10px 14px", display: "flex", alignItems: "center", gap: "10px", borderBottom: `1px solid ${epc.border}` }}>
-                          <Icon src={ep.icon} size="28px" style={{ filter: `drop-shadow(0 2px 8px ${epc.dot})`, flexShrink: 0 }} />
+                          {ep.id === "signature" ? <ChefRecipeArt src={matchingRecipeArtwork(ep)} size={70}
+                            fallbackSrc={epQuote.items.find(item => item.id === PRESET_ART[ep.id])?.icon || epQuote.items[0]?.icon || "/icons/lettuce_romaine.webp"} />
+                            : <Icon src={ep.icon} size="28px" style={{ filter: `drop-shadow(0 2px 8px ${epc.dot})`, flexShrink: 0 }} />}
                           <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px", textAlign: "right" }}>
                             <span style={{ fontSize: "15px", fontWeight: 900, color: epc.text }}>{ep.he}</span>
                             <span style={{ fontSize: "11px", fontWeight: 800, color: "#f0d060" }}>
@@ -984,7 +993,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                             onClick={() => closeExpandedPreset(ep.id)}
                             style={{ width: "44px", height: "44px", display: "grid", placeItems: "center", background: "none", border: "none", color: "rgba(255,255,255,0.55)", fontSize: "14px", cursor: "pointer", padding: 0, lineHeight: 1, flexShrink: 0, borderRadius: "10px" }}
                             aria-label="סגור"
-                          >✕</button>
+                          >{ep.id === "signature" ? <X size={18} aria-hidden /> : "✕"}</button>
                         </div>
 
                         {/* Description */}
@@ -1014,14 +1023,15 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                           <button
                             type="button"
                             onClick={() => { loadPreset(ep); setExpandedPreset(null); }}
+                            className={ep.id === "signature" ? artLayers.action : undefined}
                             style={{
-                              width: "100%", padding: "11px 0", borderRadius: "10px",
+                              width: "100%", padding: ep.id === "signature" ? "11px 30px" : "11px 0", borderRadius: "10px",
                               border: "none", cursor: "pointer",
                               display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
-                              background: `linear-gradient(135deg, ${epc.dot}, ${epc.border})`,
+                              background: ep.id === "signature" ? "transparent" : `linear-gradient(135deg, ${epc.dot}, ${epc.border})`,
                               color: "#0a1a0a", fontSize: "14px", fontWeight: 900,
                               fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
-                              boxShadow: `0 4px 18px ${epc.dot}`,
+                              boxShadow: ep.id === "signature" ? "none" : `0 4px 18px ${epc.dot}`,
                               letterSpacing: "0.02em",
                             }}
                           >

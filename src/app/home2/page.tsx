@@ -211,7 +211,7 @@ export default function HomeV2() {
     useEffect(() => {
         if (!sizePicker) return;
         router.prefetch('/build');
-        for (const src of ['/builder-assets/builder-brand-cartouche-v2.webp', '/builder-assets/footer-brand.png']) {
+        for (const src of ['/builder-assets/builder-brand-cartouche-v3.webp', '/builder-assets/footer-brand.png']) {
             const img = new window.Image();
             img.src = src;
         }

@@ -1298,7 +1298,7 @@ const S = {
     // dvh — see the note in BariBaliBuilder: `100vh` would push the total +
     // "לתשלום" bar below the browser chrome on a phone.
     root: { position: "relative", width: "100%", maxWidth: "430px", minHeight: "100dvh", margin: "0 auto", overflow: "hidden", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", direction: "rtl" },
-    bg: { position: "fixed", inset: 0, zIndex: 0, background: "linear-gradient(155deg, #030a03 0%, #071a07 20%, #0a200a 45%, #071a07 70%, #030a03 100%)", filter: "blur(2px) brightness(0.65)" },
+    bg: { position: "fixed", inset: 0, zIndex: 0, background: "url(/homepage-assets/BG_8K.webp) center center / cover no-repeat, #020a02", filter: "brightness(0.45)" },
     bgRay: { position: "fixed", top: "-30%", left: "50%", transform: "translateX(-50%)", width: "110%", height: "70%", zIndex: 0, pointerEvents: "none", background: "radial-gradient(ellipse 70% 60% at 50% 20%, rgba(255,224,100,0.05) 0%, rgba(200,168,78,0.02) 50%, transparent 70%)" },
     main: { position: "relative", zIndex: 2, display: "flex", flexDirection: "column", height: "100dvh" },
     pricePill: { display: "flex", alignItems: "baseline", justifyContent: "center", direction: "ltr", flexShrink: 0, gap: "3px", minWidth: "70px", minHeight: "44px", boxSizing: "border-box", background: "#28351a", border: "1px solid #bfa54f", padding: "4px 10px", borderRadius: "13px", boxShadow: "inset 0 1px 0 rgba(249,229,147,0.15)" },

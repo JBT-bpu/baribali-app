@@ -72,7 +72,9 @@ test('the large entry bowl retains native draft, facts, sibling sizing and failu
     assert.match(card, /hasDraft \? 'המשיכו לבנות'/);
     assert.match(card, /₪\{price\}/);
     assert.match(card, /onError=\{\(\) => setArtFailed\(true\)\}/);
-    assert.match(css, /aspect-ratio: 2 \/ 1/);
+    assert.match(card, /<BuilderArtFrame \/>/);
+    assert.match(css, /grid-template-areas: 'food copy'/);
+    assert.doesNotMatch(css.slice(0, css.indexOf('.body')), /aspect-ratio:|height: [0-9]+px/);
     assert.match(css, /flex-shrink: 0/);
     assert.match(css, /:focus-visible/);
     assert.match(css, /forced-colors: active/);
@@ -80,7 +82,8 @@ test('the large entry bowl retains native draft, facts, sibling sizing and failu
     assert.match(builder, /<BuilderStartCard[\s\S]*?\/>\s*<button\s*ref=\{changeSizeButtonRef\}/);
     const recipeArt = source('src/components/builder/ui/ChefRecipeArt.tsx');
     assert.match(recipeArt, /failedSrc !== src \? src : fallbackSrc/);
-    assert.match(recipeArt, /width=\{52\} height=\{52\}/);
+    assert.match(recipeArt, /size = 52/);
+    assert.match(recipeArt, /width=\{size\} height=\{size\}/);
     assert.doesNotMatch(recipeArt, /useEffect|fetch\(/);
     assert.match(builder, /gap: "6px", padding: "6px 8px", minHeight: "66px"/);
 });
@@ -103,16 +106,22 @@ test('utility controls and footer preserve state, RTL direction, confirmation an
     assert.match(bowl, /onClick=\{\(\) => onRemove\(item.id\)\}/);
 });
 
-test('gold plaque refinement selects versioned rectangular art without growing the controls', async () => {
+test('layered entry uses the rectangular plaque without a flattened card or geometry observer', async () => {
     const card = source('src/components/builder/ui/BuilderStartCard.tsx');
     const cardCss = source('src/components/builder/ui/BuilderStartCard.module.css');
     const visualCss = source('src/components/builder/ui/BuilderVisuals.module.css');
-    assert.match(card, /src="\/builder-assets\/start-hero-seal-v2\.webp"/);
+    const layerCss = source('src/components/builder/ui/BuilderArtFrame.module.css');
+    assert.match(card, /src="\/builder-assets\/entry-bowl-layer-v1\.webp"/);
+    assert.doesNotMatch(card, /start-hero-seal-v2\.webp/);
     assert.match(visualCss, /url\('\/builder-assets\/button-leaf-seal-v2\.webp'\)/);
-    assert.match(cardCss, /\.fallback \.action \{[^}]*border-radius: 8px/);
+    assert.match(layerCss, /border-radius: 8px/);
     assert.match(visualCss, /\.actionSeal \{[^}]*border-radius: 8px/);
     assert.doesNotMatch(cardCss + visualCss, /border-radius: 100px/);
-    assert.match(cardCss, /width: 100%; aspect-ratio: 2 \/ 1; min-height: 180px/);
+    assert.match(cardCss, /width: 100%; flex-shrink: 0/);
+    assert.match(cardCss, /@container \(max-width: 290px\)/);
+    assert.doesNotMatch(card, /ResizeObserver|useEffect|cloneNode|getBoundingClientRect/);
+    assert.match(cardCss, /object-fit: contain/);
+    assert.doesNotMatch(cardCss, /object-fit: cover|overflow: hidden|aspect-ratio:/);
     assert.match(visualCss, /min-width: 112px; min-height: 44px/);
     for (const name of ['start-hero-seal-v1.webp', 'button-leaf-seal-v1.webp']) {
         assert.ok(readFileSync(new URL(`../../public/builder-assets/${name}`, import.meta.url)).length > 0);

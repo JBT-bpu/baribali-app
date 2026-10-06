@@ -1,0 +1,41 @@
+.frame {
+    position: absolute; inset: 0; z-index: 0; pointer-events: none;
+    box-sizing: border-box; border: 24px solid transparent;
+    border-image-repeat: stretch;
+}
+.hero {
+    border-image-source: url('/builder-assets/entry-frame-layer-v1.webp');
+    border-image-slice: 120;
+    border-image-width: 24px;
+}
+.recipe {
+    border-image-source: url('/builder-assets/recipe-frame-layer-v1.webp');
+    border-image-slice: 115;
+    border-image-width: 16px;
+}
+.action {
+    position: relative; isolation: isolate;
+    display: flex; align-items: center; justify-content: center; flex-wrap: wrap;
+    gap: 7px; min-height: 44px; padding: 10px 30px;
+    border: 0; border-radius: 8px; background: transparent;
+    color: #123618; font-family: var(--font-heebo), 'Heebo', sans-serif;
+    font-size: 14px; font-weight: 900; line-height: 1.35; text-align: center;
+}
+.action::before {
+    content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+    box-sizing: border-box; border: 12px solid transparent;
+    border-image-source: url('/builder-assets/button-leaf-seal-v2.webp');
+    border-image-slice: 32 100 fill;
+    border-image-width: 12px 32px;
+    border-image-repeat: stretch;
+}
+.action::after {
+    content: ''; position: absolute; inset: 9px 32px; z-index: -2;
+    pointer-events: none; border-radius: 3px; background: #e7c862;
+}
+.action svg { flex-shrink: 0; }
+.action:focus-visible { outline: 3px solid #fff0b0; outline-offset: 3px; }
+@media (forced-colors: active) {
+    .frame, .action::before, .action::after { display: none; }
+    .action { background: ButtonFace; color: ButtonText; border: 1px solid ButtonText; }
+}
