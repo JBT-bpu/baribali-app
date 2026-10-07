@@ -2,10 +2,12 @@
 import { useCallback, useMemo, useState, useEffect, useRef } from "react";
 import { requestHostedPayment } from '@/lib/hostedPaymentRequest';
 import { useRouter } from 'next/navigation';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Check, ChevronDown, Clock3, Leaf, LockKeyhole, Pencil, ShoppingBag } from 'lucide-react';
 import BuilderBrandHeader from './ui/BuilderBrandHeader';
 import BariMeterFrame from './ui/BariMeterFrame';
 import meterStyles from './ui/BariMeterFrame.module.css';
+import SummarySelectionTray from './ui/SummarySelectionTray';
+import trayStyles from './ui/SummaryTray.module.css';
 import { fireGoldConfetti } from "../../lib/confetti";
 import { isPreparationChoice, preparationLabel } from "../../lib/summaryPresentation";
 
@@ -110,7 +112,6 @@ import { STEPS, BASE } from "../../data/salad-data.js";
 import { effectiveItemPrice } from "../../lib/menuConfig";
 import { findDiscount, discountAmount } from "../../lib/discounts";
 import OrderSealScreen from "./ui/OrderSealScreen.jsx";
-import BariPanel from "../ui/bari/BariPanel";
 import BariButton from "../ui/bari/BariButton";
 import BariBadge from "../ui/bari/BariBadge";
 import BariModal from "../ui/bari/BariModal";
@@ -160,6 +161,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     const [showMixing, setShowMixing] = useState(false);
     const [notesError, setNotesError] = useState("");
     const [notesOpen, setNotesOpen] = useState(false);
+    const notesTriggerRef = useRef(null);
     const { openOverlay: openNotes, closeOverlay: closeNotes } = useHistoryBackedOverlay({
         id: "summary-notes",
         open: notesOpen,
@@ -173,6 +175,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     }, [setCheckoutDraft]);
     const [pickupSelectionNotice, setPickupSelectionNotice] = useState("");
     const pickupSectionRef = useRef(null);
+    const summarySelectionsRef = useRef(null);
     const effectivePickupTime = resolvePickupSelection(pickupTime, pickupAvailability.slots, shop.open);
     const paymentChoice = checkoutDraft.paymentChoice; // 'now' | 'pickup' — demo mode only
     const setPaymentChoice = useCallback((value) => {
@@ -371,6 +374,17 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
             : canCoordinatePickupAtCounter
                 ? "בתיאום בדלפק"
                 : pickupBlockLabel);
+    const pickupShortcutLabel = effectivePickupTime
+        ?? (shopBlocked ? "סגור כרגע"
+            : canCoordinatePickupAtCounter ? "בתיאום"
+                : pickupAvailability.slots === null || pickupCheckingMoreSlots ? "בודקים…"
+                    : pickupHasAvailableSlot ? "בחרו שעה" : "אין זמינות");
+    const focusSummarySelections = () => {
+        const selections = summarySelectionsRef.current;
+        if (!selections) return;
+        selections.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
+        window.requestAnimationFrame(() => selections.focus({ preventScroll: true }));
+    };
     const focusPickupPicker = () => {
         const picker = pickupSectionRef.current;
         if (!picker) return;
@@ -757,6 +771,11 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                 <div style={S.content}>
                     {/* Layered bowl — hero */}
                     <div style={S.sumBowlWrap}>
+                        <button type="button" className={trayStyles.meterJump}
+                            aria-controls="summary-selections" onClick={focusSummarySelections}>
+                            <span>{all.length} בחירות</span>
+                            <span>לבדיקת הבחירות <ChevronDown size={16} aria-hidden="true" /></span>
+                        </button>
                         <BariMeterFrame bowl={bowlRows.map((items, t) => {
                                 if (!items.length) return null;
                                 const row = BOWL_ROWS[t];
@@ -800,9 +819,6 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                             })}>
                             <CompositionStats all={all} estimate={nutritionEstimate} />
                         </BariMeterFrame>
-                        <div style={S.sumBowlMeta}>
-                            <span>{all.length} בחירות</span>
-                        </div>
                         {preparationChoices.length > 0 && (
                             <div style={S.preparationNote}>
                                 <span style={{ color: "#f0d060", fontWeight: 800 }}>הנחיות הכנה</span>
@@ -844,91 +860,22 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                         </div>
                     )}
 
-                    {/* ── RPG Inventory ── */}
-                    {/* No side margin: `content` already supplies the 16px
-                        gutter, and the extra 12px here made these panels
-                        narrower than the combo banner right above them. */}
-                    <div style={{ margin: "0 0 8px" }}>
-                        {grouped.map(({ s, items }, gi) => (
-                            <BariPanel key={s.id} className="p-2.5" style={{
-                                marginBottom: "10px",
-                                opacity: highlightedStep && highlightedStep !== s.id ? 0.45 : 1,
-                                transition: "opacity 0.3s ease, border-color 0.2s, box-shadow 0.2s",
-                            }}>
-                                {/* Shelf label */}
-                                <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
-                                    <span style={{ fontSize: "13px" }}>{s.emoji}</span>
-                                    <span style={{ fontSize: "10px", fontWeight: 800, color: "rgba(200,168,78,0.75)", letterSpacing: "0.06em", textTransform: "uppercase" }}>{s.title}</span>
-                                    <div style={{ flex: 1, height: "1px", background: "linear-gradient(90deg, rgba(200,168,78,0.2), transparent)" }} />
-                                    <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.25)", fontWeight: 600 }}>{items.length}</span>
-                                </div>
-                                {/* Slot grid — 64px slots sized so 10px Hebrew names fit one line */}
-                                <div style={{ display: "flex", flexWrap: "wrap", gap: "5px", alignItems: "flex-start" }}>
-                                    {items.map((item, i) => { const p = effectiveItemPrice(item.id, item.price); return (
-                                        <div key={item.id} style={{
-                                            width: "64px",
-                                            background: "linear-gradient(145deg, rgba(12,36,12,0.85), rgba(6,18,6,0.92))",
-                                            border: `1px solid ${p > 0 ? "rgba(200,168,78,0.45)" : "rgba(255,255,255,0.1)"}`,
-                                            borderRadius: "9px",
-                                            display: "flex", flexDirection: "column",
-                                            alignItems: "center", justifyContent: "flex-start",
-                                            padding: "7px 4px 6px",
-                                            gap: "3px",
-                                            position: "relative",
-                                            boxShadow: p > 0
-                                                ? "0 0 8px rgba(200,168,78,0.15), 0 2px 6px rgba(0,0,0,0.4)"
-                                                : "0 2px 6px rgba(0,0,0,0.4)",
-                                            animation: `popBounce 0.3s ease ${gi * 60 + i * 40}ms both`,
-                                        }}>
-                                            {p > 0 && (
-                                                <div style={{
-                                                    position: "absolute", top: "-5px", right: "-4px",
-                                                    background: "linear-gradient(135deg, #c8a832, #f0d060)",
-                                                    color: "#0d2e0d", fontSize: "10px", fontWeight: 900,
-                                                    padding: "2px 6px", borderRadius: "7px",
-                                                    boxShadow: "0 1px 3px rgba(0,0,0,0.4)",
-                                                }}>+₪{p}</div>
-                                            )}
-                                            <Icon src={item.icon} size="30px" style={{ filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.5))" }} />
-                                            <span style={{
-                                                fontSize: "10px", fontWeight: 700,
-                                                color: "rgba(255,255,255,0.6)",
-                                                textAlign: "center", lineHeight: 1.15,
-                                                maxWidth: "58px", overflow: "hidden",
-                                                textOverflow: "ellipsis", whiteSpace: "nowrap",
-                                            }}>{item.he}</span>
-                                        </div>
-                                    ); })}
-                                    {onEdit && (
-                                        <button type="button" aria-label={`עריכת ${s.title}`} disabled={checkoutLocked} onClick={() => onEdit(STEPS.findIndex(st => st.id === s.id))}
-                                            style={{
-                                                width: "64px", height: "72px",
-                                                background: "rgba(255,255,255,0.02)",
-                                                border: "1px dashed rgba(200,168,78,0.18)",
-                                                borderRadius: "9px",
-                                                display: "flex", flexDirection: "column",
-                                                alignItems: "center", justifyContent: "center",
-                                                cursor: checkoutLocked ? "not-allowed" : "pointer", gap: "3px",
-                                                opacity: checkoutLocked ? 0.45 : 1,
-                                            }}>
-                                            <span style={{ fontSize: "14px", opacity: 0.5 }}>✏️</span>
-                                            <span style={{ fontSize: "10px", fontWeight: 700, color: "rgba(200,168,78,0.55)" }}>ערוך</span>
-                                        </button>
-                                    )}
-                                </div>
-                            </BariPanel>
-                        ))}
-                    </div>
+                    {/* Selected option 2: shared shelves, not individual framed slots. */}
+                    <SummarySelectionTray
+                        groups={grouped} disabled={checkoutLocked} sectionRef={summarySelectionsRef}
+                        highlightedStep={highlightedStep}
+                        onEdit={onEdit ? stepId => onEdit(STEPS.findIndex(st => st.id === stepId)) : undefined}
+                    />
 
                     {/* Notes — opens in a sheet instead of an inline collapse */}
-                    <button type="button" disabled={checkoutLocked} style={{ ...S.notesToggle, ...(checkoutLocked ? { cursor: 'not-allowed', opacity: 0.55 } : {}) }} onClick={openNotes} aria-haspopup="dialog">
-                        <span>📝 הערה לבשלן</span>
+                    <button type="button" ref={notesTriggerRef} className={trayStyles.notes} disabled={checkoutLocked} onClick={openNotes} aria-haspopup="dialog">
+                        <Pencil size={18} aria-hidden="true" /><span>הערה לבשלן</span>
                         {notes.length > 0 && (
-                            <BariBadge className="mr-auto">✓ נוספה</BariBadge>
+                            <span className={trayStyles.notesStatus}><Check size={15} aria-hidden="true" />נוספה</span>
                         )}
-                        {notes.length === 0 && <span style={{ marginRight: "auto", fontSize: "12px", color: "rgba(255,255,255,0.3)" }}>▾</span>}
+                        {notes.length === 0 && <ChevronDown size={16} style={{ marginInlineStart: "auto" }} aria-hidden="true" />}
                     </button>
-                    <BariModal open={notesOpen} onClose={closeNotes} variant="sheet" title="📝 הערה לבשלן">
+                    <BariModal open={notesOpen} onClose={closeNotes} variant="sheet" title="הערה לבשלן" returnFocusRef={notesTriggerRef}>
                         <div style={{ padding: "0 16px 16px" }}>
                             <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "6px" }}>
                                 <span style={{ fontSize: "10px", color: notes.length > MAX_NOTES_LENGTH * 0.8 ? "#e57373" : "rgba(255,255,255,0.35)" }}>
@@ -973,14 +920,14 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                     />
 
                     {/* Price breakdown */}
-                    <BariPanel ornate style={{ marginTop: "14px", padding: "14px 16px" }}>
+                    <section className={trayStyles.pricePanel} aria-label="פירוט המחיר">
                         <div style={S.sumPriceLine}>
-                            <span>מחיר בסיס{sizeLabel ? <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)", fontWeight: 500 }}> · {sizeLabel}</span> : null}</span>
+                            <span>מחיר בסיס{sizeLabel ? <span style={{ fontSize: "13px", color: "#c9d7c5", fontWeight: 500 }}> · {sizeLabel}</span> : null}</span>
                             <span style={{ fontWeight: 700 }}>₪{base}</span>
                         </div>
                         {extras.map(it => (
                             <div key={it.id} style={S.sumPriceLine}>
-                                <span style={{ opacity: 0.7, fontSize: "12px" }}>+ {it.he}</span>
+                                <span style={{ fontSize: "13px" }}>+ {it.he}</span>
                                 <span style={{ color: "#edd87e", fontWeight: 600 }}>₪{effectiveItemPrice(it.id, it.price)}</span>
                             </div>
                         ))}
@@ -996,7 +943,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                                 onChange={e => { setPromoInput(e.target.value); setPromoError(""); }}
                                 placeholder="קוד הנחה"
                                 aria-label="קוד הנחה"
-                                style={{ flex: 1, minHeight: "44px", padding: "8px 10px", borderRadius: "8px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.15)", color: "#fff", fontSize: "13px", fontWeight: 600, fontFamily: "var(--font-heebo), 'Heebo', sans-serif", outline: "none" }}
+                                style={{ flex: 1, minHeight: "44px", padding: "8px 10px", borderRadius: "8px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.15)", color: "#fff", fontSize: "16px", fontWeight: 600, fontFamily: "var(--font-heebo), 'Heebo', sans-serif", outline: "none" }}
                             />
                             <button type="submit" disabled={checkoutLocked} style={{ minHeight: "44px", padding: "8px 14px", borderRadius: "8px", background: "rgba(200,168,78,0.2)", border: "1px solid rgba(200,168,78,0.4)", color: "#f0d060", fontSize: "13px", fontWeight: 800, cursor: checkoutLocked ? "not-allowed" : "pointer", opacity: checkoutLocked ? 0.55 : 1, fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }}>החל</button>
                         </form>
@@ -1015,7 +962,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                             <span style={{ fontSize: "16px", fontWeight: 700, color: "rgba(255,255,255,0.55)" }}>סה"כ</span>
                             <span style={{ fontFamily: "var(--font-display), 'Secular One', sans-serif" }}>₪{checkoutTotal}</span>
                         </div>
-                    </BariPanel>
+                    </section>
 
                     {/* Payment choice — demo mode only (no real gateway configured yet) */}
                     {DEMO_MODE && checkoutTotal > 0 && (
@@ -1065,10 +1012,14 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                     )}
 
                     {hostedPaymentExpected && (
-                        <div style={S.paymentHandoffNote}>
-                            <span aria-hidden="true">🔒</span>
-                            <span>לאחר שליחת ההזמנה תועברו לעמוד התשלום המאובטח של {hostedProviderName}. סטטוס התשלום יוצג כשתחזרו לאפליקציה; אם האישור עדיין בבדיקה, נמשיך לאמת אותו.</span>
-                        </div>
+                        <details className={trayStyles.paymentDetails}>
+                            <summary>
+                                <LockKeyhole size={17} aria-hidden="true" />
+                                <span>התשלום יתבצע בעמוד של {hostedProviderName}</span>
+                                <span className={trayStyles.paymentDetailsToggle}>פרטים <ChevronDown size={15} aria-hidden="true" /></span>
+                            </summary>
+                            <p>לאחר שליחת ההזמנה תועברו לעמוד התשלום המאובטח של {hostedProviderName}. סטטוס התשלום יוצג כשתחזרו לאפליקציה; אם האישור עדיין בבדיקה, נמשיך לאמת אותו.</p>
+                        </details>
                     )}
                     {pickupPaymentExpected && (
                         <div style={S.paymentHandoffNote}>
@@ -1084,34 +1035,26 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                     )}
 
                     <div style={S.trustCopy}>
-                        <span style={{ opacity: 0.75 }}>🌿</span>
+                        <Leaf size={16} aria-hidden="true" />
                         <span>מרכיבים כל הזמנה לפי הבחירות שלכם</span>
                     </div>
                 </div>
 
                 <div className="summary-action-zone" style={S.bar}>
-                    {/* Order meta pills */}
-                    <div style={S.barMeta}>
-                        <div className="summary-pick-count" style={S.metaPill}>
-                            <span style={S.metaPillIcon}>🥗</span>
-                            <span style={S.metaPillText}>{all.length} בחירות</span>
-                        </div>
+                    <div className={trayStyles.footer}>
                         <button
                             type="button"
                             onClick={focusPickupPicker}
                             aria-controls="pickup-time-picker"
                             aria-label={`זמן איסוף: ${pickupFooterLabel}. מעבר לבחירת זמן`}
-                            style={{ ...S.metaPill, ...S.metaPillGold, cursor: "pointer", fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }}
+                            className={trayStyles.pickupShortcut}
                         >
-                            <span style={S.metaPillIcon}>⏰</span>
-                            <span style={{ ...S.metaPillText, color: "#f0d060", fontWeight: 800 }}>
-                                {pickupFooterLabel}
-                            </span>
+                            <span className={trayStyles.pickupShortcutTitle}><ShoppingBag size={15} aria-hidden="true" /><small>איסוף</small></span>
+                            <span>{pickupShortcutLabel}</span>
                         </button>
-                    </div>
                     {/* Submission failure — shown instead of a false confirmation */}
                     {submitError && (
-                        <div role="alert" style={{
+                        <div role="alert" className={trayStyles.footerError} style={{
                             display: "flex", alignItems: "center", gap: "8px",
                             padding: "10px 12px", borderRadius: "12px",
                             background: "rgba(239,83,80,0.12)", border: "1px solid rgba(239,83,80,0.4)",
@@ -1127,18 +1070,22 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                         dropped request must never be able to turn a customer
                         away from an open shop, and the server refuses for real
                         anyway — now with a message they can read. */}
-                    <BariButton
+                    <button
                         type="button"
-                        variant="primary"
-                        fullWidth
+                        className={trayStyles.submit}
                         aria-busy={submitting}
                         disabled={submitting || paymentConfigurationBlocked || (!recoveryPending && (shopBlocked || pickupBlocked))}
                         style={{ fontFamily: "var(--font-heebo), 'Heebo', sans-serif", opacity: (submitting || paymentConfigurationBlocked || (!recoveryPending && (shopBlocked || pickupBlocked))) ? 0.6 : 1 }}
                         onClick={() => submitOrder()}
                     >
+                        {!submitting && <ArrowRight size={18} aria-hidden="true" />}
                         <span>{submitting ? "שולח…" : hasPendingPayment ? "פתחו שוב את התשלום" : hasPendingSubmission ? "בדקו הזמנה קודמת" : paymentConfigurationBlocked ? "התשלום אינו זמין כרגע" : shopBlocked ? "סגור כרגע" : pickupBlocked ? pickupBlockLabel : priceReconfirmation ? "אישור המחיר המעודכן" : submitError ? "נסו שוב" : defaultSubmitLabel}</span>
-                        {!recoveryPending && <span style={S.orderBtnPrice}>₪{checkoutTotal}</span>}
-                    </BariButton>
+                        {!recoveryPending && <bdi dir="ltr">₪{checkoutTotal}</bdi>}
+                    </button>
+                    </div>
+                    {hostedPaymentExpected && <div className={trayStyles.footerTrust}>
+                        <LockKeyhole size={15} aria-hidden="true" /><span>תשלום מאובטח ב־{hostedProviderName}</span>
+                    </div>}
                     {/* Consent disclosure — links open the legal docs before ordering */}
                     <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.68)", textAlign: "center", lineHeight: 1.6, fontFamily: "var(--font-heebo), 'Heebo', sans-serif" }}>
                         בלחיצה על הכפתור אני מאשר/ת את{" "}
@@ -1278,7 +1225,6 @@ const S = {
     priceV: { fontSize: "24px", color: "#ffffff", fontWeight: 900, fontVariantNumeric: "tabular-nums" },
     content: { flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", padding: "12px 16px max(24px, env(safe-area-inset-bottom))", scrollbarWidth: "none" },
     sumBowlWrap: { position: "relative", margin: "0 auto 18px", width: "100%", maxWidth: "360px", display: "flex", flexDirection: "column", alignItems: "center" },
-    sumBowlMeta: { marginTop: "10px", display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", fontWeight: 600, color: "#c9d7c5", letterSpacing: "0.03em" },
     preparationNote: { width: "100%", display: "flex", flexDirection: "column", gap: "3px", marginTop: "8px", padding: "10px 12px", borderRadius: "12px", background: "rgba(200,168,78,0.08)", border: "1px solid rgba(200,168,78,0.2)", fontSize: "12px", lineHeight: 1.5, color: "rgba(255,255,255,0.85)" },
     nutritionDisclaimer: { margin: "10px 4px 0", fontSize: "12px", lineHeight: 1.55, color: "rgba(255,255,255,0.75)", textAlign: "center" },
     nutritionDetails: { width: "100%", marginTop: "8px", padding: "0 12px", borderRadius: "11px", background: "rgba(9,31,14,0.66)", border: "1px solid rgba(200,168,78,0.24)", color: "rgba(255,255,255,0.8)", fontSize: "12px", lineHeight: 1.55 },
@@ -1299,38 +1245,15 @@ const S = {
     // the way a collection is. The title still reaches screen readers via alt.
     comboBannerRow: { display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: "6px", justifyItems: "center" },
     comboEmblem: { width: "100%", height: "auto", display: "block" },
-    notesToggle: { width: "100%", minHeight: "44px", margin: "12px 0", padding: "10px 12px", borderRadius: "12px", display: "flex", alignItems: "center", gap: "8px", background: "#0d2815", border: "1px solid rgba(200,168,78,0.25)", cursor: "pointer", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", fontSize: "13px", fontWeight: 600, color: "#c9d7c5", direction: "rtl", textAlign: "right" },
-    notesInput: { width: "100%", padding: "8px 10px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.04)", color: "#e8f5e9", fontSize: "12px", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", outline: "none", direction: "rtl", resize: "vertical", minHeight: "60px" },
-    sumPriceCard: { marginTop: "14px", padding: "14px 16px", borderRadius: "14px", background: "linear-gradient(145deg, rgba(15,45,15,0.9), rgba(20,55,20,0.85))", border: "1px solid rgba(200,168,78,0.25)", boxShadow: "0 4px 16px rgba(0,0,0,0.3)" },
-    sumPriceLine: { display: "flex", justifyContent: "space-between", fontSize: "13px", color: "#c9d7c5", padding: "3px 0" },
+    notesInput: { width: "100%", padding: "8px 10px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.04)", color: "#e8f5e9", fontSize: "16px", fontFamily: "var(--font-heebo), 'Heebo', sans-serif", outline: "none", direction: "rtl", resize: "vertical", minHeight: "60px" },
+    sumPriceLine: { display: "flex", justifyContent: "space-between", fontSize: "14px", color: "#c9d7c5", padding: "3px 0" },
     sumTotal: { display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: "36px", fontWeight: 900, color: "#f0d060", textShadow: "0 0 24px rgba(200,168,78,0.55), 0 2px 8px rgba(200,168,78,0.3)", padding: "12px 0 2px", marginTop: "10px", borderTop: "1px solid rgba(200,168,78,0.2)" },
     bar: {
-        display: "flex", flexDirection: "column", gap: "10px",
-        padding: "12px 16px max(18px, env(safe-area-inset-bottom))",
+        display: "flex", flexDirection: "column", gap: "6px", flexShrink: 0,
+        padding: "8px 16px max(10px, env(safe-area-inset-bottom))",
         background: `linear-gradient(rgba(0,0,0,0.72), rgba(0,0,0,0.68)), url(/builder-assets/footer-brand.png) center top / cover no-repeat`,
         borderTop: "2px solid rgba(200,168,78,0.4)",
         boxShadow: "0 -6px 28px rgba(0,0,0,0.55)",
-    },
-    barMeta: {
-        display: "flex", gap: "10px", justifyContent: "center",
-    },
-    metaPill: {
-        display: "flex", alignItems: "center", gap: "6px",
-        padding: "8px 16px", borderRadius: "12px",
-        background: "rgba(255,255,255,0.07)",
-        border: "1px solid rgba(255,255,255,0.1)",
-        flex: 1, justifyContent: "center", minHeight: "44px",
-    },
-    metaPillGold: {
-        background: "rgba(200,168,78,0.12)",
-        border: "1px solid rgba(200,168,78,0.35)",
-        boxShadow: "0 0 12px rgba(200,168,78,0.12)",
-    },
-    metaPillIcon: { fontSize: "16px", lineHeight: 1 },
-    metaPillText: { fontSize: "13px", fontWeight: 700, color: "rgba(255,255,255,0.7)", fontFamily: "var(--font-heebo), 'Heebo', sans-serif" },
-    orderBtnPrice: {
-        fontSize: "15px", fontWeight: 900,
-        background: "rgba(0,0,0,0.18)", padding: "3px 10px", borderRadius: "8px",
     },
     paymentHandoffNote: {
         display: "flex", alignItems: "flex-start", gap: "8px",
@@ -1429,8 +1352,8 @@ function PickupTimePicker({ value, onChange, disabled = false, shop, localSlots,
     // offers times for a shop with its shutters down.
     if (localSlots === null || !shop.open) {
         return (
-            <div ref={sectionRef} id="pickup-time-picker" role="region" tabIndex={-1} aria-labelledby="pickup-time-picker-title" style={PT.box}>
-                <div id="pickup-time-picker-title" style={PT.title}>⏰ זמן איסוף</div>
+                <div ref={sectionRef} id="pickup-time-picker" role="region" tabIndex={-1} aria-labelledby="pickup-time-picker-title" className={trayStyles.pickup}>
+                <div id="pickup-time-picker-title" style={PT.title}><Clock3 size={18} aria-hidden="true" />זמן איסוף</div>
                 <div style={PT.closedMsg}>{noPickupMessage(shop, new Date())}</div>
             </div>
         );
@@ -1438,8 +1361,8 @@ function PickupTimePicker({ value, onChange, disabled = false, shop, localSlots,
 
     if (slots === null) {
         return (
-            <div ref={sectionRef} id="pickup-time-picker" role="region" tabIndex={-1} aria-labelledby="pickup-time-picker-title" style={PT.box} aria-live="polite">
-                <div id="pickup-time-picker-title" style={PT.title}>⏰ זמן איסוף</div>
+            <div ref={sectionRef} id="pickup-time-picker" role="region" tabIndex={-1} aria-labelledby="pickup-time-picker-title" className={trayStyles.pickup} aria-live="polite">
+                <div id="pickup-time-picker-title" style={PT.title}><Clock3 size={18} aria-hidden="true" />זמן איסוף</div>
                 <div style={PT.closedMsg}>
                     {capacityStatus === 'error'
                         ? 'לא הצלחנו לעדכן זמני איסוף · ננסה שוב אוטומטית'
@@ -1455,13 +1378,17 @@ function PickupTimePicker({ value, onChange, disabled = false, shop, localSlots,
             ? 'בודקים זמינות לשעות הקרובות…'
             : 'אין שעות פנויות כרגע.'
         : selectionNotice || null;
+    const needsChoice = !value && hasAvailableSlot && !disabled;
 
     return (
-        <div ref={sectionRef} id="pickup-time-picker" role="region" tabIndex={-1} aria-labelledby="pickup-time-picker-title" style={PT.box}>
+        <div ref={sectionRef} id="pickup-time-picker" role="region" tabIndex={-1} aria-labelledby="pickup-time-picker-title" className={trayStyles.pickup} data-needs-choice={needsChoice}>
             <div style={PT.header}>
-                <span id="pickup-time-picker-title" style={PT.title}>⏰ זמן איסוף</span>
-                <span style={value ? PT.selectedLabel : PT.chooseLabel}>{value || 'בחרו שעה'}</span>
+                <span id="pickup-time-picker-title" style={PT.title}><Clock3 size={18} aria-hidden="true" />זמן איסוף</span>
+                <span className={trayStyles.pickupSelection} style={value ? PT.selectedLabel : PT.chooseLabel}>
+                    {value && <Check size={15} aria-hidden="true" />}{value ? `נבחרה ${value}` : 'בחרו שעה'}
+                </span>
             </div>
+            {needsChoice && !statusMessage && <p id="pickup-time-guidance" className={trayStyles.pickupGuidance}>בחרו שעה כדי להמשיך להזמנה</p>}
             {statusMessage && (
                 <div id="pickup-time-status" role="status" aria-live="polite" aria-atomic="true" style={PT.statusMessage}>
                     {statusMessage}
@@ -1471,7 +1398,7 @@ function PickupTimePicker({ value, onChange, disabled = false, shop, localSlots,
                 style={PT.row}
                 role="group"
                 aria-label="בחירת זמן איסוף"
-                aria-describedby={statusMessage ? "pickup-time-status" : undefined}
+                aria-describedby={statusMessage ? "pickup-time-status" : needsChoice ? "pickup-time-guidance" : undefined}
             >
                 {slots.map(slot => (
                     <button
@@ -1479,6 +1406,7 @@ function PickupTimePicker({ value, onChange, disabled = false, shop, localSlots,
                         key={slot.id}
                         disabled={disabled || slot.full}
                         aria-pressed={value === slot.id}
+                        className={trayStyles.slot}
                         onClick={() => !disabled && !slot.full && onChange(slot.id)}
                         style={{
                             ...PT.chip,
@@ -1515,14 +1443,13 @@ const PAY = {
 };
 
 const PT = {
-    box: { margin: "12px 0", padding: "12px 14px", borderRadius: "12px", background: "rgba(15,45,15,0.6)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", border: "1px solid rgba(200,168,78,0.15)" },
-    header: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" },
-    title: { fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.45)" },
+    header: { display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px", marginBottom: "10px" },
+    title: { display: "flex", alignItems: "center", gap: "6px", fontSize: "1rem", fontWeight: 800, color: "#f3ecc8" },
     selectedLabel: { fontSize: "14px", fontWeight: 900, color: "#f0d060", letterSpacing: "0.04em" },
     chooseLabel: { fontSize: "12px", fontWeight: 800, color: "rgba(255,255,255,0.68)" },
     statusMessage: { marginBottom: "9px", padding: "8px 10px", borderRadius: "9px", background: "rgba(242,196,106,0.1)", border: "1px solid rgba(242,196,106,0.24)", color: "#f2c46a", fontSize: "11.5px", fontWeight: 700, lineHeight: 1.45 },
     row: { display: "flex", gap: "8px", overflowX: "auto", overscrollBehaviorX: "contain", paddingBottom: "2px", scrollbarWidth: "none", WebkitOverflowScrolling: "touch" },
-    chip: { flexShrink: 0, minHeight: "44px", padding: "8px 16px", borderRadius: "10px", border: "1px solid rgba(200,168,78,0.22)", background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.62)", fontSize: "13px", fontWeight: 700, fontFamily: "var(--font-heebo), 'Heebo', sans-serif", cursor: "pointer", transition: "all 0.15s", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "5px" },
+    chip: { flexShrink: 0, minHeight: "44px", padding: "8px 16px", borderRadius: "10px", border: "1px solid #a7b57380", background: "#042b18d9", color: "#e1e5ce", fontSize: "1rem", fontWeight: 700, fontFamily: "var(--font-heebo), 'Heebo', sans-serif", cursor: "pointer", transition: "all 0.15s", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "5px" },
     chipActive: { background: "linear-gradient(135deg, rgba(200,168,78,0.28), rgba(200,168,78,0.12))", border: "1px solid var(--color-gold-deep)", color: "var(--color-gold-light)", boxShadow: "var(--shadow-gold-glow)" },
     selectedCheck: { color: "#f0d060", fontSize: "13px", fontWeight: 900, lineHeight: 1 },
     // Was rgba(255,255,255,0.35) — a footnote weight, from when this was a

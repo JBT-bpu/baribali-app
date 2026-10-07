@@ -1,4 +1,44 @@
-# Design QA — ornamental controls v8, 2026-10-06 (latest)
+# Design QA — iteration history (latest pass appended at end)
+
+final result: passed
+
+# Follow-up QA — all four approved pre-preview polish items, 2026-10-07
+
+Scope: the BariMeter navigation hint, honest per-group counts, compact persistent
+actions, clearer pickup prerequisite and expandable payment details. No new art,
+dependency, business-hours, pricing, provider, backend or order-flow change.
+The Compact Ingredient Tray remains the selected visual direction.
+
+Final evidence: `.playwright-cli/summary-polish-2026-10-07/`.
+`capture.js` and `interactions.js` use only local GET fixtures; all order/payment
+writes and external hosts are blocked. Zero page exceptions or attempted writes.
+Opened mobile hero/tray/receipt, 320px tray, pickup prerequisite, expanded/collapsed
+payment details, forced-colors, closed/error/stale-state captures.
+
+Seven viewport sizes pass with no document overflow and56–73px footer actions.
+At393×852 the selected-time footer is145px versus approximately169px before this
+polish. Full legal consent remains readable and safe-area padding is retained.
+The hero frame/bowl remain complete; the new 44px hint sits above the artwork.
+Eight food ingredients and two sauces are labelled independently; singular and
+preparation-only/mixed groups have direct helper tests.
+
+Keyboard hint activation focuses the actual selections at y122; the pickup
+shortcut focuses its region. Native payment disclosure opens/collapses using Enter.
+Root-font200% has no document overflow; high-contrast selected-time text stays
+readable. Closed, full, capacity-error and stale-time states block checkout.
+The initial loading label was observed; the delayed-loading screenshot settled
+after its fixture arrived, so it is not evidence of a stable loading screen.
+
+Fixed an old inline-style override of the prerequisite card. Harness corrections:
+allow the intentional one-pixel decorative CTA border overhang, and refresh stale
+capacity through the real visibility-change listener rather than a focus event.
+
+268 tests pass; final isolated optimized build/TypeScript pass,37 pages;
+touched-file lint0 errors/warnings, full-repo lint0 errors/8 existing warnings.
+React review preserves pure keyed native presentation, type-only optional refs,
+all request/recovery gates and errors; no new fetch, effect or dependency.
+Limits: Chrome viewport emulation/root-font stress, not physical-device or live
+payment certification. See `docs/SUMMARY_TRAY_2026-10-07.md` for the full record.
 
 final result: passed
 
@@ -1756,6 +1796,103 @@ unknown catalog item was forced through the real builder's validation.
   art while preserving actual-choice honesty. User visual acceptance and any
   Vercel preview publication are still separate steps.
 - No real payment, database write, secret exposure, commit, push, merge or
-  deployment. No broad-app accessibility or device certification claimed.
+deployment. No broad-app accessibility or device certification claimed.
+
+final result: passed
+
+---
+
+# Latest QA — summary option 2, 2026-10-07
+
+Selected truth: Compact Ingredient Tray, `exec-7e21b6d2-3f8b-410d-9779-71c433977f5b.png`.
+Scope: actual choices, sauces, note, pickup presentation, receipt and footer
+below the approved BariMeter. Existing header/background/BariMeter and all
+checkout business rules are retained. Local implementation only, no deployment.
+
+## Matched source/render evidence
+
+Evidence directory: `.playwright-cli/summary-tray-2026-10-07/`.
+Source852×1846 normalized proportionally to393px width, actual393×852/DPR1,
+same ten-choice guest draft, native Hebrew RTL and loaded fonts. Source and real
+render were opened together in `comparison-6-full.png`, `comparison-6-tray.png`
+and `comparison-6-footer.png`. Focused crops retain natural width and use padding,
+not stretching. `final-lower-393.png` and `final-price-393.png` also opened.
+Finite existing drawer/entrance animations are disabled for the final diagnostic
+captures; this is not a change to the application's motion settings.
+
+Intentional adaptation: native44px targets, 14px ingredient labels, full detailed
+extras/consent copy, original catalog artwork and truthful checkout labels.
+Vegetable tray245px and sauce strip131px require more scroll than the mock's
+~230px/~95px surfaces. The existing nested body scrolls; content crossing the
+viewport edge is not a clipped frame. No mock price/time overrides real logic.
+
+## Findings, fixes and recapture loop
+
+1. First pass [P2]: shelves too tall and food too small compared with the selected
+   source. Tightened internal padding, enlarged actual illustrations in the same
+   space and added a quiet row divider. First/final captures and comparison boards
+   retained. Footer uses the selected left pickup/right action arrangement in RTL.
+2. [P2]: an experimental brightness filter over-saturated the generated gold.
+   Removed it; final warm satin face uses the real generated material unchanged.
+3. [P2]: forced-colors selected-time spans became white-on-white rectangles.
+   Explicit Highlight/HighlightText span pairing fixes readability without
+   hard-coding a high-contrast palette. `qa-forced-colors-fixed.png` opened;
+   actual14:15 text white on the system purple highlight, complete native controls.
+4. [P2]: the existing sheet had no explicit Drawer.Trigger, so closing notes
+   returned focus to BODY. Optional `returnFocusRef` restores the summary trigger
+   only for this caller. Final browser check observes `הערה לבשלן` focused.
+   `qa-notes-final.png` opened: settled visible drawer, opacity1, z-index300,
+   transformnone, full textarea and completion action. Maxlength200 retained.
+5. Harness corrections, not app defects: choose the footer save button when two
+   existing save controls share a name; await the picker's existing rAF focus;
+   remove the test-only root-font style through its handle rather than a hidden
+   text locator. Early transition captures do not substitute for settled evidence.
+
+No remaining actionable P0/P1/P2 issue found within this pass. Optional P3:
+richer individual food artwork, without replacing actual choices by a fixed salad.
+
+## Five fidelity surfaces
+
+- Fonts: installed Heebo/Secular One, native headings and 14px wrapping food
+  labels. Note/promo inputs16px. Count and currency remain native, LTR values
+  inside RTL text. No ellipsis or hidden ingredient names in the matrix.
+- Spacing: one shelf rather than framed inventory tiles; four columns at360–430,
+  three at320. Sauces pair/stack responsively. Footer controls stay at least44px
+  tall; actual60–77px with truthful copy. Desktop retains the existing430px column.
+- Colors: quiet emerald, ivory labels and warm gold. Approved bright background
+  and particles untouched. Selected pickup visibly gold; closed/error wording
+  retained. High contrast removes ornaments and preserves readable native controls.
+- Imagery: two separately generated genuine-alpha WebPs, complete gold corners,
+  transparent frame center/exterior, opaque gold action center. 62,494bytes total.
+  Border-image grows without raster text/price stretching. Existing food assets
+  contain only the actual chosen ingredients. No screenshots used as production art.
+- Copy: product-neutral group title, actual names, preparation labels and extras;
+  native note state, all pickup/peak/full/checking/error messages and recovery gates.
+  Full legal and Hyp handoff explanation retained. Concept's shorter fixed CTA,
+  aggregated extras and illustrative time spacing are intentionally not copied.
+
+## Functional evidence and limits
+
+`browser-results.json` records seven viewport sizes, edit return, note save,
+pickup change, invalid promo alert, keyboard focus, forced colors and root-font200%.
+`state-results.json` adds full slot, capacity503 error, closed override, long sauce
+plus two preparation instructions, and empty tray. Representative captures were
+actually opened; recorded geometry covers the complete responsive matrix.
+Post-fix high-contrast and note-focus checks supplement the original matrix.
+No horizontal document overflow or clipped control text; final receipt and footer
+remain accessible by scrolling. Promo focus computed solid3px. No page exceptions
+or attempted non-GET/HEAD writes; all external hosts blocked by the local fixture.
+
+263 regressions passed; scoped lint0errors; final isolated optimized build and
+TypeScript passed, 37pages; diff whitespace check passed with existing CRLF notices.
+React review: pure presentation extraction, no new dependency/hooks in the tray,
+no fetch/waterfall/storage loop, keyed native lists, named controls and optional
+focus prop with unchanged defaults for other modal consumers. Price, order locks,
+provider handoff, pending recovery, schedule and backend remain unchanged.
+
+Limits: Chrome emulation/200% root-font stress are not physical-device, screen-
+reader or full zoom certification.503s are explicit local fixtures, not live
+service checks. No real order/payment, database write, secret exposure, commit,
+push, merge or deployment. Owner visual approval/publication are separate.
 
 final result: passed

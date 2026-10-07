@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useRef, type ReactNode } from 'react';
+import { useEffect, useId, useRef, type ReactNode, type RefObject } from 'react';
 import { Drawer } from 'vaul';
 
 export interface BariModalProps {
@@ -10,11 +10,13 @@ export interface BariModalProps {
     children: ReactNode;
     /** 'sheet' = bottom drawer (vaul, draggable). 'dialog' = centered card. */
     variant?: 'sheet' | 'dialog';
+    /** Explicit sheet trigger, for drawers opened without Drawer.Trigger. */
+    returnFocusRef?: RefObject<HTMLElement | null>;
 }
 
 const PANEL_BG = 'linear-gradient(175deg, rgba(14,42,14,0.99) 0%, rgba(8,26,8,0.99) 100%)';
 
-export default function BariModal({ open, onClose, title, children, variant = 'sheet' }: BariModalProps) {
+export default function BariModal({ open, onClose, title, children, variant = 'sheet', returnFocusRef }: BariModalProps) {
     const dialogRef = useRef<HTMLDivElement>(null);
     const closeRef = useRef(onClose);
     const titleId = useId();
@@ -106,6 +108,11 @@ export default function BariModal({ open, onClose, title, children, variant = 's
             <Drawer.Portal>
                 <Drawer.Overlay className="fixed inset-0 z-[300] bg-black/65 backdrop-blur-[5px]" />
                 <Drawer.Content
+                    onCloseAutoFocus={event => {
+                        if (!returnFocusRef?.current) return;
+                        event.preventDefault();
+                        returnFocusRef.current.focus({ preventScroll: true });
+                    }}
                     className="fixed inset-x-0 bottom-0 z-[300] mx-auto flex max-h-[90dvh] w-full max-w-[430px] flex-col rounded-t-2xl border border-gold/18 outline-none"
                     style={{ background: PANEL_BG, direction: 'rtl' }}
                 >

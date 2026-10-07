@@ -6,6 +6,14 @@ const summary = readFileSync(new URL(
     '../../src/components/builder/SummaryView.jsx',
     import.meta.url,
 ), 'utf8');
+const summaryTray = readFileSync(new URL(
+    '../../src/components/builder/ui/SummarySelectionTray.tsx',
+    import.meta.url,
+), 'utf8');
+const summaryTrayStyles = readFileSync(new URL(
+    '../../src/components/builder/ui/SummaryTray.module.css',
+    import.meta.url,
+), 'utf8');
 const tracking = readFileSync(new URL(
     '../../src/app/order/[id]/OrderStatusView.tsx',
     import.meta.url,
@@ -803,7 +811,7 @@ test('checkout controls stay truthful, stateful and touchable in demo mode', () 
         'the persistent footer must give customers a route back to the buried pickup picker');
     assert.match(summary, /id="pickup-time-picker" role="region" tabIndex=\{-1\} aria-labelledby="pickup-time-picker-title"/,
         'the labelled pickup region must accept programmatic focus after the footer shortcut');
-    assert.match(summary, /padding: "12px 16px max\(18px, env\(safe-area-inset-bottom\)\)"/,
+    assert.match(summary, /padding: "8px 16px max\(10px, env\(safe-area-inset-bottom\)\)"/,
         'checkout actions and legal copy must clear the iPhone home indicator');
     assert.equal(summary.match(/target="_blank" rel="noopener noreferrer" aria-label="[^"]+\(נפתח(?:ת)? בלשונית חדשה\)"/g)?.length, 3,
         'legal documents must open without destroying the in-progress checkout state');
@@ -812,7 +820,9 @@ test('checkout controls stay truthful, stateful and touchable in demo mode', () 
         'the summary must not override Tailwind button padding with an unlayered reset');
     assert.doesNotMatch(builder, /\* \{ -webkit-tap-highlight-color:transparent; box-sizing:border-box; margin:0; padding:0; \}/,
         'the builder must rely on the safely layered global reset');
-    assert.match(summary, /notesToggle: \{ width: "100%", minHeight: "44px"/);
+    assert.match(summary, /className=\{trayStyles\.notes\} disabled=\{checkoutLocked\}/);
+    assert.match(summaryTrayStyles, /\.notes \{[^}]*min-height: 48px/,
+        'the rendered cook-note control must retain a mobile-sized target');
     assert.match(summary, /aria-label="קוד הנחה"[\s\S]*?minHeight: "44px", padding: "8px 10px"/,
         'the promo input must meet the mobile target floor');
     assert.match(summary, /<form[\s\S]*?onSubmit=\{event => \{ event\.preventDefault\(\); if \(!checkoutLocked\) applyPromo\(\); \}\}[\s\S]*?<button type="submit" disabled=\{checkoutLocked\}[\s\S]*?minHeight: "44px", padding: "8px 14px"/,
@@ -822,8 +832,10 @@ test('checkout controls stay truthful, stateful and touchable in demo mode', () 
     assert.match(summary, /promoError && <div role="alert"/);
     assert.match(summary, /<div role="status" aria-live="polite" style=\{\{ \.\.\.S\.sumPriceLine/,
         'an applied discount must be announced as well as shown');
-    assert.match(summary, /aria-label=\{`עריכת \$\{s\.title\}`\}/,
+    assert.match(summaryTray, /aria-label=\{`עריכת \$\{s\.title\}`\}/,
         'repeated edit buttons must identify the section they open');
+    assert.match(summary, /<SummarySelectionTray[\s\S]*?disabled=\{checkoutLocked\}[\s\S]*?onEdit\(STEPS\.findIndex\(st => st\.id === stepId\)\)/,
+        'the extracted edit controls must preserve checkout locking and canonical step navigation');
     assert.match(summary, /<button[\s\S]*?aria-label=\{`הדגש את \$\{it\.he\} ברשימת הבחירות`\}[\s\S]*?<Icon src=\{it\.icon\}/,
         'interactive bowl art must be keyboard reachable and named');
     assert.match(summary, /key=\{t\} style=\{\{ position: "absolute", inset: 0, zIndex: t \+ 1, pointerEvents: "none" \}\}[\s\S]*?pointerEvents: "auto"/,
