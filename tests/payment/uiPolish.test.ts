@@ -7,6 +7,7 @@ import { PANEL, panelHeight, statsColumnHeight, ringFor } from '../../src/compon
 
 const builder = readFileSync(new URL('../../src/components/builder/BariBaliBuilder.jsx', import.meta.url), 'utf8');
 const summary = readFileSync(new URL('../../src/components/builder/SummaryView.jsx', import.meta.url), 'utf8');
+const meterCss = readFileSync(new URL('../../src/components/builder/ui/BariMeterFrame.module.css', import.meta.url), 'utf8');
 const brandHeader = readFileSync(new URL('../../src/components/builder/ui/BuilderBrandHeader.tsx', import.meta.url), 'utf8');
 const brandHeaderCss = readFileSync(new URL('../../src/components/builder/ui/BuilderBrandHeader.module.css', import.meta.url), 'utf8');
 const home = readFileSync(new URL('../../src/app/home2/page.tsx', import.meta.url), 'utf8');
@@ -148,7 +149,8 @@ test('card and bowl removal have no dangling animation setter', () => {
 
 test('nutrition simulation keeps explicit units and does not invent a health score', () => {
     assert.match(summary, /label: 'פחמימות'/);
-    assert.match(summary, /fontSize: "32px"/);
+    assert.match(summary, /className=\{meterStyles.calories\}/);
+    assert.match(meterCss, /font-size: clamp\(2rem, 12cqw, 3rem\)/);
     assert.match(summary, /סימולציה/);
     assert.match(summary, /הערכה לפי מנות טיפוסיות · הכמויות וההכנה בפועל משתנות/);
     assert.doesNotMatch(summary, /nutritionMeterFill|bariMeterFill|bariMeterGlow/);
@@ -157,36 +159,42 @@ test('nutrition simulation keeps explicit units and does not invent a health sco
 test('short summary viewports retain pickup and legal consent while compacting decoration', () => {
     assert.match(summary, /@media \(max-height: 700px\)/);
     assert.match(brandHeaderCss, /@media \(max-height: 700px\)/);
-    assert.match(brandHeaderCss, /height: 82px/);
+    assert.match(brandHeaderCss, /max-height: 480px\) and \(min-width: 600px/);
+    assert.doesNotMatch(brandHeaderCss, /height: 82px|aspect-ratio: auto/);
     assert.match(brandHeaderCss, /object-fit: contain/);
     assert.match(summary, /aria-controls="pickup-time-picker"/);
     for (const href of ['/terms', '/privacy', '/cancellations']) assert.ok(summary.includes(`href="${href}"`));
     assert.doesNotMatch(summary, /height: "110px"/);
 });
 
-test('entry and summary share the selected cartouche without duplicate or cropped branding', () => {
+test('entry and summary share the selected compact emblem without duplicate or cropped branding', () => {
     for (const screen of [builder, summary]) {
-        assert.match(screen, /<BuilderBrandHeader>/);
+        assert.match(screen, /<BuilderBrandHeader(?: variant="summary")?>/);
         assert.doesNotMatch(screen, /header-brand\.png/);
     }
     assert.match(brandHeader, /import Image from 'next\/image'/);
-    assert.match(brandHeader, /builder-brand-cartouche-v3\.webp/);
+    assert.match(brandHeader, /builder-brand-emblem-v7\.webp/);
     assert.match(brandHeader, /alt="BariBali"/);
-    assert.match(brandHeader, /sizes="\(max-width: 430px\) 100vw, 430px"/);
-    assert.match(brandHeaderCss, /aspect-ratio: 3 \/ 1/);
+    assert.match(brandHeader, /sizes="\(max-width: 360px\) 108px, \(max-width: 440px\) 30vw, 132px"/);
+    assert.match(brandHeaderCss, /--brand-width: clamp\(108px, 30vw, 132px\)/);
+    assert.match(brandHeaderCss, /--brand-height: calc\(var\(--brand-width\) \* 422 \/ 488\)/);
     assert.match(brandHeaderCss, /padding-top: env\(safe-area-inset-top\)/);
-    assert.doesNotMatch(brandHeaderCss, /object-fit: cover|position: absolute|animation:/);
-    const art = readFileSync(new URL('../../public/builder-assets/builder-brand-cartouche-v3.webp', import.meta.url));
+    assert.doesNotMatch(brandHeaderCss, /object-fit: cover|animation:|mask-image/);
+    const art = readFileSync(new URL('../../public/builder-assets/builder-brand-emblem-v7.webp', import.meta.url));
     assert.equal(art.toString('ascii', 0, 4), 'RIFF');
     assert.equal(art.toString('ascii', 8, 12), 'WEBP');
-    assert.equal(art.toString('ascii', 12, 16), 'VP8X');
-    assert.ok(art[20] & 0x10, 'the masthead must retain a real alpha channel');
-    assert.ok(art.length < 120 * 1024, 'the branded header must remain lightweight on mobile');
+    assert.ok(art.length < 90 * 1024, 'the branded header must remain lightweight on mobile');
 });
 
-test('shared masthead reveals the existing background instead of an opaque backplate', () => {
-    assert.match(brandHeaderCss, /background: transparent/);
-    assert.match(brandHeaderCss, /width: calc\(100% - 24px\)/);
+test('selected header floats on the unchanged background with real open botanical art', () => {
+    assert.match(brandHeaderCss, /\.header[\s\S]*?background: transparent/);
+    assert.doesNotMatch(brandHeaderCss, /linear-gradient|builder-brand-frieze-v7/);
+    assert.match(brandHeaderCss, /builder-brand-wings-v8\.webp/);
+    assert.match(brandHeaderCss, /center \/ contain no-repeat/);
+    assert.match(brandHeaderCss, /builder-control-frame-v8\.webp/);
+    assert.match(brandHeaderCss, /grid-template-columns: minmax\(0, 1fr\) calc\(var\(--brand-width\) \+ 16px\) minmax\(0, 1fr\)/);
+    assert.match(brandHeader, /aria-hidden="true" data-brand-wings/);
+    assert.match(brandHeaderCss, /@media \(forced-colors: active\)/);
     assert.match(summary, /url\(\/homepage-assets\/BG_8K\.webp\)/);
     assert.doesNotMatch(brandHeaderCss, /background: #071d0c/);
 });
@@ -200,7 +208,18 @@ test('cartouche toolbar keeps real accessible controls and request locking', () 
     assert.match(summary, /<h1>ההזמנה שלכם<\/h1>/);
 });
 
-test('size selection warms the current cartouche instead of unused legacy branding', () => {
-    assert.match(home, /for \(const src of \['\/builder-assets\/builder-brand-cartouche-v3\.webp', '\/builder-assets\/footer-brand\.png'\]\)/);
+test('size selection warms the selected native header and chef ornament layers', () => {
+    for (const name of ['builder-brand-emblem-v7', 'builder-brand-wings-v8', 'builder-control-frame-v8', 'builder-chef-divider-v8']) {
+        assert.ok(home.includes(`/builder-assets/${name}.webp`));
+    }
+    assert.doesNotMatch(home, /builder-brand-frieze-v7\.webp/);
     assert.doesNotMatch(home, /header-brand\.png/);
+});
+
+test('checkout keeps the price and title in native reserved lanes beside the emblem', () => {
+    assert.match(summary, /<BuilderBrandHeader variant="summary">/);
+    assert.match(brandHeaderCss, /data-variant='summary'\] h1 \{ grid-row: 2;/);
+    assert.match(brandHeaderCss, /data-variant='summary'[\s\S]*grid-column: 3;[\s\S]*grid-row: 1;/);
+    assert.match(brandHeaderCss, /@media \(max-width: 279px\)/);
+    assert.doesNotMatch(brandHeader, /fetch\(|useEffect|requestAnimationFrame/);
 });

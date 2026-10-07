@@ -272,7 +272,7 @@ function parseSizeParam(raw) {
 }
 
 // ─── BUILDER PARTICLES ──────────────────────────────────────
-function HeaderBanner({ onBack }) {
+function HeaderBanner({ onBack, onChangeSize, sizeButtonRef, sizeLabel }) {
   return (
     <BuilderBrandHeader>
       <button
@@ -284,6 +284,15 @@ function HeaderBanner({ onBack }) {
         <span>לתפריט</span>
       </button>
       <h1>הסלט שלכם, בדרך שלכם</h1>
+      <button
+        ref={sizeButtonRef}
+        type="button"
+        onClick={onChangeSize}
+        aria-label={`שינוי גודל. הגודל הנוכחי: ${sizeLabel}`}
+      >
+        <span>שינוי גודל</span>
+        <RotateCcw size={16} strokeWidth={1.8} aria-hidden="true" />
+      </button>
     </BuilderBrandHeader>
   );
 }
@@ -845,9 +854,9 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
           ...S.main, justifyContent: "space-between", padding: "0 0 20px",
         }}>
           {/* Brand header banner */}
-          <div style={rise(2) ?? undefined}><HeaderBanner onBack={exitPresetToMenu} /></div>
+          <div style={rise(2) ?? undefined}><HeaderBanner onBack={exitPresetToMenu} onChangeSize={openSizePicker} sizeButtonRef={changeSizeButtonRef} sizeLabel={sc.label} /></div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "16px", flex: 1, padding: "16px 16px 24px", overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "24px", flex: 1, padding: "8px 16px 24px", overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
 
             {/* Draft was restored — explain the pre-filled bowl */}
             {draftNotice && (
@@ -858,35 +867,22 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
               </div>
             )}
 
-            {/* HERO. Change Size is deliberately
-                a sibling control, never an interactive element nested inside
-                this button. */}
+            {/* HERO. Size selection lives in the header, outside this hit area. */}
             <div style={{ width: "100%", ...rise(1) }}>
               <BuilderStartCard
                 buttonRef={startEmptyButtonRef}
                 onStart={() => { setStep(0); haptic("step"); playSound("step"); }}
                 hasDraft={hasDraft} sizeLabel={sc.label} price={effectiveSizePrice(sc.ml)}
               />
-              <button
-                ref={changeSizeButtonRef}
-                type="button"
-                onClick={openSizePicker}
-                style={S.changeSizeBtn}
-                aria-label={`שינוי גודל. הגודל הנוכחי: ${sc.label}`}
-              >
-                <RotateCcw size={16} strokeWidth={1.8} aria-hidden />
-                <span>שינוי גודל · {sc.label}</span>
-              </button>
             </div>
 
             {/* Presets - Secondary */}
             <div style={{ width: "100%", ...rise(0) }}>
-              <div style={{ textAlign: "center", marginBottom: "14px" }}>
-                <ChefHat size={26} color="#e6d18b" aria-hidden style={{ display: "block", margin: "0 auto 5px" }} />
-                <div style={{
-                  fontSize: "15px", fontWeight: 900, letterSpacing: "0.06em",
-                  color: "#e6d18b",
-                }}>מתכוני השף</div>
+              <div className={visuals.chefHeading}>
+                <div className={visuals.chefOrnament} aria-hidden="true">
+                  <ChefHat size={26} color="#e6d18b" />
+                </div>
+                <h2 className={visuals.chefTitle}>מתכוני השף</h2>
                 <div style={{ fontSize: "12px", color: "#c4d2bf", fontWeight: 500, marginTop: "3px" }}>
                   בחרו מתכון מוכן או התחילו מאפס
                 </div>
@@ -899,9 +895,8 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                 const epItemPrices = new Map(epQuote?.valid ? epQuote.items.map(item => [item.id, item.price]) : []);
                 return (
                   <>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "7px" }}>
+                    <div data-chef-recipes style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "8px" }}>
                       {PRESETS.map((p) => {
-                        const pc = PRESET_COLORS[p.id] || PRESET_COLORS.balanced;
                         const isOpen = expandedPreset === p.id;
                         const presetQuote = presetResolutions.get(p.id);
                         const presetAvailable = presetQuote?.valid === true;
@@ -913,22 +908,22 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                                 else presetButtonRefs.current.delete(p.id);
                               }}
                               type="button"
-                              className={`${p.id === "signature" ? visuals.recipePilot : visuals.leafSurface} ${visuals.recipeButton}`}
+                              data-chef-preset={p.id}
+                              className={`${visuals.recipePilot} ${visuals.recipeButton}`}
                               onClick={() => isOpen ? closeExpandedPreset(p.id) : setExpandedPreset(p.id)}
                               disabled={!presetAvailable}
                               style={{
                                 ...S.presetCard,
                                 width: "100%",
-                                background: p.id === "signature" ? "#0b2c1ded" : pc.bg,
-                                border: p.id === "signature" ? "1px solid #b69a4855" : 0,
-                                borderRadius: p.id === "signature" ? "8px" : S.presetCard.borderRadius,
-                                overflow: p.id === "signature" ? "visible" : S.presetCard.overflow,
-                                boxShadow: p.id === "signature"
-                                  ? (isOpen ? "0 0 0 2px #e4c86e88" : "0 3px 12px #0005")
-                                  : (isOpen ? `${pc.glow}, inset 0 0 0 1px ${pc.border}` : pc.glow),
-                                opacity: expandedPreset && !isOpen ? 0.55 : 1,
-                                transform: isOpen && !reducedMotion ? "scale(1.01)" : "none",
-                                transition: "all 0.2s cubic-bezier(0.34,1.56,0.64,1)",
+                                padding: "9px 10px", minHeight: "76px",
+                                flexWrap: "wrap",
+                                background: "#0b2c1ded",
+                                border: "1px solid #b69a4877",
+                                borderRadius: "8px",
+                                overflow: "visible",
+                                boxShadow: isOpen ? "0 0 0 2px #e4c86e88" : "0 3px 12px #0005",
+                                opacity: presetAvailable ? 1 : 0.55,
+                                transition: reducedMotion ? "none" : "box-shadow 0.2s, border-color 0.2s",
                               }}
                               aria-expanded={isOpen}
                               aria-controls={`chef-preset-${p.id}`}
@@ -937,19 +932,17 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                                 : `מתכון ${p.he}, אינו זמין כרגע`}
                               tabIndex={0}
                             >
-                              {p.id === "signature" && <>
-                                <BuilderArtFrame variant="recipe" />
-                                <span className={visuals.recipeBadge}>מומלץ</span>
-                              </>}
+                              <BuilderArtFrame variant="recipe" />
+                              {p.id === "signature" && <span className={visuals.recipeBadge}>מומלץ</span>}
                               <ChefRecipeArt src={presetAvailable ? matchingRecipeArtwork(p) : null}
                                 fallbackSrc={presetQuote?.items.find(item => item.id === PRESET_ART[p.id])?.icon || presetQuote?.items[0]?.icon || "/icons/lettuce_romaine.webp"} />
-                              <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px", textAlign: "right" }}>
+                              <span style={{ flex: "1 1 3em", minWidth: "min(100%, 3em)", display: "flex", flexDirection: "column", gap: "2px", textAlign: "right" }}>
                                 <span style={{ fontSize: "12px", fontWeight: 800, color: "#fff0ba", lineHeight: 1.3 }}>{p.he}</span>
                                 <span style={{ fontSize: "11px", fontWeight: 600, color: presetAvailable ? "#d6c384" : "#c4d2bf", lineHeight: 1.3 }}>
                                   {presetAvailable ? `₪${presetQuote.total} למתכון` : "לא זמין כרגע"}
                                 </span>
                               </span>
-                              <ChevronDown size={14} color="#d6c384" aria-hidden style={{ flexShrink: 0, transition: reducedMotion ? "none" : "transform 0.2s", transform: isOpen ? "rotate(180deg)" : "none" }} />
+                              <ChevronDown size={14} color="#d6c384" aria-hidden style={{ flexShrink: 0, marginInlineStart: "auto", transition: reducedMotion ? "none" : "transform 0.2s", transform: isOpen ? "rotate(180deg)" : "none" }} />
                             </button>
                           </div>
                         );
@@ -964,26 +957,25 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                         role="region"
                         tabIndex={-1}
                         aria-label={`פרטי מתכון ${ep.he}`}
-                        className={ep.id === "signature" ? visuals.recipePilotPanel : undefined}
+                        className={visuals.recipePilotPanel}
                         style={{
                         // The id binds each recipe button's aria-expanded state
                         // to the details it reveals.
                         marginTop: "8px",
-                        borderRadius: ep.id === "signature" ? "8px" : "14px",
-                        background: ep.id === "signature" ? "#0b2c1ded" : epc.bg,
-                        border: ep.id === "signature" ? "1px solid #b69a4855" : `1.5px solid ${epc.border}`,
-                        boxShadow: ep.id === "signature" ? "0 5px 20px #0005" : epc.glow,
-                        overflow: ep.id === "signature" ? "visible" : "hidden",
+                        borderRadius: "8px",
+                        background: "#0b2c1ded",
+                        border: "1px solid #b69a4877",
+                        boxShadow: "0 5px 20px #0005",
+                        overflow: "visible",
                         animation: reducedMotion ? "none" : "expandIn 0.28s cubic-bezier(0.22,1.2,0.36,1) both",
                         }} id={`chef-preset-${ep.id}`}>
-                        {ep.id === "signature" && <BuilderArtFrame variant="recipe" />}
+                        <BuilderArtFrame variant="recipe" />
                         {/* Header */}
                         <div style={{ padding: "10px 10px 10px 14px", display: "flex", alignItems: "center", gap: "10px", borderBottom: `1px solid ${epc.border}` }}>
-                          {ep.id === "signature" ? <ChefRecipeArt src={matchingRecipeArtwork(ep)} size={70}
+                          <ChefRecipeArt src={matchingRecipeArtwork(ep)} size={70}
                             fallbackSrc={epQuote.items.find(item => item.id === PRESET_ART[ep.id])?.icon || epQuote.items[0]?.icon || "/icons/lettuce_romaine.webp"} />
-                            : <Icon src={ep.icon} size="28px" style={{ filter: `drop-shadow(0 2px 8px ${epc.dot})`, flexShrink: 0 }} />}
                           <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px", textAlign: "right" }}>
-                            <span style={{ fontSize: "15px", fontWeight: 900, color: epc.text }}>{ep.he}</span>
+                            <span style={{ fontSize: "15px", fontWeight: 900, color: "#fff0ba" }}>{ep.he}</span>
                             <span style={{ fontSize: "11px", fontWeight: 800, color: "#f0d060" }}>
                               מחיר המתכון ₪{epQuote.total}{epExtra > 0 ? ` · תוספות ₪${epExtra}` : " · ללא תוספת"}
                             </span>
@@ -993,7 +985,7 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                             onClick={() => closeExpandedPreset(ep.id)}
                             style={{ width: "44px", height: "44px", display: "grid", placeItems: "center", background: "none", border: "none", color: "rgba(255,255,255,0.55)", fontSize: "14px", cursor: "pointer", padding: 0, lineHeight: 1, flexShrink: 0, borderRadius: "10px" }}
                             aria-label="סגור"
-                          >{ep.id === "signature" ? <X size={18} aria-hidden /> : "✕"}</button>
+                          ><X size={18} aria-hidden /></button>
                         </div>
 
                         {/* Description */}
@@ -1023,20 +1015,20 @@ export default function BariBaliBuilder({ sizeParam = null, type = "salad", entr
                           <button
                             type="button"
                             onClick={() => { loadPreset(ep); setExpandedPreset(null); }}
-                            className={ep.id === "signature" ? artLayers.action : undefined}
+                            className={artLayers.action}
                             style={{
-                              width: "100%", padding: ep.id === "signature" ? "11px 30px" : "11px 0", borderRadius: "10px",
+                              width: "100%", padding: "11px 30px", borderRadius: "10px",
                               border: "none", cursor: "pointer",
                               display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
-                              background: ep.id === "signature" ? "transparent" : `linear-gradient(135deg, ${epc.dot}, ${epc.border})`,
+                              background: "transparent",
                               color: "#0a1a0a", fontSize: "14px", fontWeight: 900,
                               fontFamily: "var(--font-heebo), 'Heebo', sans-serif",
-                              boxShadow: ep.id === "signature" ? "none" : `0 4px 18px ${epc.dot}`,
+                              boxShadow: "none",
                               letterSpacing: "0.02em",
                             }}
                           >
                             <span>בנו את {ep.he} · ₪{epQuote.total}</span>
-                            <ArrowLeft size={15} strokeWidth={2.8} />
+                            <ArrowLeft size={15} strokeWidth={2.8} aria-hidden />
                           </button>
                         </div>
                       </div>

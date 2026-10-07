@@ -211,7 +211,7 @@ export default function HomeV2() {
     useEffect(() => {
         if (!sizePicker) return;
         router.prefetch('/build');
-        for (const src of ['/builder-assets/builder-brand-cartouche-v3.webp', '/builder-assets/footer-brand.png']) {
+        for (const src of ['/builder-assets/builder-brand-emblem-v7.webp', '/builder-assets/builder-brand-wings-v8.webp', '/builder-assets/builder-control-frame-v8.webp', '/builder-assets/builder-chef-divider-v8.webp', '/builder-assets/footer-brand.png']) {
             const img = new window.Image();
             img.src = src;
         }

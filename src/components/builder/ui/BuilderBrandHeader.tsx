@@ -2,22 +2,28 @@ import Image from 'next/image';
 import type { ReactNode } from 'react';
 import styles from './BuilderBrandHeader.module.css';
 
-/** The selected botanical cartouche. Artwork and interactive UI never overlap. */
-export default function BuilderBrandHeader({ children }: { children: ReactNode }) {
+/** Only decorative edges may crop; the complete emblem and controls never do. */
+export default function BuilderBrandHeader({ children, variant = 'entry' }: {
+    children: ReactNode;
+    variant?: 'entry' | 'summary';
+}) {
     return (
         <header className={styles.header} data-builder-brand-header>
-            <div className={styles.masthead}>
-                <Image
-                    src="/builder-assets/builder-brand-cartouche-v3.webp"
-                    alt="BariBali"
-                    fill
-                    sizes="(max-width: 430px) 100vw, 430px"
-                    priority
-                    unoptimized
-                    className={styles.art}
-                />
+            <div className={styles.stage}>
+                <div className={styles.wings} aria-hidden="true" data-brand-wings />
+                <div className={styles.masthead}>
+                    <Image
+                        src="/builder-assets/builder-brand-emblem-v7.webp"
+                        alt="BariBali"
+                        fill
+                        sizes="(max-width: 360px) 108px, (max-width: 440px) 30vw, 132px"
+                        priority
+                        unoptimized
+                        className={styles.art}
+                    />
+                </div>
+                <div className={styles.toolbar} data-variant={variant}>{children}</div>
             </div>
-            <div className={styles.toolbar}>{children}</div>
         </header>
     );
 }

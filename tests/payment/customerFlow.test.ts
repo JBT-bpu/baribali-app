@@ -422,8 +422,10 @@ test('builder size changes keep rendered, URL, history and reset state aligned',
         'only a true missing-size entry may return home');
     assert.doesNotMatch(builder, /setSelectedSize\(null\)/,
         'Change Size must not destroy the current selection');
-    assert.match(builder, /<button[\s\S]*?ref=\{changeSizeButtonRef\}[\s\S]*?type="button"[\s\S]*?onClick=\{openSizePicker\}/,
-        'Change Size must be a separate native control');
+    assert.match(builder, /<button[\s\S]*?ref=\{sizeButtonRef\}[\s\S]*?type="button"[\s\S]*?onClick=\{onChangeSize\}/,
+        'Change Size must remain a separate native header control');
+    assert.match(builder, /onChangeSize=\{openSizePicker\} sizeButtonRef=\{changeSizeButtonRef\}/,
+        'the relocated button must keep the existing handler and focus-return ref');
     assert.doesNotMatch(builder, /role="button"[\s\S]*?>שנה גודל<\/span>/,
         'the old nested pseudo-button must not return');
 
@@ -577,7 +579,7 @@ test('the home page renders useful content on the server instead of a hydration 
 });
 
 test('builder entry, summary edits and checkout keep clear escape and return paths', () => {
-    assert.match(builder, /function HeaderBanner\(\{ onBack \}\)/);
+    assert.match(builder, /function HeaderBanner\(\{ onBack, onChangeSize, sizeButtonRef, sizeLabel \}\)/);
     assert.match(builder, /<button[\s\S]*?onClick=\{onBack\}[\s\S]*?aria-label="חזרה לתפריט"[\s\S]*?<span>לתפריט<\/span>/,
         'the preset landing needs a visible, native way back to the menu');
     assert.match(home, /markBuilderNavigationFromHome\(\);[\s\S]*?router\.replace\(target\)/,
@@ -589,7 +591,7 @@ test('builder entry, summary edits and checkout keep clear escape and return pat
         'origin detection must not destructively consume storage in a replayed initializer');
     assert.match(builder, /const exitPresetToMenu = useCallback\(\(\) => \{[\s\S]*?if \(enteredFromHome\) router\.back\(\);[\s\S]*?else router\.replace\("\/home2"\)/,
         'menu arrivals should go Back once, while direct links need an in-app replacement');
-    assert.match(builder, /<HeaderBanner onBack=\{exitPresetToMenu\} \/>/);
+    assert.match(builder, /<HeaderBanner onBack=\{exitPresetToMenu\} onChangeSize=\{openSizePicker\}/);
     const headerCss = readFileSync(new URL('../../src/components/builder/ui/BuilderBrandHeader.module.css', import.meta.url), 'utf8');
     assert.match(headerCss, /padding-top: env\(safe-area-inset-top\)/,
         'the shared preset header must clear the status bar when the app runs edge-to-edge');

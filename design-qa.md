@@ -1,3 +1,462 @@
+# Design QA — ornamental controls v8, 2026-10-06 (latest)
+
+final result: passed
+
+Selected visual truth: owner's accepted option 2 with the requested translucent
+main-card refinement, `.playwright-cli/ornamental-controls-2026-10-06/approved-option2-translucent.png`
+(851 x 1847). Scope: existing builder entry and summary controls, chef heading,
+and main build-card material. V1.0 navigation, price authority, order locks,
+twelve recipe frames and original bright page art/particles remain intact.
+No commit, push, deployment, order submission, payment or external write.
+
+## Matched source and browser evidence
+
+Evidence folder: `.playwright-cli/ornamental-controls-2026-10-06/`.
+Actual settled page: /build?size=M, empty draft, Hebrew RTL, open-shop fixture,
+Chrome, reduced motion, 393 x 852 CSS px, DPR 1, fonts loaded before capture.
+Selected source normalized proportionally from 851 x 1847 to 393 x 853;
+browser capture is 393 x 852. Neither side is stretched.
+
+Combined images actually opened in the same visual input:
+`source-render-full.png`, `source-render-header.png` and
+`source-render-hero-chef.png`. Source/render full board is 802 px wide with a
+16 px gap. Header and hero boards align corresponding regions with padding.
+The source's larger top spacing/display type, greener background and wrapped
+size label are not treated as code requirements. Existing production column
+(430 px maximum), native Heebo/Secular One, compact top lane and requested
+original luminous gold-field background are intentional adaptations, documented
+instead of silently described as a pixel-perfect clone.
+
+Actual 320/360/393/430 mobile-width entry, small-height summary, desktop 1440,
+keyboard-focus, forced-colors and 240 px fallback captures were opened.
+`header-393-dpr3.png` and `hero-393-dpr3.png` were captured at real browser
+deviceScaleFactor 3 and actually inspected; not a rescaled DPR-1 sharpness claim.
+
+## Findings and comparison history
+
+1. First implementation captures retained as `entry-first-pass-393.png` and
+   `summary-first-pass-393.png`. Selected-source comparison confirms the actual
+   native controls now match the botanical/gold language; the old rectangular
+   frieze and duplicate size action beneath the hero are no longer consumed.
+2. First matrix exposed premature entrance measurements: header y=-14 while the
+   pre-existing arrival animation/hydration had not settled. Capture harness now
+   awaits header top >= -.5 px and asserts the full logo remains onscreen.
+   This was a capture timing correction, not a new application animation.
+3. Subsequent resize/emulated-media readings could precede Chromium's responsive
+   style pass. Harness now awaits the expected rendered emblem width (or forced-
+   colors min-height), not an arbitrary fixed delay. Final summary320 measures
+   the actual 108 px emblem and 113.39 px header; forced-colors header is 66 px.
+4. Final settled matrix and combined source/render comparison found no remaining
+   actionable P0/P1/P2 issue within this scoped change. Rollback assets and previous
+   QA history below remain intact. No app bug was hidden by deleting a fixture.
+
+## Five required fidelity surfaces
+
+- Fonts/typography: existing loaded Heebo and Secular One. Native menu/change-size
+  labels fit without ellipsis; current volume remains in the accessible label.
+  Chef title becomes a native h2, not baked copy. Existing entry h1 stays accessible
+  but visually hidden to avoid another competing slogan. Summary heading and
+  authoritative native 67-shekel seeded fixture price are legible.
+- Spacing/layout: complete contained emblem and reserved central lane. Entry
+  header heights: 113.39 px at 320/360 x640, 121.95 at 393x852, 131.55 at
+  430x932, 134.14 at desktop1440x900. Native buttons are at least 44 x50 px.
+  No logo/control overlap, horizontal document overflow or clipped control text
+  in the final matrix. At 240 px controls reflow below the logo. At 320 px the
+  existing hero container query stacks food/copy instead of crushing the text.
+  Recipe grid stays scrollable; viewport-bottom cropping is normal scroll content,
+  not a clipped decorative frame. Summary body is also intentionally scrollable.
+- Colors/tokens: emerald material and warm gold ornament; original luminous
+  background and particles untouched. Only the hero material is opacity 0.8;
+  card, text, food, outer frame and primary CTA are opacity 1. Header is transparent.
+  Forced colors remove these decorative layers while native controls remain.
+- Image quality: three independently generated true-alpha ornaments; empty
+  control centers, clear exterior margins, complete leaf tips, no checkerboard
+  or reconstruction mask. Nine-slice gold contours plus code-owned button faces,
+  contained wings and independent chef icon. New assets total 114,768 bytes.
+  DPR-3 capture confirms sharp complete logo/frame edges and text.
+- Copy/content: existing build/draft labels, offer/volume and price, all twelve
+  recipe labels/quotes, summary legal links and pickup controls are retained.
+  Size selection appears once in the header; menu and summary edit keep their
+  original actions. No mock price or mock click target overrides product data.
+
+## Functional verification and boundaries
+
+`browser-results.json` records 16 final states: five entry viewports, S/L,
+size-picker cancel with focus return and committed URL preserved, forced colors,
+240 px fallback, menu return, four summary viewports and summary edit.
+Zero page exceptions, console errors or attempted non-GET writes. API fixtures
+and external hosts were intercepted before any live service; no charge or order.
+Separate temporary DPR-3 context also recorded zero writes/page errors and closed.
+
+253 regression tests, dedicated TypeScript check and isolated Next production
+build passed. Full lint: zero errors, eight pre-existing hook-effect warnings.
+Default installed formatter used; the removed ESLint compact formatter did not
+trigger a new dependency installation. Git diff --check passed apart from
+existing CRLF conversion notices.
+
+React/Next review: no new dependencies, hooks/observers, parallel fetches,
+animation loops, server/client boundary change or hydration-only layout.
+Shared decorative component remains pure. No nested interactive controls.
+Relocated size button retains history handler and original focus ref;
+summary request lock and checkoutTotal are unchanged. Current assets are prefetched.
+
+Scope limits: Chrome emulation is not physical iOS/Android validation. Real pending
+payment, screen-reader walkthrough and provider error flows were not exercised
+in this visual pass; their existing source invariants/tests were preserved.
+Unrelated pre-existing lint warnings and non-header forced-colors polish are not
+presented as resolved. Local preview only: http://127.0.0.1:3004/build?size=M.
+
+Provenance/composition note: `docs/ORNAMENTAL_CONTROLS_2026-10-06.md`.
+
+---
+
+# Previous QA — compact layered brand v7, 2026-10-06
+
+final result: passed
+
+Selected visual truth: the owner's accepted muted green/gold header v15,
+`.playwright-cli/compact-brand-2026-10-06/approved-header-v15.png` (2048 × 683).
+Scope: compact responsive header on the existing builder entry and summary;
+native title, menu/back actions and order total remain code-owned.
+Existing page brightness, particles, hero/recipe art, product rules and payments
+are outside this change and remain intact. No push/deployment or external writes.
+
+## Matched visual evidence and intentional adaptation
+
+All latest evidence lives in `.playwright-cli/compact-brand-2026-10-06/`.
+Browser state: /build?size=M, empty draft, Hebrew RTL, open-shop fixture,
+reduced motion, Chrome, 393 × 852 CSS px. The existing app is a 430 px maximum
+column on desktop; this is not a new desktop-wide page.
+
+Full-view combined board actually opened: `full-entry-before-after-393.png`,
+802 × 852; prior round-header capture and new page are both 393 × 852 pixels,
+DPR 1. This is a structural compactness/background comparison, not a claim
+that historical body screenshots are pixel-identical. Hero/recipe component
+code, artwork, data and the original page background were not edited here.
+
+Selected source/render header board actually opened:
+`source-render-header-393.png`, 802 × 131. Source mock normalized without
+stretching from 2048 × 683 to 393 × 131; browser header is 393 × 110,
+padding only for the combined board. The shorter band, native existing title
+instead of the mock's 'בנו סלט', and inherited accessible menu button are
+intentional adaptations requested for the existing app. This is not a
+pixel-perfect clone of the mock's baked UI. Complete circular identity,
+green/gold botanical wings and two gold rails are the fidelity targets.
+
+Focused boards actually opened: `emblem-source-render-393.png` and
+`summary-readability-before-after-393.png`. The DPR-1 emblem board uses a 2×
+display enlargement to inspect edges, not a false claim of retina density.
+Actual separate 393 × 852 / DPR-3 browser capture was also opened:
+`header-393-dpr3.png`. It confirms sharp real-density artwork and native text.
+
+## Findings, fixes and comparison history
+
+1. First browser pass found [P2] summary readability: the heading occupied
+   the busy decorative frieze, although geometric logo/control overlap was zero.
+   Evidence: `summary-before-readability-fix-393-640.png`.
+   Fix: native price in the upper-left lane, heading underneath; no baked copy.
+   Post-fix full summary and combined before/after board inspected. The title
+   now lies on the quiet surface below the strip. Pickup fixture state differs
+   between those full captures; that lower-page difference is not attributed
+   to the header fix.
+2. Added 4 px breathing space above the emblem so the gold ring is not flush
+   with the screen edge. Latest source/render and actual DPR-3 captures inspected.
+3. QA-only pickup fixture now matches the real read-only slots response, and
+   two animation frames are awaited after resize. The initial deliberate 503
+   and stale post-resize measurements were harness issues, not app fixes.
+
+Second complete browser pass and the combined visual comparisons found no
+remaining actionable P0/P1/P2 issue in this scoped header change.
+
+## Five required fidelity surfaces
+
+- Fonts/typography: existing Heebo controls and Secular One display retained,
+  loaded before capture. Title is intentionally smaller (13–16 px) to fit the
+  compact side lane; no ellipsis/copy removal. Price remains native, bold and
+  legible. Wordmark/tagline stay in the real generated brand asset.
+- Spacing/layout: 393 × 852 entry header is 109.95 px instead of approximately
+  219 px in the prior round implementation. 320/360 × 640 headers are 101.39 px;
+  430 × 932 is 119.55 px. Both rails remain visible, emblem keeps its 488:422
+  ratio, toolbar has a reserved central lane and 44 px minimum touch targets.
+  No logo/control overlap, horizontal document overflow, clipped heading or
+  hidden button at the tested sizes. At 240 CSS px the toolbar deliberately
+  reflows beneath the emblem rather than compressing text into the artwork.
+- Colors/tokens: rich emerald and warm gold lead; ingredient accents remain
+  subdued within botanical engraving. Original bright gold-field background
+  and particles remain. Forced colors replace decoration with system colors.
+- Image quality: independent genuine-alpha WebP emblem/frieze, 488 × 422 and
+  1600 × 143; combined 157,078 bytes. No painted checkerboard, manual extraction
+  mask, emblem clipping, stretch, animation or code-native artwork substitute.
+  DPR-3 screenshot verifies sharpness at common high-density phone rendering.
+- Copy/content: existing entry and summary Hebrew copy, menu/edit actions,
+  price 67 for the seeded signature fixture, recipe labels, pickup control and
+  legal links retained. Mock navigation text never became application authority.
+
+## Verification and boundaries
+
+`browser-results.json` records 15 states: entry and summary at 320, 360, 393,
+430 and desktop 1440 widths, keyboard focus, forced-colors entry, 240 px fallback,
+summary Back and menu navigation. Separate DPR-3 run passed with no writes/errors.
+Zero page exceptions, console errors or non-GET attempts in the final matrix.
+API fixtures intercepted before reaching live services; no order/payment test.
+Existing request-lock source invariant retained; pending payment lock was not
+exercised as a live browser scenario.
+
+All 252 regression tests, TypeScript check, scoped lint and corrected isolated
+production build passed. Full-project lint: 0 errors / 8 existing warnings.
+React/Next review: pure shared component, no new hooks/observers, dependencies,
+network requests, hydration-only layout, price authority or nested controls.
+Git diff --check passed; only existing CRLF-conversion notices were emitted.
+
+## Follow-up polish and test gaps
+
+No blocking P0/P1/P2 finding remains in the header. Native controls intentionally
+do not exactly copy the mock's baked UI. Physical iOS/Android devices, real
+safe-area hardware, live order/payment state, full-app text scaling and unrelated
+screens are not certified by this scoped pass. Local preview stays available;
+owner approval is still required before commit/push/Vercel publication.
+
+Production assets, exact built-in ImageGen prompts and provenance:
+`docs/COMPACT_LAYERED_HEADER_2026-10-06.md`.
+
+Earlier complete reports below are retained as history, not current-v7 evidence.
+
+---
+
+# Design QA — integrated emerald masthead, 2026-10-06
+
+final result: passed
+
+Scope: owner-requested alternative to the transparent header; the existing v1.0
+builder entry and shared order summary, not a whole-app redesign.
+Local only; no commit, push, deployment or external data writes.
+
+## Source truth and matched comparison evidence
+
+Selected source art: public/builder-assets/builder-brand-masthead-v5.webp,
+960 × 320 pixels, opaque, 48,448 bytes. Original master/provenance/exact prompt:
+docs/EMERALD_MASTHEAD_2026-10-06.md.
+Structural source: before-entry-393.png and before-header-393.png, captured from
+the previous local v4 implementation, not from older HEAD or the protected live preview.
+
+All paths below are under .playwright-cli/emerald-header-2026-10-06/.
+Same full-view state: /build?size=M, empty draft, Hebrew RTL, open-shop fixture,
+reduced motion, 393 × 852 CSS px, Chrome DPR 1. Source and implementation both
+393 × 852 image pixels. Route entrance settled before capture.
+Full-view combined board actually opened: entry-before-after-393.png, 798 × 852.
+Focused board actually opened: header-before-after-393.png, 798 × 198;
+source 393 × 198, implementation 393 × 193, canvas padding only, no stretching.
+Selected artwork/render board actually opened: asset-render-comparison.png,
+798 × 131; source resized to 393 × 131 against actual 393 × 131 masthead capture.
+This checks the intentional background-only margin fade, not a logo crop.
+
+Additional evidence opened: short-phone-before-after.png (732 × 640),
+entry-320-568.png, entry-844-390.png, entry-1440-900.png,
+summary-393-640.png, header-text-200-320.png, header-forced-colors.png,
+header-missing.png. Hero captures remain 361 × 240 on both sides.
+Generated background artwork plus native inherited title/controls are the target;
+old transparent header placement/particles behind logo are intentionally replaced.
+
+## Findings and comparison history
+
+Owner-requested [P2] header visual integration: floating ornamental arch over the
+busy gold field and disconnected side decoration did not feel like a cohesive masthead.
+Fix: generate one opaque emerald brand artwork, full-width reserved 3:1 slot,
+low-relief botanical accents, background-only bottom fade and quiet native toolbar.
+Before/after and selected-source/render boards above show the complete logo,
+no cut-off rail, readable native title and no change to food cards or page background.
+First post-build visual comparison found no actionable P0/P1/P2 differences.
+No visual-repair iteration was required. A QA-only heading selector was corrected
+to the real existing premium-step heading before rerunning the complete browser suite;
+that harness correction is not a design iteration or an application change.
+
+## Five required fidelity surfaces
+
+- Fonts/typography: existing Secular One display and Heebo controls retained and
+  loaded; title weight/wrapping/hierarchy match the surrounding app. Raster wordmark
+  preserves supplied letterforms; it is intentionally larger/clearer than v4.
+  Synthetic 200% font doubling wraps rather than clipping at 320/393 px.
+- Spacing/layout rhythm: original structural order and hero/card spacing preserved.
+  393 px header is 193 px rather than 197.375 px; short 360 px header is 178 px.
+  Fluid art is width-driven, with contain sizing and no portrait height cap.
+  Eleven widths/heights, shared summary controls and document width checked.
+- Colors/tokens: own deep emerald brand surface and warm gold logo match the selected
+  artwork; native fade releases the existing bright gold field under the toolbar.
+  Original page brightness and particle implementation are untouched. System
+  colors take over in forced-colors mode; visible real controls retain focus.
+- Image quality: 960 × 320 source supplies over 2× density at maximum 430 CSS px.
+  WebP is sharp and opaque, with no checkerboard, extraction halo, hard-cut gold rail
+  or cropped emblem. Generated engraving is real raster art, not a CSS approximation.
+  Native gradients are surface transitions, not substitutes for pictured imagery.
+- Copy/content: inherited Hebrew title/menu action, summary title/price, legal links,
+  size prices and recipe labels retained. No extra slogan or baked UI text.
+  Canonical S/M/L prices remain 54/59/72; signature summary remains 67.
+
+## Interaction/accessibility/build evidence
+
+browser-results.json records 24 states, eleven viewport checks, zero page exceptions,
+zero external writes, no header/control overflow, 44 px minimum native targets,
+keyboard focus/start, summary Back, forced colors, normal/reduced motion and image failure.
+Two short summaries retain all three legal links and pickup shortcut.
+Expected logs only: two existing Chrome haptic restrictions, intentional pickup 503,
+deliberate image-abort failure. These are not claimed to be a clean live payment flow.
+TypeScript, focused lint, all 249 regression tests and isolated production build passed.
+Whole-project lint retained 0 errors / 8 existing warnings; focused changed files are clean.
+React/Next review: pure existing component; no hooks, hydration-only conditionals,
+new requests, nested interactive controls, dynamic price authority or dependencies.
+
+## Follow-up polish and test gaps
+
+No blocking P0/P1/P2 findings. Existing P3 recipe recommendation-badge behavior under
+synthetic large text remains documented in the previous report, unchanged here.
+Physical phones/iOS safe-area hardware not available; emulated CSS viewports and font
+doubling are not device certification. Tall content in very short landscape viewports
+uses the existing inner scroller, rather than squeezing cards to fit simultaneously.
+No actual order/card charge, production config change or Vercel publication attempted.
+
+## Implementation checklist
+
+- [x] Selected versioned generated asset saved in project; earlier assets preserved.
+- [x] Shared responsive header and homepage prefetch updated.
+- [x] Canonical controls, business rules and previous recipe changes preserved.
+- [x] Source and actual render compared together at matching density/state.
+- [x] Browser, accessibility and build/regression verification complete.
+- [x] Owner publication approval remains required.
+
+---
+
+
+# Design QA — open alpha header and completed recipe family, 2026-10-06
+
+final result: passed
+
+Scope: the owner's annotated header/recipe feedback; existing v1.0 structure.
+Local implementation only. No commit, push, deployment, database or payment write.
+
+## Source truth, state and normalized comparison
+
+Owner reference: the two screenshots in /tmp/codex-remote-attachments/
+01a06340-dcbe-7fd0-b3cb-302686bed44f/23690a65-62ad-4d7b-9cb1-18524fbcb3b0/.
+Unannotated screenshot is 591 × 1280 pixels and includes browser chrome,
+draft continuation and an expanded signature recipe. It grounds the complaint,
+not a falsely claimed pixel-perfect match to an empty-draft desktop capture.
+
+Matched structural source: fresh current-HEAD captures in
+.playwright-cli/header-recipes-2026-10-06/before-*.png.
+Matched implementation: final-build after-*.png in the same directory.
+Same state: /build?size=M, Hebrew RTL, empty draft, open-shop fixture,
+Chrome DPR 1, 393 × 852 CSS px. Expanded-grid pair has signature expanded
+on both sides. The existing route entrance was allowed to settle before
+checking viewport origins; every final matrix header top is 0.
+
+Full comparison actually opened: entry-before-after-393.png, 798 × 852.
+Focused comparisons actually opened, before LEFT / after RIGHT:
+- header-before-after-393.png: source 393 × 186, implementation 393 × 198,
+  padded only for comparison; deliberate larger, rail-free crest.
+- recipes-before-after-393.png and recipes-expanded-before-after-393.png:
+  source 361 × 431, implementation 361 × 497. Intentional completed frames,
+  modest card padding and full-opacity alternatives, not a density mismatch.
+- hero-before-after-393.png: both 361 × 240; hero code/art unchanged.
+- panel-before-after-393.png: both 361 × 298, shared finished treatment.
+
+Short-phone comparison actually opened: short-phone-before-after-360.png,
+732 × 640. Source 360 × 640 from the preserved current-HEAD atmosphere QA
+capture, same M/empty/reduced-motion/open fixture; after 360 × 640.
+It visibly confirms that the old 82 px masthead leaves gaps whereas the new
+328 × 123 CSS px silhouette uses the available width without cropping.
+
+Additional evidence opened: primary-phone-widths.png, desktop 1440 × 900,
+enlarged header, forced-colors recipes, Asian recipe detail, actual summary
+393 × 640, and corrected per-card 200% typography galleries at 320/393 px.
+Asset truth/provenance/prompt: docs/HEADER_RECIPE_COMPLETION_2026-10-06.md.
+
+## Findings, fixes and comparison history
+
+1. Owner-identified [P2] header integration/flexibility: fixed 82 px height on
+   portrait phones shrank contained artwork; flat lower rails and toolbar
+   backplate reinforced the rectangular-banner appearance.
+   Fix: generated open organic alpha crest, fluid 8:3 width, transparent toolbar,
+   landscape-only compaction. Matched short-phone and header evidence inspected.
+2. Owner-identified [P2] incomplete recipe family: only one of twelve buttons
+   and one detail panel had the finished gold frame; opening a panel reduced
+   alternatives to 55% opacity.
+   Fix: share the real nine-slice frame and finished panel/CTA across all twelve,
+   recommendation badge signature-only, available alternatives remain opaque.
+   Both idle and expanded matched comparisons inspected after the fix.
+3. First rendered accessibility comparison [P2]: 200% synthetic fonts at 320 px
+   broke names into near-vertical fragments. Bounds-only checks did not detect
+   this visual problem. Evidence retained as text-200-cramped-before-320.png.
+   Fix: flexible button wrapping, text-relative minimum copy width and a
+   wrapping chevron. Recaptured all twelve individual cards at 320/393 px and
+   opened text-200-all-cards-320.png / text-200-all-cards-393.png.
+   Names/price words now wrap readably; all frames and controls remain intact.
+4. No remaining actionable P0/P1/P2 finding in the final visual comparisons.
+
+QA harness corrections are not implementation fixes: await the existing RAF
+focus return; do not sample the route's initial pre-hydration translateY(-14px);
+do not treat black offscreen areas from a clipped scroll-container element
+screenshot as missing UI. Final enlarged evidence uses individual card captures,
+assembled without stretching. It is a diagnostic gallery, not a full viewport.
+
+## Required fidelity surfaces
+
+- Fonts/typography: existing next/font Heebo UI and Secular One display retained;
+  no added font/fallback. Native headings, prices and recipe names stay live.
+  Main header 16–20 px with balanced wrapping; enlarged copy checked visually.
+- Spacing/layout: 16 px gutters; entire alpha silhouette remains contained.
+  Standard 393 px cards 176.5 × 76, eight-pixel grid gap, flexible larger text.
+  Complete corners/rails remain visible. Larger header is intentional, while
+  native entry CTA stays reachable and lower content remains scrollable.
+- Colors/tokens: emerald/ivory/gold preserved; luminous page background and
+  particles unchanged. Removing the toolbar plate reveals the original photo.
+  Frame and selected outline distinguish states without dimming alternatives.
+  Forced colors retains native readable text/buttons; no WCAG certification.
+- Image quality: new 960 × 360 WebP has true outer/internal alpha, no opaque
+  backplate, chopped baseline or visible runtime rectangular matte/halo.
+  Existing recipe bowls reused with their canonical mapping; no distorted sprite
+  crops, handcrafted art substitutes or background-removal masks.
+- Copy/content: original coherent Hebrew retained; canonical volume/price,
+  recommendation, unavailable and draft labels are native. No text/prices baked
+  into recipe art; large hero and checkout logic not re-authored.
+
+## Browser, interaction and accessibility evidence
+
+Final browser-results-final.json contains 46 states and zero exceptions,
+attempted writes or console warnings/errors. Eleven CSS viewports:
+320×568, 360×640, 390×844, 393×640, 393×852, 412×915, 430×932,
+591×760, 768×1024, 844×390, 1440×900.
+All final header tops 0; twelve frames each; no document horizontal overflow,
+toolbar collision, card child spill or decorative hit-test interception.
+
+All twelve recipe panels open, display matching bowls and close with focus
+returned. Keyboard recipe activation and entry tested. Signature loads eight
+canonical base selections; Mediterranean seven; draft retention and S/M/L
+prices ₪54/₪59/₪72 verified. Reduced-motion/normal particle canvas checked.
+The actual five-step journey reaches summary; shared header, pickup shortcut
+and three legal links present on 360/393 × 640 fixtures. No order submitted.
+
+fallback-results.json: missing header/frame/recipe artwork and loading/closed/
+unavailable shop fixtures retain native flow. No exceptions or attempted writes.
+Intentional resource aborts and Chromium user-gesture vibration-policy messages
+occurred in those artificial failure runs; not misreported as normal-render
+errors. Final normal matrix and matched comparisons were clean.
+
+## Checks, limits and follow-up
+
+248 regression tests, TypeScript and isolated production build passed.
+Whole-repo lint: zero errors/eight pre-existing warnings; final changed-file
+lint zero errors/the same five builder warnings. React/Next review retained
+native semantics, stable refs, inert decorations, no new effects or fetches.
+git diff --check passed.
+
+Synthetic 200% computed-font tests are not physical OS text-size or browser-zoom
+certification. No physical handset, Safari, GPU/performance or end-to-end-payment
+claim. [P3] At synthetic 200% the recommendation ribbon can overlap part of its
+decorative bowl thumbnail; label, frame and hit area remain readable/intact.
+Owner visual approval remains open. New Git/Vercel publishing needs approval.
+
+---
+
 # Design QA — separated material backdrop, 2026-10-06
 
 final result: passed
@@ -1163,5 +1622,140 @@ clipping. This heuristic flag is not a confirmed defect.
   evidence is from dev, not a production deployment.
 - No real order/card payment, database write, provider change, secret exposure,
   commit, push, merge or deployment.
+
+final result: passed
+
+---
+
+# 2026-10-07 — selected BariMeter option 1 / Emerald Atelier
+
+## Target, state and normalization
+
+- Source visual truth:
+  `C:/Users/COMP13/.codex/generated_images/01a06340-dcbe-7fd0-b3cb-302686bed44f/exec-ddc8646a-35df-45bf-9b7a-06909199494a.png`.
+- Evidence copy: `.playwright-cli/barimeter-atelier-2026-10-07/selected-option-1.png`.
+- Source pixels: 851×1847. Downsampled proportionally to 393px wide (~853px
+  tall), without stretching; source has no browser chrome or phone bezel.
+- Final implementation: `http://127.0.0.1:3004/build?size=M`, local optimized
+  production build, not a Vercel deployment.
+- Implementation pixels/CSS viewport: 393×852, deviceScaleFactor 1 verified.
+  Final screenshot: `iteration-4-393.png` in the evidence directory above.
+- Same guest draft/state: 1000ml salad, 10 choices, ₪67, 330–550 kcal, protein
+  12–21g / carbs 43–71g / fat 14–23g / fibre 9–16g. Checking-pickup footer
+  fixture, same header/background, Hebrew RTL, reduced motion.
+- Fixture availability is not live evidence of opening hours or payment status.
+  No account, order, payment or external-provider mutation was performed.
+
+## Combined visual evidence and comparison history
+
+Source and rendered screenshot were placed together in each comparison input,
+then inspected visually; not judged from separate images or code alone.
+
+1. `comparison-1-full.png` and `comparison-1-focus.png`: **blocked**.
+   [P2] Hero was over-tall: the bowl/plinth and bottom frame extended behind the
+   persistent footer at 393×852. Excess whitespace below the wordmark also
+   changed the selected hierarchy. [P2] Food icons were undersized relative
+   to the bowl opening, leaving the main imagery visually thin.
+   Fix: smaller crest-to-readout padding and calorie scale, remove an extra
+   outer margin; split actual base choices into two larger staggered rows,
+   with extras in their own front row. Every real ingredient remains once.
+2. `comparison-2-full.png` / `comparison-2-focus.png`: **blocked**.
+   Food readability improved, but frame measured 546.25px tall and its lower
+   ornament still crossed the footer edge. Fix: tighten native readout gaps
+   and bottom padding, keeping bowl width, frame rails and text unclipped.
+3. `comparison-3-full.png` / `comparison-3-focus.png`: no remaining actionable
+   P0/P1/P2 in the scoped mobile visual. Hero is 360×519.125px; full outer frame
+   is visible, native data and bowl fit. Responsive/interaction checks below
+   followed; no further visual fixes were made.
+4. Final optimized build recaptured and jointly compared:
+   `comparison-4-full.png` and `comparison-4-focus.png`. Geometry unchanged:
+   frame x16.5/y133.953, width360, height519.125; fonts loaded, 10 native food
+   controls, no browser console errors or warnings during this fresh run.
+
+![Final combined comparison](.playwright-cli/barimeter-atelier-2026-10-07/comparison-4-full.png)
+
+![Final focused comparison](.playwright-cli/barimeter-atelier-2026-10-07/comparison-4-focus.png)
+
+## Required fidelity surfaces
+
+- **Fonts/typography:** gold serif BariMeter wordmark retained in dedicated
+  real artwork, with a native accessible h2. Native Heebo family retained for
+  dynamic data; loaded fonts verified. Calorie hierarchy is large/ivory,
+  numeric ranges use tabular figures and explicit LTR inside Hebrew RTL. Macro
+  labels/units remain native and readable. Heavier native Hebrew labels and
+  slightly different numeric spacing are expected app typography, not missing
+  artwork. No clipped label/value found in tested widths or enlarged text.
+- **Spacing/layout:** pointed arch, integrated macro faceplate and oval bowl
+  plinth follow option 1. Data flows vertically instead of fixed absolute
+  raster slots; quiet nine-slice rails grow with content. 360px hero limit
+  remains centered inside the existing 430px app. The selected default-state
+  full frame fits above the footer; narrow/short or enlarged-text views scroll
+  normally rather than compressing data or hiding checkout.
+- **Colors/tokens:** dark luminous emerald, sculpted warm gold, ivory calories,
+  uniform gold macro ranges. Removed the unrelated turquoise/purple per-macro
+  chips. Existing gold background/particles and footer are unchanged. Native
+  simulation badge is quiet and distinct; no health-score state colors.
+- **Image quality/fidelity:** three individually generated reference-guided
+  WebPs, actual alpha outside artwork, complete outlines, no visible fringe,
+  stretching of the wordmark, or missing raster. No SVG/CSS/emoji substitute
+  for the target frame, plaque or bowl. Borders/separators/focus remain native
+  UI. **Intentional constraint:** the reference's fixed, photographic salad
+  heap is replaced by the actual selected ingredient art and existing buttons,
+  not a misleading permanent meal. Bigger staggered rows improve recognisability;
+  richer food styling is a possible P3 art follow-up, not falsely claimed
+  photographic/pixel-identical fidelity.
+- **Copy/content:** BariMeter, simulation, broad calorie/macro ranges and grams
+  retained; concise estimate note in the frame plus the existing full disclaimer
+  and explanatory disclosure below. Empty state says no nutrition estimate,
+  never a fabricated zero-kcal meal. Partial coverage warning remains native.
+  Preparation choices remain in the order but outside the pictured food.
+
+## Responsive and functional evidence
+
+All paths below are under `.playwright-cli/barimeter-atelier-2026-10-07/`.
+
+| View/check | Result |
+| --- | --- |
+| 320×640, qa-320x640.png | Frame 288×503.734px; 2×2 macro grid. No page overflow, clipped value/label or broken image. |
+| 360×800, qa-360x800.png | Frame 328×482.172px; four macro columns; same checks clear. |
+| 393×852, qa-393x852.png | Frame 360×519.125px; four columns, complete default-state frame. |
+| 430×932, qa-430x932.png | Same max-width hero and full frame; no expanding/hiding controls. |
+| 768×1024 / 1280×900 | qa-768x1024.png / qa-1280x900.png; existing centered 430px app, 360px hero; no horizontal overflow. |
+| Short 393×640 | qa-393x640.png; nested content remains scrollable; persistent footer unchanged. |
+| Enlarged root font | qa-text-200.png / qa-text-200-checkout.png; injected 32px root-font check, 2×2 grid, frame grows to ~851px, no clipped values/page overflow, pickup scrolled into view. This is not a full browser-zoom certification. |
+| Reduced motion | Every native ingredient control reports animation-name none. |
+| Forced colors | qa-forced-colors.png; decorative layers hidden, native h2/data/outlines retained. |
+| Keyboard | qa-keyboard-highlight.png; real Tab reaches baby-leaf control, focus-visible true with solid outline; Enter activates existing group emphasis (vegetables opacity1, sauces0.45). |
+| Explanation | Disclosure opens/closes natively, including in final production-built screen. |
+| Edit/return | Ten summary controls → ten retained builder selections → ten summary controls. Initial harness incorrectly expected edit to reset to step1; corrected to existing retained step5. No app bug/change inferred. |
+| Empty bowl | qa-empty.png; disposable guest context with empty reorder fixture, zero food controls, visible no-estimate text, no broken image/overflow. |
+| Large bowl | qa-large.png; real current IDs for 14 base + protein + two sauces + preparation. 17 actual food controls, 18 order choices, preparation correctly omitted from bowl; no missing image/overflow. |
+
+Empty/large fixtures blocked all non-GET/HEAD requests and external hosts;
+local API unavailability was explicitly mocked. This exercises failure-state
+presentation, not a settlement, availability or Supabase end-to-end test.
+Unknown/partial nutrition contracts are source/model regression checks; no
+unknown catalog item was forced through the real builder's validation.
+
+## Technical checks, checklist and limits
+
+- Full regression: **257 passed, zero failed**. Four focused Atelier tests
+  cover assets/payload, native ranges/fallback, responsive/accessibility CSS,
+  actual ingredient controls and preparation exclusion.
+- Typecheck passed. Touched JSX/TSX lint clean. Full repo lint: zero errors,
+  eight pre-existing effect warnings, none introduced by this visual pass.
+- Optimized isolated build passed, 37 pages; final rendered capture from that
+  build verified. Whitespace diff check passed (existing CRLF notices only).
+- Asset dimensions/alpha/payload verified; no new dependency installed and no
+  original asset deleted. Nutrition, discounts, authoritative quote, provider
+  handoff, shop-hours enforcement and checkout locks unchanged.
+- Scope checklist complete: selected frame/plaque/bowl, native data, honest
+  fallback/disclaimer, responsive fit, keyboard/reduced-motion/forced-colors,
+  build/regression and combined final visual comparison.
+- Remaining P3: optionally generate richer individual ingredient presentation
+  art while preserving actual-choice honesty. User visual acceptance and any
+  Vercel preview publication are still separate steps.
+- No real payment, database write, secret exposure, commit, push, merge or
+  deployment. No broad-app accessibility or device certification claimed.
 
 final result: passed

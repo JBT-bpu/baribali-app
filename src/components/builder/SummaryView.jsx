@@ -4,6 +4,8 @@ import { requestHostedPayment } from '@/lib/hostedPaymentRequest';
 import { useRouter } from 'next/navigation';
 import { ArrowRight } from 'lucide-react';
 import BuilderBrandHeader from './ui/BuilderBrandHeader';
+import BariMeterFrame from './ui/BariMeterFrame';
+import meterStyles from './ui/BariMeterFrame.module.css';
 import { fireGoldConfetti } from "../../lib/confetti";
 import { isPreparationChoice, preparationLabel } from "../../lib/summaryPresentation";
 
@@ -15,55 +17,31 @@ function Icon({ src, size = "1.2em", style = {} }) {
 }
 
 /*
-  Scatters ingredients inside the bowl art so it reads as a filled bowl rather
-  than three tidy rows.
-
-  Position comes from a hash of the ingredient ID, never its index in the list,
-  so adding or removing one ingredient never reshuffles the others — a scatter
-  that reshuffles on every render is far worse than a neat grid.
-
-  The bowl's front rim is an arc, deepest in the middle and rising toward the
-  sides. `yMax` models that arc from measurements taken off the artwork (gold
-  density per column: ~66% down at centre, ~30% at the edges) and stays
-  deliberately inside it, so an icon can never sit on the gold band.
-*/
-/*
   The bowl is read, not admired: its job is to let someone confirm at a glance
   that their order is right. A realistic scattered pile looked better in
   isolation but made that harder, so ingredients sit in tidy rows — one row per
   layer of the build, in the order the salad is assembled.
 
-    row 0  ירקות     the base, widest, largest icons
-    row 1  תוספות    everything that goes on top — protein, sauces, extras
+    rows 0–1  ירקות     the actual base ingredients, back then front
+    row 2     תוספות    protein, sauces and extras
 
-  Two rows rather than three: with the artwork this shallow, a third row cost
-  every icon about a quarter of its size, and size is what makes them readable.
-
-  No overlap, no rotation, nothing hidden behind anything else.
+  Base ingredients occupy two staggered rows; sauces and extras sit at the
+  front. Splitting a crowded base keeps each actual ingredient large enough
+  to recognize, without inventing additional food for the illustration.
 
   The rows also fit the bowl's geometry: the interior runs nearly full width
-  near the top rim and narrows toward the front, so the widest row belongs at
-  the back and the narrowest at the front.
+  through the middle and narrows toward the front, where the smaller sauces
+  and extras belong.
 
   `y` and `width` are fractions of the art box, and were chosen so that each
-  row's lowest pixel clears the front-rim arc across its whole width — see
-  ARC_* below, measured off the artwork.
+  row sits inside the opening rather than over the decorated bowl body.
 */
-// One piece of art holds both the composition plaque and the bowl, so every
-// figure below is a fraction of THAT panel, measured off it directly:
-//   composition plaque interior x 8.2-91.4%,  y 16-56%
-//   bowl interior begins        y 56.4%
-//   front rim                   ~78% at the centre, ~70% at the far edges
-const PANEL_AR = 760 / 1035;  // width / height
-const RIM_BASE = 0.69;        // front rim at the far left/right
-const RIM_DEPTH = 0.09;       // extra depth at the centre
-
-// Sat lower in the bowl than it needed to; the interior starts at 56.4% and
-// the base row's top edge was only reaching 58.6%, so both rows move up into
-// that headroom. This also buys the lower row more clearance from the rim.
+// Coordinates are local to the independent 960x543 bowl layer. Nutrition is
+// native flow content above it, so longer labels never displace the ingredients.
 const BOWL_ROWS = [
-    { y: 0.625, width: 0.74, maxSize: 16.0 },
-    { y: 0.692, width: 0.46, maxSize: 12.5 },
+    { y: 0.10, width: 0.70, maxSize: 26.0 },
+    { y: 0.25, width: 0.78, maxSize: 22.0 },
+    { y: 0.38, width: 0.43, maxSize: 14.0 },
 ];
 const BOWL_GAP = 1.5;         // % of bowl width, between icons when they fit
 // Each icon advances at least this fraction of its own width, so no ingredient
@@ -424,9 +402,10 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
     const preparationChoices = all.filter(isPreparationChoice);
     // Instructions remain in the order, but are not pictured as edible food.
     const bowlRows = useMemo(() => {
-        const rows = BOWL_ROWS.map(() => []);
-        all.filter(it => !isPreparationChoice(it)).forEach(it => rows[tierOf(it)].push(it));
-        return rows;
+        const food = all.filter(it => !isPreparationChoice(it));
+        const base = food.filter(it => tierOf(it) === 0);
+        const split = Math.ceil(base.length / 2);
+        return [base.slice(0, split), base.slice(split), food.filter(it => tierOf(it) === 1)];
     }, [all]);
 
     const handleNotesChange = (e) => {
@@ -761,13 +740,13 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
             )}
 
             <div style={S.main}>
-                <BuilderBrandHeader>
+                <BuilderBrandHeader variant="summary">
                         <button
                             type="button"
                             aria-label="חזרה לעריכת ההזמנה"
                             disabled={requestLocked}
                             onClick={leaveSummary}
-                        ><ArrowRight size={22} aria-hidden="true" /></button>
+                        ><ArrowRight size={18} aria-hidden="true" /><span>עריכה</span></button>
                         <h1>ההזמנה שלכם</h1>
                         <div style={S.pricePill} aria-label={`סך ההזמנה ${checkoutTotal} שקלים`}>
                             <span style={S.priceV}>{checkoutTotal}</span>
@@ -778,13 +757,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                 <div style={S.content}>
                     {/* Layered bowl — hero */}
                     <div style={S.sumBowlWrap}>
-                        <div style={S.sumBowlGlow} />
-                        {/* One piece of art: the composition plaque and the bowl are a
-                            single frame, so both live inside it as positioned slots
-                            rather than as two stacked panels with their own borders. */}
-                        <div style={S.panel}>
-                            <div style={S.panelNut}><CompositionStats all={all} estimate={nutritionEstimate} /></div>
-                            {bowlRows.map((items, t) => {
+                        <BariMeterFrame bowl={bowlRows.map((items, t) => {
                                 if (!items.length) return null;
                                 const row = BOWL_ROWS[t];
                                 const { size, step } = bowlRowLayout(row, items.length);
@@ -796,6 +769,7 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                                             <button
                                                 key={it.id}
                                                 type="button"
+                                                className={meterStyles.ingredient}
                                                 onClick={() => highlightStep(it)}
                                                 aria-label={`הדגש את ${it.he} ברשימת הבחירות`}
                                                 style={{
@@ -823,8 +797,9 @@ export default function SummaryView({ sels, total, all, comboBadges, notes, setN
                                         ))}
                                     </div>
                                 );
-                            })}
-                        </div>
+                            })}>
+                            <CompositionStats all={all} estimate={nutritionEstimate} />
+                        </BariMeterFrame>
                         <div style={S.sumBowlMeta}>
                             <span>{all.length} בחירות</span>
                         </div>
@@ -1185,54 +1160,51 @@ function CompositionStats({ all, estimate }) {
             <div
                 role="group"
                 aria-label={`${all.length} בחירות בהזמנה`}
-                style={{ width: "100%", display: "flex", flexDirection: "column", justifyContent: "center", textAlign: "center" }}
+                className={meterStyles.readout}
             >
-                <div style={{ fontSize: "11px", fontWeight: 900, color: "rgba(240,208,96,0.72)", letterSpacing: "0.08em" }}>
-                    ההרכב שלכם
+                <div className={meterStyles.range}>
+                    <span className={meterStyles.calories}>{all.length}</span>
+                    <span className={meterStyles.unit}>בחירות שביצעתם</span>
                 </div>
-                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: "6px", marginTop: "3px" }}>
-                    <span style={{ fontSize: "32px", fontWeight: 950, color: "#ffffff", lineHeight: 1 }}>{all.length}</span>
-                    <span style={{ fontSize: "13px", fontWeight: 800, color: "rgba(255,255,255,0.62)" }}>בחירות שביצעתם</span>
-                </div>
+                <p className={meterStyles.unavailable}>אין הערכה תזונתית לבחירות האלה</p>
             </div>
         );
     }
 
     const stats = [
-        { key: 'protein', label: 'חלבון', color: '#e9c85f', bg: 'rgba(233,200,95,0.12)' },
-        { key: 'carbs', label: 'פחמימות', color: '#55c6c4', bg: 'rgba(85,198,196,0.11)' },
-        { key: 'fat', label: 'שומן', color: '#7ed37d', bg: 'rgba(126,211,125,0.11)' },
-        { key: 'fiber', label: 'סיבים', color: '#b69af2', bg: 'rgba(182,154,242,0.11)' },
+        { key: 'protein', label: 'חלבון' },
+        { key: 'carbs', label: 'פחמימות' },
+        { key: 'fat', label: 'שומן' },
+        { key: 'fiber', label: 'סיבים' },
     ];
 
     return (
         <div
             role="group"
             aria-label={`סימולציה תזונתית: ${estimate.calories.low} עד ${estimate.calories.high} קילוקלוריות`}
-            style={{ width: "100%", display: "flex", flexDirection: "column", justifyContent: "center", textAlign: "center" }}
+            className={meterStyles.readout}
         >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
-                <span style={{ fontSize: "13px", fontWeight: 950, color: "#f0d060", letterSpacing: "0.04em" }}>BariMeter</span>
-                <span style={{ padding: "2px 6px", borderRadius: "999px", background: "rgba(85,198,196,0.12)", border: "1px solid rgba(85,198,196,0.26)", color: "#a5efeb", fontSize: "11px", fontWeight: 800 }}>סימולציה</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: "4px", marginTop: "3px" }}>
-                <span dir="ltr" style={{ display: "inline-block", fontSize: "32px", fontWeight: 950, color: "#ffffff", lineHeight: 1.1, letterSpacing: "-0.04em", textShadow: "0 0 18px rgba(200,168,78,0.38)" }}>
+            <span className={meterStyles.simulation}>סימולציה</span>
+            <div className={meterStyles.range}>
+                <span dir="ltr" className={meterStyles.calories}>
                     {estimate.calories.low}–{estimate.calories.high}
                 </span>
-                <span style={{ fontSize: "12px", fontWeight: 800, color: "rgba(255,255,255,0.8)" }}>קק״ל</span>
+                <span className={meterStyles.unit}>קק״ל</span>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "4px", marginTop: "9px" }}>
+            <div className={meterStyles.macros}>
                 {stats.map(stat => {
                     const value = estimate.macros[stat.key];
                     return (
-                        <div key={stat.key} role="group" aria-label={`${stat.label}: ${value.low} עד ${value.high} גרם`} style={{ background: stat.bg, border: `1px solid ${stat.color}33`, borderRadius: "8px", padding: "6px 1px", minWidth: 0 }}>
-                            <div dir="ltr" style={{ fontSize: "clamp(11px, 3.4vw, 14px)", lineHeight: 1.1, fontWeight: 950, color: stat.color, whiteSpace: "nowrap" }}>{value.low}–{value.high}</div>
-                            <div style={{ marginTop: "4px", fontSize: "11px", lineHeight: 1.2, fontWeight: 700, color: "rgba(255,255,255,0.88)" }}>{stat.label}</div>
-                            <div style={{ marginTop: "2px", fontSize: "10px", lineHeight: 1.1, color: "rgba(255,255,255,0.74)" }}>גרם</div>
+                        <div key={stat.key} role="group" aria-label={`${stat.label}: ${value.low} עד ${value.high} גרם`} className={meterStyles.stat}>
+                            <div dir="ltr" className={meterStyles.macroValue}>{value.low}–{value.high}</div>
+                            <div className={meterStyles.macroLabel}>{stat.label}</div>
+                            <div className={meterStyles.macroUnit}>גרם</div>
                         </div>
                     );
                 })}
             </div>
+            <p className={meterStyles.estimateNote}>הערכה לפי מנות טיפוסיות</p>
+            {estimate.coverage < 100 && <p className={meterStyles.unavailable}>חלק מהבחירות אינן כלולות בהערכה</p>}
         </div>
     );
 }
@@ -1301,47 +1273,11 @@ const S = {
     bg: { position: "fixed", inset: 0, zIndex: 0, background: "url(/homepage-assets/BG_8K.webp) center center / cover no-repeat, #020a02", filter: "brightness(0.45)" },
     bgRay: { position: "fixed", top: "-30%", left: "50%", transform: "translateX(-50%)", width: "110%", height: "70%", zIndex: 0, pointerEvents: "none", background: "radial-gradient(ellipse 70% 60% at 50% 20%, rgba(255,224,100,0.05) 0%, rgba(200,168,78,0.02) 50%, transparent 70%)" },
     main: { position: "relative", zIndex: 2, display: "flex", flexDirection: "column", height: "100dvh" },
-    pricePill: { display: "flex", alignItems: "baseline", justifyContent: "center", direction: "ltr", flexShrink: 0, gap: "3px", minWidth: "70px", minHeight: "44px", boxSizing: "border-box", background: "#28351a", border: "1px solid #bfa54f", padding: "4px 10px", borderRadius: "13px", boxShadow: "inset 0 1px 0 rgba(249,229,147,0.15)" },
+    pricePill: { display: "flex", alignItems: "baseline", justifyContent: "center", direction: "ltr", flexShrink: 0, gap: "3px", minWidth: "44px", minHeight: "50px", boxSizing: "border-box", background: "transparent", border: 0, padding: "9px 15px", borderRadius: "8px" },
     priceS: { fontSize: "12px", color: "#e8cf74", fontWeight: 700 },
     priceV: { fontSize: "24px", color: "#ffffff", fontWeight: 900, fontVariantNumeric: "tabular-nums" },
     content: { flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", padding: "12px 16px max(24px, env(safe-area-inset-bottom))", scrollbarWidth: "none" },
-    sumBowlWrap: { position: "relative", margin: "8px auto 18px", width: "100%", maxWidth: "360px", display: "flex", flexDirection: "column", alignItems: "center" },
-    sumBowlGlow: { position: "absolute", bottom: "20px", left: "50%", transform: "translateX(-50%)", width: "200px", height: "60px", borderRadius: "50%", background: "radial-gradient(ellipse, rgba(200,168,78,0.18) 0%, transparent 70%)", pointerEvents: "none", filter: "blur(8px)" },
-    /*
-      The bowl is now artwork, so every CSS approximation of it — the gradient
-      fill, the faked border-radius bowl shape, the rim border and inset shadow
-      — is gone; the image carries all of it.
-
-      The padding places ingredients in the bowl's INTERIOR rather than over the
-      rim or the outer body. Measured off the art by scanning gold density down
-      the image: the top rim occupies 0-5% of the height and the front rim band
-      runs 58-68%, leaving 6-57% as usable interior. CSS percentage padding
-      resolves against WIDTH, so those figures are converted through the 0.52
-      aspect ratio — hence 3% / 23% rather than 6% / 43%.
-    */
-    /*
-      The single framed plaque: composition overview above, bowl below, one gold border.
-      Replaces the two separately-framed panels, which meant two borders and two
-      sets of corner filigree stacked down the screen.
-
-      Both regions are positioned slots inside it, so all the geometry lives in
-      one coordinate space measured off this one image.
-    */
-    panel: {
-        position: "relative", zIndex: 1,
-        width: "100%", maxWidth: "360px",
-        aspectRatio: "760 / 1035",
-        backgroundImage: "url(/builder-assets/summary-panel.webp)",
-        backgroundSize: "100% 100%",
-        backgroundRepeat: "no-repeat",
-        animation: "pFadeIn 0.5s ease 0.35s both",
-    },
-    // The plaque's interior measures x 8.2-91.4%, y 16-56%; inset a little from
-    // that so the content never touches the engraved border.
-    panelNut: {
-        position: "absolute", left: "11%", right: "11%", top: "18%", height: "36%",
-        display: "flex", flexDirection: "column", justifyContent: "center",
-    },
+    sumBowlWrap: { position: "relative", margin: "0 auto 18px", width: "100%", maxWidth: "360px", display: "flex", flexDirection: "column", alignItems: "center" },
     sumBowlMeta: { marginTop: "10px", display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", fontWeight: 600, color: "#c9d7c5", letterSpacing: "0.03em" },
     preparationNote: { width: "100%", display: "flex", flexDirection: "column", gap: "3px", marginTop: "8px", padding: "10px 12px", borderRadius: "12px", background: "rgba(200,168,78,0.08)", border: "1px solid rgba(200,168,78,0.2)", fontSize: "12px", lineHeight: 1.5, color: "rgba(255,255,255,0.85)" },
     nutritionDisclaimer: { margin: "10px 4px 0", fontSize: "12px", lineHeight: 1.55, color: "rgba(255,255,255,0.75)", textAlign: "center" },

@@ -1,0 +1,186 @@
+.frame {
+    position: relative;
+    isolation: isolate;
+    container-type: inline-size;
+    width: 100%;
+    color: #fff5d6;
+}
+
+/* Source is 960x1360. The crest/wordmark and bottom leaf keep their proportions;
+   only the quiet emerald field and side rails grow with the native content. */
+.frameArt {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border: solid transparent;
+    border-width: 0;
+    border-image-source: url('/builder-assets/barimeter-atelier-frame-v1.webp');
+    border-image-slice: 365 53 135 53 fill;
+    border-image-width: 38.02cqw 5.52cqw 14.06cqw 5.52cqw;
+    border-image-repeat: stretch;
+    pointer-events: none;
+}
+
+.content {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 32% 6.5% 10%;
+    text-align: center;
+}
+
+.readout {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.2rem;
+}
+
+.simulation {
+    padding: 0.1rem 0.7rem;
+    border: 1px solid #d6bd69;
+    border-radius: 1rem;
+    color: #e8f4d9;
+    background: #06391f;
+    font-size: 0.8125rem;
+    font-weight: 800;
+    line-height: 1.4;
+}
+
+.range {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: center;
+    gap: 0.15rem 0.4rem;
+    width: 100%;
+    margin: 0.12rem 0 0;
+}
+
+.calories {
+    min-width: 0;
+    font-size: clamp(2rem, 12cqw, 3rem);
+    line-height: 1.06;
+    font-weight: 900;
+    letter-spacing: -0.045em;
+    font-variant-numeric: tabular-nums;
+    color: #fff7dc;
+}
+
+.unit {
+    color: #e9edce;
+    font-size: 1rem;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.macros {
+    position: relative;
+    isolation: isolate;
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    padding: 0.65rem 0.65rem;
+    box-sizing: border-box;
+}
+
+.macros::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border: solid transparent;
+    border-image-source: url('/builder-assets/barimeter-atelier-macros-v1.webp');
+    border-image-slice: 36 120 36 120 fill;
+    border-image-width: 9px 20px;
+    pointer-events: none;
+}
+
+.stat {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.05rem;
+    padding: 0 0.2rem;
+}
+
+.stat + .stat { border-inline-start: 1px solid #998d44; }
+
+.macroValue {
+    color: #efd371;
+    font-size: clamp(0.875rem, 5.15cqw, 1.25rem);
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    line-height: 1.25;
+}
+
+.macroLabel {
+    color: #fff7dc;
+    font-size: clamp(0.75rem, 3.7cqw, 0.9375rem);
+    font-weight: 800;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+
+.macroUnit { color: #e9edce; font-size: 0.75rem; line-height: 1.4; }
+
+.estimateNote {
+    margin: 0.2rem 0 0;
+    color: #e1e8cc;
+    font-size: 0.75rem;
+    line-height: 1.5;
+}
+
+.unavailable {
+    color: #d7e6cb;
+    font-size: 0.875rem;
+    line-height: 1.6;
+    margin: 0;
+}
+
+.bowl {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 960 / 543;
+    margin: 0.25rem auto 0;
+    isolation: isolate;
+}
+
+.bowlArt { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+
+.ingredient:focus-visible { outline: 2px solid #fff5d6; outline-offset: 3px; border-radius: 8px; }
+
+@media (prefers-reduced-motion: reduce) {
+    .ingredient { animation: none !important; }
+}
+
+.srOnly {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    padding: 0;
+    border: 0;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+/* rem thresholds also react to the user's default font size, not just pixels. */
+@container (max-width: 19rem) {
+    .macros { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 0.4rem; padding: 0.65rem 1rem; }
+    .stat:nth-child(3) { border-inline-start: 0; }
+    .stat:nth-child(n + 3) { padding-top: 0.3rem; border-block-start: 1px solid #998d44; }
+}
+
+@media (forced-colors: active) {
+    .frameArt, .macros::before, .bowlArt { display: none; }
+    .frame { border: 1px solid CanvasText; color: CanvasText; }
+    .content { padding: 1rem; }
+    .srOnly { position: static; width: auto; height: auto; clip-path: none; white-space: normal; }
+    .simulation, .calories, .unit, .macroValue, .macroLabel, .macroUnit, .estimateNote, .unavailable { color: CanvasText; }
+    .macros { border: 1px solid CanvasText; }
+}

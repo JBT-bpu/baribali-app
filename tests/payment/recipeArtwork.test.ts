@@ -79,7 +79,9 @@ test('the large entry bowl retains native draft, facts, sibling sizing and failu
     assert.match(css, /:focus-visible/);
     assert.match(css, /forced-colors: active/);
     assert.doesNotMatch(card, /<a|<input|<button[\s\S]*?<button/);
-    assert.match(builder, /<BuilderStartCard[\s\S]*?\/>\s*<button\s*ref=\{changeSizeButtonRef\}/);
+    assert.match(builder, /<HeaderBanner[\s\S]*?sizeButtonRef=\{changeSizeButtonRef\}/);
+    assert.doesNotMatch(builder, /<BuilderStartCard[\s\S]*?\/>\s*<button\s*ref=\{changeSizeButtonRef\}/,
+        'size selection has one header control, not a duplicate below the primary action');
     const recipeArt = source('src/components/builder/ui/ChefRecipeArt.tsx');
     assert.match(recipeArt, /failedSrc !== src \? src : fallbackSrc/);
     assert.match(recipeArt, /size = 52/);

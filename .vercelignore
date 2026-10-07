@@ -1,0 +1,31 @@
+# Upload only the inputs needed to build this Next.js application.
+# Credentials are configured separately in Vercel, never uploaded as source.
+/*
+!/src
+!/public
+!/scripts
+!/tests
+!/package.json
+!/package-lock.json
+!/next.config.js
+!/next-env.d.ts
+!/postcss.config.js
+!/tsconfig.json
+!/eslint.config.mjs
+!/.vercelignore
+
+# These exclusions also apply inside the allowed directories.
+**/.env*
+**/*.pem
+**/*.key
+**/pass.txt
+**/HYP-PASSP.TXT
+**/node_modules/
+**/.next/
+**/.vercel/
+**/.git/
+**/.tmp/
+**/.playwright-cli/
+**/coverage/
+**/*.tsbuildinfo
+**/*-debug.log*
